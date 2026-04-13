@@ -1,0 +1,13 @@
+node_modules
+.DS_Store
+/dist
+/.turbo
+/.idea
+/.vscode
+/test-results
+/playwright-report
+/coverage
+
+# env files
+.env
+.env.local

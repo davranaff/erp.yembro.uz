@@ -1,0 +1,19 @@
+from app.models.feed.feed_arrival import FeedArrival
+from app.models.feed.feed_consumption import FeedConsumption
+from app.models.feed.feed_ingredient import FeedIngredient
+from app.models.feed.feed_formula import FeedFormula, FeedFormulaIngredient
+from app.models.feed.feed_production import FeedProductShipment, FeedProductionBatch, FeedRawArrival, FeedRawConsumption
+from app.models.feed.feed_type import FeedType
+
+__all__ = [
+    "FeedArrival",
+    "FeedConsumption",
+    "FeedIngredient",
+    "FeedFormula",
+    "FeedFormulaIngredient",
+    "FeedProductShipment",
+    "FeedProductionBatch",
+    "FeedRawArrival",
+    "FeedRawConsumption",
+    "FeedType",
+]

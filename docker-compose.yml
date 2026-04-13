@@ -1,0 +1,99 @@
+services:
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    env_file:
+      - ./.env
+    depends_on:
+      - api
+    environment:
+      - CHOKIDAR_USEPOLLING=true
+      - WDS_SOCKET_PORT=0
+    ports:
+      - "${FRONTEND_PUBLISHED_PORT:-30080}:${FRONTEND_CONTAINER_PORT:-30080}"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    command: >
+      sh -c "npm ci --include=dev && npm run dev -- --host $${APP_HOST:-0.0.0.0} --port $${FRONTEND_CONTAINER_PORT:-30080}"
+    restart: unless-stopped
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    command:
+      - postgres
+      - -p
+      - ${POSTGRES_CONTAINER_PORT}
+    ports:
+      - "${POSTGRES_PUBLISHED_PORT:-30001}:${POSTGRES_CONTAINER_PORT:-30010}"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -p ${POSTGRES_CONTAINER_PORT}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    command:
+      - redis-server
+      - --port
+      - ${REDIS_CONTAINER_PORT}
+    ports:
+      - "${REDIS_PUBLISHED_PORT:-30002}:${REDIS_CONTAINER_PORT:-30011}"
+    restart: unless-stopped
+
+  api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    env_file:
+      - ./.env
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    ports:
+      - "${APP_PUBLISHED_PORT:-30000}:${APP_CONTAINER_PORT:-30000}"
+    command: >
+      sh -c "python -m alembic upgrade head && uvicorn app.main:app --host ${APP_HOST:-0.0.0.0} --port ${APP_CONTAINER_PORT:-30000} --reload --reload-dir /app"
+    volumes:
+      - ./backend:/app
+    restart: unless-stopped
+
+  worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    env_file:
+      - ./.env
+    depends_on:
+      - redis
+      - postgres
+    command: >
+      sh -c "taskiq worker app.taskiq_app:broker --fs-discover"
+    restart: unless-stopped
+
+  scheduler:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    env_file:
+      - ./.env
+    depends_on:
+      - redis
+      - postgres
+    command: >
+      sh -c "taskiq scheduler app.tasks.scheduler:scheduler app.tasks.jobs"
+    restart: unless-stopped
+
+volumes:
+  postgres_data:

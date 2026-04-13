@@ -1,0 +1,6376 @@
+import type { Language } from './types';
+
+const baseMessages: Record<Language, Record<string, unknown>> = {
+  ru: {
+    common: {
+      empty: '—',
+      yes: 'Да',
+      no: 'Нет',
+      data: 'Данные',
+      save: 'Сохранить',
+      refresh: 'Обновить',
+      retry: 'Повторить',
+      apply: 'Применить',
+      create: 'Создать',
+      edit: 'Изменить',
+      delete: 'Удалить',
+      confirm: 'Подтверждаю',
+      back: 'Вернуться',
+      continue: 'Продолжить',
+      reset: 'Сбросить',
+      close: 'Закрыть',
+      unsavedChangesConfirm: 'Есть несохранённые изменения. Закрыть форму без сохранения?',
+      history: 'История',
+      previous: 'Назад',
+      next: 'Вперёд',
+      pageStatus: 'Страница {current} из {total}',
+      logout: 'Выход',
+      startTour: 'Тур',
+      help: 'Помощь',
+      allDepartments: 'Все отделы',
+      search: 'Поиск',
+      chooseValue: 'Выберите значение',
+      noResults: 'Ничего не найдено',
+      loadingOptions: 'Загрузка вариантов',
+      clearAll: 'Очистить все',
+      clearSelection: 'Очистить выбор',
+      selectedCount: '{count} выбрано',
+      paginationLabel: 'Пагинация',
+      paginationPreviousAria: 'Перейти на предыдущую страницу',
+      paginationNextAria: 'Перейти на следующую страницу',
+      paginationMorePages: 'Другие страницы',
+      totalRecords: 'Всего записей: {count}',
+      loadingLabel: 'Загрузка',
+      noData: 'Нет данных',
+      email: 'Эл. почта',
+      good: 'Хорошо',
+      warning: 'Внимание',
+      bad: 'Риск',
+      neutral: 'Без оценки',
+    },
+    language: { label: 'Язык', uz: 'Oʻz', ru: 'Рус', en: 'Eng' },
+    nav: {
+      dashboard: 'Дашборд',
+      heading: 'Навигация',
+      overview: 'Обзор',
+      settings: 'Настройки',
+      roleManagement: 'Роли',
+      audit: 'Аудит',
+    },
+    route: {
+      sessionLabel: 'Сессия',
+      sessionTitle: 'Подготовка доступа',
+      sessionDescription: 'Проверяются данные пользователя перед открытием страницы.',
+      initLabel: 'Запуск',
+      initTitle: 'Подготовка приложения',
+      initDescription: 'Проверяется локальная сессия и выбирается стартовая страница.',
+      forbiddenTitle: 'Нет доступа',
+      forbiddenDescription: 'У текущего пользователя нет прав для открытия этой страницы.',
+      dashboardForbiddenDescription:
+        'Для этой страницы нужны расширенные права на обзор финансов и операционных показателей.',
+      moduleForbiddenDescription:
+        'Для этого раздела у текущего пользователя нет прав на чтение записей или аналитики.',
+      roleManagementForbiddenDescription:
+        'Для этой страницы у текущего пользователя нет прав на чтение ролей и назначений.',
+      auditForbiddenDescription:
+        'Для этой страницы у текущего пользователя нет прав на просмотр журнала изменений.',
+    },
+    tour: {
+      badge: 'Экскурсия',
+      close: 'Закрыть тур',
+      stepCounter: 'Шаг {current} из {total}',
+      locatingTarget: 'Ищем элемент текущего шага...',
+      skip: 'Пропустить',
+      previous: 'Назад',
+      next: 'Далее',
+      finish: 'Завершить',
+      tours: {
+        platform: {
+          title: 'Быстрый тур по платформе',
+          description: 'Обзор навигации, отделов и инструментов рабочей панели.',
+        },
+        login: {
+          title: 'Тур по входу',
+          description: 'Как быстро войти в систему и где находятся подсказки.',
+        },
+        dashboard: {
+          title: 'Тур по обзору',
+          description: 'Ключевые блоки аналитики: статус, фильтры и итоговые метрики.',
+        },
+        module: {
+          title: 'Тур по модулю',
+          description: 'Как устроен раздел: действия, группы данных, таблица и история изменений.',
+        },
+        settings: {
+          title: 'Тур по настройкам',
+          description: 'Вкладки, профиль и доступы текущего пользователя.',
+        },
+        roles: {
+          title: 'Тур по ролям',
+          description: 'Матрица ролей, список ролей и карточка выбранной роли.',
+        },
+        audit: {
+          title: 'Тур по аудиту',
+          description: 'Фильтры, лента изменений и просмотр деталей правок.',
+        },
+        notFound: {
+          title: 'Тур по странице 404',
+          description: 'Короткая подсказка, как вернуться в рабочие разделы.',
+        },
+      },
+      steps: {
+        loginShowcase: {
+          title: 'Информационный блок',
+          description: 'Кратко о доступе и работе в системе.',
+        },
+        loginForm: {
+          title: 'Форма входа',
+          description: 'Основной блок для входа в систему.',
+        },
+        loginCredentials: {
+          title: 'Логин и пароль',
+          description: 'Введите данные сотрудника для входа.',
+        },
+        loginSubmit: {
+          title: 'Кнопка входа',
+          description: 'Открывает рабочее пространство после проверки данных.',
+        },
+        workspaceNav: {
+          title: 'Рабочая панель',
+          description: 'Здесь отображается текущий контекст и быстрый доступ к разделам.',
+        },
+        primaryNavigation: {
+          title: 'Основная навигация',
+          description: 'Переходите между главными разделами приложения.',
+        },
+        departmentNavigation: {
+          title: 'Навигация по отделам',
+          description: 'Выбор отдела меняет видимые данные и доступные записи.',
+        },
+        sessionTools: {
+          title: 'Сессионные инструменты',
+          description: 'Смена языка, запуск тура и выход из аккаунта.',
+        },
+        dashboardHero: {
+          title: 'Статус и контекст',
+          description: 'Текущий период, выбранный отдел и общий статус показателей.',
+        },
+        dashboardFilters: {
+          title: 'Фильтры аналитики',
+          description: 'Управляйте периодом и отделом для пересчёта метрик.',
+        },
+        dashboardQuickRanges: {
+          title: 'Быстрые периоды',
+          description: 'Готовые кнопки для быстрого выбора периода.',
+        },
+        dashboardDepartmentFilter: {
+          title: 'Выбор отдела',
+          description: 'Показывает данные только по выбранному отделу.',
+        },
+        dashboardDateFilter: {
+          title: 'Точный период',
+          description: 'Позволяет вручную указать диапазон дат.',
+        },
+        dashboardSummary: {
+          title: 'Сводные метрики',
+          description: 'Карточки показывают итоговые значения по ключевым показателям.',
+        },
+        dashboardSections: {
+          title: 'Подробные блоки',
+          description: 'Здесь находится детальная аналитика по направлениям.',
+        },
+        moduleViewSwitch: {
+          title: 'Переключение режима',
+          description: 'Переключает между списком данных и аналитикой.',
+        },
+        moduleActions: {
+          title: 'Действия модуля',
+          description: 'Создание записей и быстрые действия внутри текущего раздела.',
+        },
+        moduleResourceGroups: {
+          title: 'Группы ресурсов',
+          description: 'Данные сгруппированы по смыслу и типу операций.',
+        },
+        moduleGroupSwitch: {
+          title: 'Группы разделов',
+          description: 'Переключение между группами данных внутри модуля.',
+        },
+        moduleTabs: {
+          title: 'Разделы группы',
+          description: 'Выбор конкретного раздела для работы.',
+        },
+        moduleDepartmentFilter: {
+          title: 'Фильтр по отделу',
+          description: 'Ограничивает список записей выбранным отделом.',
+        },
+        moduleSummaryPills: {
+          title: 'Краткая сводка',
+          description: 'Показывает количество записей и текущий контекст.',
+        },
+        moduleCreateRecord: {
+          title: 'Создание записи',
+          description: 'Если у вас есть доступ на создание, запись откроется в боковой форме.',
+        },
+        moduleRecords: {
+          title: 'Таблица данных',
+          description: 'Список записей, страницы, редактирование и переход в историю изменений.',
+        },
+        moduleTable: {
+          title: 'Список записей',
+          description: 'Основная таблица со строками данных.',
+        },
+        modulePagination: {
+          title: 'Страницы списка',
+          description: 'Переход между страницами таблицы.',
+        },
+        moduleFormDrawer: {
+          title: 'Форма записи',
+          description: 'Боковая форма создания и редактирования.',
+        },
+        moduleFormFields: {
+          title: 'Поля формы',
+          description: 'Заполните основные поля перед сохранением.',
+        },
+        moduleAuditDrawer: {
+          title: 'Окно истории',
+          description: 'Подробная история изменений выбранной записи.',
+        },
+        moduleAuditHistory: {
+          title: 'Лента истории',
+          description: 'Список всех изменений по времени.',
+        },
+        moduleSubdepartments: {
+          title: 'Дочерние отделы',
+          description: 'Быстрый переход в дочерние подразделения.',
+        },
+        settingsTabs: {
+          title: 'Вкладки настроек',
+          description: 'Переключайтесь между аккаунтом и управлением отделами.',
+        },
+        settingsProfile: {
+          title: 'Профиль',
+          description: 'Основные данные пользователя и точка входа в редактирование.',
+        },
+        settingsAccess: {
+          title: 'Роли и доступы',
+          description: 'Текущие роли и права, применённые к вашему профилю.',
+        },
+        settingsSecurity: {
+          title: 'Безопасность',
+          description: 'Управление паролем и безопасностью профиля.',
+        },
+        settingsContext: {
+          title: 'Рабочий контекст',
+          description: 'Текущая организация и отдел, в котором вы работаете.',
+        },
+        settingsDepartments: {
+          title: 'Управление отделами',
+          description: 'Во вкладке отделов доступно создание и изменение структуры.',
+        },
+        settingsDepartmentFilters: {
+          title: 'Поиск и фильтры',
+          description: 'Помогают быстро найти нужный отдел.',
+        },
+        settingsDepartmentTree: {
+          title: 'Структура отделов',
+          description: 'Список отделов с иерархией.',
+        },
+        settingsDepartmentDetails: {
+          title: 'Карточка отдела',
+          description: 'Подробности выбранного отдела и действия.',
+        },
+        settingsAccountDrawer: {
+          title: 'Форма профиля',
+          description: 'Редактирование личных данных и пароля.',
+        },
+        settingsDepartmentDrawer: {
+          title: 'Форма отдела',
+          description: 'Создание и редактирование отдела.',
+        },
+        settingsDepartmentFormMain: {
+          title: 'Основные поля отдела',
+          description: 'Главные данные для сохранения отдела.',
+        },
+        settingsDepartmentFormIcon: {
+          title: 'Выбор иконки',
+          description: 'Визуальная иконка для отдела.',
+        },
+        settingsDepartmentFormResponsible: {
+          title: 'Ответственный',
+          description: 'Назначение сотрудника, отвечающего за отдел.',
+        },
+        rolesHero: {
+          title: 'Матрица ролей',
+          description: 'Сводка по ролям, доступам и назначенным сотрудникам.',
+        },
+        rolesList: {
+          title: 'Список ролей',
+          description: 'Выберите роль для редактирования или создайте новую.',
+        },
+        rolesSearch: {
+          title: 'Поиск роли',
+          description: 'Быстрый поиск по названию или коду.',
+        },
+        rolesWorkspace: {
+          title: 'Карточка роли',
+          description: 'Статус роли, описание и текущий набор прав.',
+        },
+        rolesWorkspaceActions: {
+          title: 'Действия роли',
+          description: 'Кнопки редактирования и назначения сотрудников.',
+        },
+        rolesPermissionsPreview: {
+          title: 'Доступы роли',
+          description: 'Текущий набор доступов выбранной роли.',
+        },
+        rolesEditorDrawer: {
+          title: 'Форма роли',
+          description: 'Создание новой роли или редактирование текущей.',
+        },
+        rolesEditorMainFields: {
+          title: 'Основные поля',
+          description: 'Название, код и описание роли.',
+        },
+        rolesEditorPermissions: {
+          title: 'Настройка доступов',
+          description: 'Выбор доступов для сотрудников с этой ролью.',
+        },
+        rolesAssignmentsDrawer: {
+          title: 'Назначение сотрудников',
+          description: 'Управление тем, кто входит в роль.',
+        },
+        rolesAssignmentsSearch: {
+          title: 'Поиск сотрудника',
+          description: 'Поиск по имени, логину или почте.',
+        },
+        rolesAssignmentsList: {
+          title: 'Список сотрудников',
+          description: 'Назначение и снятие роли в один клик.',
+        },
+        auditHero: {
+          title: 'Журнал изменений',
+          description: 'Общее назначение раздела и счётчик записей.',
+        },
+        auditFilters: {
+          title: 'Фильтры аудита',
+          description: 'Сузьте журнал по действию, таблице, записи и периоду.',
+        },
+        auditSearch: {
+          title: 'Поиск изменений',
+          description: 'Быстрый поиск нужных записей в журнале.',
+        },
+        auditFeed: {
+          title: 'Лента изменений',
+          description: 'Откройте запись, чтобы увидеть детали и снимки до/после.',
+        },
+        auditMainTable: {
+          title: 'Таблица истории',
+          description: 'Основной список найденных изменений.',
+        },
+        auditPagination: {
+          title: 'Страницы истории',
+          description: 'Переход между страницами журнала.',
+        },
+        auditDetailsDrawer: {
+          title: 'Детали изменения',
+          description: 'Подробная карточка выбранного изменения.',
+        },
+        auditDetailsSnapshots: {
+          title: 'Состояние до и после',
+          description: 'Сравнение данных до и после изменения.',
+        },
+        notFoundShowcase: {
+          title: 'Подсказки',
+          description: 'Почему вы оказались на странице 404.',
+        },
+        notFoundCard: {
+          title: 'Страница не найдена',
+          description: 'Основная информация о недоступной странице.',
+        },
+        notFoundBack: {
+          title: 'Возврат назад',
+          description: 'Кнопка возврата в рабочий раздел.',
+        },
+      },
+    },
+    login: {
+      sideBadge: 'Вход',
+      formBadge: 'Авторизация',
+      title: 'Вход в систему',
+      description: 'Введите логин и пароль для доступа к рабочему пространству.',
+      sideDescription: 'Используйте учётные данные сотрудника для входа в систему.',
+      cardOneTitle: 'Безопасный вход',
+      cardOneDescription: 'Доступ открывается по учётной записи сотрудника.',
+      cardTwoTitle: 'Рабочая область',
+      cardTwoDescription: 'После входа открывается основная часть приложения.',
+      cardThreeTitle: 'Права доступа',
+      cardThreeDescription: 'Разделы отображаются в соответствии с ролью пользователя.',
+      username: 'Логин',
+      password: 'Пароль',
+      submit: 'Войти',
+      pending: 'Проверка данных...',
+      afterLogin: 'После успешного входа откроется рабочая область.',
+      validation: { usernameRequired: 'Логин обязателен', passwordRequired: 'Пароль обязателен' },
+    },
+    dashboard: {
+      label: 'Аналитика',
+      loadingTitle: 'Подготовка данных',
+      loadingDescription: 'Загружаются показатели по основным разделам.',
+      errorTitle: 'Данные временно недоступны',
+      heroTitleFallback: 'Обзор',
+      heroDescriptionFallback: 'Ключевые показатели по выбранному разделу.',
+      activeSection: 'Раздел',
+      charts: 'Графики',
+      updatedAt: 'Обновлено',
+      chartsSummary: '{charts} графиков и {lists} списков',
+      summaryBadge: 'Сводка',
+      summaryTitle: 'Краткий обзор',
+      summaryDescription: 'Ключевые показатели по выбранному разделу.',
+      overallStatus: 'Общий итог',
+      metrics: 'Метрики',
+      lists: 'Списки',
+      listsHint: 'Клиенты, партии и остатки',
+      switcherTitle: 'Разделы',
+      switcherDescription: 'Выберите раздел для просмотра данных.',
+      dateRangeTitle: 'Период',
+      dateRangeDescription:
+        'Выберите точные даты. Один клик выбирает один день, два клика задают диапазон.',
+      dateRangePlaceholder: 'Все даты',
+      periodLabel: 'Период',
+      scopeLabel: 'Область',
+      noChartData: 'Нет данных для отображения',
+      noBreakdownData: 'Нет данных',
+      noDataTitle: 'Нет данных за выбранный период',
+      noDataDescription: 'Измените период или выберите другой отдел, чтобы увидеть показатели.',
+      moduleUnavailable: 'Для этого раздела аналитика пока недоступна.',
+      revenueCalculatorTitle: 'Расчёт выручки',
+      revenueCalculatorDescription:
+        'Введите объём продажи, и система посчитает ожидаемую выручку по средней цене за выбранный период.',
+      calculationVolume: 'Объём для расчёта',
+      averagePrice: 'Средняя цена',
+      estimatedRevenue: 'Расчётная выручка',
+    },
+    settings: {
+      title: 'Настройки',
+      description: 'Профиль и параметры доступа.',
+      account: 'Аккаунт',
+      profileTitle: 'Профиль',
+      profileDescription: 'Основные данные пользователя.',
+      securityTitle: 'Пароль',
+      securityDescription: 'Заполняйте поля ниже только если нужно изменить пароль.',
+      username: 'Логин',
+      firstName: 'Имя',
+      lastName: 'Фамилия',
+      email: 'Эл. почта',
+      phone: 'Телефон',
+      currentPassword: 'Текущий пароль',
+      newPassword: 'Новый пароль',
+      confirmNewPassword: 'Подтверждение нового пароля',
+      success: 'Изменения сохранены.',
+      validation: {
+        firstNameRequired: 'Имя обязательно',
+        lastNameRequired: 'Фамилия обязательна',
+        invalidEmail: 'Неверный адрес электронной почты',
+        currentPasswordRequired: 'Укажите текущий пароль',
+        newPasswordRequired: 'Укажите новый пароль',
+        newPasswordShort: 'Новый пароль должен быть не короче 8 символов',
+        confirmPasswordMismatch: 'Подтверждение пароля не совпадает',
+      },
+    },
+    validation: {
+      defaultValueLabel: 'Значение',
+      defaultDateLabel: 'Дата',
+      required: 'Поле "{label}" обязательно.',
+      nonEmpty: 'Поле "{label}" не может быть пустым.',
+      textType: 'Поле "{label}" должно быть текстом.',
+      numberType: 'Поле "{label}" должно быть числом.',
+      positive: 'Поле "{label}" должно быть больше 0.',
+      validEmail: 'Введите корректный {label}.',
+      dateFormat: 'Поле "{label}" должно быть в формате ГГГГ-ММ-ДД.',
+    },
+    notFound: {
+      sideTitle: 'Маршрут не найден',
+      sideDescription: 'Запрошенная страница отсутствует или адрес указан неверно.',
+      cardOneTitle: 'Адрес',
+      cardOneDescription: 'Страница по этому адресу не найдена.',
+      cardTwoTitle: 'Навигация',
+      cardTwoDescription: 'Вернитесь на стартовую страницу приложения.',
+      cardThreeTitle: 'Действие',
+      cardThreeDescription: 'Кнопка справа возвращает к началу работы.',
+      title: 'Страница не найдена',
+      description: 'Вернитесь на главную страницу и продолжите работу.',
+    },
+    crud: {
+      moduleNotFoundTitle: 'Раздел не найден',
+      moduleNotFoundDescription: 'Запрошенный раздел недоступен.',
+      resourceNotFoundTitle: 'Раздел недоступен',
+      resourceNotFoundDescription: 'Для этого раздела пока нет доступных данных.',
+      pageDescription: 'Просмотр и редактирование данных.',
+      listDescription: 'Список записей.',
+      resourceGroupFinance: 'Финансы',
+      resourceGroupPeopleClients: 'Сотрудники и клиенты',
+      resourceGroupOperations: 'Подкатегории отдела',
+      departmentFilter: 'Отдел',
+      departmentAnalyticsTitle: 'Аналитика',
+      departmentAnalyticsDescription:
+        'Для головного отдела доступен обзор показателей по всему его поддереву.',
+      departmentAnalyticsHint:
+        'Операционные записи ведутся в дочерних подразделениях. На уровне головного отдела остаётся только аналитика.',
+      openAnalytics: 'Открыть аналитику',
+      openFinanceCenter: 'Финансовый центр',
+      subdepartmentsTitle: 'Подотделы',
+      subdepartmentsDescription:
+        'Выберите дочернее подразделение для работы с сотрудниками, расходами и другими данными.',
+      subdepartmentCount: 'Подотделов: {count}',
+      formCreateTitle: 'Создание записи',
+      formEditTitle: 'Редактирование записи',
+      formDescription: 'Заполните поля и сохраните изменения.',
+      newRecord: 'Новая запись',
+      clearForm: 'Очистить форму',
+      actions: 'Действия',
+      emptyResource: 'Для раздела «{resource}» пока нет записей.',
+      confirmDelete: 'Удалить запись?',
+      confirmDeleteAgain: 'Подтвердите удаление ещё раз.',
+      created: 'Запись создана.',
+      updated: 'Изменения сохранены.',
+      deleted: 'Запись удалена.',
+      selectRecordFirst: 'Сначала выберите запись для редактирования.',
+      validation: {
+        required: 'Заполните поле.',
+        integer: 'Введите целое число.',
+        number: 'Введите число.',
+        invalidJson: 'Неверный формат данных.',
+      },
+    },
+    fields: {
+      id: 'Идентификатор',
+      key: 'Ключ',
+      name: 'Название',
+      code: 'Код',
+      description: 'Описание',
+      first_name: 'Имя',
+      last_name: 'Фамилия',
+      email: 'Эл. почта',
+      phone: 'Телефон',
+      organization_id: 'Организация',
+      department_id: 'Отдел',
+      warehouse_id: 'Склад',
+      from_warehouse_id: 'Со склада',
+      to_warehouse_id: 'На склад',
+      counterparty_warehouse_id: 'Встречный склад',
+      parent_department_id: 'Родительский отдел',
+      module_key: 'Модуль',
+      head_id: 'Руководитель',
+      position_id: 'Должность',
+      role_id: 'Роль',
+      permission_id: 'Право',
+      employee_id: 'Сотрудник',
+      title: 'Название',
+      slug: 'Системное имя',
+      is_active: 'Активно',
+      min_salary: 'Минимальная зарплата',
+      max_salary: 'Максимальная зарплата',
+      salary: 'Зарплата',
+      address: 'Адрес',
+      company_name: 'Компания',
+      category: 'Категория',
+      client_code: 'Код клиента',
+      legal_name: 'Юридическое название',
+      organization_key: 'Логин',
+      password: 'Пароль',
+      action: 'Действие',
+      resource: 'Ресурс',
+      is_primary: 'Основной',
+      expires_at: 'Срок действия',
+      created_at: 'Создано',
+      updated_at: 'Обновлено',
+      sort_order: 'Порядок сортировки',
+      category_id: 'Категория',
+      expense_category_id: 'Категория расхода',
+      item: 'Позиция',
+      quantity: 'Количество',
+      unit: 'Единица',
+      unit_price: 'Цена за единицу',
+      amount: 'Сумма',
+      expense_date: 'Дата расхода',
+      cash_account_id: 'Касса',
+      opening_balance: 'Начальный остаток',
+      transaction_type: 'Тип операции',
+      transaction_date: 'Дата операции',
+      reference_no: 'Номер документа',
+      counterparty_client_id: 'Контрагент',
+      created_by: 'Создал',
+      note: 'Примечание',
+      part_name: 'Часть',
+      poultry_type_id: 'Тип птицы',
+      supplier_client_id: 'Поставщик',
+      arrived_on: 'Дата прихода',
+      birds_count: 'Количество птицы',
+      average_weight_kg: 'Средний вес, кг',
+      currency: 'Валюта',
+      symbol: 'Символ',
+      is_default: 'По умолчанию',
+      invoice_no: 'Накладная',
+      arrival_id: 'Партия прихода',
+      processed_on: 'Дата разделки',
+      birds_processed: 'Обработано птицы',
+      first_sort_count: 'Первый сорт',
+      second_sort_count: 'Второй сорт',
+      bad_count: 'Брак',
+      first_sort_weight_kg: 'Вес первого сорта, кг',
+      second_sort_weight_kg: 'Вес второго сорта, кг',
+      bad_weight_kg: 'Вес брака, кг',
+      processed_by: 'Ответственный',
+      produced_on: 'Дата выпуска',
+      quality: 'Качество',
+      shipped_on: 'Дата отгрузки',
+      semi_product_id: 'Полуфабрикат',
+      client_id: 'Клиент',
+      icon: 'Иконка',
+    },
+    cashTransactionTypes: {
+      income: 'Приход',
+      expense: 'Расход',
+      transfer_in: 'Перевод входящий',
+      transfer_out: 'Перевод исходящий',
+      adjustment: 'Корректировка',
+    },
+    departmentIcons: {
+      building: 'Здание',
+      coins: 'Монеты',
+      egg: 'Яйцо',
+      factory: 'Фабрика',
+      package: 'Пакет',
+      pill: 'Лекарство',
+      shield: 'Щит',
+      users: 'Команда',
+      box: 'Коробка',
+      briefcase: 'Портфель',
+      leaf: 'Лист',
+      archive: 'Архив',
+    },
+    modules: {
+      core: { label: 'Справочники' },
+      egg: { label: 'Маточник' },
+      incubation: { label: 'Инкубация' },
+      factory: { label: 'Фабрика' },
+      feed: { label: 'Корма' },
+      medicine: { label: 'Ветаптека' },
+      slaughter: { label: 'Убойня' },
+      finance: { label: 'Финансы' },
+      hr: { label: 'Сотрудники' },
+    },
+    resources: {
+      organizations: { label: 'Организации' },
+      departments: { label: 'Отделы' },
+      warehouses: { label: 'Склады' },
+      'stock-movements': { label: 'Движение остатков' },
+      'department-modules': { label: 'Модули отделов' },
+      clients: { label: 'Клиенты' },
+      currencies: { label: 'Валюты' },
+      'poultry-types': { label: 'Типы птицы' },
+      production: { label: 'Производство' },
+      shipments: { label: 'Отгрузки' },
+      'monthly-analytics': { label: 'Месячная аналитика' },
+      'chick-arrivals': { label: 'Приход птенцов' },
+      'feed-arrivals': { label: 'Приход кормов' },
+      'medicine-arrivals': { label: 'Приход лекарств' },
+      'factory-clients': { label: 'Клиентская база' },
+      'chick-shipments': { label: 'Отгрузки птенцов' },
+      batches: { label: 'Партии' },
+      runs: { label: 'Циклы' },
+      'factory-monthly-analytics': { label: 'Аналитика фабрики' },
+      types: { label: 'Типы' },
+      ingredients: { label: 'Сырьё' },
+      arrivals: { label: 'Поступления' },
+      formulas: { label: 'Продукт' },
+      'formula-ingredients': { label: 'Комбинация сырья' },
+      'raw-arrivals': { label: 'Приход сырья' },
+      'production-batches': { label: 'Выпуск продукта' },
+      'raw-consumptions': { label: 'Расход сырья' },
+      'product-shipments': { label: 'Отгрузки продукта' },
+      'cash-accounts': { label: 'Кассы' },
+      'cash-transactions': { label: 'Кассовые операции' },
+      consumptions: { label: 'Расход' },
+      processings: { label: 'Сортировка и разделка' },
+      'semi-products': { label: 'Полуфабрикат и части' },
+      'semi-product-shipments': { label: 'Отгрузки полуфабриката' },
+      'expense-categories': { label: 'Категории расходов' },
+      expenses: { label: 'Расходы' },
+      employees: { label: 'Сотрудники' },
+      positions: { label: 'Должности' },
+      roles: { label: 'Роли' },
+      permissions: { label: 'Права' },
+    },
+    units: { pcs: 'шт', clients: 'клиентов', kg: 'кг', units: 'ед.' },
+    dashboardData: {
+      sections: {
+        egg_farm: {
+          title: 'Маточник',
+          description: 'Яйценоскость, расход лекарств, корм и отгрузки клиентам.',
+          metrics: {
+            net_eggs: { label: 'Чистый выход яиц' },
+            sales_volume: { label: 'Продано клиентам' },
+            sales_revenue: { label: 'Выручка' },
+            avg_sale_price: { label: 'Средняя цена' },
+            client_base: { label: 'Активная база клиентов' },
+          },
+          charts: {
+            egg_output_daily: {
+              title: 'Выход яиц по дням',
+              description: 'Динамика собранных и чистых яиц по дням.',
+              series: {
+                collected: 'Собрано',
+                broken: 'Битые',
+                rejected: 'Отбраковка',
+                net: 'Чистый выход',
+              },
+            },
+            egg_monthly_flow: {
+              title: 'Месячная динамика',
+              description: 'Производство, отгрузка и потери по месяцам.',
+              series: { produced: 'Произведено', shipped: 'Отгружено', losses: 'Потери' },
+            },
+            farm_feed_supply: {
+              title: 'Поступление корма',
+              description: 'Объём поступившего корма по дням.',
+              series: { feed: 'Корм' },
+            },
+            farm_medicine_usage: {
+              title: 'Расход лекарств',
+              description: 'Использование лекарств по дням.',
+              series: { medicine: 'Лекарства' },
+            },
+            egg_revenue_daily: {
+              title: 'Выручка по яйцам',
+              description: 'Сколько денег приносят клиентские отгрузки яиц.',
+              series: { revenue: 'Выручка' },
+            },
+          },
+          breakdowns: {
+            egg_clients: {
+              title: 'Выручка по клиентам',
+              description: 'Клиенты, которые приносят основную выручку по яйцам.',
+            },
+          },
+        },
+        incubation: {
+          title: 'Инкубация',
+          description: 'Приход яиц, сортировка и вывод птенцов.',
+          metrics: {
+            eggs_arrived: { label: 'Яиц поступило' },
+            chicks_hatched: { label: 'Птенцов выведено' },
+            sales_volume: { label: 'Продано птенцов' },
+            sales_revenue: { label: 'Выручка' },
+            avg_sale_price: { label: 'Средняя цена' },
+            destination_clients: { label: 'Клиенты отгрузки' },
+          },
+          charts: {
+            incubation_egg_arrivals: {
+              title: 'Приход яиц',
+              description: 'Объём поступивших яиц по дням.',
+              series: { eggs_arrived: 'Яйца' },
+            },
+            incubation_quality: {
+              title: 'Сортировка по качеству',
+              description: 'Распределение яиц по качеству.',
+              series: { grade_1: 'Сорт 1', grade_2: 'Сорт 2', bad: 'Брак' },
+            },
+            incubation_hatch: {
+              title: 'Выход птенцов',
+              description: 'Количество выведенных птенцов.',
+              series: { chicks: 'Птенцы' },
+            },
+            incubation_revenue: {
+              title: 'Выручка по птенцам',
+              description: 'Сколько денег приносят клиентские отгрузки птенцов.',
+              series: { revenue: 'Выручка' },
+            },
+          },
+          breakdowns: {
+            incubation_sources: {
+              title: 'Поставщики яиц',
+              description: 'Основные источники поставки яиц.',
+            },
+            incubation_clients: {
+              title: 'Выручка по птенцам',
+              description: 'Клиенты, которые приносят основную выручку по птенцам.',
+            },
+          },
+        },
+        factory: {
+          title: 'Фабрика',
+          description: 'Птенцы, корма, лекарства и клиентская база.',
+          metrics: {
+            chicks_arrived: { label: 'Птенцов поступило' },
+            feed_arrived: { label: 'Корма поступило' },
+            medicine_arrived: { label: 'Лекарств поступило' },
+            client_base: { label: 'Клиентская база' },
+          },
+          charts: {
+            factory_chicks: {
+              title: 'Поступление птенцов',
+              description: 'Динамика поступления птенцов.',
+              series: { chicks: 'Птенцы' },
+            },
+            factory_feed_types: {
+              title: 'Корма по типам',
+              description: 'Распределение кормов по категориям.',
+              series: {
+                'BS-01': 'Старт для бройлеров',
+                'LG-01': 'Рост для несушек',
+                'DF-01': 'Финиш для уток',
+              },
+            },
+            factory_medicine_types: {
+              title: 'Лекарства по типам',
+              description: 'Поступление лекарств по категориям.',
+              series: {
+                'MED-ANT': 'Антибиотики',
+                'MED-VIT': 'Витамины',
+                'MED-PUL': 'Сыпучие препараты',
+              },
+            },
+          },
+          breakdowns: {
+            factory_clients: {
+              title: 'Клиентская база',
+              description: 'Основные контрагенты по приходу птенцов.',
+            },
+          },
+        },
+        feed_mill: {
+          title: 'Корма завод',
+          description: 'Сырьё, комбинация ингредиентов, выпуск продукта и клиентская база.',
+          metrics: {
+            raw_arrivals: { label: 'Сырья поступило' },
+            raw_consumptions: { label: 'Сырья израсходовано' },
+            product_output: { label: 'Готового корма выпущено' },
+            sales_volume: { label: 'Продано продукта' },
+            sales_revenue: { label: 'Выручка' },
+            avg_sale_price: { label: 'Средняя цена' },
+            client_base: { label: 'Клиентская база' },
+          },
+          charts: {
+            feed_raw_flow: {
+              title: 'Сырьё: приход и расход',
+              description: 'Поступление и использование сырья.',
+              series: { arrivals: 'Приход', consumptions: 'Расход' },
+            },
+            feed_product_flow: {
+              title: 'Продукт: выпуск и отгрузка',
+              description: 'Выпуск и отгрузка готовой продукции.',
+              series: { output: 'Выпуск', shipment: 'Отгрузка' },
+            },
+            feed_revenue: {
+              title: 'Выручка по продукту',
+              description: 'Сколько денег приносят отгрузки готового корма.',
+              series: { revenue: 'Выручка' },
+            },
+            feed_ingredient_mix: {
+              title: 'Комбинация сырья',
+              description: 'Какие сырьевые компоненты входят в продукт.',
+              series: { 'ING-CORN': 'Кукуруза', 'ING-SOY': 'Соя', 'ING-WHEAT': 'Пшеница' },
+            },
+          },
+          breakdowns: {
+            feed_formulas: {
+              title: 'Продукт и формулы',
+              description: 'Какие формулы дают основной выпуск продукта.',
+            },
+            feed_clients: {
+              title: 'Выручка по клиентам',
+              description: 'Клиенты, которые приносят основную выручку по готовому корму.',
+            },
+          },
+        },
+        vet_pharmacy: {
+          title: 'Ветаптека',
+          description: 'Поступление, уход, клиентская база и партии лекарств.',
+          metrics: {
+            arrivals: { label: 'Лекарств поступило' },
+            consumptions: { label: 'Лекарств ушло' },
+            stock: { label: 'Остаток на складе' },
+            client_base: { label: 'Клиентская база' },
+          },
+          charts: {
+            medicine_flow: {
+              title: 'Приход и расход лекарств',
+              description: 'Поступление и использование лекарств.',
+              series: { arrivals: 'Приход', consumptions: 'Расход' },
+            },
+            medicine_stock: {
+              title: 'Остатки по типам',
+              description: 'Остатки по категориям лекарств.',
+              series: { stock: 'Остаток' },
+            },
+            medicine_expiry: {
+              title: 'Остатки по срокам',
+              description: 'Остатки с учётом срока годности.',
+              series: { stock: 'Остаток' },
+            },
+          },
+          breakdowns: {
+            medicine_suppliers: {
+              title: 'Клиентская база',
+              description: 'Основные контрагенты по поставкам лекарств.',
+            },
+            medicine_batches: {
+              title: 'Штрихкод и срок годности',
+              description: 'Партии лекарств с кодом и сроком действия.',
+            },
+          },
+        },
+        slaughterhouse: {
+          title: 'Убойня',
+          description:
+            'Приход птицы, первый и второй сорт, разделка по частям, полуфабрикат и клиентская база.',
+          metrics: {
+            arrivals: { label: 'Птицы поступило' },
+            processed: { label: 'Птицы обработано' },
+            first_sort_total: { label: 'Первый сорт' },
+            second_sort_total: { label: 'Второй сорт' },
+            semi_products: { label: 'Полуфабриката произведено' },
+            sales_volume: { label: 'Продано полуфабриката' },
+            sales_revenue: { label: 'Выручка' },
+            avg_sale_price: { label: 'Средняя цена' },
+            client_base: { label: 'Клиентская база' },
+          },
+          charts: {
+            slaughter_flow: {
+              title: 'Приход и разделка',
+              description: 'Поступление и разделка птицы.',
+              series: { arrivals: 'Приход', processed: 'Разделка' },
+            },
+            slaughter_quality: {
+              title: 'Сортировка по качеству',
+              description: 'Первый сорт, второй сорт и брак.',
+              series: { first: 'Первый сорт', second: 'Второй сорт', bad: 'Брак' },
+            },
+            slaughter_semi_products: {
+              title: 'Разделка по частям',
+              description: 'Какие части птицы выходят после разделки.',
+              series: {
+                Голень: 'Голень',
+                Крыло: 'Крыло',
+                Филе: 'Филе',
+                Бедро: 'Бедро',
+                Грудка: 'Грудка',
+              },
+            },
+            slaughter_revenue: {
+              title: 'Выручка по полуфабрикату',
+              description: 'Сколько денег приносят клиентские отгрузки полуфабриката.',
+              series: { revenue: 'Выручка' },
+            },
+          },
+          breakdowns: {
+            slaughter_parts: {
+              title: 'Полуфабрикат и части',
+              description: 'Основные части и партии полуфабриката.',
+            },
+            slaughter_clients: {
+              title: 'Выручка по клиентам',
+              description: 'Клиенты, которые приносят основную выручку по полуфабрикату.',
+            },
+          },
+        },
+      },
+    },
+  },
+  uz: {
+    common: {
+      empty: '—',
+      yes: 'Ha',
+      no: "Yo'q",
+      data: "Ma'lumotlar",
+      save: 'Saqlash',
+      refresh: 'Yangilash',
+      retry: 'Qayta urinish',
+      apply: "Qo'llash",
+      create: 'Yaratish',
+      edit: "O'zgartirish",
+      delete: "O'chirish",
+      confirm: 'Tasdiqlayman',
+      back: 'Qaytish',
+      continue: 'Davom etish',
+      reset: 'Tozalash',
+      close: 'Yopish',
+      unsavedChangesConfirm: 'Saqlanmagan o‘zgarishlar bor. Saqlamasdan yopilsinmi?',
+      history: 'Tarix',
+      previous: 'Oldingi',
+      next: 'Keyingi',
+      pageStatus: '{total} dan {current}-sahifa',
+      logout: 'Chiqish',
+      startTour: 'Tur',
+      help: 'Yordam',
+      allDepartments: "Barcha bo'limlar",
+      search: 'Qidiruv',
+      chooseValue: 'Qiymatni tanlang',
+      noResults: 'Hech narsa topilmadi',
+      loadingOptions: 'Variantlar yuklanmoqda',
+      clearAll: 'Barchasini tozalash',
+      clearSelection: 'Tanlovni tozalash',
+      selectedCount: '{count} tanlandi',
+      paginationLabel: 'Sahifalash',
+      paginationPreviousAria: 'Oldingi sahifaga o‘tish',
+      paginationNextAria: 'Keyingi sahifaga o‘tish',
+      paginationMorePages: 'Qo‘shimcha sahifalar',
+      totalRecords: 'Jami yozuvlar: {count}',
+      loadingLabel: 'Yuklanmoqda',
+      noData: "Ma'lumot yo'q",
+      email: 'Email',
+      good: 'Yaxshi',
+      warning: 'Diqqat',
+      bad: 'Xavf',
+      neutral: 'Baholanmagan',
+    },
+    language: { label: 'Til', uz: 'Oʻz', ru: 'Рус', en: 'Eng' },
+    nav: {
+      dashboard: 'Dashboard',
+      heading: 'Navigatsiya',
+      overview: 'Umumiy ko‘rinish',
+      settings: 'Sozlamalar',
+      roleManagement: 'Rollar',
+      audit: 'Audit',
+    },
+    route: {
+      sessionLabel: 'Sessiya',
+      sessionTitle: 'Kirish tayyorlanmoqda',
+      sessionDescription: 'Sahifa ochilishidan oldin foydalanuvchi maʼlumotlari tekshirilmoqda.',
+      initLabel: 'Ishga tushirish',
+      initTitle: 'Ilova tayyorlanmoqda',
+      initDescription: 'Mahalliy sessiya tekshirilmoqda va boshlang‘ich sahifa aniqlanmoqda.',
+      forbiddenTitle: 'Kirish taqiqlangan',
+      forbiddenDescription: 'Joriy foydalanuvchida bu sahifani ochish uchun ruxsat yo‘q.',
+      dashboardForbiddenDescription:
+        'Bu sahifa uchun moliyaviy va operatsion ko‘rsatkichlarni ko‘rish bo‘yicha kengaytirilgan permission kerak.',
+      moduleForbiddenDescription:
+        'Joriy foydalanuvchida bu bo‘lim uchun yozuvlar yoki tahlilni o‘qish permission yo‘q.',
+      roleManagementForbiddenDescription:
+        'Joriy foydalanuvchida bu sahifa uchun rollar va tayinlovlarni o‘qish permission yo‘q.',
+      auditForbiddenDescription:
+        'Joriy foydalanuvchida bu sahifa uchun o‘zgarishlar jurnalini ko‘rish permission yo‘q.',
+    },
+    tour: {
+      badge: 'Ekskursiya',
+      close: 'Turni yopish',
+      stepCounter: '{total} dan {current}-qadam',
+      locatingTarget: 'Joriy qadam elementi qidirilmoqda...',
+      skip: "O'tkazib yuborish",
+      previous: 'Orqaga',
+      next: 'Keyingi',
+      finish: 'Yakunlash',
+      tours: {
+        platform: {
+          title: 'Platforma bo‘yicha tezkor tur',
+          description: 'Navigatsiya, bo‘limlar va ishchi panel vositalari ko‘rinishi.',
+        },
+        login: {
+          title: 'Kirish bo‘yicha tur',
+          description: 'Tizimga tez kirish va asosiy ko‘rsatmalar.',
+        },
+        dashboard: {
+          title: 'Dashboard turi',
+          description: 'Status, filtrlar va yakuniy metrikalar bo‘yicha qisqa ko‘rsatma.',
+        },
+        module: {
+          title: 'Modul turi',
+          description:
+            "Bo'lim qanday ishlashi: amallar, ma'lumotlar guruhlari, jadval va o'zgarishlar tarixi.",
+        },
+        settings: {
+          title: 'Settings turi',
+          description: 'Vkladkalar, profil va joriy foydalanuvchi kirishlari.',
+        },
+        roles: {
+          title: 'Roles turi',
+          description: 'Rollar matritsasi, rollar ro‘yxati va rol kartasi.',
+        },
+        audit: {
+          title: 'Audit turi',
+          description: 'Filtrlar, o‘zgarishlar lentasi va batafsil ko‘rish.',
+        },
+        notFound: {
+          title: '404 sahifa turi',
+          description: "Ishchi bo'limlarga qaytish bo'yicha qisqa yo'riqnoma.",
+        },
+      },
+      steps: {
+        loginShowcase: {
+          title: "Ma'lumot bloki",
+          description: 'Tizimga kirish va ishlash haqida qisqa maʼlumot.',
+        },
+        loginForm: {
+          title: 'Kirish formasi',
+          description: 'Tizimga kirish uchun asosiy blok.',
+        },
+        loginCredentials: {
+          title: 'Login va parol',
+          description: 'Xodim maʼlumotlarini kiriting.',
+        },
+        loginSubmit: {
+          title: 'Kirish tugmasi',
+          description: "Tekshiruvdan so'ng ishchi maydonni ochadi.",
+        },
+        workspaceNav: {
+          title: 'Ishchi panel',
+          description: 'Bu yerda joriy kontekst va asosiy bo‘limlarga tez kirish bor.',
+        },
+        primaryNavigation: {
+          title: 'Asosiy navigatsiya',
+          description: "Ilovaning asosiy bo'limlari o'rtasida tez o'ting.",
+        },
+        departmentNavigation: {
+          title: 'Bo‘limlar navigatsiyasi',
+          description: "Bo'lim tanlovi ko'rinadigan ma'lumotlar va yozuvlarni o'zgartiradi.",
+        },
+        sessionTools: {
+          title: 'Sessiya vositalari',
+          description: 'Tilni almashtirish, turni boshlash va hisobdan chiqish.',
+        },
+        dashboardHero: {
+          title: 'Status va kontekst',
+          description: "Tanlangan davr, bo'lim va umumiy holat shu yerda ko'rinadi.",
+        },
+        dashboardFilters: {
+          title: 'Analitika filtrlari',
+          description: 'Davr va bo‘limni tanlab metrikalarni qayta hisoblang.',
+        },
+        dashboardQuickRanges: {
+          title: 'Tezkor davrlar',
+          description: 'Davrni tez tanlash uchun tayyor tugmalar.',
+        },
+        dashboardDepartmentFilter: {
+          title: "Bo'lim tanlash",
+          description: "Faqat tanlangan bo'lim ma'lumotlarini ko'rsatadi.",
+        },
+        dashboardDateFilter: {
+          title: 'Aniq sana oralig‘i',
+          description: 'Sana oralig‘ini qo‘lda belgilash mumkin.',
+        },
+        dashboardSummary: {
+          title: 'Yig‘ma metrikalar',
+          description: 'Kartochkalar asosiy ko‘rsatkichlarning yakuniy qiymatlarini beradi.',
+        },
+        dashboardSections: {
+          title: 'Batafsil bo‘limlar',
+          description: "Yo'nalishlar bo'yicha batafsil tahlil shu yerda.",
+        },
+        moduleViewSwitch: {
+          title: 'Ko‘rinish rejimi',
+          description: "Ro'yxat va tahlil o'rtasida o'tadi.",
+        },
+        moduleActions: {
+          title: 'Modul amallari',
+          description: 'Joriy bo‘lim ichidagi yozuv yaratish va tezkor amallar.',
+        },
+        moduleResourceGroups: {
+          title: 'Resurs guruhlari',
+          description: "Ma'lumotlar ma'nosi va operatsiya turiga ko'ra guruhlangan.",
+        },
+        moduleGroupSwitch: {
+          title: "Bo'lim guruhlari",
+          description: "Ichki guruhlar o'rtasida tez o'tish.",
+        },
+        moduleTabs: {
+          title: 'Guruh ichidagi bo‘limlar',
+          description: "Ishlash uchun aniq bo'limni tanlang.",
+        },
+        moduleDepartmentFilter: {
+          title: "Bo'lim filtri",
+          description: "Ro'yxatni tanlangan bo'lim bilan cheklaydi.",
+        },
+        moduleSummaryPills: {
+          title: 'Qisqa ko‘rsatkichlar',
+          description: "Joriy holat va yozuvlar sonini ko'rsatadi.",
+        },
+        moduleCreateRecord: {
+          title: 'Yangi yozuv',
+          description:
+            "Agar yaratish huquqi bo'lsa, yangi yozuv yon paneldagi forma orqali ochiladi.",
+        },
+        moduleRecords: {
+          title: 'Maʼlumotlar jadvali',
+          description:
+            "Ro'yxat, sahifalash, tahrirlash va o'zgarishlar tarixiga o'tish imkoniyati.",
+        },
+        moduleTable: {
+          title: "Yozuvlar ro'yxati",
+          description: "Topilgan ma'lumotlar shu jadvalda ko'rinadi.",
+        },
+        modulePagination: {
+          title: 'Sahifalar',
+          description: "Ro'yxat sahifalari bo'yicha o'tish.",
+        },
+        moduleFormDrawer: {
+          title: 'Yozuv formasi',
+          description: 'Yaratish va tahrirlash uchun yon panel formasi.',
+        },
+        moduleFormFields: {
+          title: 'Forma maydonlari',
+          description: 'Saqlashdan oldin asosiy maydonlarni to‘ldiring.',
+        },
+        moduleAuditDrawer: {
+          title: 'Tarix oynasi',
+          description: "Tanlangan yozuv bo'yicha batafsil tarix.",
+        },
+        moduleAuditHistory: {
+          title: 'Tarix lentasi',
+          description: "Vaqt bo'yicha barcha o'zgarishlar ro'yxati.",
+        },
+        moduleSubdepartments: {
+          title: "Quyi bo'limlar",
+          description: "Quyi bo'limlarga tez o'tish.",
+        },
+        settingsTabs: {
+          title: 'Sozlamalar vkladkalari',
+          description: "Profil va bo'limlarni boshqarish bo'limlari o'rtasida o'ting.",
+        },
+        settingsProfile: {
+          title: 'Profil',
+          description: 'Foydalanuvchining asosiy maʼlumotlari va tahrirlash nuqtasi.',
+        },
+        settingsAccess: {
+          title: 'Rollar va huquqlar',
+          description: "Profilga qo'llangan joriy rollar va huquqlar shu yerda.",
+        },
+        settingsSecurity: {
+          title: 'Xavfsizlik',
+          description: 'Parol va profil xavfsizligini boshqarish.',
+        },
+        settingsContext: {
+          title: 'Ishchi kontekst',
+          description: "Joriy tashkilot va ishlayotgan bo'limingiz.",
+        },
+        settingsDepartments: {
+          title: 'Bo‘limlarni boshqarish',
+          description: "Bo'limlar vkladkasida tuzilma yaratish va o'zgartirish mumkin.",
+        },
+        settingsDepartmentFilters: {
+          title: 'Qidiruv va filtrlar',
+          description: "Kerakli bo'limni tez topishga yordam beradi.",
+        },
+        settingsDepartmentTree: {
+          title: "Bo'limlar tuzilmasi",
+          description: "Bo'limlar ro'yxati va ierarxiyasi.",
+        },
+        settingsDepartmentDetails: {
+          title: "Bo'lim kartasi",
+          description: "Tanlangan bo'lim tafsilotlari va amallar.",
+        },
+        settingsAccountDrawer: {
+          title: 'Profil formasi',
+          description: "Shaxsiy ma'lumotlar va parolni tahrirlash.",
+        },
+        settingsDepartmentDrawer: {
+          title: "Bo'lim formasi",
+          description: "Bo'lim yaratish va tahrirlash.",
+        },
+        settingsDepartmentFormMain: {
+          title: "Bo'limning asosiy maydonlari",
+          description: "Bo'limni saqlash uchun kerakli asosiy ma'lumotlar.",
+        },
+        settingsDepartmentFormIcon: {
+          title: 'Ikonka tanlash',
+          description: "Bo'lim uchun mos ikonka tanlanadi.",
+        },
+        settingsDepartmentFormResponsible: {
+          title: "Mas'ul xodim",
+          description: "Bo'lim uchun mas'ul xodimni belgilang.",
+        },
+        rolesHero: {
+          title: 'Rollar matritsasi',
+          description: "Rollar, huquqlar va tayinlangan xodimlar bo'yicha yig'ma blok.",
+        },
+        rolesList: {
+          title: 'Rollar ro‘yxati',
+          description: 'Roldan birini tanlang yoki yangi rol yarating.',
+        },
+        rolesSearch: {
+          title: 'Rol qidiruvi',
+          description: "Nomi yoki kodi bo'yicha tez qidiruv.",
+        },
+        rolesWorkspace: {
+          title: 'Rol kartasi',
+          description: 'Tanlangan rol holati, tavsifi va huquqlari to‘plami.',
+        },
+        rolesWorkspaceActions: {
+          title: 'Rol amallari',
+          description: 'Tahrirlash va xodim tayinlash tugmalari.',
+        },
+        rolesPermissionsPreview: {
+          title: 'Rol huquqlari',
+          description: "Tanlangan rolning joriy huquqlari ro'yxati.",
+        },
+        rolesEditorDrawer: {
+          title: 'Rol formasi',
+          description: 'Yangi rol yaratish yoki mavjudini tahrirlash.',
+        },
+        rolesEditorMainFields: {
+          title: 'Asosiy maydonlar',
+          description: 'Rol nomi, kodi va tavsifi.',
+        },
+        rolesEditorPermissions: {
+          title: 'Huquqlar sozlamasi',
+          description: 'Ushbu rol uchun huquqlarni tanlash.',
+        },
+        rolesAssignmentsDrawer: {
+          title: 'Xodimlarni tayinlash',
+          description: 'Rolga kim kirishini boshqarish.',
+        },
+        rolesAssignmentsSearch: {
+          title: 'Xodim qidiruvi',
+          description: 'Ism, login yoki email bo‘yicha qidiruv.',
+        },
+        rolesAssignmentsList: {
+          title: "Xodimlar ro'yxati",
+          description: 'Rolni bir bosishda berish yoki olib tashlash.',
+        },
+        auditHero: {
+          title: 'O‘zgarishlar jurnali',
+          description: 'Bo‘lim vazifasi va umumiy yozuvlar soni ko‘rinadi.',
+        },
+        auditFilters: {
+          title: 'Audit filtrlari',
+          description: 'Jurnalni amal, jadval, yozuv va davr bo‘yicha toraytiring.',
+        },
+        auditSearch: {
+          title: "O'zgarish qidiruvi",
+          description: 'Jurnaldan kerakli yozuvni tez topish.',
+        },
+        auditFeed: {
+          title: 'O‘zgarishlar lentasi',
+          description: 'Qatorni ochib oldin/keyin snapshot va tafsilotni ko‘ring.',
+        },
+        auditMainTable: {
+          title: 'Tarix jadvali',
+          description: "Topilgan o'zgarishlarning asosiy ro'yxati.",
+        },
+        auditPagination: {
+          title: 'Tarix sahifalari',
+          description: "Jurnal sahifalari bo'yicha o'tish.",
+        },
+        auditDetailsDrawer: {
+          title: "O'zgarish tafsiloti",
+          description: "Tanlangan o'zgarishning to'liq kartasi.",
+        },
+        auditDetailsSnapshots: {
+          title: 'Oldin va keyin',
+          description: "O'zgarishdan oldingi va keyingi holat taqqoslanadi.",
+        },
+        notFoundShowcase: {
+          title: "Ko'rsatmalar",
+          description: 'Nega 404 sahifasiga tushganingiz haqida qisqa izoh.',
+        },
+        notFoundCard: {
+          title: 'Sahifa topilmadi',
+          description: 'Topilmagan sahifa haqida asosiy maʼlumot.',
+        },
+        notFoundBack: {
+          title: 'Orqaga qaytish',
+          description: 'Ishchi bo‘limga qaytaruvchi tugma.',
+        },
+      },
+    },
+    login: {
+      sideBadge: 'Kirish',
+      formBadge: 'Tizimga kirish',
+      title: 'Tizimga kirish',
+      description: 'Ishchi maydonga kirish uchun foydalanuvchi nomi va parolni kiriting.',
+      sideDescription: 'Tizimga kirish uchun xodimga berilgan maʼlumotlardan foydalaning.',
+      cardOneTitle: 'Xavfsiz kirish',
+      cardOneDescription: 'Kirish xodim hisobi orqali amalga oshiriladi.',
+      cardTwoTitle: 'Ishchi maydon',
+      cardTwoDescription: 'Kirishdan keyin asosiy bo‘lim ochiladi.',
+      cardThreeTitle: 'Ruxsatlar',
+      cardThreeDescription: 'Bo‘limlar foydalanuvchi roliga qarab ko‘rsatiladi.',
+      username: 'Foydalanuvchi nomi',
+      password: 'Parol',
+      submit: 'Kirish',
+      pending: "Ma'lumotlar tekshirilmoqda...",
+      afterLogin: 'Muvaffaqiyatli kirishdan so‘ng ishchi maydon ochiladi.',
+      validation: {
+        usernameRequired: 'Foydalanuvchi nomini kiriting',
+        passwordRequired: 'Parolni kiriting',
+      },
+    },
+    dashboard: {
+      label: 'Tahlil',
+      loadingTitle: "Ma'lumotlar tayyorlanmoqda",
+      loadingDescription: 'Asosiy bo‘limlar bo‘yicha ko‘rsatkichlar yuklanmoqda.',
+      errorTitle: "Ma'lumotlar vaqtincha mavjud emas",
+      heroTitleFallback: 'Umumiy ko‘rinish',
+      heroDescriptionFallback: 'Tanlangan bo‘lim bo‘yicha asosiy ko‘rsatkichlar.',
+      activeSection: "Bo'lim",
+      charts: 'Grafiklar',
+      updatedAt: 'Yangilangan vaqt',
+      chartsSummary: '{charts} ta grafik va {lists} ta ro‘yxat',
+      summaryBadge: 'Qisqacha',
+      summaryTitle: 'Qisqa ko‘rinish',
+      summaryDescription: 'Tanlangan bo‘lim bo‘yicha asosiy ko‘rsatkichlar.',
+      overallStatus: 'Umumiy holat',
+      metrics: "Ko'rsatkichlar",
+      lists: "Ro'yxatlar",
+      listsHint: 'Mijozlar, partiyalar va qoldiqlar',
+      switcherTitle: "Bo'limlar",
+      switcherDescription: "Ma'lumotlarni ko‘rish uchun bo‘limni tanlang.",
+      dateRangeTitle: 'Davr',
+      dateRangeDescription:
+        'Aniq sanalarni tanlang. Bir marta bosish bir kunni, ikki marta bosish davrni belgilaydi.',
+      dateRangePlaceholder: 'Barcha sanalar',
+      periodLabel: 'Davr',
+      scopeLabel: 'Qamrov',
+      noChartData: 'Ko‘rsatish uchun maʼlumot yo‘q',
+      noBreakdownData: 'Maʼlumot yo‘q',
+      noDataTitle: "Tanlangan davr bo'yicha ma'lumot yo'q",
+      noDataDescription: "Ko'rsatkichlarni ko'rish uchun davrni yoki bo'limni o'zgartiring.",
+      moduleUnavailable: "Bu bo'lim uchun tahlil hozircha mavjud emas.",
+      revenueCalculatorTitle: 'Tushum hisob-kitobi',
+      revenueCalculatorDescription:
+        "Sotuv hajmini kiriting, tizim tanlangan davr bo'yicha o'rtacha narxda kutilgan tushumni hisoblaydi.",
+      calculationVolume: 'Hisoblash hajmi',
+      averagePrice: "O'rtacha narx",
+      estimatedRevenue: 'Hisoblangan tushum',
+    },
+    settings: {
+      title: 'Sozlamalar',
+      description: 'Profil va kirish parametrlari.',
+      account: 'Hisob',
+      profileTitle: 'Profil',
+      profileDescription: 'Foydalanuvchining asosiy maʼlumotlari.',
+      securityTitle: 'Parol',
+      securityDescription: "Parolni o'zgartirish kerak bo'lsa, quyidagi maydonlarni to'ldiring.",
+      username: 'Login',
+      firstName: 'Ism',
+      lastName: 'Familiya',
+      email: 'Email',
+      phone: 'Telefon',
+      currentPassword: 'Joriy parol',
+      newPassword: 'Yangi parol',
+      confirmNewPassword: 'Yangi parolni tasdiqlang',
+      success: "O'zgarishlar saqlandi.",
+      validation: {
+        firstNameRequired: 'Ism majburiy',
+        lastNameRequired: 'Familiya majburiy',
+        invalidEmail: 'Email noto‘g‘ri',
+        currentPasswordRequired: 'Joriy parolni kiriting',
+        newPasswordRequired: 'Yangi parolni kiriting',
+        newPasswordShort: 'Yangi parol kamida 8 ta belgidan iborat bo‘lishi kerak',
+        confirmPasswordMismatch: 'Parol tasdig‘i mos kelmadi',
+      },
+    },
+    validation: {
+      defaultValueLabel: 'Qiymat',
+      defaultDateLabel: 'Sana',
+      required: '"{label}" maydoni majburiy.',
+      nonEmpty: '"{label}" maydoni bo‘sh bo‘lishi mumkin emas.',
+      textType: '"{label}" maydoni matn bo‘lishi kerak.',
+      numberType: '"{label}" maydoni son bo‘lishi kerak.',
+      positive: '"{label}" maydoni 0 dan katta bo‘lishi kerak.',
+      validEmail: '"{label}" uchun to‘g‘ri email kiriting.',
+      dateFormat: '"{label}" maydoni YYYY-MM-DD formatida bo‘lishi kerak.',
+    },
+    notFound: {
+      sideTitle: 'Sahifa topilmadi',
+      sideDescription: 'So‘ralgan sahifa mavjud emas yoki manzil noto‘g‘ri kiritilgan.',
+      cardOneTitle: 'Manzil',
+      cardOneDescription: 'Bu manzil bo‘yicha sahifa topilmadi.',
+      cardTwoTitle: 'Navigatsiya',
+      cardTwoDescription: 'Ilovaning boshlang‘ich sahifasiga qayting.',
+      cardThreeTitle: 'Harakat',
+      cardThreeDescription: 'O‘ng tomondagi tugma ish boshlanishiga qaytaradi.',
+      title: 'Sahifa topilmadi',
+      description: 'Bosh sahifaga qayting va ishni davom ettiring.',
+    },
+    crud: {
+      moduleNotFoundTitle: "Bo'lim topilmadi",
+      moduleNotFoundDescription: "So'ralgan bo'lim mavjud emas.",
+      resourceNotFoundTitle: "Bo'lim mavjud emas",
+      resourceNotFoundDescription: "Bu bo'lim uchun ma'lumotlar mavjud emas.",
+      pageDescription: "Ma'lumotlarni ko'rish va tahrirlash.",
+      listDescription: "Yozuvlar ro'yxati.",
+      resourceGroupFinance: 'Moliya',
+      resourceGroupPeopleClients: 'Xodimlar va mijozlar',
+      resourceGroupOperations: "Bo'lim ichidagi yo'nalishlar",
+      departmentFilter: "Bo'lim",
+      departmentAnalyticsTitle: 'Tahlil',
+      departmentAnalyticsDescription:
+        "Bosh bo'lim uchun butun bo'lim daraxti bo'yicha umumiy ko'rsatkichlar ko'rsatiladi.",
+      departmentAnalyticsHint:
+        "Operatsion yozuvlar quyi bo'limlarda yuritiladi. Bosh bo'lim darajasida faqat tahlil qoladi.",
+      openAnalytics: 'Tahlilni ochish',
+      openFinanceCenter: 'Moliyaviy markaz',
+      subdepartmentsTitle: "Quyi bo'limlar",
+      subdepartmentsDescription:
+        "Xodimlar, xarajatlar va boshqa ma'lumotlar bilan ishlash uchun quyi bo'limni tanlang.",
+      subdepartmentCount: "Quyi bo'limlar: {count}",
+      formCreateTitle: 'Yangi yozuv',
+      formEditTitle: 'Yozuvni tahrirlash',
+      formDescription: "Maydonlarni to'ldiring va saqlang.",
+      newRecord: 'Yangi yozuv',
+      clearForm: 'Formani tozalash',
+      actions: 'Amallar',
+      emptyResource: '«{resource}» bo‘limida hozircha yozuvlar yo‘q.',
+      confirmDelete: "Yozuv o'chirilsinmi?",
+      confirmDeleteAgain: "O'chirishni yana bir bor tasdiqlang.",
+      created: 'Yozuv yaratildi.',
+      updated: "O'zgarishlar saqlandi.",
+      deleted: "Yozuv o'chirildi.",
+      selectRecordFirst: 'Avval tahrirlash uchun yozuvni tanlang.',
+      validation: {
+        required: 'Maydonni to‘ldiring.',
+        integer: 'Butun son kiriting.',
+        number: 'Son kiriting.',
+        invalidJson: 'JSON formati noto‘g‘ri.',
+      },
+    },
+    fields: {
+      id: 'ID',
+      key: 'Kalit',
+      name: 'Nomi',
+      code: 'Kod',
+      description: 'Tavsif',
+      first_name: 'Ism',
+      last_name: 'Familiya',
+      email: 'Email',
+      phone: 'Telefon',
+      organization_id: 'Tashkilot',
+      department_id: "Bo'lim",
+      warehouse_id: 'Ombor',
+      from_warehouse_id: 'Qaysi ombordan',
+      to_warehouse_id: 'Qaysi omborga',
+      counterparty_warehouse_id: 'Qarama-qarshi ombor',
+      parent_department_id: "Yuqori bo'lim",
+      module_key: 'Modul',
+      head_id: 'Rahbar',
+      position_id: 'Lavozim',
+      role_id: 'Rol',
+      permission_id: 'Huquq',
+      employee_id: 'Xodim',
+      title: 'Nomi',
+      slug: 'Tizim nomi',
+      is_active: 'Faol',
+      min_salary: 'Minimal oylik',
+      max_salary: 'Maksimal oylik',
+      salary: 'Oylik',
+      address: 'Manzil',
+      company_name: 'Kompaniya',
+      category: 'Toifa',
+      client_code: 'Mijoz kodi',
+      legal_name: 'Yuridik nom',
+      organization_key: 'Login',
+      password: 'Parol',
+      action: 'Amal',
+      resource: 'Resurs',
+      is_primary: 'Asosiy',
+      expires_at: 'Amal qilish muddati',
+      created_at: 'Yaratilgan',
+      updated_at: 'Yangilangan',
+      sort_order: 'Saralash tartibi',
+      category_id: 'Kategoriya',
+      expense_category_id: 'Xarajat kategoriyasi',
+      item: 'Pozitsiya',
+      quantity: 'Miqdor',
+      unit: "O'lchov birligi",
+      unit_price: 'Birlik narxi',
+      amount: 'Summa',
+      expense_date: 'Xarajat sanasi',
+      cash_account_id: 'Kassa',
+      opening_balance: 'Boshlang‘ich qoldiq',
+      transaction_type: 'Operatsiya turi',
+      transaction_date: 'Operatsiya sanasi',
+      reference_no: 'Hujjat raqami',
+      counterparty_client_id: 'Kontragent',
+      created_by: 'Yaratgan',
+      note: 'Izoh',
+      part_name: 'Qism',
+      poultry_type_id: 'Parranda turi',
+      supplier_client_id: 'Yetkazib beruvchi',
+      arrived_on: 'Kelgan sana',
+      birds_count: 'Parranda soni',
+      average_weight_kg: "O'rtacha vazn, kg",
+      currency: 'Valyuta',
+      symbol: 'Belgi',
+      is_default: 'Asosiy',
+      invoice_no: 'Nakladnoy',
+      arrival_id: 'Kirim partiyasi',
+      processed_on: 'Bo‘laklash sanasi',
+      birds_processed: 'Qayta ishlangan parranda',
+      first_sort_count: '1-nav',
+      second_sort_count: '2-nav',
+      bad_count: 'Brak',
+      first_sort_weight_kg: '1-nav vazni, kg',
+      second_sort_weight_kg: '2-nav vazni, kg',
+      bad_weight_kg: 'Brak vazni, kg',
+      processed_by: "Mas'ul xodim",
+      produced_on: 'Ishlab chiqarilgan sana',
+      quality: 'Sifat',
+      shipped_on: "Jo'natma sanasi",
+      semi_product_id: 'Yarim tayyor mahsulot',
+      client_id: 'Mijoz',
+      icon: 'Ikona',
+    },
+    cashTransactionTypes: {
+      income: 'Kirim',
+      expense: 'Chiqim',
+      transfer_in: "Kiruvchi o'tkazma",
+      transfer_out: "Chiquvchi o'tkazma",
+      adjustment: 'Tuzatish',
+    },
+    departmentIcons: {
+      building: 'Bino',
+      coins: 'Tangalar',
+      egg: 'Tuxum',
+      factory: 'Fabrika',
+      package: 'Paket',
+      pill: 'Dori',
+      shield: 'Qalqon',
+      users: 'Jamoa',
+      box: 'Quti',
+      briefcase: 'Portfel',
+      leaf: 'Barg',
+      archive: 'Arxiv',
+    },
+    modules: {
+      core: { label: "Ma'lumotnomalar" },
+      egg: { label: 'Tuxumchilik' },
+      incubation: { label: 'Inkubatsiya' },
+      factory: { label: 'Fabrika' },
+      feed: { label: 'Yem' },
+      medicine: { label: 'Veterinariya dorixonasi' },
+      slaughter: { label: 'So‘yish' },
+      finance: { label: 'Moliya' },
+      hr: { label: 'Xodimlar' },
+    },
+    resources: {
+      organizations: { label: 'Tashkilotlar' },
+      departments: { label: "Bo'limlar" },
+      warehouses: { label: 'Omborlar' },
+      'stock-movements': { label: 'Qoldiq harakatlari' },
+      'department-modules': { label: "Bo'lim modullari" },
+      clients: { label: 'Mijozlar' },
+      currencies: { label: 'Valyutalar' },
+      'poultry-types': { label: 'Parranda turlari' },
+      production: { label: 'Ishlab chiqarish' },
+      shipments: { label: "Jo'natmalar" },
+      'monthly-analytics': { label: 'Oylik tahlil' },
+      'chick-arrivals': { label: 'Jo‘jalar kelishi' },
+      'feed-arrivals': { label: 'Yem kirimi' },
+      'feed-consumptions': { label: 'Yem sarfi' },
+      'medicine-arrivals': { label: 'Dori kirimi' },
+      'medicine-consumptions': { label: 'Dori sarfi' },
+      'factory-clients': { label: 'Mijozlar bazasi' },
+      'chick-shipments': { label: 'Jo‘jalar jo‘natilishi' },
+      batches: { label: 'Partiyalar' },
+      runs: { label: 'Sikllar' },
+      'factory-monthly-analytics': { label: 'Fabrika tahlili' },
+      types: { label: 'Turlar' },
+      ingredients: { label: 'Xomashyo' },
+      arrivals: { label: 'Kirimlar' },
+      formulas: { label: 'Mahsulot' },
+      'formula-ingredients': { label: 'Xomashyo kombinatsiyasi' },
+      'raw-arrivals': { label: 'Xomashyo kirimi' },
+      'production-batches': { label: 'Mahsulot chiqishi' },
+      'raw-consumptions': { label: 'Xomashyo sarfi' },
+      'product-shipments': { label: "Mahsulot jo'natmalari" },
+      'cash-accounts': { label: 'Kassalar' },
+      'cash-transactions': { label: 'Kassa operatsiyalari' },
+      consumptions: { label: 'Sarflar' },
+      processings: { label: 'Saralash va bo‘laklash' },
+      'semi-products': { label: 'Yarim tayyor mahsulot va qismlar' },
+      'semi-product-shipments': { label: "Yarim tayyor mahsulot jo'natmalari" },
+      'expense-categories': { label: 'Xarajat toifalari' },
+      expenses: { label: 'Xarajatlar' },
+      employees: { label: 'Xodimlar' },
+      positions: { label: 'Lavozimlar' },
+      roles: { label: 'Rollar' },
+      permissions: { label: 'Huquqlar' },
+    },
+    units: { pcs: 'dona', clients: 'mijoz', kg: 'kg', units: 'birlik' },
+    dashboardData: {
+      sections: {
+        egg_farm: {
+          title: 'Tuxumchilik',
+          description: 'Tuxum ishlab chiqarish, dori sarfi, yem va mijozlarga jo‘natmalar.',
+          metrics: {
+            net_eggs: { label: 'Sof tuxum chiqishi' },
+            feed_consumed: { label: 'Sarflangan yem' },
+            medicine_used: { label: 'Sarflangan dorilar' },
+            sales_volume: { label: 'Mijozlarga sotildi' },
+            sales_revenue: { label: 'Tushum' },
+            avg_sale_price: { label: "O'rtacha narx" },
+            client_base: { label: 'Faol mijozlar bazasi' },
+          },
+          charts: {
+            egg_output_daily: {
+              title: 'Kunlik tuxum chiqishi',
+              description: 'Kunlar bo‘yicha yig‘ilgan va sof tuxum dinamikasi.',
+              series: {
+                collected: 'Yig‘ildi',
+                broken: 'Singan',
+                rejected: 'Brak',
+                net: 'Sof chiqish',
+              },
+            },
+            egg_monthly_flow: {
+              title: 'Oylik dinamika',
+              description: 'Ishlab chiqarish, jo‘natma va yo‘qotishlar oylar bo‘yicha.',
+              series: {
+                produced: 'Ishlab chiqarildi',
+                shipped: 'Jo‘natildi',
+                losses: 'Yo‘qotishlar',
+              },
+            },
+            farm_feed_supply: {
+              title: 'Yem sarfi',
+              description: 'Kunlar bo‘yicha haqiqiy yem sarfi.',
+              series: { feed: 'Yem' },
+            },
+            farm_medicine_usage: {
+              title: 'Dori sarfi',
+              description: 'Kunlar bo‘yicha dori ishlatilishi.',
+              series: { medicine: 'Dorilar' },
+            },
+            egg_revenue_daily: {
+              title: 'Tuxum bo‘yicha tushum',
+              description: 'Tuxum jo‘natmalaridan kelgan mablag‘.',
+              series: { revenue: 'Tushum' },
+            },
+          },
+          breakdowns: {
+            egg_clients: {
+              title: 'Mijozlar bo‘yicha tushum',
+              description: 'Tuxum bo‘yicha asosiy tushumni berayotgan mijozlar.',
+            },
+            egg_feed_types: {
+              title: 'Yem turlari bo‘yicha sarf',
+              description: 'Matishnikda eng ko‘p ishlatiladigan yem turlari.',
+            },
+          },
+        },
+        incubation: {
+          title: 'Inkubatsiya',
+          description: 'Tuxum kirimi, saralash va jo‘ja chiqarish.',
+          metrics: {
+            eggs_arrived: { label: 'Kelgan tuxumlar' },
+            grade_1_total: { label: '1-nav' },
+            grade_2_total: { label: '2-nav' },
+            bad_eggs_total: { label: 'Brak' },
+            chicks_hatched: { label: 'Chiqqan jo‘jalar' },
+            sales_volume: { label: "Sotilgan jo'jalar" },
+            sales_revenue: { label: 'Tushum' },
+            avg_sale_price: { label: "O'rtacha narx" },
+            client_base: { label: 'Mijozlar bazasi' },
+          },
+          charts: {
+            incubation_egg_arrivals: {
+              title: 'Tuxum kirimi',
+              description: 'Kunlar bo‘yicha kelgan tuxumlar hajmi.',
+              series: { eggs_arrived: 'Tuxumlar' },
+            },
+            incubation_quality: {
+              title: 'Sifat bo‘yicha saralash',
+              description: 'Tuxumlar sifat bo‘yicha taqsimoti.',
+              series: { grade_1: '1-nav', grade_2: '2-nav', bad: 'Brak' },
+            },
+            incubation_hatch: {
+              title: 'Jo‘ja chiqishi',
+              description: 'Chiqqan jo‘jalar soni.',
+              series: { chicks: 'Jo‘jalar' },
+            },
+            incubation_revenue: {
+              title: "Jo'jalar bo'yicha tushum",
+              description: "Jo'ja jo'natmalaridan tushgan mablag'.",
+              series: { revenue: 'Tushum' },
+            },
+          },
+          breakdowns: {
+            incubation_sources: {
+              title: 'Tuxum yetkazib beruvchilar',
+              description: 'Asosiy tuxum yetkazib beruvchilar.',
+            },
+            incubation_clients: {
+              title: 'Mijozlar bo‘yicha tushum',
+              description: "Jo'jalar bo'yicha asosiy tushumni berayotgan mijozlar.",
+            },
+          },
+        },
+        factory: {
+          title: 'Fabrika',
+          description: 'Jo‘jalar, yem, dorilar va mijozlar bazasi.',
+          metrics: {
+            chicks_arrived: { label: 'Kelgan jo‘jalar' },
+            feed_arrived: { label: 'Kelgan yem' },
+            medicine_arrived: { label: 'Kelgan dorilar' },
+            client_base: { label: 'Mijozlar bazasi' },
+          },
+          charts: {
+            factory_chicks: {
+              title: 'Jo‘jalar kirimi',
+              description: 'Jo‘jalar kelishi dinamikasi.',
+              series: { chicks: 'Jo‘jalar' },
+            },
+            factory_feed_types: {
+              title: 'Yem turlari',
+              description: 'Yemlarning turlar bo‘yicha taqsimoti.',
+              series: {
+                'BS-01': 'Broyler start',
+                'LG-01': 'Nesushka o‘sish',
+                'DF-01': 'O‘rdak finish',
+              },
+            },
+            factory_medicine_types: {
+              title: 'Dori turlari',
+              description: 'Dorilar toifalar bo‘yicha.',
+              series: {
+                'MED-ANT': 'Antibiotiklar',
+                'MED-VIT': 'Vitaminlar',
+                'MED-PUL': 'Kukun dorilar',
+              },
+            },
+          },
+          breakdowns: {
+            factory_clients: {
+              title: 'Mijozlar bazasi',
+              description: 'Jo‘ja kirimi bo‘yicha asosiy kontragentlar.',
+            },
+          },
+        },
+        feed_mill: {
+          title: 'Yem zavodi',
+          description:
+            'Xomashyo, ingredientlar kombinatsiyasi, mahsulot chiqishi va mijozlar bazasi.',
+          metrics: {
+            raw_arrivals: { label: 'Kelgan xomashyo' },
+            raw_consumptions: { label: 'Sarflangan xomashyo' },
+            product_output: { label: 'Ishlab chiqarilgan mahsulot' },
+            sales_volume: { label: 'Sotilgan mahsulot' },
+            sales_revenue: { label: 'Tushum' },
+            avg_sale_price: { label: "O'rtacha narx" },
+            client_base: { label: 'Mijozlar bazasi' },
+          },
+          charts: {
+            feed_raw_flow: {
+              title: 'Xomashyo: kirim va sarf',
+              description: 'Xomashyo kirimi va ishlatilishi.',
+              series: { arrivals: 'Kirim', consumptions: 'Sarf' },
+            },
+            feed_product_flow: {
+              title: 'Mahsulot: ishlab chiqarish va jo‘natma',
+              description: 'Tayyor mahsulot ishlab chiqarish va jo‘natma.',
+              series: { output: 'Ishlab chiqarish', shipment: 'Jo‘natma' },
+            },
+            feed_revenue: {
+              title: 'Mahsulot bo‘yicha tushum',
+              description: 'Tayyor mahsulot jo‘natmalaridan tushgan mablag‘.',
+              series: { revenue: 'Tushum' },
+            },
+            feed_ingredient_mix: {
+              title: 'Xomashyo kombinatsiyasi',
+              description: 'Mahsulot ichiga qaysi komponentlar kirishini ko‘rsatadi.',
+              series: { 'ING-CORN': 'Makkajo‘xori', 'ING-SOY': 'Soya', 'ING-WHEAT': 'Bug‘doy' },
+            },
+          },
+          breakdowns: {
+            feed_formulas: {
+              title: 'Mahsulot va formulalar',
+              description: 'Asosiy mahsulot chiqishini beradigan formulalar.',
+            },
+            feed_clients: {
+              title: 'Mijozlar bo‘yicha tushum',
+              description: 'Tayyor mahsulot bo‘yicha asosiy tushumni berayotgan mijozlar.',
+            },
+          },
+        },
+        vet_pharmacy: {
+          title: 'Vetapteka',
+          description: 'Dori kirimi, chiqimi, mijozlar bazasi va partiyalar.',
+          metrics: {
+            arrivals: { label: 'Kelgan dorilar' },
+            consumptions: { label: 'Chiqqan dorilar' },
+            stock: { label: 'Ombordagi qoldiq' },
+            client_base: { label: 'Mijozlar bazasi' },
+          },
+          charts: {
+            medicine_flow: {
+              title: 'Dori kirimi va sarfi',
+              description: 'Dorilar kirimi va ishlatilishi.',
+              series: { arrivals: 'Kirim', consumptions: 'Sarf' },
+            },
+            medicine_stock: {
+              title: 'Turlar bo‘yicha qoldiq',
+              description: 'Dori toifalari bo‘yicha qoldiq.',
+              series: { stock: 'Qoldiq' },
+            },
+            medicine_expiry: {
+              title: 'Muddat bo‘yicha qoldiq',
+              description: 'Yaroqlilik muddati bo‘yicha qoldiq.',
+              series: { stock: 'Qoldiq' },
+            },
+          },
+          breakdowns: {
+            medicine_suppliers: {
+              title: 'Mijozlar bazasi',
+              description: 'Dori yetkazib berish bo‘yicha asosiy kontragentlar.',
+            },
+            medicine_batches: {
+              title: 'Shtrix-kod va muddat',
+              description: 'Dori partiyalari, kod va amal qilish muddati.',
+            },
+          },
+        },
+        slaughterhouse: {
+          title: 'So‘yish',
+          description:
+            'Parranda kirimi, 1-nav va 2-nav, qismlarga bo‘lish, yarim tayyor mahsulot va mijozlar bazasi.',
+          metrics: {
+            arrivals: { label: 'Kelgan parranda' },
+            processed: { label: 'Qayta ishlangan parranda' },
+            first_sort_total: { label: '1-nav' },
+            second_sort_total: { label: '2-nav' },
+            semi_products: { label: 'Ishlab chiqarilgan yarim tayyor mahsulot' },
+            sales_volume: { label: 'Sotilgan yarim tayyor mahsulot' },
+            sales_revenue: { label: 'Tushum' },
+            avg_sale_price: { label: "O'rtacha narx" },
+            client_base: { label: 'Mijozlar bazasi' },
+          },
+          charts: {
+            slaughter_flow: {
+              title: 'Kirim va qayta ishlash',
+              description: 'Parranda kirimi va qayta ishlash dinamikasi.',
+              series: { arrivals: 'Kirim', processed: 'Qayta ishlash' },
+            },
+            slaughter_quality: {
+              title: 'Sifat bo‘yicha saralash',
+              description: '1-nav, 2-nav va brak bo‘yicha taqsimot.',
+              series: { first: '1-nav', second: '2-nav', bad: 'Brak' },
+            },
+            slaughter_semi_products: {
+              title: 'Qismlar bo‘yicha bo‘laklash',
+              description: 'Bo‘laklashdan keyin qaysi qismlar chiqishini ko‘rsatadi.',
+              series: {
+                Голень: 'Boldir',
+                Крыло: 'Qanot',
+                Филе: 'File',
+                Бедро: 'Son qismi',
+                Грудка: 'Ko‘krak go‘shti',
+              },
+            },
+            slaughter_revenue: {
+              title: 'Yarim tayyor mahsulot bo‘yicha tushum',
+              description: 'Yarim tayyor mahsulot jo‘natmalaridan tushgan mablag‘.',
+              series: { revenue: 'Tushum' },
+            },
+          },
+          breakdowns: {
+            slaughter_parts: {
+              title: 'Yarim tayyor mahsulot va qismlar',
+              description: 'Asosiy qismlar va yarim tayyor mahsulot partiyalari.',
+            },
+            slaughter_clients: {
+              title: 'Mijozlar bo‘yicha tushum',
+              description: 'Yarim tayyor mahsulot bo‘yicha asosiy tushumni berayotgan mijozlar.',
+            },
+          },
+        },
+      },
+    },
+  },
+  en: {
+    common: {
+      empty: '—',
+      yes: 'Yes',
+      no: 'No',
+      data: 'Data',
+      save: 'Save',
+      refresh: 'Refresh',
+      retry: 'Retry',
+      apply: 'Apply',
+      create: 'Create',
+      edit: 'Edit',
+      delete: 'Delete',
+      confirm: 'Confirm',
+      back: 'Back',
+      continue: 'Continue',
+      reset: 'Reset',
+      close: 'Close',
+      unsavedChangesConfirm: 'There are unsaved changes. Close without saving?',
+      history: 'History',
+      previous: 'Previous',
+      next: 'Next',
+      pageStatus: 'Page {current} of {total}',
+      logout: 'Logout',
+      startTour: 'Tour',
+      help: 'Help',
+      allDepartments: 'All departments',
+      search: 'Search',
+      chooseValue: 'Select a value',
+      noResults: 'Nothing found',
+      loadingOptions: 'Loading options',
+      clearAll: 'Clear all',
+      clearSelection: 'Clear selection',
+      selectedCount: '{count} selected',
+      paginationLabel: 'Pagination',
+      paginationPreviousAria: 'Go to previous page',
+      paginationNextAria: 'Go to next page',
+      paginationMorePages: 'More pages',
+      totalRecords: 'Total records: {count}',
+      loadingLabel: 'Loading',
+      noData: 'No data',
+      email: 'Email',
+      good: 'Good',
+      warning: 'Attention',
+      bad: 'Risk',
+      neutral: 'No rating',
+    },
+    language: { label: 'Language', uz: 'Oʻz', ru: 'Рус', en: 'Eng' },
+    nav: {
+      dashboard: 'Dashboard',
+      heading: 'Navigation',
+      overview: 'Overview',
+      settings: 'Settings',
+      roleManagement: 'Roles',
+      audit: 'Audit',
+    },
+    route: {
+      sessionLabel: 'Session',
+      sessionTitle: 'Preparing access',
+      sessionDescription: 'Checking user data before opening the page.',
+      initLabel: 'Startup',
+      initTitle: 'Preparing application',
+      initDescription: 'Checking local session and choosing the initial page.',
+      forbiddenTitle: 'Access denied',
+      forbiddenDescription: 'The current user does not have permission to open this page.',
+      dashboardForbiddenDescription:
+        'This page requires extended permissions to review financial and operational metrics.',
+      moduleForbiddenDescription:
+        'The current user does not have permission to read records or analytics for this section.',
+      roleManagementForbiddenDescription:
+        'The current user does not have permission to read roles and assignments for this page.',
+      auditForbiddenDescription:
+        'The current user does not have permission to view the audit journal on this page.',
+    },
+    tour: {
+      badge: 'Tour',
+      close: 'Close tour',
+      stepCounter: 'Step {current} of {total}',
+      locatingTarget: 'Locating step element...',
+      skip: 'Skip',
+      previous: 'Back',
+      next: 'Next',
+      finish: 'Finish',
+      tours: {
+        platform: {
+          title: 'Quick platform tour',
+          description: 'Overview of navigation, departments, and workspace controls.',
+        },
+        login: {
+          title: 'Sign-in tour',
+          description: 'A quick guide for signing in and finding key hints.',
+        },
+        dashboard: {
+          title: 'Dashboard tour',
+          description: 'A short walkthrough of status, filters, and summary metrics.',
+        },
+        module: {
+          title: 'Module tour',
+          description: 'How this section works: actions, data groups, records, and change history.',
+        },
+        settings: {
+          title: 'Settings tour',
+          description: 'Tabs, profile details, and your current access.',
+        },
+        roles: {
+          title: 'Roles tour',
+          description: 'Role matrix, role list, and selected role workspace.',
+        },
+        audit: {
+          title: 'Audit tour',
+          description: 'Filters, change feed, and detailed revision snapshots.',
+        },
+        notFound: {
+          title: '404 page tour',
+          description: 'A quick hint on how to get back to working sections.',
+        },
+      },
+      steps: {
+        loginShowcase: {
+          title: 'Info panel',
+          description: 'A short explanation of access and platform basics.',
+        },
+        loginForm: {
+          title: 'Sign-in form',
+          description: 'The main area for entering credentials.',
+        },
+        loginCredentials: {
+          title: 'Credentials',
+          description: 'Enter employee username and password.',
+        },
+        loginSubmit: {
+          title: 'Sign-in button',
+          description: 'Opens the workspace after validation.',
+        },
+        workspaceNav: {
+          title: 'Workspace panel',
+          description: 'This block shows current context and quick access to main sections.',
+        },
+        primaryNavigation: {
+          title: 'Primary navigation',
+          description: 'Move across the main app sections.',
+        },
+        departmentNavigation: {
+          title: 'Department navigation',
+          description: 'Choosing a department changes visible data and available records.',
+        },
+        sessionTools: {
+          title: 'Session tools',
+          description: 'Language switch, tour launch, and sign-out controls.',
+        },
+        dashboardHero: {
+          title: 'Status and context',
+          description: 'Current period, selected department, and overall status are shown here.',
+        },
+        dashboardFilters: {
+          title: 'Analytics filters',
+          description: 'Use period and department filters to recalculate metrics.',
+        },
+        dashboardQuickRanges: {
+          title: 'Quick ranges',
+          description: 'Predefined date ranges for faster reporting.',
+        },
+        dashboardDepartmentFilter: {
+          title: 'Department filter',
+          description: 'Shows data only for the selected department.',
+        },
+        dashboardDateFilter: {
+          title: 'Date range',
+          description: 'Set an exact date range manually.',
+        },
+        dashboardSummary: {
+          title: 'Summary metrics',
+          description: 'Cards with key totals for the selected period and department.',
+        },
+        dashboardSections: {
+          title: 'Detailed sections',
+          description: 'Detailed analytics grouped by business direction.',
+        },
+        moduleViewSwitch: {
+          title: 'View switch',
+          description: 'Switch between record list and analytics view.',
+        },
+        moduleActions: {
+          title: 'Module actions',
+          description: 'Record creation and quick actions inside the current section.',
+        },
+        moduleResourceGroups: {
+          title: 'Resource groups',
+          description: 'Data is grouped by meaning and operation type.',
+        },
+        moduleGroupSwitch: {
+          title: 'Group switch',
+          description: 'Switch between data groups inside the section.',
+        },
+        moduleTabs: {
+          title: 'Section tabs',
+          description: 'Pick the exact section to work with.',
+        },
+        moduleDepartmentFilter: {
+          title: 'Department filter',
+          description: 'Limits records to the selected department.',
+        },
+        moduleSummaryPills: {
+          title: 'Quick summary',
+          description: 'Shows record counts and current context.',
+        },
+        moduleCreateRecord: {
+          title: 'Create record',
+          description: 'If you can create records, a new entry opens in the side form.',
+        },
+        moduleRecords: {
+          title: 'Records table',
+          description: 'Record list with pagination, editing, and quick change history access.',
+        },
+        moduleTable: {
+          title: 'Record list',
+          description: 'Main table with all found records.',
+        },
+        modulePagination: {
+          title: 'Table pages',
+          description: 'Move across record list pages.',
+        },
+        moduleFormDrawer: {
+          title: 'Record form',
+          description: 'Side form for creating and editing records.',
+        },
+        moduleFormFields: {
+          title: 'Form fields',
+          description: 'Fill key fields before saving.',
+        },
+        moduleAuditDrawer: {
+          title: 'History panel',
+          description: 'Detailed history for the selected record.',
+        },
+        moduleAuditHistory: {
+          title: 'History feed',
+          description: 'All changes sorted by time.',
+        },
+        moduleSubdepartments: {
+          title: 'Child departments',
+          description: 'Quick navigation to child department areas.',
+        },
+        settingsTabs: {
+          title: 'Settings tabs',
+          description: 'Switch between profile settings and department management.',
+        },
+        settingsProfile: {
+          title: 'Profile card',
+          description: 'Main profile details and edit entry point are located here.',
+        },
+        settingsAccess: {
+          title: 'Roles and access',
+          description: 'Current roles and access applied to your profile.',
+        },
+        settingsSecurity: {
+          title: 'Security',
+          description: 'Manage password and profile security.',
+        },
+        settingsContext: {
+          title: 'Work context',
+          description: 'Current organization and department you work in.',
+        },
+        settingsDepartments: {
+          title: 'Department management',
+          description: 'In this tab you can build and update the department structure.',
+        },
+        settingsDepartmentFilters: {
+          title: 'Search and filters',
+          description: 'Helps you quickly find the needed department.',
+        },
+        settingsDepartmentTree: {
+          title: 'Department tree',
+          description: 'Department list with hierarchy.',
+        },
+        settingsDepartmentDetails: {
+          title: 'Department card',
+          description: 'Details and actions for the selected department.',
+        },
+        settingsAccountDrawer: {
+          title: 'Profile form',
+          description: 'Edit personal details and password.',
+        },
+        settingsDepartmentDrawer: {
+          title: 'Department form',
+          description: 'Create and edit departments.',
+        },
+        settingsDepartmentFormMain: {
+          title: 'Main department fields',
+          description: 'Core fields required to save a department.',
+        },
+        settingsDepartmentFormIcon: {
+          title: 'Icon selection',
+          description: 'Choose a visual icon for the department.',
+        },
+        settingsDepartmentFormResponsible: {
+          title: 'Responsible employee',
+          description: 'Assign the person responsible for this department.',
+        },
+        rolesHero: {
+          title: 'Roles matrix',
+          description: 'Top summary for roles, access levels, and assigned employees.',
+        },
+        rolesList: {
+          title: 'Role list',
+          description: 'Pick a role for editing or create a new one.',
+        },
+        rolesSearch: {
+          title: 'Role search',
+          description: 'Quick search by role name or code.',
+        },
+        rolesWorkspace: {
+          title: 'Role workspace',
+          description: 'Status, description, and active access set for the selected role.',
+        },
+        rolesWorkspaceActions: {
+          title: 'Role actions',
+          description: 'Buttons for editing and employee assignments.',
+        },
+        rolesPermissionsPreview: {
+          title: 'Role access list',
+          description: 'Current access set of the selected role.',
+        },
+        rolesEditorDrawer: {
+          title: 'Role form',
+          description: 'Create a new role or edit an existing one.',
+        },
+        rolesEditorMainFields: {
+          title: 'Main role fields',
+          description: 'Role name, code, and description.',
+        },
+        rolesEditorPermissions: {
+          title: 'Access setup',
+          description: 'Choose access options for this role.',
+        },
+        rolesAssignmentsDrawer: {
+          title: 'Employee assignments',
+          description: 'Manage who belongs to this role.',
+        },
+        rolesAssignmentsSearch: {
+          title: 'Employee search',
+          description: 'Search by name, username, or email.',
+        },
+        rolesAssignmentsList: {
+          title: 'Employee list',
+          description: 'Assign or remove role in one click.',
+        },
+        auditHero: {
+          title: 'Audit journal',
+          description: 'Section purpose and total change volume overview.',
+        },
+        auditFilters: {
+          title: 'Audit filters',
+          description: 'Filter changes by action, table, specific record, and date range.',
+        },
+        auditSearch: {
+          title: 'Change search',
+          description: 'Quickly find needed entries in the journal.',
+        },
+        auditFeed: {
+          title: 'Change feed',
+          description: 'Open any row to inspect changed fields and before/after snapshots.',
+        },
+        auditMainTable: {
+          title: 'History table',
+          description: 'Main list of found changes.',
+        },
+        auditPagination: {
+          title: 'History pages',
+          description: 'Navigate across journal pages.',
+        },
+        auditDetailsDrawer: {
+          title: 'Change details',
+          description: 'Detailed card of the selected change.',
+        },
+        auditDetailsSnapshots: {
+          title: 'Before and after',
+          description: 'Compare data state before and after the change.',
+        },
+        notFoundShowcase: {
+          title: 'Hints',
+          description: 'Why this 404 page may have appeared.',
+        },
+        notFoundCard: {
+          title: 'Page not found',
+          description: 'Main information about the unavailable page.',
+        },
+        notFoundBack: {
+          title: 'Back action',
+          description: 'Button to return to a working section.',
+        },
+      },
+    },
+    login: {
+      sideBadge: 'Sign in',
+      formBadge: 'Authorization',
+      title: 'Sign in',
+      description: 'Enter your username and password to access the workspace.',
+      sideDescription: 'Use employee credentials to sign in.',
+      cardOneTitle: 'Secure access',
+      cardOneDescription: 'Access is granted through an employee account.',
+      cardTwoTitle: 'Workspace',
+      cardTwoDescription: 'The main workspace opens after sign in.',
+      cardThreeTitle: 'Permissions',
+      cardThreeDescription: 'Sections are shown according to the user role.',
+      username: 'Username',
+      password: 'Password',
+      submit: 'Sign in',
+      pending: 'Checking credentials...',
+      afterLogin: 'The workspace will open after successful sign in.',
+      validation: {
+        usernameRequired: 'Username is required',
+        passwordRequired: 'Password is required',
+      },
+    },
+    dashboard: {
+      label: 'Analytics',
+      loadingTitle: 'Preparing data',
+      loadingDescription: 'Loading metrics for the main sections.',
+      errorTitle: 'Data is temporarily unavailable',
+      heroTitleFallback: 'Overview',
+      heroDescriptionFallback: 'Key metrics for the selected section.',
+      activeSection: 'Section',
+      charts: 'Charts',
+      updatedAt: 'Updated',
+      chartsSummary: '{charts} charts and {lists} lists',
+      summaryBadge: 'Summary',
+      summaryTitle: 'Quick overview',
+      summaryDescription: 'Key metrics for the selected section.',
+      overallStatus: 'Overall status',
+      metrics: 'Metrics',
+      lists: 'Lists',
+      listsHint: 'Clients, batches and stock',
+      switcherTitle: 'Sections',
+      switcherDescription: 'Choose a section to view data.',
+      dateRangeTitle: 'Period',
+      dateRangeDescription:
+        'Choose exact dates. One click selects a day, two clicks create a range.',
+      dateRangePlaceholder: 'All dates',
+      periodLabel: 'Period',
+      scopeLabel: 'Scope',
+      noChartData: 'No data to display',
+      noBreakdownData: 'No data',
+      noDataTitle: 'No data for the selected period',
+      noDataDescription: 'Change the period or choose another department to see the metrics.',
+      moduleUnavailable: 'Analytics is not available for this section yet.',
+      revenueCalculatorTitle: 'Revenue calculator',
+      revenueCalculatorDescription:
+        'Enter a sales volume and the system will estimate revenue using the average price for the selected period.',
+      calculationVolume: 'Volume for calculation',
+      averagePrice: 'Average price',
+      estimatedRevenue: 'Estimated revenue',
+    },
+    settings: {
+      title: 'Settings',
+      description: 'Profile and access settings.',
+      account: 'Account',
+      profileTitle: 'Profile',
+      profileDescription: 'Main user information.',
+      securityTitle: 'Password',
+      securityDescription: 'Fill the fields below only if you want to change the password.',
+      username: 'Username',
+      firstName: 'First name',
+      lastName: 'Last name',
+      email: 'Email',
+      phone: 'Phone',
+      currentPassword: 'Current password',
+      newPassword: 'New password',
+      confirmNewPassword: 'Confirm new password',
+      success: 'Changes have been saved.',
+      validation: {
+        firstNameRequired: 'First name is required',
+        lastNameRequired: 'Last name is required',
+        invalidEmail: 'Invalid email',
+        currentPasswordRequired: 'Enter the current password',
+        newPasswordRequired: 'Enter the new password',
+        newPasswordShort: 'New password must be at least 8 characters long',
+        confirmPasswordMismatch: 'Password confirmation does not match',
+      },
+    },
+    validation: {
+      defaultValueLabel: 'Значение',
+      defaultDateLabel: 'Дата',
+      required: 'Поле "{label}" обязательно.',
+      nonEmpty: 'Поле "{label}" не может быть пустым.',
+      textType: 'Поле "{label}" должно быть текстом.',
+      numberType: 'Поле "{label}" должно быть числом.',
+      positive: 'Поле "{label}" должно быть больше 0.',
+      validEmail: 'Введите корректный {label}.',
+      dateFormat: 'Поле "{label}" должно быть в формате YYYY-MM-DD.',
+    },
+    notFound: {
+      sideTitle: 'Страница не найдена',
+      sideDescription: 'Запрошенная страница не существует или введён неверный адрес.',
+      cardOneTitle: 'Адрес',
+      cardOneDescription: 'По этому адресу страница не найдена.',
+      cardTwoTitle: 'Навигация',
+      cardTwoDescription: 'Вернуться на стартовую страницу приложения.',
+      cardThreeTitle: 'Действие',
+      cardThreeDescription: 'Кнопка справа возвращает вас на начальный экран.',
+      title: 'Страница не найдена',
+      description: 'Вернитесь на главную страницу и продолжите работу.',
+    },
+    crud: {
+      moduleNotFoundTitle: 'Раздел не найден',
+      moduleNotFoundDescription: 'Запрошенный раздел недоступен.',
+      resourceNotFoundTitle: 'Раздел недоступен',
+      resourceNotFoundDescription: 'Для этого раздела пока нет данных.',
+      pageDescription: 'Просмотр и редактирование данных.',
+      listDescription: 'Список записей.',
+      resourceGroupFinance: 'Финансы',
+      resourceGroupPeopleClients: 'Сотрудники и клиенты',
+      resourceGroupOperations: 'Подразделы отделов',
+      departmentFilter: 'Отдел',
+      departmentAnalyticsTitle: 'Аналитика',
+      departmentAnalyticsDescription: 'Головной отдел показывает аналитику всего дерева отделов.',
+      departmentAnalyticsHint:
+        'Операционные записи ведутся в дочерних отделах. На уровне головного отдела доступна только аналитика.',
+      openAnalytics: 'Открыть аналитику',
+      openFinanceCenter: 'Финансовый центр',
+      subdepartmentsTitle: 'Подотделы',
+      subdepartmentsDescription:
+        'Выберите дочерний отдел для работы с сотрудниками, расходами и другими данными.',
+      subdepartmentCount: 'Подотделов: {count}',
+      formCreateTitle: 'Создать запись',
+      formEditTitle: 'Редактировать запись',
+      formDescription: 'Заполните поля и сохраните изменения.',
+      newRecord: 'Новая запись',
+      clearForm: 'Очистить форму',
+      actions: 'Действия',
+      emptyResource: 'Для “{resource}” пока нет записей.',
+      confirmDelete: 'Удалить эту запись?',
+      confirmDeleteAgain: 'Подтвердите удаление ещё раз.',
+      created: 'Запись создана.',
+      updated: 'Изменения сохранены.',
+      deleted: 'Запись удалена.',
+      selectRecordFirst: 'Сначала выберите запись для редактирования.',
+      validation: {
+        required: 'Пожалуйста, заполните это поле.',
+        integer: 'Введите целое число.',
+        number: 'Введите числовое значение.',
+        invalidJson: 'Неверный формат JSON.',
+      },
+    },
+    fields: {
+      id: 'ID',
+      key: 'Ключ',
+      name: 'Название',
+      code: 'Код',
+      description: 'Описание',
+      first_name: 'Имя',
+      last_name: 'Фамилия',
+      email: 'Эл. почта',
+      phone: 'Телефон',
+      organization_id: 'Организация',
+      department_id: 'Отдел',
+      warehouse_id: 'Склад',
+      from_warehouse_id: 'Со склада',
+      to_warehouse_id: 'На склад',
+      counterparty_warehouse_id: 'Встречный склад',
+      parent_department_id: 'Родительский отдел',
+      module_key: 'Модуль',
+      head_id: 'Руководитель отдела',
+      position_id: 'Должность',
+      role_id: 'Роль',
+      permission_id: 'Право',
+      employee_id: 'Сотрудник',
+      title: 'Наименование',
+      slug: 'Системное имя',
+      is_active: 'Активно',
+      min_salary: 'Минимальная зарплата',
+      max_salary: 'Максимальная зарплата',
+      salary: 'Зарплата',
+      address: 'Адрес',
+      company_name: 'Компания',
+      category: 'Категория',
+      client_code: 'Код клиента',
+      legal_name: 'Юр. лицо',
+      organization_key: 'Логин',
+      password: 'Пароль',
+      action: 'Действие',
+      resource: 'Ресурс',
+      is_primary: 'Основной',
+      expires_at: 'Срок действия',
+      created_at: 'Создано',
+      updated_at: 'Обновлено',
+      sort_order: 'Порядок',
+      category_id: 'Категория',
+      expense_category_id: 'Категория расхода',
+      item: 'Позиция',
+      quantity: 'Количество',
+      unit: 'Единица',
+      unit_price: 'Цена за единицу',
+      amount: 'Сумма',
+      expense_date: 'Дата расхода',
+      cash_account_id: 'Счёт кассы',
+      opening_balance: 'Остаток на начало',
+      transaction_type: 'Тип операции',
+      transaction_date: 'Дата операции',
+      reference_no: 'Номер документа',
+      counterparty_client_id: 'Контрагент',
+      created_by: 'Создано',
+      note: 'Примечание',
+      part_name: 'Наименование части',
+      poultry_type_id: 'Тип птицы',
+      supplier_client_id: 'Поставщик',
+      arrived_on: 'Дата прихода',
+      birds_count: 'Количество птицы',
+      average_weight_kg: 'Средний вес, кг',
+      currency: 'Валюта',
+      symbol: 'Символ',
+      is_default: 'По умолчанию',
+      invoice_no: 'Номер счёта',
+      arrival_id: 'Партия прихода',
+      processed_on: 'Дата обработки',
+      birds_processed: 'Птицы обработано',
+      first_sort_count: 'Первый сорт',
+      second_sort_count: 'Второй сорт',
+      bad_count: 'Брак',
+      first_sort_weight_kg: 'Вес первого сорта, кг',
+      second_sort_weight_kg: 'Вес второго сорта, кг',
+      bad_weight_kg: 'Вес брака, кг',
+      processed_by: 'Ответственный сотрудник',
+      produced_on: 'Дата производства',
+      quality: 'Качество',
+      shipped_on: 'Дата отгрузки',
+      semi_product_id: 'Полуфабрикат',
+      client_id: 'Клиент',
+      icon: 'Иконка',
+    },
+    cashTransactionTypes: {
+      income: 'Приход',
+      expense: 'Расход',
+      transfer_in: 'Входящий перевод',
+      transfer_out: 'Исходящий перевод',
+      adjustment: 'Корректировка',
+    },
+    departmentIcons: {
+      building: 'Здание',
+      coins: 'Монеты',
+      egg: 'Яйцо',
+      factory: 'Фабрика',
+      package: 'Упаковка',
+      pill: 'Таблетка',
+      shield: 'Щит',
+      users: 'Команда',
+      box: 'Коробка',
+      briefcase: 'Портфель',
+      leaf: 'Лист',
+      archive: 'Архив',
+    },
+    modules: {
+      core: { label: 'Справочники' },
+      egg: { label: 'Маточник' },
+      incubation: { label: 'Инкубация' },
+      factory: { label: 'Фабрика' },
+      feed: { label: 'Корма' },
+      medicine: { label: 'Ветаптека' },
+      slaughter: { label: 'Убойня' },
+      finance: { label: 'Финансы' },
+      hr: { label: 'Сотрудники' },
+    },
+    resources: {
+      organizations: { label: 'Организации' },
+      departments: { label: 'Отделы' },
+      warehouses: { label: 'Склады' },
+      'stock-movements': { label: 'Stock movements' },
+      'department-modules': { label: 'Модули отделов' },
+      clients: { label: 'Клиенты' },
+      currencies: { label: 'Валюты' },
+      'poultry-types': { label: 'Типы птицы' },
+      production: { label: 'Производство' },
+      shipments: { label: 'Отгрузки' },
+      'monthly-analytics': { label: 'Месячная аналитика' },
+      'chick-arrivals': { label: 'Приход птенцов' },
+      'feed-arrivals': { label: 'Приход корма' },
+      'feed-consumptions': { label: 'Расход корма' },
+      'medicine-arrivals': { label: 'Приход лекарств' },
+      'medicine-consumptions': { label: 'Расход лекарств' },
+      'factory-clients': { label: 'Клиентская база' },
+      'chick-shipments': { label: 'Отгрузка птенцов' },
+      batches: { label: 'Партии' },
+      runs: { label: 'Циклы' },
+      'factory-monthly-analytics': { label: 'Аналитика фабрики' },
+      types: { label: 'Типы' },
+      ingredients: { label: 'Сырьё' },
+      arrivals: { label: 'Приход' },
+      formulas: { label: 'Продукт' },
+      'formula-ingredients': { label: 'Комбинация сырья' },
+      'raw-arrivals': { label: 'Приход сырья' },
+      'production-batches': { label: 'Выпуск продукции' },
+      'raw-consumptions': { label: 'Расход сырья' },
+      'product-shipments': { label: 'Отгрузка продукции' },
+      'cash-accounts': { label: 'Кассы' },
+      'cash-transactions': { label: 'Движение кассы' },
+      consumptions: { label: 'Расходы' },
+      processings: { label: 'Сортировка и разделка' },
+      'semi-products': { label: 'Полуфабрики и части' },
+      'semi-product-shipments': { label: 'Отгрузка полуфабриката' },
+      'expense-categories': { label: 'Категории расходов' },
+      expenses: { label: 'Расходы' },
+      employees: { label: 'Сотрудники' },
+      positions: { label: 'Должности' },
+      roles: { label: 'Роли' },
+      permissions: { label: 'Права' },
+    },
+    units: { pcs: 'шт', clients: 'клиентов', kg: 'кг', units: 'ед.' },
+    dashboardData: {
+      sections: {
+        egg_farm: {
+          title: 'Маточник',
+          description: 'Производство яиц, расход корма и лекарств, отгрузки клиентам.',
+          metrics: {
+            net_eggs: { label: 'Чистый выход яиц' },
+            feed_consumed: { label: 'Расход корма' },
+            medicine_used: { label: 'Расход лекарств' },
+            sales_volume: { label: 'Продано клиентам' },
+            sales_revenue: { label: 'Выручка' },
+            avg_sale_price: { label: 'Средняя цена' },
+            client_base: { label: 'Активная клиентская база' },
+          },
+          charts: {
+            egg_output_daily: {
+              title: 'Ежедневный выход яиц',
+              description: 'Ежедневная динамика собранных и чистых яиц.',
+              series: {
+                collected: 'Собрано',
+                broken: 'Брак',
+                rejected: 'Брак',
+                net: 'Чистый выход',
+              },
+            },
+            egg_monthly_flow: {
+              title: 'Месячная динамика',
+              description: 'Производство, отгрузки и потери по месяцам.',
+              series: { produced: 'Произведено', shipped: 'Отгружено', losses: 'Потери' },
+            },
+            farm_feed_supply: {
+              title: 'Расход корма',
+              description: 'Фактический ежедневный расход корма.',
+              series: { feed: 'Корм' },
+            },
+            farm_medicine_usage: {
+              title: 'Расход лекарств',
+              description: 'Ежедневный расход лекарств.',
+              series: { medicine: 'Лекарства' },
+            },
+            egg_revenue_daily: {
+              title: 'Выручка от яиц',
+              description: 'Выручка по отгрузкам яиц.',
+              series: { revenue: 'Выручка' },
+            },
+          },
+          breakdowns: {
+            egg_clients: {
+              title: 'Выручка по клиентам',
+              description: 'Клиенты, обеспечивающие основную выручку по яйцам.',
+            },
+            egg_feed_types: {
+              title: 'Смешивание корма по типам',
+              description: 'Типы корма, наиболее используемые на маточнике.',
+            },
+          },
+        },
+        incubation: {
+          title: 'Инкубация',
+          description: 'Приход яиц, сортировка и вывод птенцов.',
+          metrics: {
+            eggs_arrived: { label: 'Яиц поступило' },
+            grade_1_total: { label: 'Сорт 1' },
+            grade_2_total: { label: 'Сорт 2' },
+            bad_eggs_total: { label: 'Брак' },
+            chicks_hatched: { label: 'Птенцов выведено' },
+            sales_volume: { label: 'Птенцов продано' },
+            sales_revenue: { label: 'Выручка' },
+            avg_sale_price: { label: 'Средняя цена' },
+            client_base: { label: 'Клиентская база' },
+          },
+          charts: {
+            incubation_egg_arrivals: {
+              title: 'Приход яиц',
+              description: 'Ежедневный объём поступивших яиц.',
+              series: { eggs_arrived: 'Яйца' },
+            },
+            incubation_quality: {
+              title: 'Сортировка по качеству',
+              description: 'Распределение по качеству яиц.',
+              series: { grade_1: 'Сорт 1', grade_2: 'Сорт 2', bad: 'Брак' },
+            },
+            incubation_hatch: {
+              title: 'Вылупление',
+              description: 'Количество выведенных птенцов.',
+              series: { chicks: 'Птенцы' },
+            },
+            incubation_revenue: {
+              title: 'Выручка от птенцов',
+              description: 'Выручка по отгрузкам птенцов.',
+              series: { revenue: 'Выручка' },
+            },
+          },
+          breakdowns: {
+            incubation_sources: {
+              title: 'Поставщики яиц',
+              description: 'Основные источники поставок яиц.',
+            },
+            incubation_clients: {
+              title: 'Выручка по клиентам',
+              description: 'Клиенты с основной выручкой по птенцам.',
+            },
+          },
+        },
+        factory: {
+          title: 'Фабрика',
+          description: 'Поступление птенцов, расход корма и лекарств, клиентская база.',
+          metrics: {
+            chicks_arrived: { label: 'Поступило птенцов' },
+            feed_arrived: { label: 'Поступило корма' },
+            medicine_arrived: { label: 'Поступило лекарств' },
+            client_base: { label: 'Клиентская база' },
+          },
+          charts: {
+            factory_chicks: {
+              title: 'Приход птенцов',
+              description: 'Динамика поступления птенцов.',
+              series: { chicks: 'Птенцы' },
+            },
+            factory_feed_types: {
+              title: 'Корм по типу',
+              description: 'Распределение корма по категориям.',
+              series: {
+                'BS-01': 'Стартовый для бройлеров',
+                'LG-01': 'Интенсивный для кур-несушек',
+                'DF-01': 'Финишный для уток',
+              },
+            },
+            factory_medicine_types: {
+              title: 'Лекарства по типам',
+              description: 'Приход лекарств по категориям.',
+              series: {
+                'MED-ANT': 'Антибиотики',
+                'MED-VIT': 'Витамины',
+                'MED-PUL': 'Порошковые препараты',
+              },
+            },
+          },
+          breakdowns: {
+            factory_clients: {
+              title: 'Клиентская база',
+              description: 'Основные контрагенты по поступлению птенцов.',
+            },
+          },
+        },
+        feed_mill: {
+          title: 'Корма',
+          description: 'Сырьё, смешивание ингредиентов, выпуск продукции и клиентская база.',
+          metrics: {
+            raw_arrivals: { label: 'Поступило сырья' },
+            raw_consumptions: { label: 'Расход сырья' },
+            product_output: { label: 'Выпуск продукции' },
+            sales_volume: { label: 'Продано продукции' },
+            sales_revenue: { label: 'Выручка' },
+            avg_sale_price: { label: 'Средняя цена' },
+            client_base: { label: 'Клиентская база' },
+          },
+          charts: {
+            feed_raw_flow: {
+              title: 'Сырьё: приход и расход',
+              description: 'Приход и расход сырья.',
+              series: { arrivals: 'Приход', consumptions: 'Расход' },
+            },
+            feed_product_flow: {
+              title: 'Продукция: выпуск и отгрузка',
+              description: 'Выпуск готовой продукции и отгрузка.',
+              series: { output: 'Выпуск', shipment: 'Отгрузка' },
+            },
+            feed_revenue: {
+              title: 'Выручка по продукту',
+              description: 'Выручка от отгрузок готового продукта.',
+              series: { revenue: 'Выручка' },
+            },
+            feed_ingredient_mix: {
+              title: 'Комбинация ингредиентов',
+              description: 'Какие сырьевые компоненты используются в продукте.',
+              series: { 'ING-CORN': 'Кукуруза', 'ING-SOY': 'Соя', 'ING-WHEAT': 'Пшеница' },
+            },
+          },
+          breakdowns: {
+            feed_formulas: {
+              title: 'Продукт и формулы',
+              description: 'Формулы, определяющие основной выпуск продукта.',
+            },
+            feed_clients: {
+              title: 'Выручка по клиентам',
+              description: 'Клиенты, обеспечивающие основную выручку по готовому продукту.',
+            },
+          },
+        },
+        vet_pharmacy: {
+          title: 'Ветаптека',
+          description: 'Приход, расход и остатки лекарств, клиентская база и партии.',
+          metrics: {
+            arrivals: { label: 'Поступило лекарств' },
+            consumptions: { label: 'Списано лекарств' },
+            stock: { label: 'Текущий остаток' },
+            client_base: { label: 'Клиентская база' },
+          },
+          charts: {
+            medicine_flow: {
+              title: 'Приход и расход лекарств',
+              description: 'Поступление и использование лекарств.',
+              series: { arrivals: 'Приход', consumptions: 'Расход' },
+            },
+            medicine_stock: {
+              title: 'Остатки по типам',
+              description: 'Остатки по типам лекарств.',
+              series: { stock: 'Остаток' },
+            },
+            medicine_expiry: {
+              title: 'Остатки по сроку годности',
+              description: 'Остатки по срокам годности.',
+              series: { stock: 'Остаток' },
+            },
+          },
+          breakdowns: {
+            medicine_suppliers: {
+              title: 'Поставщики лекарств',
+              description: 'Основные контрагенты по поставкам лекарств.',
+            },
+            medicine_batches: {
+              title: 'Штрихкод и срок годности',
+              description: 'Партии лекарств с кодом и датой действия.',
+            },
+          },
+        },
+        slaughterhouse: {
+          title: 'Убойня',
+          description:
+            'Поступление птицы, 1 и 2 сорт, разделка по частям, полуфабрикаты и клиентская база.',
+          metrics: {
+            arrivals: { label: 'Птицы поступило' },
+            processed: { label: 'Птицы обработано' },
+            first_sort_total: { label: 'Первый сорт' },
+            second_sort_total: { label: 'Второй сорт' },
+            semi_products: { label: 'Полуфабрикаты произведено' },
+            sales_volume: { label: 'Продано полуфабрикатов' },
+            sales_revenue: { label: 'Выручка' },
+            avg_sale_price: { label: 'Средняя цена' },
+            client_base: { label: 'Клиентская база' },
+          },
+          charts: {
+            slaughter_flow: {
+              title: 'Приход и обработка',
+              description: 'Поступление птицы и динамика обработки.',
+              series: { arrivals: 'Приход', processed: 'Обработка' },
+            },
+            slaughter_quality: {
+              title: 'Сортировка по качеству',
+              description: 'Сорт 1, сорт 2 и брак.',
+              series: { first: 'Сорт 1', second: 'Сорт 2', bad: 'Брак' },
+            },
+            slaughter_semi_products: {
+              title: 'Разделка по частям',
+              description: 'Какие части птицы получаются после разделки.',
+              series: {
+                Голень: 'Drumstick',
+                Крыло: 'Wing',
+                Филе: 'Филе',
+                Бедро: 'Бедро',
+                Грудка: 'Грудка',
+              },
+            },
+            slaughter_revenue: {
+              title: 'Выручка от полуфабрикатов',
+              description: 'Выручка по отгрузке полуфабрикатов.',
+              series: { revenue: 'Выручка' },
+            },
+          },
+          breakdowns: {
+            slaughter_parts: {
+              title: 'Полуфабрикаты и части',
+              description: 'Ключевые позиции и партии полуфабрикатов.',
+            },
+            slaughter_clients: {
+              title: 'Выручка по клиентам',
+              description: 'Клиенты с основной выручкой от полуфабрикатов.',
+            },
+          },
+        },
+      },
+    },
+  },
+};
+
+const translationOverrides: Partial<Record<Language, Record<string, unknown>>> = {
+  ru: {
+    nav: {
+      dashboard: 'Обзор',
+    },
+    route: {
+      workspaceErrorTitle: 'Не удалось подготовить рабочее пространство',
+      workspaceErrorDescription:
+        'Не удалось загрузить конфигурацию модулей и прав. Повторите попытку.',
+    },
+    dashboard: {
+      quickRangeToday: 'Сегодня',
+      quickRangeYesterday: 'Вчера',
+      quickRangeTomorrow: 'Завтра',
+      quickRangeLast7Days: '7 дней',
+      quickRangeLast30Days: '30 дней',
+      quickRangeMonth: 'Месяц',
+      quickRangeQuarter: 'Квартал',
+      rangeSelectedCaption: 'Выбранный период',
+      rangeSingleDay: 'Один день',
+      rangeNoDateRestriction: 'Без ограничения по датам',
+      rangeDayUnit: 'дн.',
+      allTime: 'За всё время',
+      moduleLabel: 'Модуль',
+      departmentResultCaption: '{module} · Выручка {revenue} · Расходы {expenses}',
+      statusNoMovement: 'Нет движения',
+      statusLoss: 'Прибыль ниже нуля',
+      statusCashDown: 'Касса снижается',
+      statusPositiveFlow: 'Поток положительный',
+      statusNeedsAttention: 'Нужен контроль',
+      scopeTitle: 'Срез',
+      periodTitle: 'Период',
+      filterPanelTitle: 'Период и срез',
+      filterPanelDescription:
+        'Сначала выберите быстрый период или точные даты, потом при необходимости сузьте обзор до одного отдела.',
+      filterActionsTitle: 'Сброс',
+      filterResetDescription: 'Вернуть общий срез и последние 30 дней.',
+      quickRangesTitle: 'Быстрый период',
+      sectionJumpTitle: 'Разделы',
+      executiveDepartmentsTitle: 'Отделы',
+      executiveDepartmentsDescription:
+        'Сравнение отделов по оценке, выручке, выпуску и потерям.',
+      executiveRisksTitle: 'Риски и расходы',
+      executiveRisksDescription:
+        'Куда уходят деньги и какие сигналы требуют реакции в первую очередь.',
+      metricCategoryHealth: 'Состояние',
+      metricCategoryFinance: 'Финансы',
+      metricCategoryFlow: 'Объём',
+      metricCategoryRisk: 'Риски',
+      metricCategoryOperations: 'Операции',
+      metricPreviousValue: 'Было',
+      metricNoComparison: 'Без сравнения',
+      chartKindTrend: 'Тренд',
+      chartKindComparison: 'Сравнение',
+      chartKindComposition: 'Состав',
+      chartKindSnapshot: 'Срез',
+      chartBlockLabelShort: 'граф.',
+      chartSeriesLabelShort: 'сер.',
+      breakdownKindLabel: 'Список',
+      breakdownBlockLabelShort: 'списк.',
+      breakdownLabelShort: 'поз.',
+      topItemLabel: 'Главная позиция',
+      departmentResultCaptionWithStatus:
+        '{module} · Статус {status} · Потери {losses} · Выручка {revenue} · Выпуск {output}',
+      lossesLabel: 'Потери',
+      revenueLabel: 'Выручка',
+      outputLabel: 'Выпуск',
+      financeSectionTitle: 'Финансы',
+      financeSectionCaption: 'Выручка, расходы и итог периода.',
+      cashSectionTitle: 'Касса',
+      cashSectionCaption: 'Остатки, поступления и выбытия денег.',
+      summaryMetrics: {
+        cash_balance: { label: 'Касса сейчас' },
+        sales_revenue: { label: 'Выручка' },
+        total_expenses: { label: 'Расходы' },
+        financial_result: { label: 'Финрезультат' },
+        operating_profit: { label: 'Операционная прибыль' },
+        net_cashflow: { label: 'Денежный поток' },
+        health_index: { label: 'Состояние бизнеса' },
+        value_chain_output: { label: 'Общий выпуск' },
+        value_chain_loss_rate: { label: 'Доля потерь' },
+        active_risks: { label: 'Проблемные сигналы' },
+        active_departments: { label: 'Активные отделы' },
+      },
+    },
+    settings: {
+      heroHint:
+        'Здесь собраны личные настройки, контекст вашей организации и структура департаментов.',
+      heroDescription:
+        'Сначала проверьте профиль и безопасность, затем переходите к управлению отделами и их иерархией.',
+      departmentsTitle: 'Отделы',
+      departmentsSectionTitle: 'Управление отделами',
+      accessTitle: 'Доступ',
+      accessDescription: 'Текущий отдел, роли и права, применяемые к вашему профилю.',
+      rolesTitle: 'Роли',
+      permissionsTitle: 'Права',
+      securityPanelHint:
+        'Смена пароля находится в той же форме редактирования профиля. Заполняйте парольные поля только при необходимости.',
+      contextTitle: 'Рабочий контекст',
+      contextDescription:
+        'Эти данные используются системой как базовый контекст для скрытых полей в CRUD-формах.',
+      departmentsDescription:
+        'Создание, редактирование и удаление департаментов и поддепартаментов внутри вашей организации.',
+      departmentDirectoryDescription:
+        'Используйте поиск и фильтры, затем управляйте отделами прямо в списке.',
+      departmentDetailsTitle: 'Детали отдела',
+      departmentDetailsDescription:
+        'Выбранный отдел, его иерархия и доступные действия в одном месте.',
+      departmentHeadScopeHint:
+        'Вы управляете только своим отделом и вложенными подразделениями. Корневые отделы создавать и свой отдел удалять нельзя.',
+      accountTabDescription: 'Профиль, безопасность и рабочий контекст.',
+      departmentsTabDescription: 'Структура отделов, иерархия и управление подразделениями.',
+      departmentSearchLabel: 'Поиск по отделам',
+      departmentSearchPlaceholder: 'Название, код, описание, ответственный',
+      moduleFilterLabel: 'Фильтр по модулю',
+      statusFilterLabel: 'Фильтр по статусу',
+      statusAll: 'Все',
+      statusActive: 'Только активные',
+      statusInactive: 'Только неактивные',
+      filterResetTitle: 'Сбросить фильтры',
+      filterResetHint: 'Активно {count} фильтра. Верните полный список одним нажатием.',
+      currentSelectionTitle: 'Текущий срез',
+      currentSelectionHint: 'Сейчас видно {count} из {total} отделов.',
+      visibleDepartmentsLabel: 'Видно: {count}',
+      rootDepartmentsLabel: 'Головные отделы: {count}',
+      nestedDepartmentsLabel: 'Вложенные отделы: {count}',
+      responsibleDepartmentsLabel: 'С ответственным: {count}',
+      emptyDepartmentsTitle: 'Пока нет отделов',
+      emptyDepartmentsDescription:
+        'Создайте первый отдел, чтобы выстроить структуру подразделений и рабочий контекст для модулей.',
+      noDepartmentsMatchTitle: 'Ничего не найдено',
+      noDepartmentsMatchDescription:
+        'Измените поисковый запрос или сбросьте фильтры, чтобы снова увидеть структуру отделов.',
+      departmentWorkspaceTitle: 'Панель структуры',
+      departmentWorkspaceDescription:
+        'Быстрый обзор текущей организации, активных отделов и модульного распределения.',
+      organizationScopedHint:
+        'Новые отделы создаются внутри текущей организации. Поле организации больше не показывается в форме вручную.',
+      noDepartmentSelectedTitle: 'Отдел не выбран',
+      noDepartmentSelectedDescription:
+        'Выберите отдел слева, чтобы увидеть его детали, иерархию и доступные действия.',
+      selectedDepartmentPathTitle: 'Путь',
+      focusDepartmentTitle: 'Фокусный отдел',
+      focusDepartmentHint:
+        'Выберите отдел через редактирование, чтобы быстро проверить его свойства и иерархию.',
+      moduleDistributionTitle: 'Распределение по модулям',
+      childrenLabel: 'Дети: {count}',
+      descendantsLabel: 'Потомки: {count}',
+      depthLabel: 'Уровень: {count}',
+      createDepartmentTitle: 'Новый отдел',
+      createSubdepartment: 'Дочерний отдел',
+      editDepartmentTitle: 'Редактирование отдела',
+      departmentFormDescription: 'Заполните поля департамента и сохраните изменения.',
+      responsibleUserTitle: 'Ответственный пользователь',
+      responsibleUserDescription:
+        'Назначьте сотрудника, который отвечает за работу этого отдела и является основным контактным лицом.',
+      responsibleUserPlaceholder: 'Выберите пользователя',
+      responsibleUserEmpty: 'Ответственный не назначен',
+      useCurrentUserAsResponsible: 'Назначить меня',
+      clearResponsibleUser: 'Очистить',
+      employeeInactiveLabel: 'неактивный',
+      deleteDepartmentConfirm: 'Нажмите еще раз для удаления',
+      rootDepartmentConflict: 'Для выбранного модуля уже существует корневой отдел.',
+    },
+    rolesManagement: {
+      title: 'Матрица ролей и назначений',
+      description:
+        'Здесь можно управлять ролями, набором прав внутри роли и назначением сотрудников в выбранную роль.',
+      editable: 'Редактирование доступно',
+      readOnly: 'Только просмотр',
+      employeeScope: 'Назначения сотрудников доступны',
+      employeeScopeHidden: 'Назначения сотрудников скрыты',
+      totalRoles: 'Всего ролей',
+      activeRoles: 'Активных',
+      permissionsPool: 'Доступные права',
+      selectedMembers: 'Назначено в выдаче',
+      rolesListTitle: 'Роли',
+      rolesListDescription: 'Выберите роль для редактирования или создайте новую.',
+      roleSearch: 'Поиск по названию или слагу',
+      newRole: 'Новая роль',
+      emptyRoles: 'Подходящие роли не найдены.',
+      active: 'Активна',
+      inactive: 'Неактивна',
+      permissionCount: '{count} прав',
+      roleWorkspaceTitle: 'Карточка роли',
+      roleWorkspaceDescription:
+        'Основная информация и быстрые действия. Детальное редактирование и назначения открываются в боковых панелях.',
+      assignmentsTitle: 'Назначение сотрудников',
+      selectRolePlaceholderTitle: 'Роль не выбрана',
+      selectRolePlaceholderDescription:
+        'Выберите роль слева, чтобы посмотреть детали, или создайте новую роль.',
+      statusAndAssignments: 'Статус и назначения',
+      membersCount: '{count} назначено в текущей выборке',
+      emptyDescription: 'Описание не заполнено',
+      currentPermissionSet: 'Текущий набор прав',
+      selectedPermissionsCount: '{count} выбрано',
+      permissionsEmpty: 'Справочник прав пока пуст.',
+      createTitle: 'Создание роли',
+      editTitle: 'Редактирование роли',
+      editorDescription:
+        'Изменения применяются к роли и сразу влияют на доступ после обновления профиля пользователя.',
+      roleNamePlaceholder: 'Например, руководитель-отдела',
+      roleSlugPlaceholder: 'руководитель-отдела',
+      roleDescriptionPlaceholder:
+        'Коротко опишите, за что отвечает эта роль и какой доступ получает.',
+      roleStatusHint:
+        'Неактивную роль можно оставить в системе, но не использовать в новых назначениях.',
+      permissionsTitle: 'Права внутри роли',
+      permissionsDescription:
+        'Выберите права, которые будут автоматически у всех сотрудников с этой ролью.',
+      permissionsSelectPlaceholder: 'Начните вводить код или описание права',
+      permissionsSearch: 'Поиск по коду, ресурсу, действию, описанию',
+      permissionsSearchHint:
+        'Поиск работает по коду, ресурсу, действию и описанию. UUID больше не нужен.',
+      assignmentsDescription: 'Управляйте тем, какие сотрудники входят в выбранную роль.',
+      selectRoleFirst:
+        'Сначала выберите или создайте роль, затем появится список сотрудников для назначения.',
+      employeesAccessMissing:
+        'У текущего пользователя нет прав на просмотр сотрудников, поэтому блок назначений скрыт.',
+      assignmentEditable: 'Можно назначать',
+      assignmentReadOnly: 'Только просмотр',
+      employeeSearch: 'Поиск по имени, логину или эл. почте',
+      noEmployees: 'Подходящие сотрудники не найдены.',
+      inactiveEmployee: 'Неактивный',
+      removeFromRole: 'Снять роль',
+      assignToRole: 'Назначить',
+    },
+    fields: {
+      actual_output: 'Фактический выход',
+      bad_eggs_count: 'Количество брака',
+      barcode: 'Штрихкод',
+      batch_code: 'Код партии',
+      batch_id: 'Партия',
+      broken_count: 'Битые',
+      consumed_on: 'Дата списания',
+      end_date: 'Дата окончания',
+      expense_id: 'Расход',
+      expense_category_id: 'Категория расхода',
+      expected_hatch_on: 'Плановая дата вывода',
+      expiry_date: 'Срок годности',
+      feed_quantity: 'Количество корма',
+      feed_quantity_unit: 'Единица корма',
+      feed_type_id: 'Тип корма',
+      finished_on: 'Дата завершения',
+      formula_id: 'Формула',
+      grade_1_count: 'Сорт 1',
+      grade_2_count: 'Сорт 2',
+      ingredient_id: 'Ингредиент',
+      is_global: 'Глобальный',
+      lot_no: 'Номер лота',
+      medicine_type_id: 'Тип лекарства',
+      month_start: 'Начало месяца',
+      notes: 'Заметки',
+      planned_output: 'Плановый выход',
+      processing_id: 'Операция разделки',
+      produced_count: 'Произведено',
+      production_batch_id: 'Производственная партия',
+      production_id: 'Производство',
+      purpose: 'Назначение',
+      quantity_per_batch: 'Количество на партию',
+      received_quantity: 'Полученное количество',
+      rejected_count: 'Отбраковано',
+      remaining_quantity: 'Остаток',
+      revenue: 'Выручка',
+      run_id: 'Цикл',
+      shipped_count: 'Отгружено',
+      source_client_id: 'Исходный клиент',
+      start_date: 'Дата начала',
+      started_on: 'Дата запуска',
+      supplier_category: 'Категория поставщика',
+      total_shelled: 'Всего очищено',
+      unit_cost: 'Себестоимость за единицу',
+      version: 'Версия',
+      chicks_count: 'Количество птенцов',
+      chicks_destroyed: 'Утилизировано птенцов',
+      chicks_shipped: 'Отгружено птенцов',
+      eggs_set: 'Заложено яиц',
+    },
+    crud: {
+      doubleClickDeleteConfirm: 'Двойной клик для удаления',
+      currentPageRange: '{start}-{end} из {total}',
+      currentPageRangeEmpty: 'На этой странице пока нет строк.',
+      auditTitle: 'История изменений',
+      auditDescription:
+        'Просмотрите, кто и когда менял запись, какие поля изменились и что было до и после.',
+      auditEmpty: 'Для этой записи пока нет истории изменений.',
+      auditOpen: 'Открыть аудит',
+      auditActionCreate: 'Создание',
+      auditActionUpdate: 'Изменение',
+      auditActionDelete: 'Удаление',
+      auditChangedBy: 'Изменил',
+      auditChangedAt: 'Время',
+      auditChangedFields: 'Изменённые поля',
+      auditBefore: 'До',
+      auditAfter: 'После',
+      auditNoSnapshot: 'Нет данных для отображения.',
+      systemFieldContextMissing:
+        'Невозможно сохранить запись: не определены служебные поля {fields}. Выберите отдел в верхнем фильтре или обновите профиль пользователя.',
+      headDepartmentListDescription:
+        'Общие данные выбранного головного департамента и всех его поддепартаментов.',
+      moduleAnalyticsOnlyDescription:
+        'Для этого модуля у текущего пользователя доступна только аналитика.',
+      referenceNoOptions: 'Подходящие варианты не найдены.',
+      validation: {
+        invalidUuid: 'Введите корректный идентификатор.',
+      },
+    },
+    audit: {
+      description:
+        'Полный журнал изменений по всем сущностям. Фильтруйте по действию, таблице, записи, периоду и поисковому запросу.',
+      feedTitle: 'Все изменения',
+      feedDescription:
+        'Откройте запись, чтобы посмотреть детали правки и снимки состояния до и после изменения.',
+      searchLabel: 'Поиск',
+      searchPlaceholder: 'Пользователь, таблица или действие',
+      filtersTitle: 'Фильтры',
+      filtersDescription: 'Сузьте журнал по действию, таблице, записи и периоду.',
+      activeFilters: 'Фильтров: {count}',
+      actionLabel: 'Действие',
+      actionAll: 'Все',
+      entityTableLabel: 'Таблица',
+      entityTablePlaceholder: 'роли, сотрудники, расходы',
+      entityIdLabel: 'Идентификатор записи',
+      entityIdPlaceholder: 'Системный или внутренний идентификатор',
+      changedFromLabel: 'Изменено с',
+      changedToLabel: 'Изменено до',
+      empty: 'По текущим фильтрам изменений не найдено.',
+      emptySelection: 'Выберите изменение из списка.',
+      pageRange: '{start}-{end} из {total}',
+      hiddenFieldsCount: 'Скрыто полей: {count}',
+    },
+    resources: {
+      'feed-consumptions': {
+        label: 'Расход корма',
+      },
+      'medicine-consumptions': {
+        label: 'Расход лекарств',
+      },
+    },
+    dashboardData: {
+      sections: {
+        egg_farm: {
+          metrics: {
+            feed_consumed: {
+              label: 'Израсходовано корма',
+            },
+            medicine_used: {
+              label: 'Израсходовано лекарств',
+            },
+          },
+          breakdowns: {
+            egg_feed_types: {
+              title: 'Расход корма по типам',
+              description: 'Какие типы корма чаще всего используются в маточнике.',
+            },
+          },
+        },
+        incubation: {
+          metrics: {
+            grade_1_total: {
+              label: 'Первый сорт',
+            },
+            grade_2_total: {
+              label: 'Второй сорт',
+            },
+            bad_eggs_total: {
+              label: 'Брак',
+            },
+            client_base: {
+              label: 'Клиентская база',
+            },
+            destination_clients: {
+              label: 'Клиенты отгрузки',
+            },
+          },
+        },
+        finance_overview: {
+          title: 'Финансовый контур',
+          description:
+            'Куда приходят деньги, сколько уходит и какой финансовый результат остаётся на конце периода.',
+          metrics: {
+            sales_revenue: { label: 'Выручка' },
+            total_expenses: { label: 'Расходы' },
+            operating_profit: { label: 'Операционная прибыль' },
+            profit_margin: { label: 'Маржа' },
+          },
+          charts: {
+            financial_trend: {
+              title: 'Выручка, расходы и прибыль по месяцам',
+              description:
+                'Главный финансовый график: видно, где рост реальный, а где деньги съедаются расходами.',
+              series: {
+                revenue: 'Выручка',
+                expenses: 'Расходы',
+                profit: 'Прибыль',
+              },
+            },
+            revenue_by_module: {
+              title: 'Откуда приходит выручка',
+              description: 'Доли бизнеса по денежному вкладу в выбранном контуре.',
+              series: { revenue: 'Выручка' },
+            },
+          },
+          breakdowns: {
+            department_result: {
+              title: 'Результат по отделам',
+              description:
+                'Самые заметные отделы по финансовому результату. Здесь сразу видно, кто тянет итог вверх или вниз.',
+            },
+          },
+        },
+        cash_overview: {
+          title: 'Касса и движение денег',
+          description:
+            'Этот блок отвечает на три вопроса: сколько денег в кассе сейчас, как быстро они двигаются и где они лежат.',
+          metrics: {
+            cash_balance: { label: 'Касса сейчас' },
+            cash_inflow: { label: 'Поступления' },
+            cash_outflow: { label: 'Выбытия' },
+            active_cash_accounts: { label: 'Активные кассы' },
+          },
+          charts: {
+            cashflow_trend: {
+              title: 'Движение денег по месяцам',
+              description: 'Поступления, выбытия и чистый денежный поток в одном временном ряду.',
+              series: {
+                inflow: 'Поступления',
+                outflow: 'Выбытия',
+                net: 'Чистый денежный поток',
+              },
+            },
+            expense_by_category: {
+              title: 'Куда уходят расходы',
+              description: 'Главные расходные категории за выбранный период.',
+              series: { expenses: 'Расходы' },
+            },
+          },
+          breakdowns: {
+            cash_accounts: {
+              title: 'Баланс по кассам',
+              description: 'Живые остатки по кассам и счетам внутри выбранного контура.',
+            },
+            cash_by_department: {
+              title: 'Касса по отделам',
+              description: 'Где сейчас сосредоточены деньги внутри бизнеса.',
+            },
+          },
+        },
+      },
+    },
+  },
+  uz: {
+    nav: {
+      dashboard: 'Umumiy ko‘rinish',
+    },
+    route: {
+      workspaceErrorTitle: 'Ishchi maydonni tayyorlab bo‘lmadi',
+      workspaceErrorDescription:
+        'Modullar va ruxsatlar konfiguratsiyasini yuklab bo‘lmadi. Qayta urinib ko‘ring.',
+    },
+    dashboard: {
+      quickRangeToday: 'Bugun',
+      quickRangeYesterday: 'Kecha',
+      quickRangeTomorrow: 'Ertaga',
+      quickRangeLast7Days: '7 kun',
+      quickRangeLast30Days: '30 kun',
+      quickRangeMonth: 'Oy',
+      quickRangeQuarter: 'Chorak',
+      rangeSelectedCaption: 'Tanlangan davr',
+      rangeSingleDay: 'Bir kun',
+      rangeNoDateRestriction: 'Sana bo‘yicha cheklov yo‘q',
+      rangeDayUnit: 'kun',
+      allTime: 'Butun davr',
+      moduleLabel: 'Modul',
+      departmentResultCaption: '{module} · Tushum {revenue} · Xarajatlar {expenses}',
+      statusNoMovement: "Harakat yo'q",
+      statusLoss: 'Foyda manfiy',
+      statusCashDown: 'Kassa kamaymoqda',
+      statusPositiveFlow: 'Oqim ijobiy',
+      statusNeedsAttention: 'Nazorat kerak',
+      scopeTitle: 'Kesim',
+      periodTitle: 'Davr',
+      filterPanelTitle: 'Davr va kesim',
+      filterPanelDescription:
+        'Avval tezkor davr yoki aniq sanani tanlang, keyin kerak bo‘lsa ko‘rinishni bitta bo‘lim bilan cheklang.',
+      filterActionsTitle: 'Tiklash',
+      filterResetDescription: 'Umumiy kesim va so‘nggi 30 kunni qaytaradi.',
+      quickRangesTitle: 'Tezkor davr',
+      sectionJumpTitle: 'Bo‘limlar',
+      executiveDepartmentsTitle: 'Bo‘limlar',
+      executiveDepartmentsDescription:
+        'Bo‘limlarni baho, tushum, chiqish va yo‘qotishlar bo‘yicha solishtirish.',
+      executiveRisksTitle: 'Xatarlar va xarajatlar',
+      executiveRisksDescription:
+        'Pul qayerga ketayotgani va qaysi signallar darhol reaksiya talab qilishi.',
+      metricCategoryHealth: 'Holat',
+      metricCategoryFinance: 'Moliya',
+      metricCategoryFlow: 'Hajm',
+      metricCategoryRisk: 'Xatarlar',
+      metricCategoryOperations: 'Operatsiyalar',
+      metricPreviousValue: 'Oldin',
+      metricNoComparison: 'Taqqoslash yo‘q',
+      chartKindTrend: 'Trend',
+      chartKindComparison: 'Taqqoslash',
+      chartKindComposition: 'Tarkib',
+      chartKindSnapshot: 'Kesim',
+      chartBlockLabelShort: 'graf.',
+      chartSeriesLabelShort: 'ser.',
+      breakdownKindLabel: 'Ro‘yxat',
+      breakdownBlockLabelShort: 'ro‘y.',
+      breakdownLabelShort: 'poz.',
+      topItemLabel: 'Asosiy pozitsiya',
+      departmentResultCaptionWithStatus:
+        '{module} · Holat {status} · Yo‘qotishlar {losses} · Tushum {revenue} · Chiqish {output}',
+      lossesLabel: 'Yo‘qotishlar',
+      revenueLabel: 'Tushum',
+      outputLabel: 'Chiqish',
+      financeSectionTitle: 'Moliya',
+      financeSectionCaption: 'Tushum, xarajatlar va davr yakuni.',
+      cashSectionTitle: 'Kassa',
+      cashSectionCaption: 'Qoldiq, tushum va chiqimlar.',
+      summaryMetrics: {
+        cash_balance: { label: 'Hozirgi kassa' },
+        sales_revenue: { label: 'Tushum' },
+        total_expenses: { label: 'Xarajatlar' },
+        financial_result: { label: 'Moliyaviy natija' },
+        operating_profit: { label: 'Operatsion foyda' },
+        net_cashflow: { label: 'Pul oqimi' },
+        health_index: { label: 'Biznes holati' },
+        value_chain_output: { label: 'Umumiy chiqish' },
+        value_chain_loss_rate: { label: 'Yo‘qotish ulushi' },
+        active_risks: { label: 'Muammoli signallar' },
+        active_departments: { label: "Faol bo'limlar" },
+      },
+    },
+    settings: {
+      heroHint:
+        'Bu yerda shaxsiy sozlamalar, tashkilotingiz konteksti va bo‘limlar tuzilmasi jamlangan.',
+      heroDescription:
+        'Avval profil va xavfsizlikni tekshiring, so‘ng bo‘limlar va ularning ierarxiyasini boshqarishga o‘ting.',
+      departmentsTitle: "Bo'limlar",
+      departmentsSectionTitle: "Bo'limlarni boshqarish",
+      accessTitle: 'Kirish',
+      accessDescription: 'Profilingizga qo‘llanadigan joriy department, rollar va permissions.',
+      rolesTitle: 'Rollar',
+      permissionsTitle: 'Permissions',
+      securityPanelHint:
+        'Parolni almashtirish profilni tahrirlash oynasining o‘zida joylashgan. Parol maydonlarini faqat zarurat bo‘lsa to‘ldiring.',
+      contextTitle: 'Ishchi kontekst',
+      contextDescription:
+        'Bu maʼlumotlar tizim tomonidan CRUD formalaridagi yashirin maydonlar uchun asosiy scope sifatida ishlatiladi.',
+      departmentsDescription:
+        'Tashkilotingiz ichida bo‘lim va quyi bo‘limlarni yaratish, tahrirlash va o‘chirish.',
+      departmentDirectoryDescription:
+        'Qidiruv va filtrlar yordamida bo‘limni toping, so‘ng uni ro‘yxatning o‘zida boshqaring.',
+      departmentDetailsTitle: "Bo'lim tafsilotlari",
+      departmentDetailsDescription:
+        'Tanlangan bo‘lim, uning ierarxiyasi va mavjud amallari bir joyda.',
+      departmentHeadScopeHint:
+        'Siz faqat o‘z bo‘limingiz va uning ichki bo‘linmalarini boshqarasiz. Ildiz bo‘lim yaratish va o‘z bo‘limingizni o‘chirish mumkin emas.',
+      accountTabDescription: 'Profil, xavfsizlik va ishchi kontekst.',
+      departmentsTabDescription: 'Bo‘limlar tuzilmasi, ierarxiya va bo‘linmalar boshqaruvi.',
+      departmentSearchLabel: 'Bo‘limlar bo‘yicha qidiruv',
+      departmentSearchPlaceholder: 'Nomi, kodi, tavsifi, mas’ul foydalanuvchi',
+      moduleFilterLabel: 'Modul filtri',
+      statusFilterLabel: 'Status filtri',
+      statusAll: 'Barchasi',
+      statusActive: 'Faqat faol',
+      statusInactive: 'Faqat nofaol',
+      filterResetTitle: 'Filtrlarni tiklash',
+      filterResetHint: '{count} ta filtr faol. Ro‘yxatni bir tugma bilan to‘liq holatga qaytaring.',
+      currentSelectionTitle: 'Joriy kesim',
+      currentSelectionHint: 'Hozir {total} ta bo‘limdan {count} tasi ko‘rinmoqda.',
+      visibleDepartmentsLabel: 'Ko‘rinmoqda: {count}',
+      rootDepartmentsLabel: 'Bosh bo‘limlar: {count}',
+      nestedDepartmentsLabel: 'Ichki bo‘limlar: {count}',
+      responsibleDepartmentsLabel: 'Mas’ul biriktirilgan: {count}',
+      emptyDepartmentsTitle: "Hozircha bo'limlar yo'q",
+      emptyDepartmentsDescription:
+        'Bo‘limlar tuzilmasi va modullar uchun ishchi scopelarni yaratish uchun birinchi bo‘limni qo‘shing.',
+      noDepartmentsMatchTitle: 'Hech narsa topilmadi',
+      noDepartmentsMatchDescription:
+        'Bo‘limlar tuzilmasini qayta ko‘rish uchun qidiruvni o‘zgartiring yoki filtrlarni tozalang.',
+      departmentWorkspaceTitle: 'Tuzilma paneli',
+      departmentWorkspaceDescription:
+        'Joriy tashkilot, faol bo‘limlar va modullar taqsimotining tezkor ko‘rinishi.',
+      organizationScopedHint:
+        'Yangi bo‘limlar joriy tashkilot ichida yaratiladi. Tashkilot maydoni endi formaga qo‘lda kiritilmaydi.',
+      noDepartmentSelectedTitle: "Bo'lim tanlanmagan",
+      noDepartmentSelectedDescription:
+        'Chapdagi ro‘yxatdan bo‘limni tanlang, shunda uning tafsilotlari, ierarxiyasi va amallarini ko‘rasiz.',
+      selectedDepartmentPathTitle: "Yo'l",
+      focusDepartmentTitle: "Fokus bo'limi",
+      focusDepartmentHint:
+        'Xususiyatlari va ierarxiyasini tez tekshirish uchun tahrirlash orqali bo‘limni tanlang.',
+      moduleDistributionTitle: 'Modullar bo‘yicha taqsimot',
+      childrenLabel: 'Farzandlar: {count}',
+      descendantsLabel: 'Avlodlar: {count}',
+      depthLabel: 'Daraja: {count}',
+      createDepartmentTitle: "Yangi bo'lim",
+      createSubdepartment: 'Quyi bo‘lim',
+      editDepartmentTitle: "Bo'limni tahrirlash",
+      departmentFormDescription: 'Bo‘lim maydonlarini to‘ldiring va o‘zgarishlarni saqlang.',
+      responsibleUserTitle: 'Mas’ul foydalanuvchi',
+      responsibleUserDescription:
+        'Ushbu bo‘lim faoliyati uchun javob beradigan va asosiy aloqa nuqtasi bo‘ladigan xodimni biriktiring.',
+      responsibleUserPlaceholder: 'Foydalanuvchini tanlang',
+      responsibleUserEmpty: 'Mas’ul foydalanuvchi biriktirilmagan',
+      useCurrentUserAsResponsible: 'Meni biriktirish',
+      clearResponsibleUser: 'Tozalash',
+      employeeInactiveLabel: 'nofaol',
+      deleteDepartmentConfirm: "Yana bir marta bosib o'chiring",
+      rootDepartmentConflict: 'Tanlangan modul uchun ildiz bo‘lim allaqachon mavjud.',
+    },
+    rolesManagement: {
+      title: 'Rollar va tayinlovlar matritsasi',
+      description:
+        'Bu yerda rollarni, rol ichidagi permissions to‘plamini va tanlangan rolga xodim tayinlashni boshqarishingiz mumkin.',
+      editable: 'Tahrirlash mumkin',
+      readOnly: 'Faqat ko‘rish',
+      employeeScope: 'Xodim tayinlovlari mavjud',
+      employeeScopeHidden: 'Xodim tayinlovlari yashirilgan',
+      totalRoles: 'Jami rollar',
+      activeRoles: 'Faol',
+      permissionsPool: 'Mavjud permissions',
+      selectedMembers: 'Joriy ro‘yxatda tayinlangan',
+      rolesListTitle: 'Rollar',
+      rolesListDescription: 'Tahrirlash uchun rolni tanlang yoki yangi rol yarating.',
+      roleSearch: 'Nomi yoki slug bo‘yicha qidiruv',
+      newRole: 'Yangi rol',
+      emptyRoles: 'Mos rollar topilmadi.',
+      active: 'Faol',
+      inactive: 'Nofaol',
+      permissionCount: '{count} permissions',
+      roleWorkspaceTitle: 'Rol kartasi',
+      roleWorkspaceDescription:
+        'Asosiy ma’lumot va tezkor amallar. Batafsil tahrirlash hamda tayinlash yon panelda ochiladi.',
+      assignmentsTitle: 'Xodimlarni tayinlash',
+      selectRolePlaceholderTitle: 'Rol tanlanmagan',
+      selectRolePlaceholderDescription: 'Chapdan rolni tanlang yoki yangi rol yarating.',
+      statusAndAssignments: 'Status va tayinlovlar',
+      membersCount: 'Joriy ro‘yxatda {count} tayinlangan',
+      emptyDescription: 'Tavsif kiritilmagan',
+      currentPermissionSet: 'Joriy ruxsatlar to‘plami',
+      selectedPermissionsCount: '{count} tanlangan',
+      permissionsEmpty: 'Permissions ma’lumotnomasi hozircha bo‘sh.',
+      createTitle: 'Rol yaratish',
+      editTitle: 'Rolni tahrirlash',
+      editorDescription:
+        'O‘zgarishlar rolga qo‘llanadi va profil yangilangach darhol kirishga ta’sir qiladi.',
+      roleNamePlaceholder: 'Masalan, HR rahbari',
+      roleSlugPlaceholder: 'hr-manager',
+      roleDescriptionPlaceholder:
+        'Rol nima uchun javob berishi va qanday kirish olishini qisqacha yozing.',
+      roleStatusHint:
+        'Nofaol rolni tizimda qoldirish mumkin, lekin yangi tayinlovlarda ishlatilmaydi.',
+      permissionsTitle: 'Rol ichidagi permissions',
+      permissionsDescription: 'Ushbu roldagi xodimlarda avtomatik bo‘ladigan ruxsatlarni tanlang.',
+      permissionsSelectPlaceholder: 'Permission kodi yoki tavsifini kiriting',
+      permissionsSearch: 'Code, resource, action, description bo‘yicha qidiruv',
+      permissionsSearchHint:
+        'Qidiruv kod, resurs, amal va tavsif bo‘yicha ishlaydi. UUID endi kerak emas.',
+      assignmentsDescription: 'Tanlangan rolga qaysi xodimlar kirishini boshqaring.',
+      selectRoleFirst:
+        'Avval rolni tanlang yoki yarating, keyin tayinlash uchun xodimlar ro‘yxati chiqadi.',
+      employeesAccessMissing:
+        'Joriy foydalanuvchida xodimlarni ko‘rish huquqi yo‘q, shuning uchun tayinlash bloki yashirilgan.',
+      assignmentEditable: 'Tayinlash mumkin',
+      assignmentReadOnly: 'Faqat ko‘rish',
+      employeeSearch: 'Ism, login yoki email bo‘yicha qidiruv',
+      noEmployees: 'Mos xodimlar topilmadi.',
+      inactiveEmployee: 'Nofaol',
+      removeFromRole: 'Roldan olish',
+      assignToRole: 'Tayinlash',
+    },
+    fields: {
+      actual_output: 'Amaldagi chiqish',
+      bad_eggs_count: 'Brak soni',
+      barcode: 'Shtrix-kod',
+      batch_code: 'Partiya kodi',
+      batch_id: 'Partiya',
+      broken_count: 'Singan',
+      consumed_on: 'Sarflangan sana',
+      end_date: 'Tugash sanasi',
+      expense_id: 'Xarajat',
+      expense_category_id: 'Xarajat kategoriyasi',
+      expected_hatch_on: 'Rejadagi chiqish sanasi',
+      expiry_date: 'Yaroqlilik muddati',
+      feed_quantity: 'Yem miqdori',
+      feed_quantity_unit: 'Yem birligi',
+      feed_type_id: 'Yem turi',
+      finished_on: 'Yakunlangan sana',
+      formula_id: 'Formula',
+      grade_1_count: '1-nav',
+      grade_2_count: '2-nav',
+      ingredient_id: 'Ingredient',
+      is_global: 'Global',
+      lot_no: 'Lot raqami',
+      medicine_type_id: 'Dori turi',
+      month_start: 'Oy boshi',
+      notes: 'Qaydlar',
+      planned_output: 'Rejadagi chiqish',
+      processing_id: 'Qayta ishlash operatsiyasi',
+      produced_count: 'Ishlab chiqarildi',
+      production_batch_id: 'Ishlab chiqarish partiyasi',
+      production_id: 'Ishlab chiqarish',
+      purpose: 'Maqsad',
+      quantity_per_batch: 'Har partiyadagi miqdor',
+      received_quantity: 'Qabul qilingan miqdor',
+      rejected_count: 'Rad etilgan',
+      remaining_quantity: 'Qoldiq',
+      revenue: 'Tushum',
+      run_id: 'Sikl',
+      shipped_count: 'Jo‘natildi',
+      source_client_id: 'Manba mijoz',
+      start_date: 'Boshlanish sanasi',
+      started_on: 'Boshlangan sana',
+      supplier_category: 'Yetkazib beruvchi toifasi',
+      total_shelled: 'Jami tozalangan',
+      unit_cost: 'Birlik tannarxi',
+      version: 'Versiya',
+      chicks_count: 'Jo‘jalar soni',
+      chicks_destroyed: 'Utilizatsiya qilingan jo‘jalar',
+      chicks_shipped: 'Jo‘natilgan jo‘jalar',
+      eggs_set: 'Joylangan tuxumlar',
+    },
+    crud: {
+      doubleClickDeleteConfirm: "O'chirish uchun ikki marta bosing",
+      currentPageRange: '{total} dan {start}-{end}',
+      currentPageRangeEmpty: 'Bu sahifada hozircha satrlar yo‘q.',
+      auditTitle: "O'zgarishlar tarixi",
+      auditDescription:
+        "Yozuvni kim va qachon o'zgartirganini, qaysi maydonlar almashganini va oldin-keyin holatini ko'ring.",
+      auditEmpty: "Bu yozuv uchun hozircha o'zgarishlar tarixi yo'q.",
+      auditOpen: 'Auditni ochish',
+      auditActionCreate: 'Yaratish',
+      auditActionUpdate: "O'zgartirish",
+      auditActionDelete: "O'chirish",
+      auditChangedBy: "O'zgartirgan",
+      auditChangedAt: 'Vaqt',
+      auditChangedFields: "O'zgargan maydonlar",
+      auditBefore: 'Oldin',
+      auditAfter: 'Keyin',
+      auditNoSnapshot: "Ko'rsatish uchun ma'lumot yo'q.",
+      systemFieldContextMissing:
+        'Yozuvni saqlab bo‘lmaydi: xizmat maydonlari aniqlanmagan {fields}. Yuqoridagi filtrdan bo‘limni tanlang yoki foydalanuvchi profilingizni yangilang.',
+      headDepartmentListDescription:
+        'Tanlangan bosh bo‘lim va uning barcha quyi bo‘limlari bo‘yicha umumiy maʼlumotlar.',
+      moduleAnalyticsOnlyDescription:
+        'Joriy foydalanuvchi uchun bu modulda faqat tahlil bo‘limi mavjud.',
+      referenceNoOptions: 'Mos variantlar topilmadi.',
+      validation: {
+        invalidUuid: 'To‘g‘ri UUID kiriting.',
+      },
+    },
+    audit: {
+      description:
+        'Barcha obyektlar bo‘yicha to‘liq o‘zgarishlar jurnali. Amal, jadval, yozuv, davr va qidiruv bo‘yicha filtrlashingiz mumkin.',
+      feedTitle: "Barcha o'zgarishlar",
+      feedDescription: "Yozuvni ochib, o'zgarish tafsilotlari va oldin-keyin holatini ko'ring.",
+      searchLabel: 'Qidiruv',
+      searchPlaceholder: 'Foydalanuvchi, jadval yoki amal',
+      filtersTitle: 'Filtrlar',
+      filtersDescription: 'Jurnalni amal, jadval, yozuv va davr bo‘yicha toraytiring.',
+      activeFilters: 'Filtrlar: {count}',
+      actionLabel: 'Amal',
+      actionAll: 'Barchasi',
+      entityTableLabel: 'Jadval',
+      entityTablePlaceholder: 'roles, employees, expenses',
+      entityIdLabel: 'Yozuv ID',
+      entityIdPlaceholder: 'UUID yoki ichki id',
+      changedFromLabel: 'Boshlanish vaqti',
+      changedToLabel: 'Tugash vaqti',
+      empty: "Joriy filtrlarda o'zgarishlar topilmadi.",
+      emptySelection: "Ro'yxatdan o'zgarishni tanlang.",
+      pageRange: '{total} dan {start}-{end}',
+      hiddenFieldsCount: 'Yashirilgan maydonlar: {count}',
+    },
+    dashboardData: {
+      sections: {
+        incubation: {
+          metrics: {
+            destination_clients: {
+              label: 'Jo‘natma mijozlari',
+            },
+          },
+        },
+        finance_overview: {
+          title: 'Moliyaviy kontur',
+          description:
+            'Pul qayerdan keladi, qancha chiqadi va davr oxirida qanday moliyaviy natija qoladi.',
+          metrics: {
+            sales_revenue: { label: 'Tushum' },
+            total_expenses: { label: 'Xarajatlar' },
+            operating_profit: { label: 'Operatsion foyda' },
+            profit_margin: { label: 'Marja' },
+          },
+          charts: {
+            financial_trend: {
+              title: 'Oylar bo‘yicha tushum, xarajat va foyda',
+              description:
+                'Asosiy moliyaviy grafik: qayerda o‘sish haqiqiy, qayerda esa xarajatlar foydani yeyayotgani ko‘rinadi.',
+              series: {
+                revenue: 'Tushum',
+                expenses: 'Xarajatlar',
+                profit: 'Foyda',
+              },
+            },
+            revenue_by_module: {
+              title: 'Tushum qayerdan keladi',
+              description: 'Tanlangan kontur bo‘yicha biznes yo‘nalishlarining pul hissasi.',
+              series: { revenue: 'Tushum' },
+            },
+          },
+          breakdowns: {
+            department_result: {
+              title: 'Bo‘limlar bo‘yicha natija',
+              description:
+                'Moliyaviy natija bo‘yicha eng sezilarli bo‘limlar. Bu yerda yakunni kim yuqoriga yoki pastga tortayotgani darhol ko‘rinadi.',
+            },
+          },
+        },
+        cash_overview: {
+          title: 'Kassa va pul harakati',
+          description:
+            'Bu blok uch savolga javob beradi: hozir kassada qancha pul bor, ular qanchalik tez harakatlanadi va qayerda saqlanadi.',
+          metrics: {
+            cash_balance: { label: 'Hozirgi kassa' },
+            cash_inflow: { label: 'Tushumlar' },
+            cash_outflow: { label: 'Chiqimlar' },
+            active_cash_accounts: { label: 'Faol kassalar' },
+          },
+          charts: {
+            cashflow_trend: {
+              title: 'Oylar bo‘yicha pul harakati',
+              description: 'Tushumlar, chiqimlar va sof cash flow bitta vaqt qatorida.',
+              series: {
+                inflow: 'Tushumlar',
+                outflow: 'Chiqimlar',
+                net: 'Sof cash flow',
+              },
+            },
+            expense_by_category: {
+              title: 'Xarajatlar qayerga ketmoqda',
+              description: 'Tanlangan davr bo‘yicha asosiy xarajat toifalari.',
+              series: { expenses: 'Xarajatlar' },
+            },
+          },
+          breakdowns: {
+            cash_accounts: {
+              title: 'Kassalar bo‘yicha balans',
+              description:
+                'Tanlangan kontur ichidagi kassalar va hisoblar bo‘yicha real qoldiqlar.',
+            },
+            cash_by_department: {
+              title: 'Bo‘limlar bo‘yicha kassa',
+              description: 'Biznes ichida pul hozir qayerda jamlanganini ko‘rsatadi.',
+            },
+          },
+        },
+      },
+    },
+  },
+  en: {
+    nav: {
+      dashboard: 'Dashboard',
+    },
+    route: {
+      workspaceErrorTitle: 'Failed to prepare workspace',
+      workspaceErrorDescription:
+        'Failed to load module and permission configuration. Please try again.',
+    },
+    dashboard: {
+      quickRangeToday: 'Today',
+      quickRangeYesterday: 'Yesterday',
+      quickRangeTomorrow: 'Tomorrow',
+      quickRangeLast7Days: '7 days',
+      quickRangeLast30Days: '30 days',
+      quickRangeMonth: 'Month',
+      quickRangeQuarter: 'Quarter',
+      rangeSelectedCaption: 'Selected period',
+      rangeSingleDay: 'One day',
+      rangeNoDateRestriction: 'No date restriction',
+      rangeDayUnit: 'days',
+      allTime: 'All time',
+      moduleLabel: 'Module',
+      departmentResultCaption: '{module} · Revenue {revenue} · Expenses {expenses}',
+      departmentResultCaptionWithStatus:
+        '{module} · Status {status} · Losses {losses} · Revenue {revenue} · Output {output}',
+      lossesLabel: 'Losses',
+      revenueLabel: 'Revenue',
+      outputLabel: 'Output',
+      statusNoMovement: 'No activity',
+      statusLoss: 'Profit is below zero',
+      statusCashDown: 'Cash is declining',
+      statusPositiveFlow: 'Positive flow',
+      statusNeedsAttention: 'Needs attention',
+      scopeTitle: 'Scope',
+      periodTitle: 'Period',
+      filterPanelTitle: 'Period and scope',
+      filterPanelDescription:
+        'Choose a quick period or exact dates first, then narrow the dashboard to one department only if needed.',
+      filterActionsTitle: 'Reset',
+      filterResetDescription: 'Return to the overall scope and the last 30 days.',
+      quickRangesTitle: 'Quick period',
+      sectionJumpTitle: 'Sections',
+      executiveDepartmentsTitle: 'Departments',
+      executiveDepartmentsDescription:
+        'Compare departments by score, revenue, output, and losses.',
+      executiveRisksTitle: 'Risks and spending',
+      executiveRisksDescription:
+        'See where money goes and which signals need immediate action.',
+      metricCategoryHealth: 'Health',
+      metricCategoryFinance: 'Finance',
+      metricCategoryFlow: 'Volume',
+      metricCategoryRisk: 'Risks',
+      metricCategoryOperations: 'Operations',
+      metricPreviousValue: 'Previous',
+      metricNoComparison: 'No comparison',
+      chartKindTrend: 'Trend',
+      chartKindComparison: 'Comparison',
+      chartKindComposition: 'Composition',
+      chartKindSnapshot: 'Snapshot',
+      chartBlockLabelShort: 'charts',
+      chartSeriesLabelShort: 'ser.',
+      breakdownKindLabel: 'List',
+      breakdownBlockLabelShort: 'lists',
+      breakdownLabelShort: 'items',
+      topItemLabel: 'Top item',
+      financeSectionTitle: 'Finance',
+      financeSectionCaption: 'Revenue, expenses and period result.',
+      cashSectionTitle: 'Cash',
+      cashSectionCaption: 'Balances, inflows and outflows.',
+      summaryMetrics: {
+        cash_balance: { label: 'Cash balance' },
+        sales_revenue: { label: 'Revenue' },
+        total_expenses: { label: 'Expenses' },
+        financial_result: { label: 'Financial result' },
+        operating_profit: { label: 'Operating profit' },
+        net_cashflow: { label: 'Cash flow' },
+        health_index: { label: 'Business health' },
+        value_chain_output: { label: 'Total output' },
+        value_chain_loss_rate: { label: 'Loss share' },
+        active_risks: { label: 'Risk signals' },
+        active_departments: { label: 'Active departments' },
+      },
+    },
+    settings: {
+      heroHint:
+        'This area contains personal settings, your organization context and the department structure.',
+      heroDescription:
+        'Review the profile and security first, then move on to managing departments and their hierarchy.',
+      departmentsTitle: 'Departments',
+      departmentsSectionTitle: 'Department management',
+      accessTitle: 'Access',
+      accessDescription: 'Current department, roles, and permissions applied to your profile.',
+      rolesTitle: 'Roles',
+      permissionsTitle: 'Permissions',
+      securityPanelHint:
+        'Password change is located in the same profile edit form. Fill the password fields only when needed.',
+      contextTitle: 'Workspace context',
+      contextDescription:
+        'This data is used by the system as the base scope for hidden fields in CRUD forms.',
+      departmentsDescription:
+        'Create, edit and delete departments and subdepartments inside your organization.',
+      departmentDirectoryDescription:
+        'Use search and filters, then manage departments directly in the list.',
+      departmentDetailsTitle: 'Department details',
+      departmentDetailsDescription:
+        'The selected department, its hierarchy and available actions in one place.',
+      departmentHeadScopeHint:
+        'You manage only your own department and its nested units. Creating root departments and deleting your own department is not allowed.',
+      accountTabDescription: 'Profile, security and workspace context.',
+      departmentsTabDescription: 'Department structure, hierarchy and subdivision management.',
+      departmentSearchLabel: 'Search departments',
+      departmentSearchPlaceholder: 'Name, code, description, responsible user',
+      moduleFilterLabel: 'Module filter',
+      statusFilterLabel: 'Status filter',
+      statusAll: 'All',
+      statusActive: 'Active only',
+      statusInactive: 'Inactive only',
+      filterResetTitle: 'Reset filters',
+      filterResetHint: '{count} filters are active. Return to the full list with one click.',
+      currentSelectionTitle: 'Current scope',
+      currentSelectionHint: 'You are currently seeing {count} of {total} departments.',
+      visibleDepartmentsLabel: 'Visible: {count}',
+      rootDepartmentsLabel: 'Head departments: {count}',
+      nestedDepartmentsLabel: 'Nested departments: {count}',
+      responsibleDepartmentsLabel: 'With responsible user: {count}',
+      emptyDepartmentsTitle: 'No departments yet',
+      emptyDepartmentsDescription:
+        'Create the first department to build the structure of units and working scopes for modules.',
+      noDepartmentsMatchTitle: 'No matches found',
+      noDepartmentsMatchDescription:
+        'Change the search query or reset the filters to see the department structure again.',
+      departmentWorkspaceTitle: 'Structure panel',
+      departmentWorkspaceDescription:
+        'Quick overview of the current organization, active departments and module distribution.',
+      organizationScopedHint:
+        'New departments are created inside the current organization. The organization field is no longer shown manually in the form.',
+      noDepartmentSelectedTitle: 'No department selected',
+      noDepartmentSelectedDescription:
+        'Choose a department from the list to see its details, hierarchy and available actions.',
+      selectedDepartmentPathTitle: 'Path',
+      focusDepartmentTitle: 'Focus department',
+      focusDepartmentHint:
+        'Select a department through edit mode to quickly inspect its properties and hierarchy.',
+      moduleDistributionTitle: 'Distribution by module',
+      childrenLabel: 'Children: {count}',
+      descendantsLabel: 'Descendants: {count}',
+      depthLabel: 'Level: {count}',
+      createDepartmentTitle: 'New department',
+      createSubdepartment: 'Child department',
+      editDepartmentTitle: 'Edit department',
+      departmentFormDescription: 'Fill in the department fields and save the changes.',
+      responsibleUserTitle: 'Responsible user',
+      responsibleUserDescription:
+        'Assign the employee who is responsible for this department and acts as the primary contact.',
+      responsibleUserPlaceholder: 'Choose a user',
+      responsibleUserEmpty: 'No responsible user assigned',
+      useCurrentUserAsResponsible: 'Assign me',
+      clearResponsibleUser: 'Clear',
+      employeeInactiveLabel: 'inactive',
+      deleteDepartmentConfirm: 'Press again to delete',
+      rootDepartmentConflict: 'A root department already exists for the selected module.',
+    },
+    rolesManagement: {
+      title: 'Roles and assignments matrix',
+      description:
+        'Manage roles, permission sets inside each role, and employee assignments to the selected role.',
+      editable: 'Editing available',
+      readOnly: 'Read-only',
+      employeeScope: 'Employee assignments available',
+      employeeScopeHidden: 'Employee assignments hidden',
+      totalRoles: 'Total roles',
+      activeRoles: 'Active',
+      permissionsPool: 'Available permissions',
+      selectedMembers: 'Assigned in current result',
+      rolesListTitle: 'Roles',
+      rolesListDescription: 'Select a role to edit or create a new one.',
+      roleSearch: 'Search by name or slug',
+      newRole: 'New role',
+      emptyRoles: 'No matching roles found.',
+      active: 'Active',
+      inactive: 'Inactive',
+      permissionCount: '{count} permissions',
+      roleWorkspaceTitle: 'Role card',
+      roleWorkspaceDescription:
+        'Core info and quick actions. Detailed editing and assignments are opened in side drawers.',
+      assignmentsTitle: 'Employee assignments',
+      selectRolePlaceholderTitle: 'No role selected',
+      selectRolePlaceholderDescription:
+        'Select a role on the left to view details, or create a new role.',
+      statusAndAssignments: 'Status and assignments',
+      membersCount: '{count} assigned in current result',
+      emptyDescription: 'Description is empty',
+      currentPermissionSet: 'Current permission set',
+      selectedPermissionsCount: '{count} selected',
+      permissionsEmpty: 'The permissions directory is empty for now.',
+      createTitle: 'Create role',
+      editTitle: 'Edit role',
+      editorDescription:
+        'Changes are applied to the role and affect access right after the user profile refresh.',
+      roleNamePlaceholder: 'For example, HR Manager',
+      roleSlugPlaceholder: 'hr-manager',
+      roleDescriptionPlaceholder:
+        'Briefly describe what this role is responsible for and what access it gets.',
+      roleStatusHint:
+        'An inactive role can remain in the system but should not be used for new assignments.',
+      permissionsTitle: 'Permissions inside role',
+      permissionsDescription:
+        'Select permissions that all employees with this role will get automatically.',
+      permissionsSelectPlaceholder: 'Start typing permission code or description',
+      permissionsSearch: 'Search by code, resource, action, description',
+      permissionsSearchHint:
+        'Search works by code, resource, action, and description. UUID is no longer required.',
+      assignmentsDescription: 'Manage which employees are included in the selected role.',
+      selectRoleFirst:
+        'Select or create a role first, then the employee assignment list will appear.',
+      employeesAccessMissing:
+        'The current user has no permission to view employees, so the assignments block is hidden.',
+      assignmentEditable: 'Can assign',
+      assignmentReadOnly: 'View only',
+      employeeSearch: 'Search by name, login, or email',
+      noEmployees: 'No matching employees found.',
+      inactiveEmployee: 'Inactive',
+      removeFromRole: 'Remove role',
+      assignToRole: 'Assign',
+    },
+    fields: {
+      actual_output: 'Actual output',
+      bad_eggs_count: 'Rejected eggs',
+      barcode: 'Barcode',
+      batch_code: 'Batch code',
+      batch_id: 'Batch',
+      broken_count: 'Broken',
+      consumed_on: 'Consumption date',
+      end_date: 'End date',
+      expense_id: 'Expense',
+      expense_category_id: 'Expense category',
+      expected_hatch_on: 'Expected hatch date',
+      expiry_date: 'Expiry date',
+      feed_quantity: 'Feed quantity',
+      feed_quantity_unit: 'Feed unit',
+      feed_type_id: 'Feed type',
+      finished_on: 'Finished on',
+      formula_id: 'Formula',
+      grade_1_count: 'Grade 1',
+      grade_2_count: 'Grade 2',
+      ingredient_id: 'Ingredient',
+      is_global: 'Global',
+      lot_no: 'Lot number',
+      medicine_type_id: 'Medicine type',
+      month_start: 'Month start',
+      notes: 'Notes',
+      planned_output: 'Planned output',
+      processing_id: 'Processing operation',
+      produced_count: 'Produced count',
+      production_batch_id: 'Production batch',
+      production_id: 'Production',
+      purpose: 'Purpose',
+      quantity_per_batch: 'Quantity per batch',
+      received_quantity: 'Received quantity',
+      rejected_count: 'Rejected count',
+      remaining_quantity: 'Remaining quantity',
+      revenue: 'Revenue',
+      run_id: 'Run',
+      shipped_count: 'Shipped count',
+      source_client_id: 'Source client',
+      start_date: 'Start date',
+      started_on: 'Started on',
+      supplier_category: 'Supplier category',
+      total_shelled: 'Total shelled',
+      unit_cost: 'Unit cost',
+      version: 'Version',
+      chicks_count: 'Chick count',
+      chicks_destroyed: 'Chicks destroyed',
+      chicks_shipped: 'Chicks shipped',
+      eggs_set: 'Eggs set',
+    },
+    crud: {
+      doubleClickDeleteConfirm: 'Double-click to delete',
+      currentPageRange: '{start}-{end} of {total}',
+      currentPageRangeEmpty: 'There are no rows on this page yet.',
+      auditTitle: 'Change history',
+      auditDescription:
+        'Review who changed the record, when it changed, which fields were affected, and the before/after values.',
+      auditEmpty: 'There is no change history for this record yet.',
+      auditOpen: 'Open audit',
+      auditActionCreate: 'Create',
+      auditActionUpdate: 'Update',
+      auditActionDelete: 'Delete',
+      auditChangedBy: 'Changed by',
+      auditChangedAt: 'Changed at',
+      auditChangedFields: 'Changed fields',
+      auditBefore: 'Before',
+      auditAfter: 'After',
+      auditNoSnapshot: 'There is no data to display.',
+      systemFieldContextMissing:
+        'Unable to save the record: required system fields are not defined: {fields}. Select a department in the top filter or update the user profile.',
+      headDepartmentListDescription:
+        'Combined data for the selected head department and all of its subdepartments.',
+      moduleAnalyticsOnlyDescription:
+        'Only analytics is available for this module for the current user.',
+      referenceNoOptions: 'No matching options found.',
+      validation: {
+        invalidUuid: 'Enter a valid UUID.',
+      },
+    },
+    audit: {
+      description:
+        'A complete change journal across all entities. Filter by action, table, record, time range, and search query.',
+      feedTitle: 'All changes',
+      feedDescription:
+        'Open any entry to review the change details and the before/after snapshots.',
+      searchLabel: 'Search',
+      searchPlaceholder: 'User, table, or action',
+      filtersTitle: 'Filters',
+      filtersDescription: 'Narrow the journal by action, table, record, and period.',
+      activeFilters: 'Filters: {count}',
+      actionLabel: 'Action',
+      actionAll: 'All',
+      entityTableLabel: 'Table',
+      entityTablePlaceholder: 'roles, employees, expenses',
+      entityIdLabel: 'Record ID',
+      entityIdPlaceholder: 'UUID or internal id',
+      changedFromLabel: 'Changed from',
+      changedToLabel: 'Changed to',
+      empty: 'No changes match the current filters.',
+      emptySelection: 'Select a change from the list.',
+      pageRange: '{start}-{end} of {total}',
+      hiddenFieldsCount: 'Hidden fields: {count}',
+    },
+    dashboardData: {
+      sections: {
+        incubation: {
+          metrics: {
+            destination_clients: {
+              label: 'Shipment clients',
+            },
+          },
+        },
+        finance_overview: {
+          title: 'Financial overview',
+          description:
+            'Where money comes from, how much goes out and what financial result remains at the end of the period.',
+          metrics: {
+            sales_revenue: { label: 'Revenue' },
+            total_expenses: { label: 'Expenses' },
+            operating_profit: { label: 'Operating profit' },
+            profit_margin: { label: 'Margin' },
+          },
+          charts: {
+            financial_trend: {
+              title: 'Revenue, expenses and profit by month',
+              description:
+                'Main financial chart showing where growth is real and where expenses are eating the result.',
+              series: {
+                revenue: 'Revenue',
+                expenses: 'Expenses',
+                profit: 'Profit',
+              },
+            },
+            revenue_by_module: {
+              title: 'Where revenue comes from',
+              description: 'Business shares by monetary contribution within the selected scope.',
+              series: { revenue: 'Revenue' },
+            },
+          },
+          breakdowns: {
+            department_result: {
+              title: 'Result by department',
+              description:
+                'The most visible departments by financial result. You can immediately see who is pulling the total up or down.',
+            },
+          },
+        },
+        cash_overview: {
+          title: 'Cash and money movement',
+          description:
+            'This block answers three questions: how much cash is available now, how quickly it moves and where it is held.',
+          metrics: {
+            cash_balance: { label: 'Cash balance' },
+            cash_inflow: { label: 'Inflows' },
+            cash_outflow: { label: 'Outflows' },
+            active_cash_accounts: { label: 'Active cash accounts' },
+          },
+          charts: {
+            cashflow_trend: {
+              title: 'Money movement by month',
+              description: 'Inflows, outflows and net cash flow in one time series.',
+              series: {
+                inflow: 'Inflows',
+                outflow: 'Outflows',
+                net: 'Net cash flow',
+              },
+            },
+            expense_by_category: {
+              title: 'Where expenses go',
+              description: 'Main expense categories for the selected period.',
+              series: { expenses: 'Expenses' },
+            },
+          },
+          breakdowns: {
+            cash_accounts: {
+              title: 'Balance by cash account',
+              description:
+                'Live balances across cash accounts and ledgers inside the selected scope.',
+            },
+            cash_by_department: {
+              title: 'Cash by department',
+              description: 'Where money is currently concentrated inside the business.',
+            },
+          },
+        },
+      },
+    },
+  },
+};
+
+const deepMergeRecords = (
+  base: Record<string, unknown>,
+  override: Record<string, unknown>,
+): Record<string, unknown> => {
+  const next: Record<string, unknown> = { ...base };
+
+  for (const [key, value] of Object.entries(override)) {
+    const currentValue = next[key];
+
+    if (
+      value &&
+      typeof value === 'object' &&
+      !Array.isArray(value) &&
+      currentValue &&
+      typeof currentValue === 'object' &&
+      !Array.isArray(currentValue)
+    ) {
+      next[key] = deepMergeRecords(
+        currentValue as Record<string, unknown>,
+        value as Record<string, unknown>,
+      );
+      continue;
+    }
+
+    next[key] = value;
+  }
+
+  return next;
+};
+
+const supplementalTranslationOverrides: Partial<Record<Language, Record<string, unknown>>> = {
+  ru: {
+    common: {
+      active: 'Активно',
+      notSpecified: 'Не указано',
+    },
+    route: {
+      dashboardForbiddenDescription:
+        'Для этой страницы нужны расширенные права на просмотр финансовых и операционных показателей.',
+      moduleForbiddenDescription:
+        'У текущего пользователя нет права на чтение записей или аналитики этого раздела.',
+      roleManagementForbiddenDescription:
+        'У текущего пользователя нет права на чтение ролей и назначений для этой страницы.',
+      auditForbiddenDescription:
+        'У текущего пользователя нет права на просмотр журнала изменений для этой страницы.',
+    },
+    tour: {
+      tours: {
+        dashboard: { title: 'Тур по обзору' },
+        settings: { title: 'Тур по настройкам' },
+        roles: { title: 'Тур по ролям' },
+        audit: { title: 'Тур по журналу изменений' },
+      },
+      steps: {
+        inventoryQuickActions: {
+          title: 'Быстрые операции',
+          description: 'Здесь открываются простые формы прихода, расхода и перемещения.',
+        },
+        warehousesList: {
+          title: 'Список складов',
+          description: 'Здесь показаны склады текущего отдела и их основные параметры.',
+        },
+        inventoryMovementsList: {
+          title: 'Журнал движений',
+          description: 'Здесь отображаются все операции по складам: приход, расход и перемещение.',
+        },
+      },
+    },
+    dashboard: {
+      currentPeriod: 'Текущий период',
+      previousPeriod: 'Предыдущий период',
+      moduleAlertsSummary: 'Активные сигналы',
+      moduleAlertsTitle: 'Операционные сигналы',
+      moduleAlertsDescription:
+        'Сигналы, которые требуют внимания до следующего операционного цикла.',
+      moduleOverviewTitle: 'Главное',
+      moduleOverviewDescription:
+        '{module}: самые важные показатели и текущая динамика.',
+      moduleFinanceTitle: 'Финансы',
+      moduleFinanceDescription:
+        '{module}: деньги отдела, расходы, касса и финансовый результат.',
+      moduleFinanceOverviewChartTitle: 'Деньги отдела',
+      moduleFinanceOverviewChartDescription:
+        'Выручка, расходы, финрезультат и денежный поток по дням.',
+      moduleExpenseCategoriesChartTitle: 'Куда уходят деньги',
+      moduleExpenseCategoriesChartDescription:
+        'Самые тяжёлые категории расходов за выбранный период.',
+      moduleExpenseCategoriesTableTitle: 'Главные категории расходов',
+      moduleExpenseCategoriesTableDescription:
+        'Какие статьи расходов сильнее всего влияют на деньги отдела.',
+      moduleCashAccountsTableTitle: 'Кассы отдела',
+      moduleCashAccountsTableDescription:
+        'Текущий баланс по кассам и счетам внутри отдела.',
+      moduleRecentExpensesTableTitle: 'Последние расходы',
+      moduleRecentExpensesTableDescription:
+        'Последние расходные операции за выбранный период.',
+      moduleFinancialResultNegativeTitle: 'Отдел работает в минус',
+      moduleFinancialResultNegativeMessage:
+        'Расходы оказались выше собственной выручки за период.',
+      moduleExpenseConcentrationTitle: 'Расходы сосредоточены в одной категории',
+      moduleExpenseConcentrationMessage:
+        'Одна категория занимает слишком большую долю расходов отдела.',
+      moduleCashBalanceNegativeTitle: 'Касса ушла в минус',
+      moduleCashBalanceNegativeMessage:
+        'Баланс касс отдела стал отрицательным.',
+      moduleEfficiencyTitle: 'Риски и эффективность',
+      moduleEfficiencyDescription:
+        '{module}: где есть отклонения и что требует реакции.',
+      moduleOperationsTitle: 'Детали и операции',
+      moduleOperationsDescription:
+        '{module}: расшифровка по клиентам, партиям и последним операциям.',
+      profileOutput: 'Объём',
+      profileCommercial: 'Коммерция',
+      profileEfficiency: 'Эффективность',
+      profileControl: 'Контроль',
+      profileChartTitle: 'Профиль периода',
+      profileChartDescription:
+        'Нормированное сравнение текущего периода с предыдущим по ключевым контурам.',
+      summaryMetrics: {
+        health_index: { label: 'Состояние бизнеса' },
+        operating_profit: { label: 'Операционная прибыль' },
+        net_cashflow: { label: 'Денежный поток' },
+        value_chain_output: { label: 'Общий выпуск' },
+        value_chain_loss_rate: { label: 'Доля потерь' },
+        active_risks: { label: 'Проблемные сигналы' },
+      },
+    },
+    settings: {
+      accessDescription: 'Текущий отдел, роли и права, которые применяются к вашему профилю.',
+      permissionsTitle: 'Права',
+      contextDescription:
+        'Эти данные используются системой как базовая область для скрытых полей в CRUD-формах.',
+      emptyDepartmentsDescription:
+        'Создайте первый отдел, чтобы выстроить структуру подразделений и рабочие области для модулей.',
+    },
+    rolesManagement: {
+      description:
+        'Здесь можно управлять ролями, набором прав внутри роли и назначением сотрудников в выбранную роль.',
+      permissionsPool: 'Доступных прав',
+      roleSearch: 'Поиск по названию или коду',
+      permissionCount: '{count} прав',
+      permissionsEmpty: 'Справочник прав пока пуст.',
+      permissionsTitle: 'Права внутри роли',
+      permissionsSelectPlaceholder: 'Начните вводить код или описание права',
+      permissionsSearch: 'Поиск по коду, ресурсу, действию и описанию',
+      employeeSearch: 'Поиск по имени, логину или эл. почте',
+    },
+    fields: {
+      as_of: 'Дата среза',
+      balance: 'Остаток',
+      item_key: 'Позиция',
+      item_type: 'Тип позиции',
+      last_movement_on: 'Дата последнего движения',
+      occurred_on: 'Дата операции',
+      warehouse_id: 'Склад',
+      from_warehouse_id: 'Со склада',
+      to_warehouse_id: 'На склад',
+      to_department_id: 'В подразделение',
+    },
+    crud: {
+      inventoryToolsTitle: 'Остатки и перемещения',
+      inventoryToolsDescription:
+        'Операции по складскому журналу: проверка остатка по складу на дату и внутреннее перемещение между складами.',
+      inventoryBalanceTitle: 'Остаток на дату',
+      inventoryBalanceItemKeyPlaceholder: 'Оставьте пустым для всех позиций',
+      inventoryBalanceWarehousePlaceholder: 'Выберите склад для расчёта остатка',
+      inventoryBalanceItemKeyTooShort:
+        'Для точечного запроса выберите позицию или укажите значение длиной минимум 2 символа.',
+      inventoryBalanceLoaded: 'Остаток загружен. Значения рассчитаны на выбранную дату.',
+      inventoryLoadBalance: 'Показать остаток',
+      inventoryBalanceResultTitle: 'Результат расчёта',
+      inventoryBalanceEmpty: 'По выбранным условиям остаток не найден.',
+      inventoryTransferTitle: 'Внутреннее перемещение',
+      inventoryTransferDepartmentPlaceholder: 'Выберите подразделение назначения',
+      inventoryTransferSourceWarehousePlaceholder: 'Выберите склад отправки',
+      inventoryTransferTargetWarehousePlaceholder: 'Выберите склад назначения',
+      inventoryTransferCreateForbidden: 'Недостаточно прав для внутреннего перемещения.',
+      inventoryTransferItemKeyRequired: 'Выберите позицию для перемещения.',
+      inventoryTransferQuantityInvalid: 'Количество должно быть больше нуля.',
+      inventoryTransferTargetDepartmentRequired: 'Выберите подразделение назначения.',
+      inventoryTransferDepartmentMismatch: 'Подразделение отправки и назначения должны отличаться.',
+      inventoryTransferTargetWarehouseRequired: 'Выберите склад назначения.',
+      inventoryTransferWarehouseMismatch: 'Склад отправки и назначения должны отличаться.',
+      inventoryTransferRequiresCreatePermission:
+        'Для создания перемещения нужен доступ `stock_movement.create`.',
+      inventoryCreateTransfer: 'Создать перемещение',
+      inventoryTransferCreated: 'Внутреннее перемещение создано: {id}.',
+      inventoryPositionChickRun: 'Вывод цыплят',
+      inventoryPositionChickArrival: 'Поступление цыплят',
+      inventoryPositionFeedRaw: 'Сырьё',
+      inventoryPositionMedicineBatch: 'Партия лекарства',
+      generateQr: 'QR',
+      refreshQr: 'Обновить QR',
+      printQr: 'Печать',
+      downloadQr: 'Скачать PNG',
+      openPublicCard: 'Public',
+      copyPublicLink: 'Копировать ссылку',
+      attachFile: 'Файл',
+      medicineBatchQrGenerated: 'QR обновлён для партии {code}.',
+      medicineBatchAttachmentUploaded: 'Файл прикреплён к партии {code}.',
+      medicineBatchPublicLinkCopied: 'Публичная ссылка для партии {code} скопирована.',
+      medicineBatchQrCenterTitle: 'QR-код партии {code}',
+      medicineBatchQrCenterDescription: 'Сканируйте QR или откройте публичную карточку товара.',
+      qrGeneratedAt: 'Сгенерирован',
+      qrExpiresAt: 'Действует до',
+      popupBlocked: 'Браузер заблокировал новое окно. Разрешите pop-up для этого сайта.',
+    },
+    publicMedicine: {
+      invalidTokenTitle: 'Некорректная ссылка',
+      invalidTokenDescription: 'В ссылке отсутствует токен для публичной карточки товара.',
+      loadingDescription: 'Получаем данные о товаре...',
+      notFoundTitle: 'Карточка не найдена',
+      notFoundDescription: 'Ссылка недействительна или срок действия QR-кода истёк.',
+      unnamedProduct: 'Товар',
+      subtitle: 'Публичная карточка товара из ветаптеки',
+      downloadAttachment: 'Скачать вложение',
+    },
+    inventory: {
+      itemTypes: {
+        egg: 'Яйца',
+        chick: 'Птенцы',
+        feed: 'Корм',
+        medicine: 'Лекарства',
+        semi_product: 'Полуфабрикаты',
+      },
+      movementKinds: {
+        adjustment_in: 'Корректировка прихода',
+        adjustment_out: 'Корректировка расхода',
+        incoming: 'Приход',
+        outgoing: 'Расход',
+        transfer_in: 'Перемещение на склад',
+        transfer_out: 'Перемещение со склада',
+      },
+      units: {
+        kg: 'Килограмм',
+        ltr: 'Литр',
+        pcs: 'Штука',
+      },
+    },
+    dashboardData: {
+      sections: {
+        executive_dashboard: {
+          title: 'Главное по бизнесу',
+          description: 'Короткая сводка: деньги, потери и проблемные зоны.',
+          charts: {
+            finance_overview: {
+              title: 'Деньги: выручка, расходы, прибыль',
+              description: 'Показывает, как менялись деньги по дням.',
+              series: {
+                revenue: 'Выручка',
+                expenses: 'Расходы',
+                profit: 'Прибыль',
+                cashflow: 'Денежный поток',
+              },
+            },
+            value_chain_trend: {
+              title: 'Выпуск и потери',
+              description: 'Показывает, растёт ли выпуск и где накапливаются потери.',
+              series: {
+                output: 'Выпуск',
+                losses: 'Потери',
+              },
+            },
+            department_contribution: {
+              title: 'Общая оценка отделов',
+              description: 'Показывает, какие отделы сейчас тянут результат вверх, а какие проседают.',
+              series: {
+                score: 'Оценка',
+              },
+            },
+            department_revenue: {
+              title: 'Выручка по отделам',
+              description: 'Показывает, какие отделы приносят основную выручку за период.',
+              series: {
+                revenue: 'Выручка',
+              },
+            },
+            department_operations: {
+              title: 'Выпуск и потери по отделам',
+              description: 'Сравнение полезного выпуска и объёма потерь по каждому отделу.',
+              series: {
+                output: 'Выпуск',
+                losses: 'Потери',
+              },
+            },
+            department_loss_rate: {
+              title: 'Доля потерь по отделам',
+              description: 'Показывает, где потери уже выходят за безопасный уровень.',
+              series: {
+                loss_rate: 'Потери',
+              },
+            },
+            expense_category_burn: {
+              title: 'Куда уходят деньги',
+              description: 'Топ категорий расходов за выбранный период.',
+              series: {
+                amount: 'Расходы',
+              },
+            },
+          },
+          breakdowns: {
+            executive_alerts: {
+              title: 'Что требует внимания',
+              description: 'Какие направления и проблемы нельзя откладывать.',
+            },
+            departments_performance: {
+              title: 'Общая картина по отделам',
+              description: 'Короткая сводка по каждому отделу: оценка, потери, выручка и выпуск.',
+            },
+            top_risk_summary: {
+              title: 'Главные риски',
+              description: 'Самые важные проблемы за выбранный период.',
+            },
+          },
+          alerts: {
+            health_index_bad: {
+              title: 'Состояние бизнеса просело',
+              message: 'Общий показатель опустился ниже безопасного уровня.',
+            },
+            operating_loss: {
+              title: 'Бизнес работает в минус',
+              message: 'За выбранный период расходы оказались выше выручки.',
+            },
+            negative_cashflow: {
+              title: 'Отрицательный денежный поток',
+              message: 'Деньги выходят быстрее, чем приходят.',
+            },
+            modules_in_bad_zone: {
+              title: 'Есть отделы в красной зоне',
+              message: 'Хотя бы один отдел работает ниже безопасного уровня.',
+            },
+          },
+        },
+        module_alerts: {
+          breakdowns: {
+            module_alerts: {
+              title: 'Операционные сигналы',
+              description: 'Список предупреждений и критичных событий по модулю.',
+            },
+          },
+        },
+        egg_farm: {
+          metrics: {
+            net_eggs: { label: 'Чистый выпуск яиц' },
+            current_stock: { label: 'Остаток яиц' },
+            loss_rate: { label: 'Процент потерь' },
+            shipment_volume: { label: 'Объём отгрузки' },
+            eggs_to_incubation: { label: 'Передано в инкубацию' },
+            egg_revenue: { label: 'Выручка от яиц' },
+            medicine_consumed: { label: 'Расход лекарств' },
+            feed_consumed: { label: 'Расход корма' },
+            client_base: { label: 'Клиентская база' },
+          },
+          charts: {
+            egg_output_daily: {
+              title: 'Выход яиц по дням',
+              description: 'Суточная динамика собранных, списанных и чистых яиц.',
+              series: {
+                collected: 'Собрано',
+                broken: 'Битые',
+                rejected: 'Отбраковка',
+                net: 'Чистый выход',
+              },
+            },
+            egg_monthly_flow: {
+              title: 'Месячная динамика',
+              description: 'Сравнение производства, отгрузки и потерь по месяцам.',
+              series: {
+                produced: 'Произведено',
+                shipped: 'Отгружено',
+                losses: 'Потери',
+              },
+            },
+            egg_destination_flow: {
+              title: 'Куда уходят яйца',
+              description: 'Чистый выпуск, клиентские отгрузки и передача в инкубацию по дням.',
+              series: {
+                net_output: 'Чистый выпуск',
+                client_shipments: 'Клиентам',
+                incubation_transfers: 'В инкубацию',
+              },
+            },
+            egg_loss_rate: {
+              title: 'Процент потерь',
+              description: 'Какая доля собранных яиц ушла в потери по дням.',
+              series: {
+                loss_rate: 'Потери',
+              },
+            },
+            farm_feed_supply: {
+              title: 'Расход корма',
+              description: 'Фактическое потребление корма по дням внутри маточника.',
+              series: {
+                feed: 'Корм',
+              },
+            },
+            farm_medicine_usage: {
+              title: 'Расход лекарств',
+              description: 'Списания лекарств по дням из операций фермы.',
+              series: {
+                medicine: 'Лекарства',
+              },
+            },
+            egg_revenue_daily: {
+              title: 'Выручка по яйцам',
+              description: 'Сколько денег принесли клиентские отгрузки по дням.',
+              series: {
+                revenue: 'Выручка',
+              },
+            },
+          },
+          breakdowns: {
+            egg_clients: {
+              title: 'Выручка по клиентам',
+              description: 'Какие клиенты дают основную выручку по яйцам.',
+            },
+            egg_recent_shipments: {
+              title: 'Последние отгрузки',
+              description: 'Последние операции отгрузки яиц клиентам.',
+            },
+            egg_destination_balance: {
+              title: 'Баланс движения яиц',
+              description: 'Куда уходит выпуск маточника: клиенты, инкубация, потери и остаток.',
+            },
+            egg_client_registry: {
+              title: 'Активная клиентская база',
+              description: 'Клиенты, участвовавшие в отгрузках яиц за период.',
+            },
+            egg_feed_types: {
+              title: 'Структура расхода корма',
+              description: 'Какие типы корма больше всего потребляются в маточнике.',
+            },
+            egg_top_clients: {
+              title: 'Топ клиентов по отгрузке',
+              description: 'Клиенты с максимальным объёмом отгруженных яиц.',
+            },
+          },
+          alerts: {
+            egg_loss_rate_critical: {
+              title: 'Высокий процент потерь',
+              message: 'Потери яиц превысили критический порог.',
+            },
+            egg_loss_rate_warning: {
+              title: 'Рост потерь яиц',
+              message: 'Потери выше целевого операционного уровня.',
+            },
+          },
+        },
+        incubation: {
+          metrics: {
+            eggs_arrived: { label: 'Яиц поступило' },
+            grade_1_total: { label: 'Сорт 1' },
+            grade_1_share: { label: 'Доля сорта 1' },
+            grade_2_total: { label: 'Сорт 2' },
+            bad_eggs_total: { label: 'Брак' },
+            chicks_hatched: { label: 'Птенцов выведено' },
+            hatch_rate: { label: 'Выводимость' },
+            sales_volume: { label: 'Продано птенцов' },
+            sales_revenue: { label: 'Выручка' },
+            avg_sale_price: { label: 'Средняя цена' },
+            client_base: { label: 'Клиентская база' },
+            eggs_set: { label: 'Яиц заложено' },
+            bad_eggs: { label: 'Брак' },
+            chicks_dispatched: { label: 'Передано или отгружено' },
+          },
+          breakdowns: {
+            incubation_egg_arrivals: {
+              title: 'Приход яиц',
+              description: 'Сколько яиц пришло в инкубационные партии по дням.',
+            },
+            incubation_quality: {
+              title: 'Сортировка по качеству',
+              description: 'Разделение на сорт 1, сорт 2 и брак по завершённым прогонам.',
+            },
+            incubation_hatch: {
+              title: 'Выход птенцов',
+              description: 'Сколько птенцов вышло из яиц по датам завершения прогонов.',
+            },
+            incubation_revenue: {
+              title: 'Выручка по птенцам',
+              description: 'Сколько денег приносит отгрузка птенцов по дням.',
+            },
+            incubation_yield: {
+              title: 'Процент выхода и качества',
+              description: 'Выводимость и доля первого сорта по завершённым прогонам.',
+            },
+            incubation_sources: {
+              title: 'База поставщиков яиц',
+              description: 'Источники инкубационных партий.',
+            },
+            incubation_clients: {
+              title: 'Клиенты по птенцам',
+              description: 'Клиенты, дающие основную выручку по выведенным птенцам.',
+            },
+            incubation_client_registry: {
+              title: 'Активная клиентская база',
+              description: 'Партнёры, участвующие в поставках яиц и отгрузках птенцов за период.',
+            },
+            incubation_active_batches: {
+              title: 'Активные партии',
+              description: 'Партии без завершённого инкубационного цикла.',
+            },
+            incubation_recent_dispatch: {
+              title: 'Последние передачи и отгрузки',
+              description: 'Куда ушли выведенные птенцы.',
+            },
+            eggs_set: {
+              title: 'Яиц заложено',
+              description: 'Ключевой входной показатель для расчётов.',
+            },
+          },
+          alerts: {
+            incubation_hatch_rate_critical: {
+              title: 'Низкая выводимость',
+              message: 'Выводимость ниже целевого уровня.',
+            },
+            incubation_hatch_rate_warning: {
+              title: 'Снижение выводимости',
+              message: 'Нужно проверить качество партии и режим инкубации.',
+            },
+          },
+        },
+        factory: {
+          metrics: {
+            chicks_arrived: { label: 'Птенцов пришло' },
+            feed_arrived: { label: 'Корма пришло' },
+            medicine_arrived: { label: 'Лекарств пришло' },
+            chicks_stock: { label: 'Текущий остаток поголовья' },
+            sent_to_slaughter: { label: 'Передано на убойню' },
+            client_base: { label: 'Клиентская база' },
+            medicine_consumed: { label: 'Расход лекарств' },
+            critical_stock_items: { label: 'Критичные остатки' },
+          },
+          charts: {
+            factory_chicks: {
+              title: 'Приход птенцов',
+              description: 'Суточный приход птицы на фабрику.',
+            },
+            factory_chicks_flow: {
+              title: 'Приход птенцов и передача на убойню',
+              description: 'Динамика движения живого поголовья.',
+              series: {
+                arrivals: 'Приход',
+                transferred: 'Передано на убойню',
+              },
+            },
+            factory_feed_types: {
+              title: 'Корма по типам',
+              description: 'Какие корма приходят и для каких птиц используются.',
+            },
+            factory_medicine_types: {
+              title: 'Лекарства по типам',
+              description: 'Какие лекарства приходят и по каким направлениям используются.',
+            },
+            factory_feed_consumption: {
+              title: 'Расход корма по времени',
+              description: 'Фактический расход кормов.',
+              series: {
+                feed: 'Корм',
+              },
+            },
+            factory_medicine_consumption: {
+              title: 'Расход лекарств по времени',
+              description: 'Фактическое использование лекарств.',
+              series: {
+                medicine: 'Лекарства',
+              },
+            },
+          },
+          breakdowns: {
+            factory_clients: {
+              title: 'Клиентская база фабрики',
+              description: 'Основные поставщики птенцов в фабричный контур.',
+            },
+            factory_feed_arrivals_by_type: {
+              title: 'Корма по типам',
+              description: 'Какие корма приходят на фабрику и для каких типов птиц используются.',
+            },
+            factory_medicine_arrivals_by_type: {
+              title: 'Лекарства по типам',
+              description: 'Какие лекарства приходят на фабрику и по направлению птицы используются.',
+            },
+            factory_client_registry: {
+              title: 'Активная клиентская база',
+              description: 'Контрагенты, поставлявшие птенцов на фабрику за период.',
+            },
+            factory_recent_arrivals: {
+              title: 'Последние приходы птенцов',
+              description: 'Последние зафиксированные поступления.',
+            },
+            factory_recent_transfers: {
+              title: 'Последние передачи на убойню',
+              description: 'Движения из фабричного контура в убойню.',
+            },
+          },
+          alerts: {
+            factory_low_chick_stock: {
+              title: 'Низкий остаток живого поголовья',
+              message: 'Текущий остаток птенцов ниже операционного минимума.',
+            },
+            factory_critical_stock_items: {
+              title: 'Есть критичные остатки',
+              message: 'Выявлены позиции с критически низким остатком.',
+            },
+          },
+        },
+        feed_mill: {
+          metrics: {
+            raw_arrivals: { label: 'Приход сырья' },
+            raw_consumed: { label: 'Расход сырья' },
+            product_output: { label: 'Выпуск готового корма' },
+            sales_volume: { label: 'Отгрузка готового продукта' },
+            client_base: { label: 'Клиентская база' },
+            sales_revenue: { label: 'Выручка' },
+            product_shipped: { label: 'Отгрузка готового продукта' },
+            stock_total: { label: 'Текущий остаток сырья и продукта' },
+            shipment_rate: { label: 'Реализация выпуска' },
+          },
+          breakdowns: {
+            feed_formulas: {
+              title: 'Продукт и формулы',
+              description: 'Какие формулы дают основной выпуск готового корма.',
+            },
+            feed_clients: {
+              title: 'Выручка по клиентам',
+              description: 'Клиенты, дающие основную выручку по готовому корму.',
+            },
+            feed_client_registry: {
+              title: 'Активная клиентская база',
+              description: 'Контрагенты, участвующие в поставках сырья и отгрузках продукта.',
+            },
+            feed_low_raw_stock: {
+              title: 'Сырьё с низким остатком',
+              description: 'Позиции, которые рискуют остановить выпуск.',
+            },
+            feed_recent_shipments: {
+              title: 'Последние отгрузки продукта',
+              description: 'Последние отгрузки готового корма клиентам.',
+            },
+            feed_recent_batches: {
+              title: 'Последние производственные партии',
+              description: 'Последние партии выпуска готового корма.',
+            },
+            feed_raw_flow: {
+              title: 'Приход сырья',
+              description: 'Динамика прихода и расхода сырья по датам.',
+            },
+            feed_product_flow: {
+              title: 'Выпуск и отгрузка',
+              description: 'Сравнение выпуска готового корма и отгрузки.',
+            },
+            feed_shipment_rate: {
+              title: 'Реализация выпуска',
+              description: 'Сравнение объёмов выпуска и отгрузки готового корма.',
+            },
+            feed_revenue: {
+              title: 'Выручка по кормовому контуру',
+              description: 'Доходы от отгрузок готового корма по датам.',
+            },
+            feed_ingredient_mix: {
+              title: 'Состав ингредиентов',
+              description: 'Доли сырьевых ингредиентов в структуре выпущенного корма.',
+            },
+          },
+          alerts: {
+            feed_shipment_rate_low: {
+              title: 'Низкая реализация выпуска',
+              message: 'Отгрузка готового продукта отстаёт от объёма выпуска.',
+            },
+            feed_low_raw_stock: {
+              title: 'Критичные остатки сырья',
+              message: 'Есть ингредиенты с низким остатком.',
+            },
+          },
+        },
+        vet_pharmacy: {
+          metrics: {
+            medicine_arrivals: { label: 'Приход лекарств' },
+            medicine_consumed: { label: 'Расход лекарств' },
+            current_stock: { label: 'Текущий остаток' },
+            expiring_batches: { label: 'Партии скоро истекают' },
+            expired_batches: { label: 'Просрочено или заблокировано' },
+            turnover_rate: { label: 'Оборачиваемость' },
+          },
+          breakdowns: {
+            medicine_suppliers: {
+              title: 'Клиентская база ветаптеки',
+              description: 'Контрагенты, участвующие в приходе и расходе лекарств.',
+            },
+            medicine_client_registry: {
+              title: 'Активная клиентская база',
+              description: 'Поставщики и получатели, участвующие в движении лекарств.',
+            },
+            medicine_expiry_batches: {
+              title: 'Партии со сроками годности',
+              description: 'Партии с ближайшими сроками и остатком.',
+            },
+            medicine_recent_batches: {
+              title: 'Последние партии прихода',
+              description: 'Последние принятые партии со штрихкодом и сроком годности.',
+            },
+            medicine_latest_consumptions: {
+              title: 'Последние списания и выдачи',
+              description: 'Последние расходные операции по лекарствам.',
+            },
+            medicine_flow: {
+              title: 'Приход и расход лекарств',
+              description: 'Суточная динамика приходов и списаний лекарств.',
+            },
+            medicine_stock: {
+              title: 'Остатки по типам',
+              description: 'Остатки по типам лекарств.',
+            },
+            medicine_expiry: {
+              title: 'Остатки по сроку годности',
+              description: 'Остатки по срокам годности.',
+            },
+            medicine_turnover_rate: {
+              title: 'Оборачиваемость',
+              description: 'Как быстро лекарства расходуются относительно приходов.',
+            },
+          },
+          alerts: {
+            medicine_expired_batches: {
+              title: 'Есть просроченные партии',
+              message: 'На складе есть партии с истекшим сроком годности.',
+            },
+            medicine_expiring_batches: {
+              title: 'Партии с близким сроком',
+              message: 'Есть партии, истекающие в ближайшие 30 дней.',
+            },
+            medicine_turnover_low: {
+              title: 'Низкая оборачиваемость',
+              message: 'Доля расхода существенно ниже входящего объёма.',
+            },
+          },
+        },
+        slaughterhouse: {
+          metrics: {
+            birds_arrived: { label: 'Птицы поступило' },
+            birds_processed: { label: 'Птицы обработано' },
+            first_sort_total: { label: 'Первый сорт' },
+            second_sort_total: { label: 'Второй сорт' },
+            bad_total: { label: 'Брак / плохой' },
+            process_rate: { label: 'Процент переработки' },
+            first_sort_share: { label: 'Доля первого сорта' },
+            semi_product_output: { label: 'Объём полуфабрикатов' },
+            shipment_volume: { label: 'Объём отгрузки полуфабрикатов' },
+            shipment_revenue: { label: 'Выручка от отгрузок' },
+            client_base: { label: 'Клиентская база' },
+          },
+          charts: {
+            slaughter_flow: {
+              title: 'Приход птицы',
+              description: 'Суточный поток приходящей птицы.',
+            },
+            slaughter_quality: {
+              title: 'Сортировка по качеству',
+              description: 'Распределение птицы по сортам и браку.',
+            },
+            slaughter_semi_products: {
+              title: 'Разделка по частям',
+              description: 'Какие части птицы получаются после разделки.',
+            },
+            slaughter_process_rate: {
+              title: 'Процент переработки',
+              description: 'Доля обработанной птицы по отношению к поступившей.',
+            },
+            slaughter_semi_flow: {
+              title: 'Выпуск и отгрузка полуфабрикатов',
+              description: 'Сравнение выпуска и клиентской отгрузки полуфабрикатов.',
+              series: {
+                produced: 'Выпуск',
+                shipped: 'Отгрузка',
+              },
+            },
+            slaughter_revenue: {
+              title: 'Выручка по полуфабрикатам',
+              description: 'Доходы по отгрузкам полуфабрикатов по датам.',
+            },
+          },
+          breakdowns: {
+            slaughter_clients: {
+              title: 'Клиенты по полуфабрикату',
+              description: 'Клиенты с основным сбытом полуфабрикатов.',
+            },
+            slaughter_client_registry: {
+              title: 'Активная клиентская база',
+              description: 'Поставщики птицы и покупатели полуфабриката за период.',
+            },
+            slaughter_recent_arrivals: {
+              title: 'Последний приход птицы',
+              description: 'Последние поступления птицы в убойный контур.',
+            },
+            slaughter_recent_processings: {
+              title: 'Последняя разделка',
+              description: 'Последние операции по переработке и разрезке по сортам.',
+            },
+            slaughter_top_products: {
+              title: 'Топ полуфабрикатов',
+              description: 'Наиболее объёмные позиции по выпуску.',
+            },
+            slaughter_recent_shipments: {
+              title: 'Последние отгрузки клиентам',
+              description: 'Последние клиентские отгрузки полуфабрикатов.',
+            },
+          },
+          alerts: {
+            slaughter_process_rate_low: {
+              title: 'Низкий процент переработки',
+              message: 'Обработка отстаёт от входящего потока птицы.',
+            },
+            slaughter_first_sort_share_low: {
+              title: 'Низкая доля первого сорта',
+              message: 'Доля первого сорта ниже операционного ориентира.',
+            },
+          },
+        },
+      },
+    },
+  },
+  uz: {
+    common: {
+      active: 'Faol',
+      notSpecified: 'Ko‘rsatilmagan',
+    },
+    route: {
+      dashboardForbiddenDescription:
+        'Bu sahifa uchun moliyaviy va operatsion ko‘rsatkichlarni ko‘rish bo‘yicha kengaytirilgan ruxsat kerak.',
+      moduleForbiddenDescription:
+        'Joriy foydalanuvchida bu bo‘lim yozuvlari yoki tahlilini o‘qish huquqi yo‘q.',
+      roleManagementForbiddenDescription:
+        'Joriy foydalanuvchida bu sahifa uchun rollar va tayinlovlarni ko‘rish huquqi yo‘q.',
+      auditForbiddenDescription:
+        'Joriy foydalanuvchida bu sahifa uchun o‘zgarishlar jurnalini ko‘rish huquqi yo‘q.',
+    },
+    tour: {
+      steps: {
+        inventoryQuickActions: {
+          title: 'Tezkor amallar',
+          description: 'Bu yerda kirim, chiqim va ko‘chirish uchun sodda formalar ochiladi.',
+        },
+        warehousesList: {
+          title: 'Omborlar ro‘yxati',
+          description: 'Bu yerda joriy bo‘lim omborlari va ularning asosiy parametrlari ko‘rinadi.',
+        },
+        inventoryMovementsList: {
+          title: 'Harakatlar jurnali',
+          description: 'Bu yerda ombor bo‘yicha barcha kirim, chiqim va ko‘chirishlar ko‘rsatiladi.',
+        },
+      },
+    },
+    dashboard: {
+      currentPeriod: 'Joriy davr',
+      previousPeriod: 'Oldingi davr',
+      moduleAlertsSummary: 'Faol signallar',
+      moduleAlertsTitle: 'Operatsion signallar',
+      moduleAlertsDescription:
+        'Keyingi operatsion siklgacha eʼtibor talab qiladigan ogohlantirishlar.',
+      moduleOverviewTitle: 'Umumiy manzara',
+      moduleOverviewDescription:
+        '{module}: asosiy natijalar, joriy oqim va bosh drayverlar tuzilmasi.',
+      moduleFinanceTitle: 'Moliya',
+      moduleFinanceDescription:
+        '{module}: bo‘lim puli, xarajatlar, kassa va moliyaviy natija.',
+      moduleFinanceOverviewChartTitle: 'Bo‘lim puli',
+      moduleFinanceOverviewChartDescription:
+        'Tushum, xarajatlar, moliyaviy natija va pul oqimi kunlar bo‘yicha.',
+      moduleExpenseCategoriesChartTitle: 'Pul qayerga ketmoqda',
+      moduleExpenseCategoriesChartDescription:
+        'Tanlangan davrdagi eng og‘ir xarajat toifalari.',
+      moduleExpenseCategoriesTableTitle: 'Asosiy xarajat toifalari',
+      moduleExpenseCategoriesTableDescription:
+        'Qaysi xarajat moddalari bo‘lim puliga eng ko‘p ta’sir qiladi.',
+      moduleCashAccountsTableTitle: 'Bo‘lim kassalari',
+      moduleCashAccountsTableDescription:
+        'Bo‘lim ichidagi kassalar va hisoblar bo‘yicha joriy qoldiq.',
+      moduleRecentExpensesTableTitle: 'So‘nggi xarajatlar',
+      moduleRecentExpensesTableDescription:
+        'Tanlangan davrdagi oxirgi xarajat operatsiyalari.',
+      moduleFinancialResultNegativeTitle: 'Bo‘lim zarar bilan ishlamoqda',
+      moduleFinancialResultNegativeMessage:
+        'Davr bo‘yicha xarajatlar o‘z tushumidan yuqori bo‘lib qoldi.',
+      moduleExpenseConcentrationTitle: 'Xarajatlar bitta toifada jamlangan',
+      moduleExpenseConcentrationMessage:
+        'Bitta toifa bo‘lim xarajatlarining juda katta ulushini egallagan.',
+      moduleCashBalanceNegativeTitle: 'Kassa minusga tushib ketdi',
+      moduleCashBalanceNegativeMessage:
+        'Bo‘lim kassalari qoldig‘i manfiy holatga tushgan.',
+      moduleEfficiencyTitle: 'Samaradorlik va xatarlar',
+      moduleEfficiencyDescription:
+        '{module}: jarayon sifati, tor joylar va yechim talab qiladigan signallar.',
+      moduleOperationsTitle: 'Mijozlar va so‘nggi operatsiyalar',
+      moduleOperationsDescription:
+        '{module}: hajm qayerdan keladi, natija qayerga ketadi va oxirgi operatsiyalar qaysilar.',
+      profileOutput: 'Hajm',
+      profileCommercial: 'Kommersiya',
+      profileEfficiency: 'Samaradorlik',
+      profileControl: 'Nazorat',
+      profileChartTitle: 'Davr profili',
+      profileChartDescription:
+        'Joriy va oldingi davrning asosiy konturlar bo‘yicha normallashtirilgan taqqoslanishi.',
+      summaryMetrics: {
+        net_cashflow: { label: 'Sof pul oqimi' },
+      },
+    },
+    settings: {
+      accessDescription: 'Profilingizga qo‘llanayotgan joriy bo‘lim, rollar va ruxsatlar.',
+      permissionsTitle: 'Ruxsatlar',
+      contextDescription:
+        'Bu maʼlumotlar CRUD formalaridagi yashirin maydonlar uchun bazaviy qamrov sifatida ishlatiladi.',
+      emptyDepartmentsDescription:
+        'Bo‘limlar tuzilmasi va modullar uchun ishchi qamrovlarni yaratish uchun birinchi bo‘limni qo‘shing.',
+    },
+    rolesManagement: {
+      description:
+        'Bu yerda rollarni, rol ichidagi ruxsatlar to‘plamini va tanlangan rolga xodim tayinlashni boshqarishingiz mumkin.',
+      permissionsPool: 'Mavjud ruxsatlar',
+      roleSearch: 'Nomi yoki kodi bo‘yicha qidiruv',
+      permissionCount: '{count} ta ruxsat',
+      permissionsEmpty: 'Ruxsatlar maʼlumotnomasi hozircha bo‘sh.',
+      permissionsTitle: 'Rol ichidagi ruxsatlar',
+      permissionsSelectPlaceholder: 'Ruxsat kodi yoki tavsifini kiriting',
+      permissionsSearch: 'Kod, resurs, amal va tavsif bo‘yicha qidiruv',
+    },
+    fields: {
+      as_of: 'Kesim sanasi',
+      balance: 'Qoldiq',
+      item_key: 'Pozitsiya',
+      item_type: 'Pozitsiya turi',
+      last_movement_on: 'Oxirgi harakat sanasi',
+      occurred_on: 'Operatsiya sanasi',
+      warehouse_id: 'Ombor',
+      from_warehouse_id: 'Qaysi ombordan',
+      to_warehouse_id: 'Qaysi omborga',
+      to_department_id: 'Qaysi bo‘limga',
+    },
+    crud: {
+      inventoryToolsTitle: 'Qoldiq va ko‘chirishlar',
+      inventoryToolsDescription:
+        'Ombor jurnali bo‘yicha amallar: tanlangan ombor bo‘yicha qoldiqni tekshirish va omborlar orasida ichki ko‘chirish.',
+      inventoryBalanceTitle: 'Sanadagi qoldiq',
+      inventoryBalanceItemKeyPlaceholder: 'Barcha pozitsiyalar uchun bo‘sh qoldiring',
+      inventoryBalanceWarehousePlaceholder: 'Qoldiqni hisoblash uchun omborni tanlang',
+      inventoryBalanceItemKeyTooShort:
+        'Aniq so‘rov uchun pozitsiyani tanlang yoki kamida 2 belgili qiymat kiriting.',
+      inventoryBalanceLoaded: 'Qoldiq yuklandi. Qiymatlar tanlangan sana bo‘yicha hisoblandi.',
+      inventoryLoadBalance: 'Qoldiqni ko‘rsatish',
+      inventoryBalanceResultTitle: 'Hisoblash natijasi',
+      inventoryBalanceEmpty: 'Tanlangan shartlar bo‘yicha qoldiq topilmadi.',
+      inventoryTransferTitle: 'Ichki ko‘chirish',
+      inventoryTransferDepartmentPlaceholder: 'Qabul qiluvchi bo‘limni tanlang',
+      inventoryTransferSourceWarehousePlaceholder: 'Jo‘natuvchi omborni tanlang',
+      inventoryTransferTargetWarehousePlaceholder: 'Qabul qiluvchi omborni tanlang',
+      inventoryTransferCreateForbidden: 'Ichki ko‘chirish uchun huquq yetarli emas.',
+      inventoryTransferItemKeyRequired: 'Ko‘chirish uchun pozitsiyani tanlang.',
+      inventoryTransferQuantityInvalid: 'Miqdor noldan katta bo‘lishi kerak.',
+      inventoryTransferTargetDepartmentRequired: 'Qabul qiluvchi bo‘limni tanlang.',
+      inventoryTransferDepartmentMismatch:
+        'Jo‘natuvchi va qabul qiluvchi bo‘limlar bir xil bo‘lishi mumkin emas.',
+      inventoryTransferTargetWarehouseRequired: 'Qabul qiluvchi omborni tanlang.',
+      inventoryTransferWarehouseMismatch:
+        'Jo‘natuvchi va qabul qiluvchi omborlar bir xil bo‘lishi mumkin emas.',
+      inventoryTransferRequiresCreatePermission:
+        'Ko‘chirish yaratish uchun `stock_movement.create` huquqi kerak.',
+      inventoryCreateTransfer: 'Ko‘chirish yaratish',
+      inventoryTransferCreated: 'Ichki ko‘chirish yaratildi: {id}.',
+      inventoryPositionChickRun: 'Jo‘ja chiqarish',
+      inventoryPositionChickArrival: 'Jo‘ja kelib tushishi',
+      inventoryPositionFeedRaw: 'Xom ashyo',
+      inventoryPositionMedicineBatch: 'Dori partiyasi',
+      generateQr: 'QR',
+      refreshQr: 'QR yangilash',
+      printQr: 'Chop etish',
+      downloadQr: 'PNG yuklab olish',
+      openPublicCard: 'Public',
+      copyPublicLink: 'Havolani nusxalash',
+      attachFile: 'Fayl',
+      medicineBatchQrGenerated: '{code} partiyasi uchun QR yangilandi.',
+      medicineBatchAttachmentUploaded: '{code} partiyasiga fayl biriktirildi.',
+      medicineBatchPublicLinkCopied: '{code} partiyasi uchun ommaviy havola nusxalandi.',
+      medicineBatchQrCenterTitle: '{code} partiyasi QR-kodi',
+      medicineBatchQrCenterDescription:
+        'QR ni skaner qiling yoki mahsulotning ommaviy kartasini oching.',
+      qrGeneratedAt: 'Yaratilgan',
+      qrExpiresAt: 'Amal qilish muddati',
+      popupBlocked: 'Brauzer yangi oynani blokladi. Ushbu sayt uchun pop-upga ruxsat bering.',
+    },
+    publicMedicine: {
+      invalidTokenTitle: 'Noto‘g‘ri havola',
+      invalidTokenDescription: 'Havolada mahsulot kartasi uchun token yo‘q.',
+      loadingDescription: 'Mahsulot ma’lumotlari olinmoqda...',
+      notFoundTitle: 'Karta topilmadi',
+      notFoundDescription: 'Havola yaroqsiz yoki QR token muddati tugagan.',
+      unnamedProduct: 'Mahsulot',
+      subtitle: 'Veterinariya dorixonasi mahsuloti uchun ommaviy karta',
+      downloadAttachment: 'Biriktirmani yuklab olish',
+    },
+    inventory: {
+      itemTypes: {
+        egg: 'Tuxumlar',
+        chick: 'Jo‘jalar',
+        feed: 'Yem',
+        medicine: 'Dorilar',
+        semi_product: 'Yarim tayyor mahsulotlar',
+      },
+      movementKinds: {
+        adjustment_in: 'Kirim tuzatishi',
+        adjustment_out: 'Chiqim tuzatishi',
+        incoming: 'Kirim',
+        outgoing: 'Chiqim',
+        transfer_in: 'Omborga ko‘chirish',
+        transfer_out: 'Ombordan ko‘chirish',
+      },
+      units: {
+        kg: 'Kilogramm',
+        ltr: 'Litr',
+        pcs: 'Dona',
+      },
+    },
+    dashboardData: {
+      sections: {
+        executive_dashboard: {
+          title: 'Rahbarlar ko‘rinishi',
+          description:
+            'Modullar bo‘yicha asosiy yig‘ma ko‘rsatkichlar: natija, harakat va xatar zonalari.',
+          charts: {
+            finance_overview: {
+              title: 'Moliyaviy nazorat: tushum, xarajatlar, foyda',
+              description: 'Asosiy moliyaviy tendensiyalarning oylik dinamikasi.',
+              series: {
+                revenue: 'Tushum',
+                expenses: 'Xarajatlar',
+                profit: 'Foyda',
+                cashflow: 'Pul oqimi',
+              },
+            },
+            value_chain_trend: {
+              title: 'Qiymat zanjiri: chiqish va yo‘qotishlar',
+              description: 'Ishlab chiqarish ketma-ketligidagi chiqish va yo‘qotish dinamikasi.',
+              series: {
+                output: 'Chiqish',
+                losses: 'Yo‘qotishlar',
+              },
+            },
+            department_contribution: {
+              title: 'Bo‘limlarning umumiy bahosi',
+              description: 'Qaysi bo‘limlar natijani yuqoriga tortayotgani, qaysilari pasayayotganini ko‘rsatadi.',
+              series: {
+                score: 'Baho',
+              },
+            },
+            department_revenue: {
+              title: 'Bo‘limlar bo‘yicha tushum',
+              description: 'Davr ichida asosiy tushumni qaysi bo‘limlar berganini ko‘rsatadi.',
+              series: {
+                revenue: 'Tushum',
+              },
+            },
+            department_operations: {
+              title: 'Bo‘limlar bo‘yicha chiqish va yo‘qotishlar',
+              description: 'Har bir bo‘limdagi foydali chiqish va yo‘qotish hajmini solishtiradi.',
+              series: {
+                output: 'Chiqish',
+                losses: 'Yo‘qotishlar',
+              },
+            },
+            department_loss_rate: {
+              title: 'Bo‘limlar bo‘yicha yo‘qotish ulushi',
+              description: 'Qayerda yo‘qotishlar xavfsiz chegaradan chiqayotganini ko‘rsatadi.',
+              series: {
+                loss_rate: 'Yo‘qotishlar',
+              },
+            },
+            expense_category_burn: {
+              title: 'Pul qayerga ketmoqda',
+              description: 'Tanlangan davrdagi eng katta xarajat kategoriyalari.',
+              series: {
+                amount: 'Xarajatlar',
+              },
+            },
+          },
+          breakdowns: {
+            executive_alerts: {
+              title: 'Modullar bo‘yicha signallar',
+              description:
+                'Qaysi yo‘nalishlar hozir darhol eʼtibor talab qilayotganini ko‘rsatadi.',
+            },
+            departments_performance: {
+              title: 'Bo‘limlar bo‘yicha umumiy ko‘rinish',
+              description:
+                'Har bir bo‘lim bo‘yicha baho, yo‘qotish, tushum va chiqish.',
+            },
+            top_risk_summary: {
+              title: 'Eng muhim xatarlar',
+              description: 'Birinchi navbatda eʼtibor talab qiladigan xatarlar.',
+            },
+          },
+          alerts: {
+            health_index_bad: {
+              title: 'Biznes salomatligi indeksi pasaydi',
+              message: 'Umumiy ko‘rsatkich xavfli chegaradan past.',
+            },
+            operating_loss: {
+              title: 'Operatsion foyda minusda',
+              message: 'Mazkur davrda operatsion natija salbiy bo‘ldi.',
+            },
+            negative_cashflow: {
+              title: 'Pul oqimi salbiy',
+              message: 'Davr bo‘yicha kasr oqimi nol dan past.',
+            },
+            modules_in_bad_zone: {
+              title: 'Qizil zonadagi bo‘limlar bor',
+              message: 'Kamida bitta bo‘lim xavfsiz darajadan past ishlamoqda.',
+            },
+          },
+        },
+        module_alerts: {
+          breakdowns: {
+            module_alerts: {
+              title: 'Operatsion signallar',
+              description: 'Modul bo‘yicha ogohlantirishlar va kritik holatlar ro‘yxati.',
+            },
+          },
+        },
+        egg_farm: {
+          metrics: {
+            current_stock: { label: 'Tuxum qoldig‘i' },
+            loss_rate: { label: 'Yo‘qotish foizi' },
+            shipment_volume: { label: 'Jo‘natma hajmi' },
+            eggs_to_incubation: { label: 'Inkubatsiyaga yuborildi' },
+            egg_revenue: { label: 'Tuxumdan tushum' },
+            medicine_consumed: { label: 'Dori sarfi' },
+          },
+          charts: {
+            egg_destination_flow: {
+              title: 'Tuxum qayerga ketmoqda',
+              description:
+                'Sof chiqish, mijozlarga jo‘natmalar va inkubatsiyaga topshirish kunlar bo‘yicha.',
+              series: {
+                net_output: 'Sof chiqish',
+                client_shipments: 'Mijozlarga',
+                incubation_transfers: 'Inkubatsiyaga',
+              },
+            },
+            egg_loss_rate: {
+              title: 'Yo‘qotish foizi',
+              description:
+                'Kunlar bo‘yicha yig‘ilgan tuxumlarning qancha qismi yo‘qotishga ketganini ko‘rsatadi.',
+              series: {
+                loss_rate: 'Yo‘qotishlar',
+              },
+            },
+          },
+          breakdowns: {
+            egg_destination_balance: {
+              title: 'Tuxum harakati balansi',
+              description:
+                'Matishnik chiqishi qayerga ketmoqda: mijozlar, inkubatsiya, yo‘qotishlar va qoldiq.',
+            },
+            egg_client_registry: {
+              title: 'Faol mijozlar bazasi',
+              description: 'Davr davomida tuxum jo‘natmalarida qatnashgan mijozlar.',
+            },
+            egg_recent_shipments: {
+              title: 'So‘nggi jo‘natmalar',
+              description: 'Mijozlarga tuxum jo‘natish bo‘yicha so‘nggi operatsiyalar.',
+            },
+            egg_top_clients: {
+              title: 'Jo‘natma bo‘yicha top mijozlar',
+              description: 'Jo‘natilgan tuxum hajmi eng katta bo‘lgan mijozlar.',
+            },
+          },
+          alerts: {
+            egg_loss_rate_critical: {
+              title: 'Yo‘qotish foizi juda yuqori',
+              message: 'Tuxum yo‘qotishlari kritik chegaradan oshdi.',
+            },
+            egg_loss_rate_warning: {
+              title: 'Tuxum yo‘qotishlari oshmoqda',
+              message: 'Yo‘qotishlar maqsadli operatsion darajadan yuqori.',
+            },
+          },
+        },
+        incubation: {
+          metrics: {
+            eggs_set: { label: 'Joylangan tuxumlar' },
+            hatch_rate: { label: 'Chiqish foizi' },
+            grade_1_share: { label: '1-nav ulushi' },
+            bad_eggs: { label: 'Brak' },
+            chicks_dispatched: { label: 'Jo‘natilgan yoki topshirilgan jo‘jalar' },
+          },
+          breakdowns: {
+            incubation_egg_arrivals: {
+              title: 'Tuxum kirimi',
+              description: 'Kunlar bo‘yicha inkubatsiya partiyalariga kelgan tuxum hajmi.',
+            },
+            incubation_quality: {
+              title: 'Sifat bo‘yicha saralash',
+              description: 'Yakunlangan sikllarda 1-nav, 2-nav va brak taqsimoti.',
+            },
+            incubation_hatch: {
+              title: 'Jo‘ja chiqishi',
+              description: 'Yakunlangan yugurishlar bo‘yicha tuxumdan chiqqan jo‘jalar soni.',
+            },
+            incubation_revenue: {
+              title: 'Jo‘jalar bo‘yicha tushum',
+              description: 'Kunlar bo‘yicha jo‘ja jo‘natmalaridan tushgan mablag‘.',
+            },
+            incubation_yield: {
+              title: 'Chiqish va sifat foizi',
+              description: 'Yakunlangan yugurishlar bo‘yicha chiqish foizi va 1-nav ulushi.',
+            },
+            incubation_client_registry: {
+              title: 'Faol mijozlar bazasi',
+              description:
+                'Davr davomida tuxum yetkazib berish va jo‘ja jo‘natmalarida qatnashgan hamkorlar.',
+            },
+            incubation_active_batches: {
+              title: 'Faol partiyalar',
+              description: 'Inkubatsiya sikli tugamagan partiyalar.',
+            },
+            incubation_recent_dispatch: {
+              title: 'So‘nggi topshirish va jo‘natmalar',
+              description: 'Chiqqan jo‘jalar qayerga ketganini ko‘rsatadi.',
+            },
+            eggs_set: {
+              title: 'Joylangan tuxumlar',
+              description: 'Hisob-kitoblar uchun asosiy kirish ko‘rsatkichi.',
+            },
+          },
+          alerts: {
+            incubation_hatch_rate_critical: {
+              title: 'Chiqish foizi past',
+              message: 'Chiqish foizi maqsadli darajadan past.',
+            },
+            incubation_hatch_rate_warning: {
+              title: 'Chiqish foizi pasaymoqda',
+              message: 'Partiya sifati va inkubatsiya rejimini tekshirish kerak.',
+            },
+          },
+        },
+        factory: {
+          metrics: {
+            chicks_stock: { label: 'Joriy tirik qoldiq' },
+            sent_to_slaughter: { label: 'So‘yishga yuborildi' },
+            medicine_consumed: { label: 'Dori sarfi' },
+            critical_stock_items: { label: 'Kritik qoldiqlar' },
+          },
+          charts: {
+            factory_chicks_flow: {
+              title: 'Jo‘jalar kirimi va so‘yishga uzatish',
+              description: 'Tirik pog‘ona harakati dinamikasi.',
+              series: {
+                arrivals: 'Kirim',
+                transferred: 'So‘yishga uzatildi',
+              },
+            },
+            factory_feed_consumption: {
+              title: 'Vaqt bo‘yicha yem sarfi',
+              description: 'Yemning haqiqiy sarfi.',
+              series: {
+                feed: 'Yem',
+              },
+            },
+            factory_medicine_consumption: {
+              title: 'Vaqt bo‘yicha dori sarfi',
+              description: 'Dorilarning haqiqiy ishlatilishi.',
+              series: {
+                medicine: 'Dorilar',
+              },
+            },
+          },
+          breakdowns: {
+            factory_feed_arrivals_by_type: {
+              title: 'Yem turlari bo‘yicha kirim',
+              description:
+                'Fabrikaga qaysi yemlar kelayotgani va ular qaysi turdagi qushlarga ishlatilishi.',
+            },
+            factory_medicine_arrivals_by_type: {
+              title: 'Dori turlari bo‘yicha kirim',
+              description:
+                'Fabrikaga qaysi dorilar kelayotgani va ular qaysi qush yo‘nalishida ishlatilishi.',
+            },
+            factory_client_registry: {
+              title: 'Faol mijozlar bazasi',
+              description: 'Davr davomida fabrikaga jo‘ja yetkazib bergan kontragentlar.',
+            },
+            factory_recent_arrivals: {
+              title: 'So‘nggi jo‘ja kirimlari',
+              description: 'Oxirgi qayd etilgan kirimlar.',
+            },
+            factory_recent_transfers: {
+              title: 'So‘yishga so‘nggi uzatishlar',
+              description: 'Fabrikadan so‘yish konturiga harakatlar.',
+            },
+          },
+          alerts: {
+            factory_low_chick_stock: {
+              title: 'Tirik pog‘ona qoldig‘i past',
+              message: 'Jo‘jalar qoldig‘i operatsion minimumdan past.',
+            },
+            factory_critical_stock_items: {
+              title: 'Kritik qoldiqlar mavjud',
+              message: 'Kritik darajada past bo‘lgan pozitsiyalar aniqlandi.',
+            },
+          },
+        },
+        feed_mill: {
+          metrics: {
+            raw_consumed: { label: 'Xomashyo sarfi' },
+            product_shipped: { label: 'Tayyor mahsulot jo‘natmasi' },
+            stock_total: { label: 'Xomashyo va mahsulot umumiy qoldig‘i' },
+            shipment_rate: { label: 'Ishlab chiqarish realizatsiyasi' },
+          },
+          breakdowns: {
+            feed_client_registry: {
+              title: 'Faol mijozlar bazasi',
+              description: 'Xomashyo yetkazib berish va mahsulot jo‘natmalarida qatnashgan kontragentlar.',
+            },
+            feed_low_raw_stock: {
+              title: 'Qoldig‘i past xomashyo',
+              description: 'Ishlab chiqarishni to‘xtatib qo‘yishi mumkin bo‘lgan pozitsiyalar.',
+            },
+            feed_recent_shipments: {
+              title: 'Mahsulotning so‘nggi jo‘natmalari',
+              description: 'Mijozlarga tayyor yemning oxirgi jo‘natmalari.',
+            },
+            feed_recent_batches: {
+              title: 'So‘nggi ishlab chiqarish partiyalari',
+              description: 'Tayyor yem bo‘yicha so‘nggi partiyalar.',
+            },
+            feed_raw_flow: {
+              title: 'Xomashyo kirimi',
+              description: 'Sana bo‘yicha xomashyo kirimi va sarfi dinamikasi.',
+            },
+            feed_product_flow: {
+              title: 'Ishlab chiqarish va jo‘natma',
+              description: 'Tayyor yem ishlab chiqarish va jo‘natma hajmlarini solishtirish.',
+            },
+            feed_shipment_rate: {
+              title: 'Ishlab chiqarish realizatsiyasi',
+              description: 'Tayyor yem ishlab chiqarish va jo‘natma hajmlari taqqoslanadi.',
+            },
+            feed_revenue: {
+              title: 'Yem konturi bo‘yicha tushum',
+              description: 'Sana bo‘yicha tayyor yem jo‘natmalaridan tushgan mablag‘.',
+            },
+            feed_ingredient_mix: {
+              title: 'Ingredientlar tarkibi',
+              description: 'Ishlab chiqarilgan yem tarkibidagi xomashyo ulushlari.',
+            },
+          },
+          alerts: {
+            feed_shipment_rate_low: {
+              title: 'Realizatsiya darajasi past',
+              message: 'Tayyor mahsulot jo‘natmasi ishlab chiqarish hajmidan ortda qolmoqda.',
+            },
+            feed_low_raw_stock: {
+              title: 'Kritik xomashyo qoldiqlari',
+              message: 'Qoldig‘i past bo‘lgan ingredientlar bor.',
+            },
+          },
+        },
+        vet_pharmacy: {
+          metrics: {
+            medicine_arrivals: { label: 'Dori kirimi' },
+            medicine_consumed: { label: 'Dori sarfi' },
+            current_stock: { label: 'Joriy qoldiq' },
+            expiring_batches: { label: 'Tez orada muddati tugaydigan partiyalar' },
+            expired_batches: { label: 'Muddati o‘tgan yoki bloklangan' },
+            turnover_rate: { label: 'Aylanish tezligi' },
+          },
+          breakdowns: {
+            medicine_client_registry: {
+              title: 'Faol mijozlar bazasi',
+              description: 'Dorilar harakatida qatnashgan yetkazib beruvchilar va oluvchilar.',
+            },
+            medicine_expiry_batches: {
+              title: 'Yaroqlilik muddati bo‘yicha partiyalar',
+              description: 'Eng yaqin muddatli va qoldig‘i mavjud partiyalar.',
+            },
+            medicine_recent_batches: {
+              title: 'So‘nggi kirim partiyalari',
+              description: 'Shtrix-kod va yaroqlilik muddati bilan qabul qilingan oxirgi partiyalar.',
+            },
+            medicine_latest_consumptions: {
+              title: 'So‘nggi sarf va berishlar',
+              description: 'Dorilar bo‘yicha so‘nggi sarf operatsiyalari.',
+            },
+            medicine_flow: {
+              title: 'Dori kirimi va sarfi',
+              description: 'Dorilar kirimi va hisobdan chiqarishining kunlik dinamikasi.',
+            },
+            medicine_stock: {
+              title: 'Turlar bo‘yicha qoldiq',
+              description: 'Dori turlari kesimida qoldiqlar.',
+            },
+            medicine_expiry: {
+              title: 'Yaroqlilik muddati bo‘yicha qoldiq',
+              description: 'Yaroqlilik muddatlari kesimida qoldiqlar.',
+            },
+            medicine_turnover_rate: {
+              title: 'Aylanish tezligi',
+              description: 'Dorilar kirimga nisbatan qanchalik tez sarflanayotganini ko‘rsatadi.',
+            },
+          },
+          alerts: {
+            medicine_expired_batches: {
+              title: 'Muddati o‘tgan partiyalar bor',
+              message: 'Omborda yaroqlilik muddati tugagan partiyalar mavjud.',
+            },
+            medicine_expiring_batches: {
+              title: 'Muddati yaqin partiyalar',
+              message: 'Keyingi 30 kun ichida muddati tugaydigan partiyalar mavjud.',
+            },
+            medicine_turnover_low: {
+              title: 'Aylanish tezligi past',
+              message: 'Sarf ulushi kirim hajmiga nisbatan sezilarli darajada past.',
+            },
+          },
+        },
+        slaughterhouse: {
+          metrics: {
+            birds_arrived: { label: 'Kelgan parranda' },
+            birds_processed: { label: 'Qayta ishlangan parranda' },
+            process_rate: { label: 'Qayta ishlash foizi' },
+            first_sort_share: { label: '1-nav ulushi' },
+            bad_total: { label: 'Brak / sifatsiz' },
+            semi_product_output: { label: 'Yarim tayyor mahsulot hajmi' },
+            shipment_volume: { label: 'Yarim tayyor mahsulot jo‘natma hajmi' },
+            shipment_revenue: { label: 'Jo‘natmadan tushum' },
+          },
+          charts: {
+            slaughter_process_rate: {
+              title: 'Qayta ishlash foizi',
+              description: 'Qayta ishlangan parranda ulushining kirimga nisbati.',
+            },
+            slaughter_semi_flow: {
+              title: 'Yarim tayyor mahsulot ishlab chiqarish va jo‘natma',
+              description: 'Ishlab chiqarish va mijoz jo‘natmasi taqqoslanadi.',
+              series: {
+                produced: 'Ishlab chiqarildi',
+                shipped: 'Jo‘natildi',
+              },
+            },
+          },
+          breakdowns: {
+            slaughter_client_registry: {
+              title: 'Faol mijozlar bazasi',
+              description:
+                'Davr davomida parranda yetkazib bergan va yarim tayyor mahsulot xarid qilganlar.',
+            },
+            slaughter_recent_arrivals: {
+              title: 'So‘nggi parranda kirimi',
+              description: 'So‘yish konturiga kelgan eng so‘nggi parranda partiyalari.',
+            },
+            slaughter_recent_processings: {
+              title: 'So‘nggi qayta ishlash',
+              description: 'Saralash va bo‘laklash bo‘yicha oxirgi operatsiyalar.',
+            },
+            slaughter_top_products: {
+              title: 'Top yarim tayyor mahsulotlar',
+              description: 'Hajmi eng katta bo‘lgan pozitsiyalar.',
+            },
+            slaughter_recent_shipments: {
+              title: 'Mijozlarga so‘nggi jo‘natmalar',
+              description: 'Yarim tayyor mahsulotlarning oxirgi jo‘natmalari.',
+            },
+          },
+          alerts: {
+            slaughter_process_rate_low: {
+              title: 'Qayta ishlash foizi past',
+              message: 'Qayta ishlash kiruvchi parranda oqimidan ortda qolmoqda.',
+            },
+            slaughter_first_sort_share_low: {
+              title: '1-nav ulushi past',
+              message: 'Birinchi nav ulushi operatsion mo‘ljaldan past.',
+            },
+          },
+        },
+      },
+    },
+  },
+  en: {
+    common: {
+      active: 'Active',
+      notSpecified: 'Not specified',
+    },
+    tour: {
+      steps: {
+        inventoryQuickActions: {
+          title: 'Quick actions',
+          description: 'Use these buttons to open simple forms for incoming, outgoing, and transfer.',
+        },
+        warehousesList: {
+          title: 'Warehouse list',
+          description: 'This area shows the current department warehouses and their main details.',
+        },
+        inventoryMovementsList: {
+          title: 'Movement log',
+          description: 'This list shows all stock operations: incoming, outgoing, and transfer.',
+        },
+      },
+    },
+    dashboard: {
+      currentPeriod: 'Current period',
+      previousPeriod: 'Previous period',
+      moduleAlertsSummary: 'Active alerts',
+      moduleAlertsTitle: 'Operational alerts',
+      moduleAlertsDescription: 'Signals that require attention before the next operational cycle.',
+      moduleOverviewTitle: 'Overview',
+      moduleOverviewDescription:
+        '{module}: key results, current flow, and the structure of the main drivers.',
+      moduleFinanceTitle: 'Finance',
+      moduleFinanceDescription:
+        '{module}: department money, expenses, cash position and financial result.',
+      moduleFinanceOverviewChartTitle: 'Department money',
+      moduleFinanceOverviewChartDescription:
+        'Revenue, expenses, financial result, and cash flow by day.',
+      moduleExpenseCategoriesChartTitle: 'Where the money goes',
+      moduleExpenseCategoriesChartDescription:
+        'The heaviest expense categories for the selected period.',
+      moduleExpenseCategoriesTableTitle: 'Main expense categories',
+      moduleExpenseCategoriesTableDescription:
+        'Which expense lines have the biggest impact on department money.',
+      moduleCashAccountsTableTitle: 'Department cash accounts',
+      moduleCashAccountsTableDescription:
+        'Current balance across the department cash accounts and tills.',
+      moduleRecentExpensesTableTitle: 'Recent expenses',
+      moduleRecentExpensesTableDescription:
+        'Latest expense operations for the selected period.',
+      moduleFinancialResultNegativeTitle: 'The department is operating at a loss',
+      moduleFinancialResultNegativeMessage:
+        'Expenses ended up higher than the department’s own revenue for the period.',
+      moduleExpenseConcentrationTitle: 'Expenses are concentrated in one category',
+      moduleExpenseConcentrationMessage:
+        'One category accounts for too much of the department expense load.',
+      moduleCashBalanceNegativeTitle: 'Cash balance went negative',
+      moduleCashBalanceNegativeMessage:
+        'The department cash position fell below zero.',
+      moduleEfficiencyTitle: 'Efficiency and risks',
+      moduleEfficiencyDescription:
+        '{module}: process quality, bottlenecks, and signals that require action.',
+      moduleOperationsTitle: 'Clients and recent operations',
+      moduleOperationsDescription:
+        '{module}: where volume comes from, where output goes, and what happened most recently.',
+      profileOutput: 'Output',
+      profileCommercial: 'Commercial',
+      profileEfficiency: 'Efficiency',
+      profileControl: 'Control',
+      profileChartTitle: 'Period profile',
+      profileChartDescription:
+        'Normalized comparison of the current and previous periods across key dimensions.',
+    },
+    fields: {
+      as_of: 'As of date',
+      balance: 'Balance',
+      item_key: 'Item',
+      item_type: 'Item type',
+      last_movement_on: 'Last movement date',
+      occurred_on: 'Movement date',
+      warehouse_id: 'Warehouse',
+      from_warehouse_id: 'From warehouse',
+      to_warehouse_id: 'To warehouse',
+      to_department_id: 'Destination department',
+    },
+    crud: {
+      inventoryToolsTitle: 'Balances and transfers',
+      inventoryToolsDescription:
+        'Stock ledger operations: check a warehouse balance as of a date and create an internal transfer between warehouses.',
+      inventoryBalanceTitle: 'Balance as of date',
+      inventoryBalanceItemKeyPlaceholder: 'Leave blank to include all items',
+      inventoryBalanceWarehousePlaceholder: 'Choose the warehouse for the balance lookup',
+      inventoryBalanceItemKeyTooShort:
+        'For an exact lookup, choose an item or provide a value with at least 2 characters.',
+      inventoryBalanceLoaded: 'Balance loaded. Values were calculated as of the selected date.',
+      inventoryLoadBalance: 'Show balance',
+      inventoryBalanceResultTitle: 'Calculation result',
+      inventoryBalanceEmpty: 'No balance matched the selected conditions.',
+      inventoryTransferTitle: 'Internal transfer',
+      inventoryTransferDepartmentPlaceholder: 'Choose destination department',
+      inventoryTransferSourceWarehousePlaceholder: 'Choose the source warehouse',
+      inventoryTransferTargetWarehousePlaceholder: 'Choose the destination warehouse',
+      inventoryTransferCreateForbidden:
+        'You do not have permission to create an internal transfer.',
+      inventoryTransferItemKeyRequired: 'Choose an item for the transfer.',
+      inventoryTransferQuantityInvalid: 'Quantity must be greater than zero.',
+      inventoryTransferTargetDepartmentRequired: 'Choose the destination department.',
+      inventoryTransferDepartmentMismatch: 'Source and destination departments must be different.',
+      inventoryTransferTargetWarehouseRequired: 'Choose the destination warehouse.',
+      inventoryTransferWarehouseMismatch:
+        'Source and destination warehouses must be different.',
+      inventoryTransferRequiresCreatePermission:
+        'Creating a transfer requires the `stock_movement.create` permission.',
+      inventoryCreateTransfer: 'Create transfer',
+      inventoryTransferCreated: 'Internal transfer created: {id}.',
+      inventoryPositionChickRun: 'Chick hatch run',
+      inventoryPositionChickArrival: 'Chick arrival',
+      inventoryPositionFeedRaw: 'Raw material',
+      inventoryPositionMedicineBatch: 'Medicine batch',
+      generateQr: 'QR',
+      refreshQr: 'Refresh QR',
+      printQr: 'Print',
+      downloadQr: 'Download PNG',
+      openPublicCard: 'Public',
+      copyPublicLink: 'Copy link',
+      attachFile: 'File',
+      medicineBatchQrGenerated: 'QR refreshed for batch {code}.',
+      medicineBatchAttachmentUploaded: 'File attached to batch {code}.',
+      medicineBatchPublicLinkCopied: 'Public link for batch {code} copied.',
+      medicineBatchQrCenterTitle: 'Batch {code} QR code',
+      medicineBatchQrCenterDescription: 'Scan the QR or open the public product page.',
+      qrGeneratedAt: 'Generated at',
+      qrExpiresAt: 'Expires at',
+      popupBlocked: 'The browser blocked a new window. Allow pop-ups for this site.',
+    },
+    publicMedicine: {
+      invalidTokenTitle: 'Invalid link',
+      invalidTokenDescription: 'The link does not contain a token for the public product page.',
+      loadingDescription: 'Loading product details...',
+      notFoundTitle: 'Card not found',
+      notFoundDescription: 'The link is invalid or the QR token has expired.',
+      unnamedProduct: 'Product',
+      subtitle: 'Public product card for the vet pharmacy module',
+      downloadAttachment: 'Download attachment',
+    },
+    inventory: {
+      itemTypes: {
+        egg: 'Eggs',
+        chick: 'Chicks',
+        feed: 'Feed',
+        medicine: 'Medicine',
+        semi_product: 'Semi-products',
+      },
+      movementKinds: {
+        adjustment_in: 'Adjustment in',
+        adjustment_out: 'Adjustment out',
+        incoming: 'Incoming',
+        outgoing: 'Outgoing',
+        transfer_in: 'Transfer in',
+        transfer_out: 'Transfer out',
+      },
+      units: {
+        kg: 'Kilogram',
+        ltr: 'Liter',
+        pcs: 'Piece',
+      },
+    },
+    dashboardData: {
+      sections: {
+        executive_dashboard: {
+          title: 'Executive dashboard',
+          description: 'Top-level module summary: results, movement, and risk areas.',
+          charts: {
+            finance_overview: {
+              title: 'Financial overview: revenue, expenses, profit',
+              description: 'Daily movement of key financial indicators.',
+              series: {
+                revenue: 'Revenue',
+                expenses: 'Expenses',
+                profit: 'Profit',
+                cashflow: 'Cash flow',
+              },
+            },
+            value_chain_trend: {
+              title: 'Throughput: output vs losses',
+              description: 'How throughput and losses are changing across the value chain.',
+              series: {
+                output: 'Output',
+                losses: 'Losses',
+              },
+            },
+            department_contribution: {
+              title: 'Overall department score',
+              description: 'Shows which departments are driving the result up and which are slipping.',
+              series: {
+                score: 'Score',
+              },
+            },
+            department_revenue: {
+              title: 'Revenue by department',
+              description: 'Shows which departments generated the most revenue in the selected period.',
+              series: {
+                revenue: 'Revenue',
+              },
+            },
+            department_operations: {
+              title: 'Output and losses by department',
+              description: 'Compares useful output and losses for each department.',
+              series: {
+                output: 'Output',
+                losses: 'Losses',
+              },
+            },
+            department_loss_rate: {
+              title: 'Loss rate by department',
+              description: 'Shows where losses are already moving beyond a safe level.',
+              series: {
+                loss_rate: 'Losses',
+              },
+            },
+            expense_category_burn: {
+              title: 'Where the money goes',
+              description: 'Top expense categories for the selected period.',
+              series: {
+                amount: 'Expenses',
+              },
+            },
+          },
+          breakdowns: {
+            executive_alerts: {
+              title: 'Module alerts',
+              description: 'Which areas need attention right now.',
+            },
+            departments_performance: {
+              title: 'Department overview',
+              description:
+                'Per-department summary of score, losses, revenue, and output.',
+            },
+            top_risk_summary: {
+              title: 'Top risks',
+              description: 'Risks requiring immediate attention.',
+            },
+          },
+          alerts: {
+            health_index_bad: {
+              title: 'Business health index declined',
+              message: 'The health index is below the safe threshold.',
+            },
+            operating_loss: {
+              title: 'Operating profit in red',
+              message: 'Negative operating result was recorded for the selected period.',
+            },
+            negative_cashflow: {
+              title: 'Negative cash flow',
+              message: 'Net cash flow was below zero for the selected period.',
+            },
+            modules_in_bad_zone: {
+              title: 'Departments in the red zone',
+              message: 'At least one department is operating below a safe level.',
+            },
+          },
+        },
+        module_alerts: {
+          breakdowns: {
+            module_alerts: {
+              title: 'Operational alerts',
+              description: 'Warnings and critical events for the current module.',
+            },
+          },
+        },
+        egg_farm: {
+          metrics: {
+            current_stock: { label: 'Egg stock balance' },
+            loss_rate: { label: 'Loss rate' },
+            shipment_volume: { label: 'Shipment volume' },
+            eggs_to_incubation: { label: 'Transferred to incubation' },
+            egg_revenue: { label: 'Egg revenue' },
+            medicine_consumed: { label: 'Medicine consumed' },
+          },
+          charts: {
+            egg_destination_flow: {
+              title: 'Where the eggs go',
+              description:
+                'Net output, client shipments, and transfers to incubation by day.',
+              series: {
+                net_output: 'Net output',
+                client_shipments: 'Clients',
+                incubation_transfers: 'Incubation',
+              },
+            },
+            egg_loss_rate: {
+              title: 'Loss rate',
+              description: 'What share of collected eggs turned into losses by day.',
+              series: {
+                loss_rate: 'Losses',
+              },
+            },
+          },
+          breakdowns: {
+            egg_destination_balance: {
+              title: 'Egg movement balance',
+              description:
+                'Where the breeder output goes: clients, incubation, losses, and stock.',
+            },
+            egg_client_registry: {
+              title: 'Active client base',
+              description: 'Clients involved in egg shipments during the selected period.',
+            },
+            egg_recent_shipments: {
+              title: 'Recent shipments',
+              description: 'Latest egg shipments to clients.',
+            },
+            egg_top_clients: {
+              title: 'Top shipment clients',
+              description: 'Clients with the highest shipped egg volume.',
+            },
+          },
+          alerts: {
+            egg_loss_rate_critical: {
+              title: 'High loss rate',
+              message: 'Egg losses exceeded the critical threshold.',
+            },
+            egg_loss_rate_warning: {
+              title: 'Egg losses are rising',
+              message: 'Losses are above the target operating level.',
+            },
+          },
+        },
+        incubation: {
+          metrics: {
+            eggs_set: { label: 'Eggs set' },
+            hatch_rate: { label: 'Hatch rate' },
+            grade_1_share: { label: 'Grade 1 share' },
+            bad_eggs: { label: 'Rejected eggs' },
+            chicks_dispatched: { label: 'Transferred or shipped' },
+          },
+          breakdowns: {
+            incubation_egg_arrivals: {
+              title: 'Egg arrivals',
+              description: 'How many eggs arrived into incubation batches by day.',
+            },
+            incubation_quality: {
+              title: 'Quality grading',
+              description: 'Split between grade 1, grade 2, and rejected eggs for completed runs.',
+            },
+            incubation_hatch: {
+              title: 'Chick output',
+              description: 'How many chicks hatched from eggs by completed run date.',
+            },
+            incubation_revenue: {
+              title: 'Chick revenue',
+              description: 'Revenue generated by chick shipments by day.',
+            },
+            incubation_yield: {
+              title: 'Yield and quality rate',
+              description: 'Hatch rate and grade 1 share for completed runs.',
+            },
+            incubation_client_registry: {
+              title: 'Active client base',
+              description:
+                'Partners involved in egg supply and chick shipments during the selected period.',
+            },
+            incubation_active_batches: {
+              title: 'Active batches',
+              description: 'Batches without a completed incubation cycle.',
+            },
+            incubation_recent_dispatch: {
+              title: 'Recent transfers and shipments',
+              description: 'Where the hatched chicks were sent.',
+            },
+            eggs_set: {
+              title: 'Eggs set',
+              description: 'Core input metric used in the incubation calculations.',
+            },
+          },
+          alerts: {
+            incubation_hatch_rate_critical: {
+              title: 'Low hatch rate',
+              message: 'Hatch rate is below the target level.',
+            },
+            incubation_hatch_rate_warning: {
+              title: 'Hatch rate is declining',
+              message: 'Review batch quality and incubation settings.',
+            },
+          },
+        },
+        factory: {
+          metrics: {
+            chicks_stock: { label: 'Current flock balance' },
+            sent_to_slaughter: { label: 'Sent to slaughter' },
+            medicine_consumed: { label: 'Medicine consumed' },
+            critical_stock_items: { label: 'Critical stock items' },
+          },
+          charts: {
+            factory_chicks_flow: {
+              title: 'Chick arrivals and slaughter transfers',
+              description: 'Movement trend of the live flock.',
+              series: {
+                arrivals: 'Arrivals',
+                transferred: 'Transferred to slaughter',
+              },
+            },
+            factory_feed_consumption: {
+              title: 'Feed consumption over time',
+              description: 'Actual feed consumption.',
+              series: {
+                feed: 'Feed',
+              },
+            },
+            factory_medicine_consumption: {
+              title: 'Medicine consumption over time',
+              description: 'Actual medicine usage.',
+              series: {
+                medicine: 'Medicine',
+              },
+            },
+          },
+          breakdowns: {
+            factory_feed_arrivals_by_type: {
+              title: 'Feed arrivals by type',
+              description:
+                'What feed arrives to the factory and which bird types it is used for.',
+            },
+            factory_medicine_arrivals_by_type: {
+              title: 'Medicine arrivals by type',
+              description:
+                'What medicine arrives to the factory and which bird streams it is used for.',
+            },
+            factory_client_registry: {
+              title: 'Active client base',
+              description: 'Counterparties that supplied chicks to the factory during the period.',
+            },
+            factory_recent_arrivals: {
+              title: 'Recent chick arrivals',
+              description: 'Most recently recorded arrivals.',
+            },
+            factory_recent_transfers: {
+              title: 'Recent slaughter transfers',
+              description: 'Movement from the factory into slaughter.',
+            },
+          },
+          alerts: {
+            factory_low_chick_stock: {
+              title: 'Low live stock balance',
+              message: 'Current chick balance is below the operating minimum.',
+            },
+            factory_critical_stock_items: {
+              title: 'Critical stock items detected',
+              message: 'Some items are at critically low levels.',
+            },
+          },
+        },
+        feed_mill: {
+          metrics: {
+            raw_consumed: { label: 'Raw materials consumed' },
+            product_shipped: { label: 'Finished product shipped' },
+            stock_total: { label: 'Total raw and product stock' },
+            shipment_rate: { label: 'Shipment rate' },
+          },
+          breakdowns: {
+            feed_client_registry: {
+              title: 'Active client base',
+              description:
+                'Counterparties involved in raw material supply and product shipments.',
+            },
+            feed_low_raw_stock: {
+              title: 'Low raw material stock',
+              description: 'Items that may put output at risk.',
+            },
+            feed_recent_shipments: {
+              title: 'Recent product shipments',
+              description: 'Latest finished feed shipments to clients.',
+            },
+            feed_recent_batches: {
+              title: 'Recent production batches',
+              description: 'Latest finished feed batches.',
+            },
+            feed_raw_flow: {
+              title: 'Raw material flow',
+              description: 'Dynamics of raw material arrivals and consumption by date.',
+            },
+            feed_product_flow: {
+              title: 'Output and shipments',
+              description: 'Comparison of finished feed output and shipments.',
+            },
+            feed_shipment_rate: {
+              title: 'Shipment rate',
+              description: 'Comparison of finished feed output and shipment volumes.',
+            },
+            feed_revenue: {
+              title: 'Feed circuit revenue',
+              description: 'Revenue from finished feed shipments by date.',
+            },
+            feed_ingredient_mix: {
+              title: 'Ingredient mix',
+              description: 'Share of raw ingredients in the structure of produced feed.',
+            },
+          },
+          alerts: {
+            feed_shipment_rate_low: {
+              title: 'Low shipment rate',
+              message: 'Finished product shipments are lagging behind output.',
+            },
+            feed_low_raw_stock: {
+              title: 'Critical raw stock',
+              message: 'Some ingredients are running low.',
+            },
+          },
+        },
+        vet_pharmacy: {
+          metrics: {
+            medicine_arrivals: { label: 'Medicine arrivals' },
+            medicine_consumed: { label: 'Medicine consumed' },
+            current_stock: { label: 'Current stock' },
+            expiring_batches: { label: 'Expiring batches' },
+            expired_batches: { label: 'Expired or blocked' },
+            turnover_rate: { label: 'Turnover rate' },
+          },
+          breakdowns: {
+            medicine_client_registry: {
+              title: 'Active client base',
+              description: 'Suppliers and recipients involved in medicine movement.',
+            },
+            medicine_expiry_batches: {
+              title: 'Batches by expiry',
+              description: 'Batches with the nearest expiry dates and remaining balance.',
+            },
+            medicine_recent_batches: {
+              title: 'Recent incoming batches',
+              description: 'Latest accepted batches with barcode and expiry date.',
+            },
+            medicine_latest_consumptions: {
+              title: 'Latest issues and consumptions',
+              description: 'Most recent medicine consumption operations.',
+            },
+            medicine_flow: {
+              title: 'Medicine arrivals and consumption',
+              description: 'Daily trend of medicine receipts and write-offs.',
+            },
+            medicine_stock: {
+              title: 'Stock by type',
+              description: 'Remaining stock grouped by medicine type.',
+            },
+            medicine_expiry: {
+              title: 'Stock by expiry',
+              description: 'Remaining stock grouped by expiry date.',
+            },
+            medicine_turnover_rate: {
+              title: 'Turnover rate',
+              description: 'How quickly medicine is consumed relative to incoming volume.',
+            },
+          },
+          alerts: {
+            medicine_expired_batches: {
+              title: 'Expired batches detected',
+              message: 'There are expired batches in stock.',
+            },
+            medicine_expiring_batches: {
+              title: 'Expiring batches detected',
+              message: 'Some batches will expire within the next 30 days.',
+            },
+            medicine_turnover_low: {
+              title: 'Low turnover rate',
+              message: 'Consumption is significantly below incoming volume.',
+            },
+          },
+        },
+        slaughterhouse: {
+          metrics: {
+            birds_arrived: { label: 'Birds arrived' },
+            birds_processed: { label: 'Birds processed' },
+            process_rate: { label: 'Process rate' },
+            first_sort_share: { label: 'First sort share' },
+            bad_total: { label: 'Rejected / poor quality' },
+            semi_product_output: { label: 'Semi-product output' },
+            shipment_volume: { label: 'Semi-product shipment volume' },
+            shipment_revenue: { label: 'Shipment revenue' },
+          },
+          charts: {
+            slaughter_process_rate: {
+              title: 'Process rate',
+              description: 'Share of processed birds relative to arriving birds.',
+            },
+            slaughter_semi_flow: {
+              title: 'Semi-product output and shipments',
+              description: 'Comparison of semi-product output and client shipments.',
+              series: {
+                produced: 'Produced',
+                shipped: 'Shipped',
+              },
+            },
+          },
+          breakdowns: {
+            slaughter_client_registry: {
+              title: 'Active client base',
+              description:
+                'Bird suppliers and semi-product buyers involved during the selected period.',
+            },
+            slaughter_recent_arrivals: {
+              title: 'Recent bird arrivals',
+              description: 'Latest bird arrivals into the slaughter circuit.',
+            },
+            slaughter_recent_processings: {
+              title: 'Recent processing operations',
+              description: 'Latest grading and cutting operations.',
+            },
+            slaughter_top_products: {
+              title: 'Top semi-products',
+              description: 'Highest-volume semi-product items.',
+            },
+            slaughter_recent_shipments: {
+              title: 'Recent client shipments',
+              description: 'Latest semi-product shipments to clients.',
+            },
+          },
+          alerts: {
+            slaughter_process_rate_low: {
+              title: 'Low process rate',
+              message: 'Processing is lagging behind incoming bird volume.',
+            },
+            slaughter_first_sort_share_low: {
+              title: 'Low first sort share',
+              message: 'First sort share is below the operating benchmark.',
+            },
+          },
+        },
+      },
+    },
+  },
+};
+
+export const messages = Object.fromEntries(
+  (Object.keys(baseMessages) as Language[]).map((language) => [
+    language,
+    deepMergeRecords(
+      deepMergeRecords(
+        baseMessages[language],
+        (translationOverrides[language] ?? {}) as Record<string, unknown>,
+      ),
+      (supplementalTranslationOverrides[language] ?? {}) as Record<string, unknown>,
+    ),
+  ]),
+) as Record<Language, Record<string, unknown>>;

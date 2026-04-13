@@ -1,0 +1,26 @@
+services:
+  api:
+    networks:
+      public:
+        aliases:
+          - prod-api
+
+  frontend:
+    networks:
+      public:
+        aliases:
+          - prod-frontend
+
+volumes:
+  postgres_data:
+    name: ${POSTGRES_VOLUME_NAME:-postgres_data_prod}
+  redis_data:
+    name: ${REDIS_VOLUME_NAME:-redis_data_prod}
+  uploads_data:
+    name: ${UPLOADS_VOLUME_NAME:-uploads_prod}
+
+networks:
+  internal:
+    name: ${INTERNAL_NETWORK_NAME:-yembro_prod_internal}
+  public:
+    name: ${PUBLIC_NETWORK_NAME:-yembro_prod_public}

@@ -1,0 +1,26 @@
+services:
+  api:
+    networks:
+      public:
+        aliases:
+          - staging-api
+
+  frontend:
+    networks:
+      public:
+        aliases:
+          - staging-frontend
+
+volumes:
+  postgres_data:
+    name: ${POSTGRES_VOLUME_NAME:-postgres_data_staging}
+  redis_data:
+    name: ${REDIS_VOLUME_NAME:-redis_data_staging}
+  uploads_data:
+    name: ${UPLOADS_VOLUME_NAME:-uploads_staging}
+
+networks:
+  internal:
+    name: ${INTERNAL_NETWORK_NAME:-yembro_staging_internal}
+  public:
+    name: ${PUBLIC_NETWORK_NAME:-yembro_staging_public}

@@ -1,0 +1,16 @@
+name: Deploy Staging
+
+on:
+  push:
+    branches:
+      - staging
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    uses: ./.github/workflows/_deploy.yml
+    with:
+      environment_name: staging
+      deploy_path: /opt/yembro/staging
+      image_alias: staging
+    secrets: inherit

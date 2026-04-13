@@ -1,0 +1,1667 @@
+organizations:
+- id: "11111111-1111-1111-1111-111111111111"
+  name: "Zarafshon Parranda"
+  legal_name: "Zarafshon Parranda MCHJ"
+  description: "Yirik tuxumchilik fermasi"
+  is_active: true
+- id: "22222222-2222-2222-2222-222222222222"
+  name: "Oqsaroy Tuxum"
+  legal_name: "Oqsaroy Tuxum MCHJ"
+  description: "Broyler yetishtirish fermasi"
+  is_active: true
+- id: "33333333-3333-3333-3333-333333333333"
+  name: "Samarqand Joja"
+  legal_name: "Samarqand Joja MCHJ"
+  description: "Inkubatsiya hamkori"
+  is_active: true
+department_modules:
+- id: "31000000-0000-0000-0000-000000000001"
+  key: "core"
+  name: "Справочники"
+  description: "Базовые каталоги и общие справочники организации"
+  icon: "building"
+  sort_order: 10
+  is_department_assignable: false
+  analytics_section_key: null
+  implicit_read_permissions: '[]'
+  analytics_read_permissions: '[]'
+  is_active: true
+- id: "31111111-1111-1111-1111-111111111111"
+  key: "egg"
+  name: "Маточник"
+  description: "Операции по яйцам, выпуску и отгрузкам"
+  icon: "egg"
+  sort_order: 20
+  is_department_assignable: true
+  analytics_section_key: "egg_farm"
+  implicit_read_permissions: '["egg_production.read", "egg_shipment.read", "egg_monthly_analytics.read", "feed_consumption.read", "medicine_consumption.read", "stock_movement.read", "warehouse.read"]'
+  analytics_read_permissions: '["egg_production.read", "egg_shipment.read", "feed_consumption.read", "medicine_consumption.read"]'
+  is_active: true
+- id: "31222222-2222-2222-2222-222222222222"
+  key: "incubation"
+  name: "Инкубация"
+  description: "Приход яиц, инкубационные партии и вывод"
+  icon: "archive"
+  sort_order: 30
+  is_department_assignable: true
+  analytics_section_key: "incubation"
+  implicit_read_permissions: '["incubation_batch.read", "incubation_run.read", "chick_shipment.read", "incubation_monthly_analytics.read", "factory_monthly_analytics.read", "stock_movement.read", "warehouse.read"]'
+  analytics_read_permissions: '["incubation_batch.read", "incubation_run.read", "chick_shipment.read"]'
+  is_active: true
+- id: "31333333-3333-3333-3333-333333333333"
+  key: "factory"
+  name: "Фабрика"
+  description: "Птенцы, корма, лекарства и клиентская база"
+  icon: "factory"
+  sort_order: 40
+  is_department_assignable: true
+  analytics_section_key: "factory"
+  implicit_read_permissions: '["chick_arrival.read", "feed_arrival.read", "medicine_arrival.read", "stock_movement.read", "warehouse.read"]'
+  analytics_read_permissions: '["chick_arrival.read", "feed_arrival.read", "medicine_arrival.read"]'
+  is_active: true
+- id: "31444444-4444-4444-4444-444444444444"
+  key: "feed"
+  name: "Корма"
+  description: "Сырьё, комбинация ингредиентов, выпуск продукта и клиентская база"
+  icon: "package"
+  sort_order: 50
+  is_department_assignable: true
+  analytics_section_key: "feed_mill"
+  implicit_read_permissions: '["feed_type.read", "feed_ingredient.read", "feed_formula.read", "feed_formula_ingredient.read", "feed_raw_arrival.read", "feed_production_batch.read", "feed_raw_consumption.read", "feed_product_shipment.read", "stock_movement.read", "warehouse.read"]'
+  analytics_read_permissions: '["feed_ingredient.read", "feed_formula.read", "feed_formula_ingredient.read", "feed_raw_arrival.read", "feed_production_batch.read", "feed_raw_consumption.read", "feed_product_shipment.read"]'
+  is_active: true
+- id: "31555555-5555-5555-5555-555555555555"
+  key: "medicine"
+  name: "Вет аптека"
+  description: "Приход, уход, клиентская база и партии лекарств"
+  icon: "pill"
+  sort_order: 60
+  is_department_assignable: true
+  analytics_section_key: "vet_pharmacy"
+  implicit_read_permissions: '["medicine_arrival.read", "medicine_consumption.read", "medicine_batch.read", "medicine_type.read", "stock_movement.read", "warehouse.read"]'
+  analytics_read_permissions: '["medicine_arrival.read", "medicine_batch.read", "medicine_consumption.read", "medicine_type.read"]'
+  is_active: true
+- id: "31666666-6666-6666-6666-666666666666"
+  key: "slaughter"
+  name: "Убойня"
+  description: "Приход птицы, сортировка, разделка по частям и полуфабрикат"
+  icon: "shield"
+  sort_order: 70
+  is_department_assignable: true
+  analytics_section_key: "slaughterhouse"
+  implicit_read_permissions: '["slaughter_arrival.read", "slaughter_processing.read", "slaughter_semi_product.read", "slaughter_semi_product_shipment.read", "stock_movement.read", "warehouse.read"]'
+  analytics_read_permissions: '["slaughter_arrival.read", "slaughter_processing.read", "slaughter_semi_product.read", "slaughter_semi_product_shipment.read"]'
+  is_active: true
+- id: "31000000-0000-0000-0000-000000000002"
+  key: "finance"
+  name: "Финансы"
+  description: "Категории расходов и финансовые операции"
+  icon: "coins"
+  sort_order: 80
+  is_department_assignable: false
+  analytics_section_key: null
+  implicit_read_permissions: '[]'
+  analytics_read_permissions: '[]'
+  is_active: true
+- id: "31000000-0000-0000-0000-000000000003"
+  key: "hr"
+  name: "Сотрудники"
+  description: "Сотрудники, должности, роли и права"
+  icon: "users"
+  sort_order: 90
+  is_department_assignable: false
+  analytics_section_key: null
+  implicit_read_permissions: '[]'
+  analytics_read_permissions: '[]'
+  is_active: true
+workspace_resources:
+- id: "32000000-0000-0000-0000-000000000001"
+  module_key: "core"
+  key: "organizations"
+  name: "Организации"
+  path: "organizations"
+  description: "Юридические и операционные единицы"
+  permission_prefix: "organization"
+  sort_order: 10
+  is_head_visible: false
+  is_active: true
+- id: "32000000-0000-0000-0000-000000000002"
+  module_key: "core"
+  key: "departments"
+  name: "Отделы"
+  path: "departments"
+  description: "Подразделения и структура компании"
+  permission_prefix: "department"
+  sort_order: 20
+  is_head_visible: false
+  is_active: true
+- id: "32000000-0000-0000-0000-000000000161"
+  module_key: "core"
+  key: "warehouses"
+  name: "Склады"
+  path: "warehouses"
+  description: "Склады и складские зоны подразделений"
+  permission_prefix: "warehouse"
+  sort_order: 25
+  is_head_visible: false
+  is_active: true
+- id: "32000000-0000-0000-0000-000000000003"
+  module_key: "core"
+  key: "department-modules"
+  name: "Модули отделов"
+  path: "department-modules"
+  description: "Каталог модулей рабочего пространства"
+  permission_prefix: "department_module"
+  sort_order: 30
+  is_head_visible: false
+  is_active: true
+- id: "32000000-0000-0000-0000-000000000004"
+  module_key: "core"
+  key: "clients"
+  name: "Клиенты"
+  path: "clients"
+  description: "Контрагенты и клиентская база"
+  permission_prefix: "client"
+  sort_order: 40
+  is_head_visible: false
+  is_active: true
+- id: "32000000-0000-0000-0000-000000000901"
+  module_key: "core"
+  key: "client-debts"
+  name: "Долги клиентов"
+  path: "client-debts"
+  description: "Управление долгами клиентов"
+  permission_prefix: "client_debt"
+  sort_order: 45
+  is_head_visible: false
+  is_active: true
+- id: "32000000-0000-0000-0000-000000000005"
+  module_key: "core"
+  key: "currencies"
+  name: "Валюты"
+  path: "currencies"
+  description: "Валюты, которыми управляет организация"
+  permission_prefix: "currency"
+  sort_order: 50
+  is_head_visible: false
+  is_active: true
+- id: "32000000-0000-0000-0000-000000000006"
+  module_key: "core"
+  key: "poultry-types"
+  name: "Типы птицы"
+  path: "poultry-types"
+  description: "Классификация птицы и пород"
+  permission_prefix: "poultry_type"
+  sort_order: 60
+  is_head_visible: false
+  is_active: true
+- id: "32000000-0000-0000-0000-000000000007"
+  module_key: "egg"
+  key: "production"
+  name: "Производство"
+  path: "production"
+  description: "Ежедневный выпуск яиц"
+  permission_prefix: "egg_production"
+  sort_order: 10
+  is_head_visible: false
+  is_active: true
+- id: "32000000-0000-0000-0000-000000000008"
+  module_key: "egg"
+  key: "shipments"
+  name: "Отгрузки"
+  path: "shipments"
+  description: "Реализация и перемещения"
+  permission_prefix: "egg_shipment"
+  sort_order: 20
+  is_head_visible: false
+  is_active: true
+- id: "32000000-0000-0000-0000-000000000009"
+  module_key: "egg"
+  key: "monthly-analytics"
+  name: "Месячная аналитика"
+  path: "monthly-analytics"
+  description: "Сводные месячные показатели"
+  permission_prefix: "egg_monthly_analytics"
+  sort_order: 30
+  is_head_visible: false
+  is_active: true
+- id: "32000000-0000-0000-0000-000000000010"
+  module_key: "egg"
+  key: "feed-consumptions"
+  name: "Расход корма"
+  path: "consumptions"
+  description: "Фактический расход корма внутри маточника"
+  permission_prefix: "feed_consumption"
+  api_module_key: "feed"
+  sort_order: 40
+  is_head_visible: false
+  is_active: true
+- id: "32000000-0000-0000-0000-000000000011"
+  module_key: "egg"
+  key: "medicine-consumptions"
+  name: "Расход лекарств"
+  path: "consumptions"
+  description: "Списания лекарств по департаменту маточника"
+  permission_prefix: "medicine_consumption"
+  api_module_key: "medicine"
+  sort_order: 50
+  is_head_visible: false
+  is_active: true
+- id: "32000000-0000-0000-0000-000000000181"
+  module_key: "egg"
+  key: "warehouses"
+  name: "Склады"
+  path: "warehouses"
+  description: "Склады и складские зоны подразделений"
+  permission_prefix: "warehouse"
+  api_module_key: "core"
+  sort_order: 56
+  is_head_visible: true
+  is_active: true
+- id: "32000000-0000-0000-0000-000000000071"
+  module_key: "egg"
+  key: "stock-movements"
+  name: "Движения остатков"
+  path: "movements"
+  description: "Движения склада и инвентарный журнал"
+  permission_prefix: "stock_movement"
+  api_module_key: "inventory"
+  sort_order: 55
+  is_head_visible: true
+  is_active: true
+- id: "32000000-0000-0000-0000-000000000012"
+  module_key: "egg"
+  key: "clients"
+  name: "Клиентская база"
+  path: "clients"
+  description: "Общая база клиентов внутри модуля"
+  permission_prefix: "client"
+  api_module_key: "core"
+  sort_order: 60
+  is_head_visible: true
+  is_active: true
+- id: "32000000-0000-0000-0000-000000000902"
+  module_key: "egg"
+  key: "client-debts"
+  name: "Долги клиентов"
+  path: "client-debts"
+  description: "Долги клиентов по модулю"
+  permission_prefix: "client_debt"
+  api_module_key: "core"
+  sort_order: 61
+  is_head_visible: true
+  is_active: true
+- id: "32000000-0000-0000-0000-000000000013"
+  module_key: "egg"
+  key: "employees"
+  name: "Сотрудники"
+  path: "employees"
+  description: "Сотрудники выбранного департамента"
+  permission_prefix: "employee"
+  api_module_key: "hr"
+  sort_order: 70
+  is_head_visible: true
+  is_active: true
+- id: "32000000-0000-0000-0000-000000000908"
+  module_key: "egg"
+  key: "expense-categories"
+  name: "Категории расходов"
+  path: "expense-categories"
+  description: "Категории расходов выбранного департамента"
+  permission_prefix: "expense_category"
+  api_module_key: "finance"
+  sort_order: 79
+  is_head_visible: true
+  is_active: true
+- id: "32000000-0000-0000-0000-000000000014"
+  module_key: "egg"
+  key: "expenses"
+  name: "Расходы"
+  path: "expenses"
+  description: "Расходы выбранного департамента"
+  permission_prefix: "expense"
+  api_module_key: "finance"
+  sort_order: 80
+  is_head_visible: true
+  is_active: true
+- id: "32000000-0000-0000-0000-000000000015"
+  module_key: "egg"
+  key: "cash-accounts"
+  name: "Кассы"
+  path: "cash-accounts"
+  description: "Кассы выбранного департамента"
+  permission_prefix: "cash_account"
+  api_module_key: "finance"
+  sort_order: 90
+  is_head_visible: true
+  is_active: true
+- id: "32000000-0000-0000-0000-000000000016"
+  module_key: "egg"
+  key: "cash-transactions"
+  name: "Кассовые операции"
+  path: "cash-transactions"
+  description: "Кассовые операции выбранного департамента"
+  permission_prefix: "cash_transaction"
+  api_module_key: "finance"
+  sort_order: 100
+  is_head_visible: true
+  is_active: true
+- id: "32000000-0000-0000-0000-000000000017"
+  module_key: "incubation"
+  key: "batches"
+  name: "Приход яиц"
+  path: "batches"
+  description: "Инкубационные партии и фактический приход яиц"
+  permission_prefix: "incubation_batch"
+  sort_order: 10
+  is_head_visible: false
+  is_active: true
+- id: "32000000-0000-0000-0000-000000000018"
+  module_key: "incubation"
+  key: "runs"
+  name: "Сортировка и вывод"
+  path: "runs"
+  description: "Сорт 1, сорт 2, брак и выход птенцов"
+  permission_prefix: "incubation_run"
+  sort_order: 20
+  is_head_visible: false
+  is_active: true
+- id: "32000000-0000-0000-0000-000000000019"
+  module_key: "incubation"
+  key: "chick-shipments"
+  name: "Отгрузки птенцов"
+  path: "chick-shipments"
+  description: "Куда уходят выведенные птенцы"
+  permission_prefix: "chick_shipment"
+  sort_order: 30
+  is_head_visible: false
+  is_active: true
+- id: "32000000-0000-0000-0000-000000000072"
+  module_key: "incubation"
+  key: "monthly-analytics"
+  name: "Месячная аналитика"
+  path: "monthly-analytics"
+  description: "Помесячные показатели инкубации"
+  permission_prefix: "incubation_monthly_analytics"
+  sort_order: 35
+  is_head_visible: true
+  is_active: true
+- id: "32000000-0000-0000-0000-000000000073"
+  module_key: "incubation"
+  key: "factory-monthly-analytics"
+  name: "Аналитика фабрики"
+  path: "factory-monthly-analytics"
+  description: "Помесячные показатели фабрики"
+  permission_prefix: "factory_monthly_analytics"
+  sort_order: 36
+  is_head_visible: true
+  is_active: true
+- id: "32000000-0000-0000-0000-000000000182"
+  module_key: "incubation"
+  key: "warehouses"
+  name: "Склады"
+  path: "warehouses"
+  description: "Склады и складские зоны подразделений"
+  permission_prefix: "warehouse"
+  api_module_key: "core"
+  sort_order: 38
+  is_head_visible: true
+  is_active: true
+- id: "32000000-0000-0000-0000-000000000074"
+  module_key: "incubation"
+  key: "stock-movements"
+  name: "Движения остатков"
+  path: "movements"
+  description: "Движения склада и инвентарный журнал"
+  permission_prefix: "stock_movement"
+  api_module_key: "inventory"
+  sort_order: 37
+  is_head_visible: true
+  is_active: true
+- id: "32000000-0000-0000-0000-000000000020"
+  module_key: "incubation"
+  key: "clients"
+  name: "Клиентская база"
+  path: "clients"
+  description: "Общая база клиентов внутри модуля"
+  permission_prefix: "client"
+  api_module_key: "core"
+  sort_order: 40
+  is_head_visible: true
+  is_active: true
+- id: "32000000-0000-0000-0000-000000000903"
+  module_key: "incubation"
+  key: "client-debts"
+  name: "Долги клиентов"
+  path: "client-debts"
+  description: "Долги клиентов по модулю"
+  permission_prefix: "client_debt"
+  api_module_key: "core"
+  sort_order: 41
+  is_head_visible: true
+  is_active: true
+- id: "32000000-0000-0000-0000-000000000021"
+  module_key: "incubation"
+  key: "employees"
+  name: "Сотрудники"
+  path: "employees"
+  description: "Сотрудники выбранного департамента"
+  permission_prefix: "employee"
+  api_module_key: "hr"
+  sort_order: 50
+  is_head_visible: true
+  is_active: true
+- id: "32000000-0000-0000-0000-000000000909"
+  module_key: "incubation"
+  key: "expense-categories"
+  name: "Категории расходов"
+  path: "expense-categories"
+  description: "Категории расходов выбранного департамента"
+  permission_prefix: "expense_category"
+  api_module_key: "finance"
+  sort_order: 59
+  is_head_visible: true
+  is_active: true
+- id: "32000000-0000-0000-0000-000000000022"
+  module_key: "incubation"
+  key: "expenses"
+  name: "Расходы"
+  path: "expenses"
+  description: "Расходы выбранного департамента"
+  permission_prefix: "expense"
+  api_module_key: "finance"
+  sort_order: 60
+  is_head_visible: true
+  is_active: true
+- id: "32000000-0000-0000-0000-000000000023"
+  module_key: "incubation"
+  key: "cash-accounts"
+  name: "Кассы"
+  path: "cash-accounts"
+  description: "Кассы выбранного департамента"
+  permission_prefix: "cash_account"
+  api_module_key: "finance"
+  sort_order: 70
+  is_head_visible: true
+  is_active: true
+- id: "32000000-0000-0000-0000-000000000024"
+  module_key: "incubation"
+  key: "cash-transactions"
+  name: "Кассовые операции"
+  path: "cash-transactions"
+  description: "Кассовые операции выбранного департамента"
+  permission_prefix: "cash_transaction"
+  api_module_key: "finance"
+  sort_order: 80
+  is_head_visible: true
+  is_active: true
+- id: "32000000-0000-0000-0000-000000000025"
+  module_key: "factory"
+  key: "chick-arrivals"
+  name: "Приход птенцов"
+  path: "chick-arrivals"
+  description: "Поступление птенцов на фабрику"
+  permission_prefix: "chick_arrival"
+  api_module_key: "incubation"
+  sort_order: 10
+  is_head_visible: false
+  is_active: true
+- id: "32000000-0000-0000-0000-000000000026"
+  module_key: "factory"
+  key: "feed-arrivals"
+  name: "Приход кормов"
+  path: "arrivals"
+  description: "Поступление кормов на фабрику"
+  permission_prefix: "feed_arrival"
+  api_module_key: "feed"
+  sort_order: 20
+  is_head_visible: false
+  is_active: true
+- id: "32000000-0000-0000-0000-000000000027"
+  module_key: "factory"
+  key: "medicine-arrivals"
+  name: "Приход лекарств"
+  path: "arrivals"
+  description: "Поступление лекарств на фабрику"
+  permission_prefix: "medicine_arrival"
+  api_module_key: "medicine"
+  sort_order: 30
+  is_head_visible: false
+  is_active: true
+- id: "32000000-0000-0000-0000-000000000075"
+  module_key: "factory"
+  key: "stock-movements"
+  name: "Движения остатков"
+  path: "movements"
+  description: "Движения склада и инвентарный журнал"
+  permission_prefix: "stock_movement"
+  api_module_key: "inventory"
+  sort_order: 35
+  is_head_visible: true
+  is_active: true
+- id: "32000000-0000-0000-0000-000000000183"
+  module_key: "factory"
+  key: "warehouses"
+  name: "Склады"
+  path: "warehouses"
+  description: "Склады и складские зоны подразделений"
+  permission_prefix: "warehouse"
+  api_module_key: "core"
+  sort_order: 36
+  is_head_visible: true
+  is_active: true
+- id: "32000000-0000-0000-0000-000000000028"
+  module_key: "factory"
+  key: "clients"
+  name: "Клиентская база"
+  path: "clients"
+  description: "Общая база клиентов внутри модуля"
+  permission_prefix: "client"
+  api_module_key: "core"
+  sort_order: 40
+  is_head_visible: true
+  is_active: true
+- id: "32000000-0000-0000-0000-000000000904"
+  module_key: "factory"
+  key: "client-debts"
+  name: "Долги клиентов"
+  path: "client-debts"
+  description: "Долги клиентов по модулю"
+  permission_prefix: "client_debt"
+  api_module_key: "core"
+  sort_order: 41
+  is_head_visible: true
+  is_active: true
+- id: "32000000-0000-0000-0000-000000000029"
+  module_key: "factory"
+  key: "employees"
+  name: "Сотрудники"
+  path: "employees"
+  description: "Сотрудники выбранного департамента"
+  permission_prefix: "employee"
+  api_module_key: "hr"
+  sort_order: 50
+  is_head_visible: true
+  is_active: true
+- id: "32000000-0000-0000-0000-000000000910"
+  module_key: "factory"
+  key: "expense-categories"
+  name: "Категории расходов"
+  path: "expense-categories"
+  description: "Категории расходов выбранного департамента"
+  permission_prefix: "expense_category"
+  api_module_key: "finance"
+  sort_order: 59
+  is_head_visible: true
+  is_active: true
+- id: "32000000-0000-0000-0000-000000000030"
+  module_key: "factory"
+  key: "expenses"
+  name: "Расходы"
+  path: "expenses"
+  description: "Расходы выбранного департамента"
+  permission_prefix: "expense"
+  api_module_key: "finance"
+  sort_order: 60
+  is_head_visible: true
+  is_active: true
+- id: "32000000-0000-0000-0000-000000000031"
+  module_key: "factory"
+  key: "cash-accounts"
+  name: "Кассы"
+  path: "cash-accounts"
+  description: "Кассы выбранного департамента"
+  permission_prefix: "cash_account"
+  api_module_key: "finance"
+  sort_order: 70
+  is_head_visible: true
+  is_active: true
+- id: "32000000-0000-0000-0000-000000000032"
+  module_key: "factory"
+  key: "cash-transactions"
+  name: "Кассовые операции"
+  path: "cash-transactions"
+  description: "Кассовые операции выбранного департамента"
+  permission_prefix: "cash_transaction"
+  api_module_key: "finance"
+  sort_order: 80
+  is_head_visible: true
+  is_active: true
+- id: "32000000-0000-0000-0000-000000000076"
+  module_key: "feed"
+  key: "types"
+  name: "Типы корма"
+  path: "types"
+  description: "Справочник типов готового корма"
+  permission_prefix: "feed_type"
+  sort_order: 5
+  is_head_visible: true
+  is_active: true
+- id: "32000000-0000-0000-0000-000000000033"
+  module_key: "feed"
+  key: "ingredients"
+  name: "Сырьё"
+  path: "ingredients"
+  description: "Сырьевые компоненты для производства"
+  permission_prefix: "feed_ingredient"
+  sort_order: 10
+  is_head_visible: false
+  is_active: true
+- id: "32000000-0000-0000-0000-000000000034"
+  module_key: "feed"
+  key: "formulas"
+  name: "Продукт"
+  path: "formulas"
+  description: "Рецептуры готового продукта"
+  permission_prefix: "feed_formula"
+  sort_order: 20
+  is_head_visible: false
+  is_active: true
+- id: "32000000-0000-0000-0000-000000000035"
+  module_key: "feed"
+  key: "formula-ingredients"
+  name: "Комбинация сырья"
+  path: "formula-ingredients"
+  description: "Состав продукта по сырьевым компонентам"
+  permission_prefix: "feed_formula_ingredient"
+  sort_order: 30
+  is_head_visible: false
+  is_active: true
+- id: "32000000-0000-0000-0000-000000000036"
+  module_key: "feed"
+  key: "raw-arrivals"
+  name: "Приход сырья"
+  path: "raw-arrivals"
+  description: "Закупка и поступление сырья"
+  permission_prefix: "feed_raw_arrival"
+  sort_order: 40
+  is_head_visible: false
+  is_active: true
+- id: "32000000-0000-0000-0000-000000000037"
+  module_key: "feed"
+  key: "production-batches"
+  name: "Выпуск продукта"
+  path: "production-batches"
+  description: "Выпуск готового продукта по партиям"
+  permission_prefix: "feed_production_batch"
+  sort_order: 50
+  is_head_visible: false
+  is_active: true
+- id: "32000000-0000-0000-0000-000000000038"
+  module_key: "feed"
+  key: "raw-consumptions"
+  name: "Расход сырья"
+  path: "raw-consumptions"
+  description: "Списание сырья в производство"
+  permission_prefix: "feed_raw_consumption"
+  sort_order: 60
+  is_head_visible: false
+  is_active: true
+- id: "32000000-0000-0000-0000-000000000039"
+  module_key: "feed"
+  key: "product-shipments"
+  name: "Отгрузки продукта"
+  path: "product-shipments"
+  description: "Отгрузка готового продукта клиентам"
+  permission_prefix: "feed_product_shipment"
+  sort_order: 70
+  is_head_visible: false
+  is_active: true
+- id: "32000000-0000-0000-0000-000000000077"
+  module_key: "feed"
+  key: "stock-movements"
+  name: "Движения остатков"
+  path: "movements"
+  description: "Движения склада и инвентарный журнал"
+  permission_prefix: "stock_movement"
+  api_module_key: "inventory"
+  sort_order: 75
+  is_head_visible: true
+  is_active: true
+- id: "32000000-0000-0000-0000-000000000184"
+  module_key: "feed"
+  key: "warehouses"
+  name: "Склады"
+  path: "warehouses"
+  description: "Склады и складские зоны подразделений"
+  permission_prefix: "warehouse"
+  api_module_key: "core"
+  sort_order: 76
+  is_head_visible: true
+  is_active: true
+- id: "32000000-0000-0000-0000-000000000040"
+  module_key: "feed"
+  key: "clients"
+  name: "Клиентская база"
+  path: "clients"
+  description: "Общая база клиентов внутри модуля"
+  permission_prefix: "client"
+  api_module_key: "core"
+  sort_order: 80
+  is_head_visible: true
+  is_active: true
+- id: "32000000-0000-0000-0000-000000000905"
+  module_key: "feed"
+  key: "client-debts"
+  name: "Долги клиентов"
+  path: "client-debts"
+  description: "Долги клиентов по модулю"
+  permission_prefix: "client_debt"
+  api_module_key: "core"
+  sort_order: 81
+  is_head_visible: true
+  is_active: true
+- id: "32000000-0000-0000-0000-000000000041"
+  module_key: "feed"
+  key: "employees"
+  name: "Сотрудники"
+  path: "employees"
+  description: "Сотрудники выбранного департамента"
+  permission_prefix: "employee"
+  api_module_key: "hr"
+  sort_order: 90
+  is_head_visible: true
+  is_active: true
+- id: "32000000-0000-0000-0000-000000000911"
+  module_key: "feed"
+  key: "expense-categories"
+  name: "Категории расходов"
+  path: "expense-categories"
+  description: "Категории расходов выбранного департамента"
+  permission_prefix: "expense_category"
+  api_module_key: "finance"
+  sort_order: 99
+  is_head_visible: true
+  is_active: true
+- id: "32000000-0000-0000-0000-000000000042"
+  module_key: "feed"
+  key: "expenses"
+  name: "Расходы"
+  path: "expenses"
+  description: "Расходы выбранного департамента"
+  permission_prefix: "expense"
+  api_module_key: "finance"
+  sort_order: 100
+  is_head_visible: true
+  is_active: true
+- id: "32000000-0000-0000-0000-000000000043"
+  module_key: "feed"
+  key: "cash-accounts"
+  name: "Кассы"
+  path: "cash-accounts"
+  description: "Кассы выбранного департамента"
+  permission_prefix: "cash_account"
+  api_module_key: "finance"
+  sort_order: 110
+  is_head_visible: true
+  is_active: true
+- id: "32000000-0000-0000-0000-000000000044"
+  module_key: "feed"
+  key: "cash-transactions"
+  name: "Кассовые операции"
+  path: "cash-transactions"
+  description: "Кассовые операции выбранного департамента"
+  permission_prefix: "cash_transaction"
+  api_module_key: "finance"
+  sort_order: 120
+  is_head_visible: true
+  is_active: true
+- id: "32000000-0000-0000-0000-000000000045"
+  module_key: "medicine"
+  key: "arrivals"
+  name: "Приход лекарств"
+  path: "arrivals"
+  description: "Поступление лекарственных средств"
+  permission_prefix: "medicine_arrival"
+  sort_order: 10
+  is_head_visible: false
+  is_active: true
+- id: "32000000-0000-0000-0000-000000000046"
+  module_key: "medicine"
+  key: "consumptions"
+  name: "Уход лекарств"
+  path: "consumptions"
+  description: "Использование и списание лекарств"
+  permission_prefix: "medicine_consumption"
+  sort_order: 20
+  is_head_visible: false
+  is_active: true
+- id: "32000000-0000-0000-0000-000000000047"
+  module_key: "medicine"
+  key: "clients"
+  name: "Клиентская база"
+  path: "clients"
+  description: "Общая база клиентов внутри модуля"
+  permission_prefix: "client"
+  api_module_key: "core"
+  sort_order: 30
+  is_head_visible: true
+  is_active: true
+- id: "32000000-0000-0000-0000-000000000906"
+  module_key: "medicine"
+  key: "client-debts"
+  name: "Долги клиентов"
+  path: "client-debts"
+  description: "Долги клиентов по модулю"
+  permission_prefix: "client_debt"
+  api_module_key: "core"
+  sort_order: 31
+  is_head_visible: true
+  is_active: true
+- id: "32000000-0000-0000-0000-000000000048"
+  module_key: "medicine"
+  key: "batches"
+  name: "Штрихкод и срок годности"
+  path: "batches"
+  description: "Партии лекарств, штрихкод и срок годности"
+  permission_prefix: "medicine_batch"
+  sort_order: 40
+  is_head_visible: false
+  is_active: true
+- id: "32000000-0000-0000-0000-000000000049"
+  module_key: "medicine"
+  key: "types"
+  name: "Типы лекарств"
+  path: "types"
+  description: "Справочник лекарственных категорий"
+  permission_prefix: "medicine_type"
+  sort_order: 50
+  is_head_visible: false
+  is_active: true
+- id: "32000000-0000-0000-0000-000000000078"
+  module_key: "medicine"
+  key: "stock-movements"
+  name: "Движения остатков"
+  path: "movements"
+  description: "Движения склада и инвентарный журнал"
+  permission_prefix: "stock_movement"
+  api_module_key: "inventory"
+  sort_order: 55
+  is_head_visible: true
+  is_active: true
+- id: "32000000-0000-0000-0000-000000000185"
+  module_key: "medicine"
+  key: "warehouses"
+  name: "Склады"
+  path: "warehouses"
+  description: "Склады и складские зоны подразделений"
+  permission_prefix: "warehouse"
+  api_module_key: "core"
+  sort_order: 56
+  is_head_visible: true
+  is_active: true
+- id: "32000000-0000-0000-0000-000000000050"
+  module_key: "medicine"
+  key: "employees"
+  name: "Сотрудники"
+  path: "employees"
+  description: "Сотрудники выбранного департамента"
+  permission_prefix: "employee"
+  api_module_key: "hr"
+  sort_order: 60
+  is_head_visible: true
+  is_active: true
+- id: "32000000-0000-0000-0000-000000000912"
+  module_key: "medicine"
+  key: "expense-categories"
+  name: "Категории расходов"
+  path: "expense-categories"
+  description: "Категории расходов выбранного департамента"
+  permission_prefix: "expense_category"
+  api_module_key: "finance"
+  sort_order: 69
+  is_head_visible: true
+  is_active: true
+- id: "32000000-0000-0000-0000-000000000051"
+  module_key: "medicine"
+  key: "expenses"
+  name: "Расходы"
+  path: "expenses"
+  description: "Расходы выбранного департамента"
+  permission_prefix: "expense"
+  api_module_key: "finance"
+  sort_order: 70
+  is_head_visible: true
+  is_active: true
+- id: "32000000-0000-0000-0000-000000000052"
+  module_key: "medicine"
+  key: "cash-accounts"
+  name: "Кассы"
+  path: "cash-accounts"
+  description: "Кассы выбранного департамента"
+  permission_prefix: "cash_account"
+  api_module_key: "finance"
+  sort_order: 80
+  is_head_visible: true
+  is_active: true
+- id: "32000000-0000-0000-0000-000000000053"
+  module_key: "medicine"
+  key: "cash-transactions"
+  name: "Кассовые операции"
+  path: "cash-transactions"
+  description: "Кассовые операции выбранного департамента"
+  permission_prefix: "cash_transaction"
+  api_module_key: "finance"
+  sort_order: 90
+  is_head_visible: true
+  is_active: true
+- id: "32000000-0000-0000-0000-000000000054"
+  module_key: "slaughter"
+  key: "arrivals"
+  name: "Приход птицы"
+  path: "arrivals"
+  description: "Поступление живой птицы"
+  permission_prefix: "slaughter_arrival"
+  sort_order: 10
+  is_head_visible: false
+  is_active: true
+- id: "32000000-0000-0000-0000-000000000055"
+  module_key: "slaughter"
+  key: "processings"
+  name: "Сортировка и разделка"
+  path: "processings"
+  description: "Первый сорт, второй сорт и операции разделки"
+  permission_prefix: "slaughter_processing"
+  sort_order: 20
+  is_head_visible: false
+  is_active: true
+- id: "32000000-0000-0000-0000-000000000056"
+  module_key: "slaughter"
+  key: "semi-products"
+  name: "Полуфабрикат и части"
+  path: "semi-products"
+  description: "Части птицы и выпущенный полуфабрикат"
+  permission_prefix: "slaughter_semi_product"
+  sort_order: 30
+  is_head_visible: false
+  is_active: true
+- id: "32000000-0000-0000-0000-000000000057"
+  module_key: "slaughter"
+  key: "semi-product-shipments"
+  name: "Отгрузки полуфабриката"
+  path: "semi-product-shipments"
+  description: "Реализация полуфабрикатов"
+  permission_prefix: "slaughter_semi_product_shipment"
+  sort_order: 40
+  is_head_visible: false
+  is_active: true
+- id: "32000000-0000-0000-0000-000000000079"
+  module_key: "slaughter"
+  key: "stock-movements"
+  name: "Движения остатков"
+  path: "movements"
+  description: "Движения склада и инвентарный журнал"
+  permission_prefix: "stock_movement"
+  api_module_key: "inventory"
+  sort_order: 45
+  is_head_visible: true
+  is_active: true
+- id: "32000000-0000-0000-0000-000000000186"
+  module_key: "slaughter"
+  key: "warehouses"
+  name: "Склады"
+  path: "warehouses"
+  description: "Склады и складские зоны подразделений"
+  permission_prefix: "warehouse"
+  api_module_key: "core"
+  sort_order: 46
+  is_head_visible: true
+  is_active: true
+- id: "32000000-0000-0000-0000-000000000058"
+  module_key: "slaughter"
+  key: "clients"
+  name: "Клиентская база"
+  path: "clients"
+  description: "Общая база клиентов внутри модуля"
+  permission_prefix: "client"
+  api_module_key: "core"
+  sort_order: 50
+  is_head_visible: true
+  is_active: true
+- id: "32000000-0000-0000-0000-000000000907"
+  module_key: "slaughter"
+  key: "client-debts"
+  name: "Долги клиентов"
+  path: "client-debts"
+  description: "Долги клиентов по модулю"
+  permission_prefix: "client_debt"
+  api_module_key: "core"
+  sort_order: 51
+  is_head_visible: true
+  is_active: true
+- id: "32000000-0000-0000-0000-000000000059"
+  module_key: "slaughter"
+  key: "employees"
+  name: "Сотрудники"
+  path: "employees"
+  description: "Сотрудники выбранного департамента"
+  permission_prefix: "employee"
+  api_module_key: "hr"
+  sort_order: 60
+  is_head_visible: true
+  is_active: true
+- id: "32000000-0000-0000-0000-000000000913"
+  module_key: "slaughter"
+  key: "expense-categories"
+  name: "Категории расходов"
+  path: "expense-categories"
+  description: "Категории расходов выбранного департамента"
+  permission_prefix: "expense_category"
+  api_module_key: "finance"
+  sort_order: 69
+  is_head_visible: true
+  is_active: true
+- id: "32000000-0000-0000-0000-000000000060"
+  module_key: "slaughter"
+  key: "expenses"
+  name: "Расходы"
+  path: "expenses"
+  description: "Расходы выбранного департамента"
+  permission_prefix: "expense"
+  api_module_key: "finance"
+  sort_order: 70
+  is_head_visible: true
+  is_active: true
+- id: "32000000-0000-0000-0000-000000000061"
+  module_key: "slaughter"
+  key: "cash-accounts"
+  name: "Кассы"
+  path: "cash-accounts"
+  description: "Кассы выбранного департамента"
+  permission_prefix: "cash_account"
+  api_module_key: "finance"
+  sort_order: 80
+  is_head_visible: true
+  is_active: true
+- id: "32000000-0000-0000-0000-000000000062"
+  module_key: "slaughter"
+  key: "cash-transactions"
+  name: "Кассовые операции"
+  path: "cash-transactions"
+  description: "Кассовые операции выбранного департамента"
+  permission_prefix: "cash_transaction"
+  api_module_key: "finance"
+  sort_order: 90
+  is_head_visible: true
+  is_active: true
+- id: "32000000-0000-0000-0000-000000000063"
+  module_key: "finance"
+  key: "expense-categories"
+  name: "Категории расходов"
+  path: "expense-categories"
+  description: "Классификатор финансовых статей"
+  permission_prefix: "expense_category"
+  sort_order: 10
+  is_head_visible: false
+  is_active: true
+- id: "32000000-0000-0000-0000-000000000064"
+  module_key: "finance"
+  key: "expenses"
+  name: "Расходы"
+  path: "expenses"
+  description: "Финансовые операции и затраты"
+  permission_prefix: "expense"
+  sort_order: 20
+  is_head_visible: false
+  is_active: true
+- id: "32000000-0000-0000-0000-000000000065"
+  module_key: "finance"
+  key: "cash-accounts"
+  name: "Кассы"
+  path: "cash-accounts"
+  description: "Кассы по департаментам"
+  permission_prefix: "cash_account"
+  sort_order: 30
+  is_head_visible: false
+  is_active: true
+- id: "32000000-0000-0000-0000-000000000066"
+  module_key: "finance"
+  key: "cash-transactions"
+  name: "Кассовые операции"
+  path: "cash-transactions"
+  description: "Движение денег по кассам"
+  permission_prefix: "cash_transaction"
+  sort_order: 40
+  is_head_visible: false
+  is_active: true
+- id: "32000000-0000-0000-0000-000000000067"
+  module_key: "hr"
+  key: "employees"
+  name: "Сотрудники"
+  path: "employees"
+  description: "Карточки сотрудников"
+  permission_prefix: "employee"
+  sort_order: 10
+  is_head_visible: false
+  is_active: true
+- id: "32000000-0000-0000-0000-000000000068"
+  module_key: "hr"
+  key: "positions"
+  name: "Должности"
+  path: "positions"
+  description: "Штатные позиции и роли"
+  permission_prefix: "position"
+  sort_order: 20
+  is_head_visible: false
+  is_active: true
+- id: "32000000-0000-0000-0000-000000000069"
+  module_key: "hr"
+  key: "roles"
+  name: "Роли"
+  path: "roles"
+  description: "Ролевые модели доступа"
+  permission_prefix: "role"
+  sort_order: 30
+  is_head_visible: false
+  is_active: true
+- id: "32000000-0000-0000-0000-000000000070"
+  module_key: "hr"
+  key: "permissions"
+  name: "Права"
+  path: "permissions"
+  description: "Разрешения и матрица доступа"
+  permission_prefix: "permission"
+  sort_order: 40
+  is_head_visible: false
+  is_active: true
+departments:
+- id: "44444444-4444-4444-4444-444444444444"
+  organization_id: "11111111-1111-1111-1111-111111111111"
+  name: "Tuxumchilik majmuasi"
+  code: "EGG"
+  module_key: "egg"
+  icon: "egg"
+  description: "Tuxumchilik bosh bolimi"
+  is_active: true
+- id: "55555555-5555-5555-5555-555555555555"
+  organization_id: "11111111-1111-1111-1111-111111111111"
+  name: "Broyler majmuasi"
+  code: "FACT"
+  module_key: "factory"
+  icon: "factory"
+  description: "Broyler bosh bolimi"
+  is_active: true
+- id: "66666666-6666-6666-6666-666666666666"
+  organization_id: "22222222-2222-2222-2222-222222222222"
+  name: "Inkubatsiya markazi"
+  code: "INCU"
+  module_key: "incubation"
+  icon: "archive"
+  description: "Inkubatsiya bosh bolimi"
+  is_active: true
+- id: "44441111-1111-1111-1111-111111111111"
+  organization_id: "11111111-1111-1111-1111-111111111111"
+  name: "Tuxum saralash"
+  code: "EGG-PACK"
+  module_key: "egg"
+  icon: "box"
+  parent_department_id: "44444444-4444-4444-4444-444444444444"
+  description: "Tuxum saralash bolinmasi"
+  is_active: true
+- id: "55551111-1111-1111-1111-111111111111"
+  organization_id: "11111111-1111-1111-1111-111111111111"
+  name: "Broyler maydoni 1"
+  code: "FACT-L1"
+  module_key: "factory"
+  icon: "briefcase"
+  parent_department_id: "55555555-5555-5555-5555-555555555555"
+  description: "Ishlab chiqarish maydoni bolinmasi"
+  is_active: true
+- id: "66661111-1111-1111-1111-111111111111"
+  organization_id: "22222222-2222-2222-2222-222222222222"
+  name: "Saralash bolimi"
+  code: "INCU-SORT"
+  module_key: "incubation"
+  icon: "box"
+  parent_department_id: "66666666-6666-6666-6666-666666666666"
+  description: "Saralash va joylash bolinmasi"
+  is_active: true
+- id: "77771111-1111-1111-1111-111111111111"
+  organization_id: "11111111-1111-1111-1111-111111111111"
+  name: "Yem zavodi"
+  code: "FEED"
+  module_key: "feed"
+  icon: "package"
+  description: "Yem zavodi bosh bolimi"
+  is_active: true
+- id: "77772222-2222-2222-2222-222222222222"
+  organization_id: "11111111-1111-1111-1111-111111111111"
+  name: "Aralashtirish liniyasi"
+  code: "FEED-MIX"
+  module_key: "feed"
+  icon: "leaf"
+  parent_department_id: "77771111-1111-1111-1111-111111111111"
+  description: "Aralashtirish va ishlab chiqarish liniyasi"
+  is_active: true
+- id: "88881111-1111-1111-1111-111111111111"
+  organization_id: "11111111-1111-1111-1111-111111111111"
+  name: "Veterinariya dorixonasi"
+  code: "VET"
+  module_key: "medicine"
+  icon: "pill"
+  description: "Veterinariya dorixonasi bosh bolimi"
+  is_active: true
+- id: "88882222-2222-2222-2222-222222222222"
+  organization_id: "11111111-1111-1111-1111-111111111111"
+  name: "Sovutkich ombori"
+  code: "VET-COLD"
+  module_key: "medicine"
+  icon: "archive"
+  parent_department_id: "88881111-1111-1111-1111-111111111111"
+  description: "Dori saqlash va sovutish ombori"
+  is_active: true
+- id: "99991111-1111-1111-1111-111111111111"
+  organization_id: "11111111-1111-1111-1111-111111111111"
+  name: "Soyish majmuasi"
+  code: "SLH"
+  module_key: "slaughter"
+  icon: "shield"
+  description: "Soyish bosh bolimi"
+  is_active: true
+- id: "99992222-2222-2222-2222-222222222222"
+  organization_id: "11111111-1111-1111-1111-111111111111"
+  name: "Ajratish liniyasi"
+  code: "SLH-CUT"
+  module_key: "slaughter"
+  icon: "box"
+  parent_department_id: "99991111-1111-1111-1111-111111111111"
+  description: "Ajratish va qadoqlash bolinmasi"
+  is_active: true
+clients:
+- id: "77777777-7777-7777-7777-777777777777"
+  organization_id: "11111111-1111-1111-1111-111111111111"
+  first_name: "Azizbek"
+  last_name: "Rasulov"
+  email: "azizbek.rasulov@agrotaminot.uz"
+  phone: "+998901234501"
+  telegram_chat_id: "10010001"
+  is_active: true
+  client_code: "C-1001"
+  company_name: "Toshkent Agro Taminot"
+  category: "supplier"
+  address: "Toshkent, Sergeli"
+- id: "88888888-8888-8888-8888-888888888888"
+  organization_id: "11111111-1111-1111-1111-111111111111"
+  first_name: "Dilafruz"
+  last_name: "Karimova"
+  email: "dilafruz.karimova@siyobsavdo.uz"
+  phone: "+998901234502"
+  telegram_chat_id: "10010002"
+  is_active: true
+  client_code: "C-1002"
+  company_name: "Siyob Savdo"
+  category: "buyer"
+  address: "Samarqand, Siyob"
+- id: "99999999-9999-9999-9999-999999999999"
+  organization_id: "33333333-3333-3333-3333-333333333333"
+  first_name: "Temur"
+  last_name: "Sodiqov"
+  email: "temur.sodiqov@buxorologistika.uz"
+  phone: "+998901234503"
+  is_active: true
+  client_code: "C-2001"
+  company_name: "Buxoro Logistika Markazi"
+  category: "logistics"
+  address: "Buxoro, Gijduvon"
+- id: "12121212-1212-1212-1212-121212121212"
+  organization_id: "11111111-1111-1111-1111-111111111111"
+  first_name: "Javohir"
+  last_name: "Abdullayev"
+  email: "javohir.toirov@vodiydon.uz"
+  phone: "+998901234504"
+  is_active: true
+  client_code: "C-1003"
+  company_name: "Vodiy Don Servis"
+  category: "supplier"
+  address: "Jizzax, Zarbdor"
+- id: "13131313-1313-1313-1313-131313131313"
+  organization_id: "11111111-1111-1111-1111-111111111111"
+  first_name: "Nigina"
+  last_name: "Rustamova"
+  email: "nigina.rustamova@shifoagro.uz"
+  phone: "+998901234505"
+  is_active: true
+  client_code: "C-1004"
+  company_name: "Shifo Agro Farm"
+  category: "supplier"
+  address: "Toshkent viloyati, Yangiyol"
+- id: "14141414-1414-1414-1414-141414141414"
+  organization_id: "11111111-1111-1111-1111-111111111111"
+  first_name: "Sherzod"
+  last_name: "Karimov"
+  email: "sherzod.karimov@bozorbeksavdo.uz"
+  phone: "+998901234506"
+  is_active: true
+  client_code: "C-1005"
+  company_name: "Bozorbek Savdo"
+  category: "buyer"
+  address: "Toshkent, Chilonzor"
+- id: "15151515-1515-1515-1515-151515151515"
+  organization_id: "11111111-1111-1111-1111-111111111111"
+  first_name: "Maftuna"
+  last_name: "Alimova"
+  email: "maftuna.alimova@barakaretail.uz"
+  phone: "+998901234507"
+  is_active: true
+  client_code: "C-1006"
+  company_name: "Baraka Retail"
+  category: "buyer"
+  address: "Samarqand, Urgut"
+- id: "16161616-1616-1616-1616-161616161616"
+  organization_id: "11111111-1111-1111-1111-111111111111"
+  first_name: "Bekzod"
+  last_name: "Ismoilov"
+  email: "bekzod.ismoilov@sovutlog.uz"
+  phone: "+998901234508"
+  is_active: true
+  client_code: "C-1007"
+  company_name: "Sovut Logistika"
+  category: "logistics"
+  address: "Andijon, Asaka"
+- id: "17171717-1717-1717-1717-171717171717"
+  organization_id: "22222222-2222-2222-2222-222222222222"
+  first_name: "Sardor"
+  last_name: "Usmonov"
+  email: "sardor.usmonov@inkubauz.uz"
+  phone: "+998901234509"
+  is_active: true
+  client_code: "C-2002"
+  company_name: "Inkubatsiya Broker"
+  category: "supplier"
+  address: "Fargona, Quva"
+- id: "18181818-1818-1818-1818-181818181818"
+  organization_id: "11111111-1111-1111-1111-111111111111"
+  first_name: "Dilshod"
+  last_name: "Nazarov"
+  email: "dilshod.nazarov@gallamax.uz"
+  phone: "+998901234510"
+  is_active: true
+  client_code: "C-1008"
+  company_name: "Galla Max"
+  category: "supplier"
+  address: "Sirdaryo, Guliston"
+- id: "19191919-1919-1919-1919-191919191919"
+  organization_id: "11111111-1111-1111-1111-111111111111"
+  first_name: "Saida"
+  last_name: "Yuldasheva"
+  email: "saida.yuldasheva@farmservis.uz"
+  phone: "+998901234511"
+  is_active: true
+  client_code: "C-1009"
+  company_name: "Fermer Servis"
+  category: "supplier"
+  address: "Navoiy, Karmana"
+- id: "20202020-1212-1212-1212-121212121212"
+  organization_id: "11111111-1111-1111-1111-111111111111"
+  first_name: "Otabek"
+  last_name: "Rahimov"
+  email: "otabek.rahimov@freshbozor.uz"
+  phone: "+998901234512"
+  is_active: true
+  client_code: "C-1010"
+  company_name: "Fresh Bozor"
+  category: "buyer"
+  address: "Toshkent, Yunusobod"
+- id: "21212121-2121-2121-2121-212121212121"
+  organization_id: "11111111-1111-1111-1111-111111111111"
+  first_name: "Shahnoza"
+  last_name: "Tursunova"
+  email: "shahnoza.tursunova@mehmonbozor.uz"
+  phone: "+998901234513"
+  is_active: true
+  client_code: "C-1011"
+  company_name: "Mehmon Bozor"
+  category: "buyer"
+  address: "Samarqand, Registon"
+- id: "22232323-2323-2323-2323-232323232323"
+  organization_id: "11111111-1111-1111-1111-111111111111"
+  first_name: "Abdulaziz"
+  last_name: "Sobirov"
+  email: "abdulaziz.sobirov@goshtsavdo.uz"
+  phone: "+998901234514"
+  is_active: true
+  client_code: "C-1012"
+  company_name: "Gosht Savdo"
+  category: "buyer"
+  address: "Buxoro, Kogon"
+- id: "23232323-2323-2323-2323-232323232324"
+  organization_id: "11111111-1111-1111-1111-111111111111"
+  first_name: "Nozima"
+  last_name: "Ahmedova"
+  email: "nozima.ahmedova@vetline.uz"
+  phone: "+998901234515"
+  is_active: true
+  client_code: "C-1013"
+  company_name: "Vet Line Uz"
+  category: "supplier"
+  address: "Fargona, Margilon"
+- id: "24242424-2424-2424-2424-242424242424"
+  organization_id: "22222222-2222-2222-2222-222222222222"
+  first_name: "Ulugbek"
+  last_name: "Qarshiyev"
+  email: "ulugbek.qarshiyev@hududiyxarid.uz"
+  phone: "+998901234516"
+  is_active: true
+  client_code: "C-2003"
+  company_name: "Hududiy Xarid"
+  category: "buyer"
+  address: "Qarshi, Nasaf"
+- id: "25252525-2525-2525-2525-252525252525"
+  organization_id: "11111111-1111-1111-1111-111111111111"
+  first_name: "Kamoliddin"
+  last_name: "Nurmatov"
+  email: "kamoliddin.nurmatov@vodiyagro.uz"
+  phone: "+998901234517"
+  is_active: true
+  client_code: "C-1014"
+  company_name: "Vodiy Agro Taminot"
+  category: "supplier"
+  address: "Namangan, Chortoq"
+- id: "26262626-2626-2626-2626-262626262626"
+  organization_id: "11111111-1111-1111-1111-111111111111"
+  first_name: "Mohinur"
+  last_name: "Qodirova"
+  email: "mohinur.qodirova@chorsumarket.uz"
+  phone: "+998901234518"
+  is_active: true
+  client_code: "C-1015"
+  company_name: "Chorsu Market"
+  category: "buyer"
+  address: "Toshkent, Chorsu"
+- id: "27272727-2727-2727-2727-272727272727"
+  organization_id: "11111111-1111-1111-1111-111111111111"
+  first_name: "Rustam"
+  last_name: "Jorayev"
+  email: "rustam.jorayev@sahovatdon.uz"
+  phone: "+998901234519"
+  is_active: true
+  client_code: "C-1016"
+  company_name: "Sahovat Don Markazi"
+  category: "supplier"
+  address: "Jizzax, Gallaorol"
+- id: "28282828-2828-2828-2828-282828282828"
+  organization_id: "11111111-1111-1111-1111-111111111111"
+  first_name: "Madina"
+  last_name: "Ergasheva"
+  email: "madina.ergasheva@navruzretail.uz"
+  phone: "+998901234520"
+  is_active: true
+  client_code: "C-1017"
+  company_name: "Navruz Retail"
+  category: "buyer"
+  address: "Toshkent, Mirzo Ulugbek"
+- id: "29292929-2929-2929-2929-292929292929"
+  organization_id: "11111111-1111-1111-1111-111111111111"
+  first_name: "Farrux"
+  last_name: "Xudoyberdiyev"
+  email: "farrux.xudoyberdiyev@coldline.uz"
+  phone: "+998901234521"
+  is_active: true
+  client_code: "C-1018"
+  company_name: "Cold Line Logistics"
+  category: "logistics"
+  address: "Toshkent viloyati, Zangiota"
+- id: "30303030-3030-3030-3030-303030303031"
+  organization_id: "11111111-1111-1111-1111-111111111111"
+  first_name: "Nodir"
+  last_name: "Raxmonov"
+  email: "nodir.raxmonov@grandpremix.uz"
+  phone: "+998901234522"
+  is_active: true
+  client_code: "C-1019"
+  company_name: "Grand Premix Trade"
+  category: "supplier"
+  address: "Toshkent viloyati, Chirchiq"
+- id: "30303030-3030-3030-3030-303030303032"
+  organization_id: "11111111-1111-1111-1111-111111111111"
+  first_name: "Laylo"
+  last_name: "Qudratova"
+  email: "laylo.qudratova@asianhoreca.uz"
+  phone: "+998901234523"
+  is_active: true
+  client_code: "C-1020"
+  company_name: "Asia HoReCa Supply"
+  category: "buyer"
+  address: "Toshkent, Yakkasaroy"
+- id: "30303030-3030-3030-3030-303030303033"
+  organization_id: "11111111-1111-1111-1111-111111111111"
+  first_name: "Sunnat"
+  last_name: "Turgunov"
+  email: "sunnat.turgunov@biovetimpex.uz"
+  phone: "+998901234524"
+  is_active: true
+  client_code: "C-1021"
+  company_name: "Bio Vet Impex"
+  category: "supplier"
+  address: "Toshkent, Bektemir"
+- id: "30303030-3030-3030-3030-303030303034"
+  organization_id: "11111111-1111-1111-1111-111111111111"
+  first_name: "Mukarram"
+  last_name: "Toshpulatova"
+  email: "mukarram.toshpulatova@maroqandfresh.uz"
+  phone: "+998901234525"
+  is_active: true
+  client_code: "C-1022"
+  company_name: "Maroqand Fresh Foods"
+  category: "buyer"
+  address: "Samarqand, Past Dargom"
+- id: "30303030-3030-3030-3030-303030303035"
+  organization_id: "22222222-2222-2222-2222-222222222222"
+  first_name: "Jasur"
+  last_name: "Mardonov"
+  email: "jasur.mardonov@jojanasl.uz"
+  phone: "+998901234526"
+  is_active: true
+  client_code: "C-2004"
+  company_name: "Jo'ja Nasl Export"
+  category: "supplier"
+  address: "Samarqand, Jomboy"
+- id: "30303030-3030-3030-3030-303030303036"
+  organization_id: "22222222-2222-2222-2222-222222222222"
+  first_name: "Munisa"
+  last_name: "Hasanova"
+  email: "munisa.hasanova@qashparranda.uz"
+  phone: "+998901234527"
+  is_active: true
+  client_code: "C-2005"
+  company_name: "Qashqadaryo Parranda Klaster"
+  category: "buyer"
+  address: "Qarshi, Beshkent"
+client_debts:
+- id: "40404040-4040-4040-4040-404040404041"
+  organization_id: "11111111-1111-1111-1111-111111111111"
+  department_id: "44444444-4444-4444-4444-444444444444"
+  client_id: "77777777-7777-7777-7777-777777777777"
+  item_type: "egg"
+  item_key: "egg:10555555-5555-5555-5555-555555555555"
+  quantity: 1200
+  unit: "pcs"
+  amount_total: 1800000
+  amount_paid: 450000
+  currency: "UZS"
+  issued_on: "2026-04-02"
+  due_on: "2026-04-20"
+  status: "partially_paid"
+  note: "Qisman to'lov qilingan qarz"
+  is_active: true
+- id: "40404040-4040-4040-4040-404040404042"
+  organization_id: "11111111-1111-1111-1111-111111111111"
+  department_id: "55555555-5555-5555-5555-555555555555"
+  client_id: "88888888-8888-8888-8888-888888888888"
+  item_type: "feed"
+  item_key: "feed_product:02020202-0202-0202-0202-020202020202"
+  quantity: 850
+  unit: "kg"
+  amount_total: 1350000
+  amount_paid: 0
+  currency: "UZS"
+  issued_on: "2026-04-03"
+  due_on: "2026-04-18"
+  status: "open"
+  note: "Yangi partiya bo'yicha to'lov kutilmoqda"
+  is_active: true
+currencies:
+- id: "32111111-1111-1111-1111-111111111111"
+  organization_id: "11111111-1111-1111-1111-111111111111"
+  code: "UZS"
+  name: "Uzbek so'm"
+  symbol: "so'm"
+  description: "Asosiy operatsion valyuta"
+  sort_order: 10
+  is_default: true
+  is_active: true
+- id: "32122222-2222-2222-2222-222222222222"
+  organization_id: "11111111-1111-1111-1111-111111111111"
+  code: "USD"
+  name: "US Dollar"
+  symbol: "$"
+  description: "Xalqaro hisob-kitoblar uchun"
+  sort_order: 20
+  is_default: false
+  is_active: true
+- id: "32133333-3333-3333-3333-333333333333"
+  organization_id: "22222222-2222-2222-2222-222222222222"
+  code: "UZS"
+  name: "Uzbek so'm"
+  symbol: "so'm"
+  description: "Asosiy operatsion valyuta"
+  sort_order: 10
+  is_default: true
+  is_active: true
+- id: "32135555-5555-5555-5555-555555555555"
+  organization_id: "22222222-2222-2222-2222-222222222222"
+  code: "EUR"
+  name: "Euro"
+  symbol: "EUR"
+  description: "Qo'shimcha hisob-kitob valyutasi"
+  sort_order: 20
+  is_default: false
+  is_active: true
+- id: "32144444-4444-4444-4444-444444444444"
+  organization_id: "33333333-3333-3333-3333-333333333333"
+  code: "USD"
+  name: "US Dollar"
+  symbol: "$"
+  description: "Hamkorlik va eksport valyutasi"
+  sort_order: 10
+  is_default: true
+  is_active: true
+poultry_types:
+- id: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
+  organization_id: "11111111-1111-1111-1111-111111111111"
+  name: "Broyler"
+  code: "BROILER"
+  description: "Broyler"
+  is_active: true
+- id: "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
+  organization_id: "11111111-1111-1111-1111-111111111111"
+  name: "Tuxumchi tovuq"
+  code: "LAYER"
+  description: "Tuxumchi tovuq"
+  is_active: true
+- id: "cccccccc-cccc-cccc-cccc-cccccccccccc"
+  organization_id: "22222222-2222-2222-2222-222222222222"
+  name: "Ordak"
+  code: "DUCK"
+  description: "Ordak"
+  is_active: true

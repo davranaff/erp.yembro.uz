@@ -1,0 +1,41 @@
+services:
+  proxy:
+    image: caddy:2.8-alpine
+    env_file:
+      - ./.env
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - caddy_data:/data
+      - caddy_config:/config
+      - ./deploy/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+    networks:
+      - prod_public
+      - staging_public
+    restart: unless-stopped
+    healthcheck:
+      test:
+        - CMD
+        - caddy
+        - validate
+        - --config
+        - /etc/caddy/Caddyfile
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 10s
+
+volumes:
+  caddy_data:
+    name: ${CADDY_DATA_VOLUME_NAME:-caddy_data}
+  caddy_config:
+    name: ${CADDY_CONFIG_VOLUME_NAME:-caddy_config}
+
+networks:
+  prod_public:
+    external: true
+    name: ${PROD_PUBLIC_NETWORK_NAME:-yembro_prod_public}
+  staging_public:
+    external: true
+    name: ${STAGING_PUBLIC_NETWORK_NAME:-yembro_staging_public}

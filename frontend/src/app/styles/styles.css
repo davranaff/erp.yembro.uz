@@ -1,0 +1,111 @@
+@import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,700&family=Manrope:wght@400;500;600;700;800&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --canvas: 33 74% 96%;
+  --background: 0 0% 99%;
+  --foreground: 20 18% 12%;
+  --card: 0 0% 100%;
+  --card-foreground: 20 18% 12%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 20 18% 12%;
+  --primary: 18 88% 52%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 32 44% 84%;
+  --secondary-foreground: 22 18% 20%;
+  --muted: 34 24% 94%;
+  --muted-foreground: 24 10% 40%;
+  --accent: 37 92% 60%;
+  --accent-foreground: 22 18% 14%;
+  --destructive: 4 74% 54%;
+  --destructive-foreground: 0 0% 98%;
+  --border: 29 22% 80%;
+  --input: 29 18% 86%;
+  --ring: 18 88% 52%;
+  --radius: 1rem;
+}
+
+.dark {
+  --canvas: 24 20% 8%;
+  --background: 24 18% 16%;
+  --foreground: 34 36% 95%;
+  --card: 0 0% 100%;
+  --card-foreground: 20 18% 12%;
+  --popover: 24 18% 22%;
+  --popover-foreground: 34 36% 95%;
+  --primary: 18 88% 60%;
+  --primary-foreground: 24 18% 12%;
+  --secondary: 22 16% 24%;
+  --secondary-foreground: 34 36% 95%;
+  --muted: 22 16% 26%;
+  --muted-foreground: 28 18% 68%;
+  --accent: 37 88% 58%;
+  --accent-foreground: 24 18% 12%;
+  --destructive: 4 72% 52%;
+  --destructive-foreground: 0 0% 98%;
+  --border: 22 14% 30%;
+  --input: 22 14% 28%;
+  --ring: 18 88% 60%;
+}
+
+@layer base {
+  html {
+    min-height: 100%;
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  #root {
+    min-height: 100vh;
+  }
+
+  body {
+    @apply bg-background text-foreground antialiased;
+    min-height: 100vh;
+    margin: 0;
+    font-family: 'Manrope', 'Avenir Next', 'Segoe UI', sans-serif;
+    text-rendering: optimizeLegibility;
+    background-attachment: fixed;
+    background:
+      radial-gradient(circle at 10% 0%, hsl(var(--primary) / 0.18), transparent 22%),
+      radial-gradient(circle at 92% 4%, hsl(var(--accent) / 0.16), transparent 24%),
+      radial-gradient(circle at 18% 100%, hsl(var(--secondary) / 0.28), transparent 28%),
+      radial-gradient(circle at 84% 82%, hsl(var(--primary) / 0.08), transparent 30%),
+      radial-gradient(circle at 50% 34%, hsl(0 0% 100% / 0.55), transparent 32%),
+      linear-gradient(
+        180deg,
+        hsl(var(--canvas)) 0%,
+        hsl(31 84% 95%) 16%,
+        hsl(31 64% 93%) 54%,
+        hsl(30 48% 90%) 100%
+      );
+  }
+
+  ::selection {
+    background: hsl(var(--accent) / 0.35);
+    color: hsl(var(--foreground));
+  }
+}
+
+@layer utilities {
+  .animate-surface-in {
+    animation: surface-in 420ms cubic-bezier(0.18, 0.88, 0.32, 1) both;
+  }
+}
+
+@keyframes surface-in {
+  from {
+    opacity: 0;
+    transform: translateY(18px) scale(0.985);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}

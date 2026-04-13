@@ -1,0 +1,47 @@
+export {
+  clearAuthSession,
+  getAuthHeaders,
+  hydrateSession,
+  loadAuthSession,
+  parseAuthHeaders,
+  saveAuthSession,
+} from './auth-storage';
+export {
+  AccessGate,
+  PermissionGate,
+  RoleGate,
+  evaluateRbacAccess,
+  useRbac,
+  type RbacAccessCheck,
+  type RbacContext,
+} from './rbac';
+export {
+  buildCrudPermission,
+  canAccessDashboard,
+  canAccessModule,
+  canAccessModuleAnalytics,
+  canAccessModuleKey,
+  canAccessRoleManagement,
+  canCreateCrudResource,
+  canCreateDepartmentsGlobally,
+  canCreateRoles,
+  canDeleteCrudResource,
+  canDeleteDepartmentsGlobally,
+  canDeleteRoles,
+  canEditCrudResource,
+  canReadAuditLogs,
+  canReadCrudResource,
+  canReadDepartmentsDirectory,
+  canEditRoles,
+  canReadEmployeesForRoleManagement,
+  canWriteEmployeesForRoleManagement,
+  canWriteDepartmentsGlobally,
+  getAccessibleModuleResources,
+  getFirstAccessibleModuleKey,
+  hasAllPermissionCodes,
+  hasAnyPermissionCode,
+  hasPermissionCode,
+  hasPrivilegedAccessRole,
+} from './access';
+export { useAuthStore } from './auth-store';
+export type { AuthCredentials, AuthSession, AuthState } from './types';

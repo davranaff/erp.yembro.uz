@@ -1,0 +1,79 @@
+from __future__ import annotations
+
+from datetime import date
+from decimal import Decimal
+from uuid import UUID
+
+from sqlalchemy import Boolean, CheckConstraint, Date, ForeignKey, Integer, Numeric, String, Text, UniqueConstraint
+from sqlalchemy.ext.hybrid import hybrid_property
+from sqlalchemy.orm import Mapped, mapped_column, relationship
+
+from ..base import Base, IDMixin, TimestampMixin
+
+
+class SlaughterArrival(Base, IDMixin, TimestampMixin):
+    __tablename__ = "slaughter_arrivals"
+
+    organization_id: Mapped[UUID] = mapped_column(
+        ForeignKey("organizations.id", ondelete="RESTRICT"),
+        nullable=False,
+        index=True,
+    )
+    department_id: Mapped[UUID] = mapped_column(
+        ForeignKey("departments.id", ondelete="RESTRICT"),
+        nullable=False,
+        index=True,
+    )
+    poultry_type_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("poultry_types.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    supplier_client_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("clients.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    chick_arrival_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("chick_arrivals.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    arrived_on: Mapped[date] = mapped_column(Date, nullable=False, index=True)
+    birds_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    average_weight_kg: Mapped[Decimal | None] = mapped_column(Numeric(8, 3), nullable=True)
+    unit_price: Mapped[Decimal | None] = mapped_column(Numeric(14, 2), nullable=True)
+    currency: Mapped[str] = mapped_column(String(8), nullable=False)
+    invoice_no: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default="true")
+    note: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    organization: Mapped["Organization"] = relationship("Organization", back_populates="slaughter_arrivals")
+    department: Mapped["Department"] = relationship("Department", back_populates="slaughter_arrivals")
+    poultry_type: Mapped["PoultryType | None"] = relationship("PoultryType", back_populates="slaughter_arrivals")
+    supplier_client: Mapped["Client | None"] = relationship("Client", back_populates="slaughter_arrivals")
+    chick_arrival: Mapped["ChickArrival | None"] = relationship("ChickArrival")
+    processings: Mapped[list["SlaughterProcessing"]] = relationship(
+        "SlaughterProcessing",
+        back_populates="arrival",
+        lazy="selectin",
+    )
+
+    __table_args__ = (
+        UniqueConstraint(
+            "organization_id",
+            "arrived_on",
+            "supplier_client_id",
+            "invoice_no",
+            name="uq_slaughter_arrival_invoice",
+        ),
+        CheckConstraint("birds_count >= 0", name="ck_slaughter_arrival_birds_count_non_negative"),
+        CheckConstraint("average_weight_kg IS NULL OR average_weight_kg >= 0", name="ck_slaughter_arrival_avg_weight_non_negative"),
+        CheckConstraint("unit_price IS NULL OR unit_price >= 0", name="ck_slaughter_arrival_unit_price_non_negative"),
+    )
+
+    @hybrid_property
+    def estimated_total_weight(self) -> Decimal:
+        if self.average_weight_kg is None:
+            return Decimal(0)
+        return self.average_weight_kg * self.birds_count
