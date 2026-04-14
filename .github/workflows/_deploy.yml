@@ -81,10 +81,98 @@ jobs:
           echo "sha_tag=sha-${GITHUB_SHA}" >> "${GITHUB_OUTPUT}"
           echo "alias_tag=${{ inputs.image_alias }}" >> "${GITHUB_OUTPUT}"
 
+      - name: Validate deploy configuration
+        id: deploy_config
+        env:
+          REGISTRY_HOST: ${{ vars.REGISTRY_HOST }}
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_PORT: ${{ secrets.DEPLOY_PORT }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+        run: |
+          set -Eeuo pipefail
+
+          sanitize_single_line() {
+            printf '%s' "$1" \
+              | tr -d '\r\n' \
+              | sed 's/^[[:space:]]*//; s/[[:space:]]*$//'
+          }
+
+          require_raw_value() {
+            local value="$1"
+            local name="$2"
+
+            if [[ -z "${value}" ]]; then
+              echo "${name} must be configured" >&2
+              exit 1
+            fi
+
+            if [[ "${value}" == "${name}="* ]]; then
+              echo "${name} must contain only the raw value, not '${name}=...'" >&2
+              exit 1
+            fi
+          }
+
+          registry_host="$(sanitize_single_line "${REGISTRY_HOST}")"
+          deploy_host="$(sanitize_single_line "${DEPLOY_HOST}")"
+          deploy_port="$(sanitize_single_line "${DEPLOY_PORT}")"
+          deploy_user="$(sanitize_single_line "${DEPLOY_USER}")"
+
+          require_raw_value "${registry_host}" "REGISTRY_HOST"
+          require_raw_value "${deploy_host}" "DEPLOY_HOST"
+          require_raw_value "${deploy_port}" "DEPLOY_PORT"
+          require_raw_value "${deploy_user}" "DEPLOY_USER"
+
+          if [[ "${registry_host}" =~ [[:space:]] || ! "${registry_host}" =~ ^[a-z0-9.-]+$ ]]; then
+            echo "REGISTRY_HOST must be a plain hostname like 'registry.example.com'" >&2
+            exit 1
+          fi
+
+          if [[ "${deploy_host}" =~ [[:space:]] || ! "${deploy_host}" =~ ^[a-zA-Z0-9.-]+$ ]]; then
+            echo "DEPLOY_HOST must be a plain hostname or IP like '173.249.24.241', without protocol or extra text" >&2
+            exit 1
+          fi
+
+          if [[ ! "${deploy_port}" =~ ^[0-9]+$ ]]; then
+            echo "DEPLOY_PORT must be numeric, for example '22'" >&2
+            exit 1
+          fi
+
+          if [[ "${deploy_user}" =~ [[:space:]] || ! "${deploy_user}" =~ ^[a-z_][a-z0-9_-]*$ ]]; then
+            echo "DEPLOY_USER must be a plain SSH username like 'deploy'" >&2
+            exit 1
+          fi
+
+          known_hosts="$(
+            printf '%s\n' "${DEPLOY_KNOWN_HOSTS}" \
+              | tr -d '\r' \
+              | sed '/^[[:space:]]*#/d; /^[[:space:]]*$/d'
+          )"
+
+          if [[ -z "${known_hosts}" ]]; then
+            echo "DEPLOY_KNOWN_HOSTS must contain one or more ssh-keyscan lines" >&2
+            exit 1
+          fi
+
+          if grep -q '^DEPLOY_KNOWN_HOSTS=' <<<"${known_hosts}"; then
+            echo "DEPLOY_KNOWN_HOSTS must contain only known_hosts lines, not 'DEPLOY_KNOWN_HOSTS=...'" >&2
+            exit 1
+          fi
+
+          echo "registry_host=${registry_host}" >> "${GITHUB_OUTPUT}"
+          echo "deploy_host=${deploy_host}" >> "${GITHUB_OUTPUT}"
+          echo "deploy_port=${deploy_port}" >> "${GITHUB_OUTPUT}"
+          echo "deploy_user=${deploy_user}" >> "${GITHUB_OUTPUT}"
+          {
+            echo "known_hosts<<EOF"
+            printf '%s\n' "${known_hosts}"
+            echo "EOF"
+          } >> "${GITHUB_OUTPUT}"
+
       - name: Log in to container registry
         uses: docker/login-action@v3
         with:
-          registry: ${{ vars.REGISTRY_HOST }}
+          registry: ${{ steps.deploy_config.outputs.registry_host }}
           username: ${{ secrets.REGISTRY_USERNAME }}
           password: ${{ secrets.REGISTRY_PASSWORD }}
 
@@ -124,7 +212,7 @@ jobs:
 
       - name: Configure known hosts
         env:
-          DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+          DEPLOY_KNOWN_HOSTS: ${{ steps.deploy_config.outputs.known_hosts }}
         run: |
           set -Eeuo pipefail
           mkdir -p ~/.ssh
@@ -134,9 +222,9 @@ jobs:
 
       - name: Sync deployment assets to server
         env:
-          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
-          DEPLOY_PORT: ${{ secrets.DEPLOY_PORT }}
-          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          DEPLOY_HOST: ${{ steps.deploy_config.outputs.deploy_host }}
+          DEPLOY_PORT: ${{ steps.deploy_config.outputs.deploy_port }}
+          DEPLOY_USER: ${{ steps.deploy_config.outputs.deploy_user }}
         run: |
           set -Eeuo pipefail
           port="${DEPLOY_PORT:-22}"
@@ -180,10 +268,10 @@ jobs:
 
       - name: Deploy on remote server
         env:
-          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
-          DEPLOY_PORT: ${{ secrets.DEPLOY_PORT }}
-          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
-          REGISTRY_HOST: ${{ vars.REGISTRY_HOST }}
+          DEPLOY_HOST: ${{ steps.deploy_config.outputs.deploy_host }}
+          DEPLOY_PORT: ${{ steps.deploy_config.outputs.deploy_port }}
+          DEPLOY_USER: ${{ steps.deploy_config.outputs.deploy_user }}
+          REGISTRY_HOST: ${{ steps.deploy_config.outputs.registry_host }}
           REGISTRY_USERNAME: ${{ secrets.REGISTRY_USERNAME }}
           REGISTRY_PASSWORD: ${{ secrets.REGISTRY_PASSWORD }}
           BACKEND_IMAGE: ${{ steps.meta.outputs.backend_image }}:${{ steps.meta.outputs.sha_tag }}
