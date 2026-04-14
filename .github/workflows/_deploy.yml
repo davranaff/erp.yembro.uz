@@ -41,12 +41,41 @@ jobs:
           REGISTRY_FRONTEND_REPO: ${{ vars.REGISTRY_FRONTEND_REPO }}
         run: |
           set -Eeuo pipefail
-          backend_repo="${REGISTRY_BACKEND_REPO,,}"
-          frontend_repo="${REGISTRY_FRONTEND_REPO,,}"
+          sanitize_repo() {
+            printf '%s' "$1" \
+              | tr '[:upper:]' '[:lower:]' \
+              | tr -d '\r\n' \
+              | sed 's/^[[:space:]]*//; s/[[:space:]]*$//'
+          }
+
+          validate_repo() {
+            local value="$1"
+            local name="$2"
+
+            if [[ -z "${value}" ]]; then
+              echo "${name} GitHub variable must not be empty" >&2
+              exit 1
+            fi
+
+            if [[ "${value}" =~ [[:space:]] ]]; then
+              echo "${name} must not contain whitespace: '${value}'" >&2
+              exit 1
+            fi
+
+            if [[ ! "${value}" =~ ^[a-z0-9._/-]+$ ]]; then
+              echo "${name} has invalid format: '${value}'" >&2
+              exit 1
+            fi
+          }
+
+          backend_repo="$(sanitize_repo "${REGISTRY_BACKEND_REPO}")"
+          frontend_repo="$(sanitize_repo "${REGISTRY_FRONTEND_REPO}")"
           if [[ -z "${backend_repo}" || -z "${frontend_repo}" ]]; then
             echo "REGISTRY_BACKEND_REPO and REGISTRY_FRONTEND_REPO GitHub vars must be configured" >&2
             exit 1
           fi
+          validate_repo "${backend_repo}" "REGISTRY_BACKEND_REPO"
+          validate_repo "${frontend_repo}" "REGISTRY_FRONTEND_REPO"
           echo "backend_image=${backend_repo}" >> "${GITHUB_OUTPUT}"
           echo "frontend_image=${frontend_repo}" >> "${GITHUB_OUTPUT}"
           echo "sha_tag=sha-${GITHUB_SHA}" >> "${GITHUB_OUTPUT}"
