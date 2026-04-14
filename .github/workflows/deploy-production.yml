@@ -3,14 +3,19 @@ name: Deploy Production
 on:
   push:
     branches:
-      - main
+      - production
   workflow_dispatch:
 
 jobs:
+  tests:
+    uses: ./.github/workflows/_test.yml
+
   deploy:
+    needs: tests
     uses: ./.github/workflows/_deploy.yml
     with:
       environment_name: production
       deploy_path: /opt/yembro/prod
       image_alias: production
+      frontend_api_base_url: /api/v1
     secrets: inherit

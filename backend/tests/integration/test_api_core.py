@@ -53,7 +53,8 @@ async def test_workspace_modules_metadata_endpoint_returns_seeded_modules(api_cl
     payload = extract_data(response)
     module_map = {item["key"]: item for item in payload["items"]}
 
-    assert {"core", "egg", "finance", "hr"} <= set(module_map)
+    assert {"core", "egg", "feed", "hr"} <= set(module_map)
+    assert "finance" not in module_map
     assert bool(module_map["core"]["is_department_assignable"]) is False
     assert module_map["egg"]["analytics_section_key"] == "egg_farm"
     assert any(
@@ -67,31 +68,16 @@ async def test_workspace_modules_metadata_endpoint_returns_seeded_modules(api_cl
     assert "warehouses" in egg_resources
     assert str(egg_resources["warehouses"].get("api_module_key") or "").strip().lower() == "core"
     assert str(egg_resources["warehouses"].get("permission_prefix") or "").strip().lower() == "warehouse"
-    assert not any(
-        str(resource.get("api_module_key") or "").strip().lower() == "finance"
-        for resource in module_map["egg"]["resources"]
-    )
-    finance_resource_keys = {
-        str(resource.get("key") or "").strip().lower()
-        for resource in module_map["finance"]["resources"]
-    }
-    assert {"cash-transactions", "expenses", "client-debts", "currencies"} <= finance_resource_keys
-
     feed_resource_keys = {
         str(resource.get("key") or "").strip().lower()
         for resource in module_map["feed"]["resources"]
     }
     assert "warehouses" in feed_resource_keys
-    assert "client-debts" not in {
-        str(resource.get("key") or "").strip().lower()
-        for resource in module_map["egg"]["resources"]
-    }
     core_resource_keys = {
         str(resource.get("key") or "").strip().lower()
         for resource in module_map["core"]["resources"]
     }
-    assert "client-debts" not in core_resource_keys
-    assert "currencies" not in core_resource_keys
+    assert {"client-debts", "currencies", "warehouses"} <= core_resource_keys
 
 
 @pytest.mark.asyncio

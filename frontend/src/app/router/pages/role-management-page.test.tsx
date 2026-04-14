@@ -244,7 +244,9 @@ describe('RoleManagementPage', () => {
     renderPage();
 
     expect(screen.queryByRole('button', { name: /сохранить/i })).not.toBeInTheDocument();
-    expect(screen.getByText('Роль не выбрана')).toBeInTheDocument();
+    expect(
+      screen.getByText('Выберите роль слева, чтобы посмотреть детали, или создайте новую роль.'),
+    ).toBeInTheDocument();
   });
 
   it('shows loading state for employee assignments instead of empty state while employees are loading', async () => {

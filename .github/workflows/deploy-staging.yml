@@ -3,14 +3,19 @@ name: Deploy Staging
 on:
   push:
     branches:
-      - staging
+      - main
   workflow_dispatch:
 
 jobs:
+  tests:
+    uses: ./.github/workflows/_test.yml
+
   deploy:
+    needs: tests
     uses: ./.github/workflows/_deploy.yml
     with:
       environment_name: staging
       deploy_path: /opt/yembro/staging
       image_alias: staging
+      frontend_api_base_url: /api/v1
     secrets: inherit

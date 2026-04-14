@@ -11,6 +11,9 @@ mkdir -p \
   "${BASE_DIR}/staging/deploy" \
   "${BASE_DIR}/edge" \
   "${BASE_DIR}/edge/deploy/caddy" \
+  "${BASE_DIR}/registry" \
+  "${BASE_DIR}/registry/auth" \
+  "${BASE_DIR}/registry/data" \
   "${BASE_DIR}/backups/prod" \
   "${BASE_DIR}/backups/staging"
 

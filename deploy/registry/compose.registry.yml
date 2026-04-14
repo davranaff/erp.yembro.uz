@@ -1,0 +1,22 @@
+services:
+  registry:
+    image: registry:3
+    restart: unless-stopped
+    environment:
+      REGISTRY_HTTP_ADDR: 0.0.0.0:5000
+      REGISTRY_AUTH: htpasswd
+      REGISTRY_AUTH_HTPASSWD_REALM: Registry Realm
+      REGISTRY_AUTH_HTPASSWD_PATH: /auth/htpasswd
+      REGISTRY_STORAGE_DELETE_ENABLED: "true"
+    volumes:
+      - ./data:/var/lib/registry
+      - ./auth:/auth:ro
+    networks:
+      public:
+        aliases:
+          - docker-registry
+
+networks:
+  public:
+    external: true
+    name: ${REGISTRY_PUBLIC_NETWORK_NAME:-yembro_registry_public}
