@@ -18,4 +18,5 @@ jobs:
       deploy_path: /opt/yembro/staging
       image_alias: staging
       frontend_api_base_url: /api/v1
+      public_base_url: https://staging.erp.yembro.uz
     secrets: inherit
