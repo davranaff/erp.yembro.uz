@@ -80,14 +80,21 @@ const FINANCE_CHART_PATTERN = /(finance_overview|expense_categories)$/i;
 const EFFICIENCY_CHART_PATTERN = /(loss|quality|yield|rate|stock|expiry|consumption)/i;
 
 const FINANCE_BREAKDOWN_PATTERN = /(expense_categories_table|cash_accounts|recent_expenses)$/i;
-const STRATEGIC_BREAKDOWN_PATTERN = /(client|clients|product|products|parts|mix|formula|supplier|top)/i;
+const STRATEGIC_BREAKDOWN_PATTERN =
+  /(client|clients|product|products|parts|mix|formula|supplier|top)/i;
 const RISK_BREAKDOWN_PATTERN = /(low|expiry|critical|active)/i;
 const RECENT_BREAKDOWN_PATTERN = /(recent|latest|dispatch|shipment|arrival|transfer|batch)/i;
 const MODULE_SUMMARY_METRIC_LIMIT = 5;
 
 const MODULE_ANALYTICS_BLUEPRINTS: Record<string, ModuleAnalyticsBlueprint> = {
   egg_farm: {
-    summaryMetricKeys: ['net_eggs', 'loss_rate', 'egg_revenue', 'financial_result', 'active_alerts'],
+    summaryMetricKeys: [
+      'net_eggs',
+      'loss_rate',
+      'egg_revenue',
+      'financial_result',
+      'active_alerts',
+    ],
     sections: [
       {
         id: 'overview',
@@ -122,7 +129,13 @@ const MODULE_ANALYTICS_BLUEPRINTS: Record<string, ModuleAnalyticsBlueprint> = {
     ],
   },
   incubation: {
-    summaryMetricKeys: ['chicks_hatched', 'hatch_rate', 'sales_revenue', 'financial_result', 'active_alerts'],
+    summaryMetricKeys: [
+      'chicks_hatched',
+      'hatch_rate',
+      'sales_revenue',
+      'financial_result',
+      'active_alerts',
+    ],
     sections: [
       {
         id: 'overview',
@@ -157,7 +170,13 @@ const MODULE_ANALYTICS_BLUEPRINTS: Record<string, ModuleAnalyticsBlueprint> = {
     ],
   },
   factory: {
-    summaryMetricKeys: ['chicks_stock', 'sent_to_slaughter', 'critical_stock_items', 'financial_result', 'active_alerts'],
+    summaryMetricKeys: [
+      'chicks_stock',
+      'sent_to_slaughter',
+      'critical_stock_items',
+      'financial_result',
+      'active_alerts',
+    ],
     sections: [
       {
         id: 'overview',
@@ -192,7 +211,13 @@ const MODULE_ANALYTICS_BLUEPRINTS: Record<string, ModuleAnalyticsBlueprint> = {
     ],
   },
   feed_mill: {
-    summaryMetricKeys: ['product_output', 'shipment_rate', 'sales_revenue', 'financial_result', 'active_alerts'],
+    summaryMetricKeys: [
+      'product_output',
+      'shipment_rate',
+      'sales_revenue',
+      'financial_result',
+      'active_alerts',
+    ],
     sections: [
       {
         id: 'overview',
@@ -227,7 +252,13 @@ const MODULE_ANALYTICS_BLUEPRINTS: Record<string, ModuleAnalyticsBlueprint> = {
     ],
   },
   vet_pharmacy: {
-    summaryMetricKeys: ['current_stock', 'expired_batches', 'turnover_rate', 'financial_result', 'active_alerts'],
+    summaryMetricKeys: [
+      'current_stock',
+      'expired_batches',
+      'turnover_rate',
+      'financial_result',
+      'active_alerts',
+    ],
     sections: [
       {
         id: 'overview',
@@ -254,7 +285,8 @@ const MODULE_ANALYTICS_BLUEPRINTS: Record<string, ModuleAnalyticsBlueprint> = {
         titleKey: 'dashboard.moduleEfficiencyTitle',
         titleFallback: 'Риски и эффективность',
         descriptionKey: 'dashboard.moduleEfficiencyDescription',
-        descriptionFallback: '{module}: сроки годности, оборачиваемость и проблемные сигналы склада.',
+        descriptionFallback:
+          '{module}: сроки годности, оборачиваемость и проблемные сигналы склада.',
         metricKeys: ['expired_batches', 'expiring_batches', 'turnover_rate'],
         chartKeys: ['medicine_expiry', 'medicine_turnover_rate'],
         breakdownKeys: ['module_alerts'],
@@ -262,7 +294,13 @@ const MODULE_ANALYTICS_BLUEPRINTS: Record<string, ModuleAnalyticsBlueprint> = {
     ],
   },
   slaughterhouse: {
-    summaryMetricKeys: ['birds_processed', 'process_rate', 'shipment_revenue', 'financial_result', 'active_alerts'],
+    summaryMetricKeys: [
+      'birds_processed',
+      'process_rate',
+      'shipment_revenue',
+      'financial_result',
+      'active_alerts',
+    ],
     sections: [
       {
         id: 'overview',
@@ -331,7 +369,10 @@ function hasSectionData(section: DashboardSection) {
   );
 }
 
-function buildAlertMetric(alerts: DashboardAlert[] | undefined, t: TranslateFn): DashboardMetric | null {
+function buildAlertMetric(
+  alerts: DashboardAlert[] | undefined,
+  t: TranslateFn,
+): DashboardMetric | null {
   if (!alerts || alerts.length === 0) {
     return null;
   }
@@ -371,7 +412,10 @@ function pickMetricsByKeys(
   return result;
 }
 
-function pickChartsByKeys(chartsByKey: Map<string, DashboardChart>, keys: string[]): DashboardChart[] {
+function pickChartsByKeys(
+  chartsByKey: Map<string, DashboardChart>,
+  keys: string[],
+): DashboardChart[] {
   const result: DashboardChart[] = [];
   const seen = new Set<string>();
 
@@ -435,7 +479,9 @@ function pickMetricByKeys(
 
 function buildSummaryMetrics(module: DashboardModuleDashboard, t: TranslateFn): DashboardMetric[] {
   const syntheticAlertMetric = buildAlertMetric(module.alerts, t);
-  const allMetrics = syntheticAlertMetric ? [...module.kpis, syntheticAlertMetric] : [...module.kpis];
+  const allMetrics = syntheticAlertMetric
+    ? [...module.kpis, syntheticAlertMetric]
+    : [...module.kpis];
   const metricsByKey = new Map(allMetrics.map((metric) => [metric.key, metric] as const));
   const selectedKeys = new Set<string>();
   const summary: DashboardMetric[] = [];
@@ -462,7 +508,10 @@ function buildSummaryMetrics(module: DashboardModuleDashboard, t: TranslateFn): 
   return summary.slice(0, MODULE_SUMMARY_METRIC_LIMIT);
 }
 
-function buildAlertsBreakdown(alerts: DashboardAlert[] | undefined, t: TranslateFn): DashboardBreakdown | null {
+function buildAlertsBreakdown(
+  alerts: DashboardAlert[] | undefined,
+  t: TranslateFn,
+): DashboardBreakdown | null {
   if (!alerts || alerts.length === 0) {
     return null;
   }
@@ -491,8 +540,10 @@ function pickBreakdown(
   excludedKeys: Set<string>,
 ) {
   return (
-    breakdowns.find((breakdown) => hasBreakdownData(breakdown) && !excludedKeys.has(breakdown.key) && predicate(breakdown)) ??
-    null
+    breakdowns.find(
+      (breakdown) =>
+        hasBreakdownData(breakdown) && !excludedKeys.has(breakdown.key) && predicate(breakdown),
+    ) ?? null
   );
 }
 
@@ -502,8 +553,9 @@ function pickChart(
   excludedKeys: Set<string>,
 ) {
   return (
-    charts.find((chart) => hasChartData(chart) && !excludedKeys.has(chart.key) && predicate(chart)) ??
-    null
+    charts.find(
+      (chart) => hasChartData(chart) && !excludedKeys.has(chart.key) && predicate(chart),
+    ) ?? null
   );
 }
 
@@ -555,10 +607,14 @@ export function buildModuleAnalyticsPresentation(
   sections: AnalyticsSectionDescriptor[];
 } {
   const syntheticAlertMetric = buildAlertMetric(module.alerts, t);
-  const allMetrics = syntheticAlertMetric ? [...module.kpis, syntheticAlertMetric] : [...module.kpis];
+  const allMetrics = syntheticAlertMetric
+    ? [...module.kpis, syntheticAlertMetric]
+    : [...module.kpis];
   const metricsByKey = new Map(allMetrics.map((metric) => [metric.key, metric] as const));
   const alertsBreakdown = buildAlertsBreakdown(module.alerts, t);
-  const blueprint = MODULE_ANALYTICS_BLUEPRINTS[module.key];
+  const blueprint = Object.prototype.hasOwnProperty.call(MODULE_ANALYTICS_BLUEPRINTS, module.key)
+    ? MODULE_ANALYTICS_BLUEPRINTS[module.key]
+    : null;
 
   if (blueprint) {
     const chartsByKey = new Map(
@@ -603,7 +659,8 @@ export function buildModuleAnalyticsPresentation(
   const usedChartKeys = new Set<string>();
   const usedBreakdownKeys = new Set<string>();
   const financeCharts = module.charts.filter(
-    (chart) => hasChartData(chart) && !usedChartKeys.has(chart.key) && FINANCE_CHART_PATTERN.test(chart.key),
+    (chart) =>
+      hasChartData(chart) && !usedChartKeys.has(chart.key) && FINANCE_CHART_PATTERN.test(chart.key),
   );
   financeCharts.forEach((chart) => usedChartKeys.add(chart.key));
   const financeBreakdowns = module.tables.filter(
@@ -685,7 +742,7 @@ export function buildModuleAnalyticsPresentation(
           'dashboard.moduleOverviewDescription',
           { module: moduleLabel },
           `${moduleLabel}: самые важные показатели и текущая динамика.`,
-      ),
+        ),
       summaryMetrics.slice(0, 3),
       [headlineChart],
       [strategicBreakdown],
@@ -710,7 +767,10 @@ export function buildModuleAnalyticsPresentation(
         { module: moduleLabel },
         `${moduleLabel}: где есть отклонения и что требует реакции.`,
       ),
-      dedupeByKey([...summaryMetrics.filter((metric) => RISK_KEYS.includes(metric.key)), ...efficiencyMetrics]),
+      dedupeByKey([
+        ...summaryMetrics.filter((metric) => RISK_KEYS.includes(metric.key)),
+        ...efficiencyMetrics,
+      ]),
       [efficiencyChart],
       [alertsBreakdown, riskBreakdown],
     ),

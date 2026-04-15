@@ -58,7 +58,15 @@ export type CrudFieldReference = {
   multiple?: boolean;
 };
 
-export type CrudFieldType = 'string' | 'uuid' | 'integer' | 'number' | 'boolean' | 'date' | 'datetime' | 'json';
+export type CrudFieldType =
+  | 'string'
+  | 'uuid'
+  | 'integer'
+  | 'number'
+  | 'boolean'
+  | 'date'
+  | 'datetime'
+  | 'json';
 
 export type CrudFieldMeta = {
   name: string;
@@ -259,7 +267,10 @@ export const updateCrudRecord = (
   recordId: string,
   payload: CrudRecord,
 ) => {
-  return apiClient.put<CrudRecord, CrudRecord>(`/${moduleKey}/${resourcePath}/${recordId}`, payload);
+  return apiClient.put<CrudRecord, CrudRecord>(
+    `/${moduleKey}/${resourcePath}/${recordId}`,
+    payload,
+  );
 };
 
 export const deleteCrudRecord = (moduleKey: string, resourcePath: string, recordId: string) => {
@@ -304,9 +315,7 @@ export const sendClientNotification = (
   );
 };
 
-export const sendBulkClientNotifications = (
-  payload: ClientNotificationBulkPayload,
-) => {
+export const sendBulkClientNotifications = (payload: ClientNotificationBulkPayload) => {
   return apiClient.post<ClientNotificationBulkResult, Record<string, unknown>>(
     '/core/clients/notify/bulk',
     {

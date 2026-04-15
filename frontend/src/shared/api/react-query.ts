@@ -169,10 +169,7 @@ type ApiMutationOptions<
   TError extends RetryableError,
   TVariables,
   TContext = unknown,
-> = Omit<
-  UseMutationOptions<TData, TError, TVariables, TContext>,
-  'mutationKey' | 'mutationFn'
-> & {
+> = Omit<UseMutationOptions<TData, TError, TVariables, TContext>, 'mutationKey' | 'mutationFn'> & {
   mutationKey: MutationKey;
   mutationFn: MutationFunction<TData, TVariables>;
 };

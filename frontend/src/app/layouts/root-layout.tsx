@@ -46,8 +46,7 @@ export function RootLayout({ children }: RootLayoutProps) {
         aria-hidden="true"
         className="pointer-events-none absolute inset-x-0 top-0 h-56"
         style={{
-          background:
-            'linear-gradient(180deg, hsl(0 0% 100% / 0.52), hsl(0 0% 100% / 0))',
+          background: 'linear-gradient(180deg, hsl(0 0% 100% / 0.52), hsl(0 0% 100% / 0))',
         }}
       />
       <main className="relative min-h-screen w-full">

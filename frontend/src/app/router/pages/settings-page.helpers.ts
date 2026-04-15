@@ -278,7 +278,10 @@ export const canCreateSubdepartmentForAccess = (
 
 export const canDeleteDepartmentRecordAccess = (
   departmentId: string,
-  scope: Pick<DepartmentRbacScope, 'canDeleteAnyDepartment' | 'managedDepartmentIds' | 'headedDepartmentIds'>,
+  scope: Pick<
+    DepartmentRbacScope,
+    'canDeleteAnyDepartment' | 'managedDepartmentIds' | 'headedDepartmentIds'
+  >,
 ): boolean => {
   if (!departmentId) {
     return false;
@@ -289,8 +292,7 @@ export const canDeleteDepartmentRecordAccess = (
   }
 
   return (
-    scope.managedDepartmentIds.has(departmentId) &&
-    !scope.headedDepartmentIds.has(departmentId)
+    scope.managedDepartmentIds.has(departmentId) && !scope.headedDepartmentIds.has(departmentId)
   );
 };
 

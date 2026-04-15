@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
 
-import type { DepartmentFormState, DepartmentRecord, DepartmentRbacScope } from './settings-page.helpers';
 import {
   canCreateSubdepartmentForAccess,
   canDeleteDepartmentByIdAccess,
@@ -8,6 +7,9 @@ import {
   canManageDepartmentRecordAccess,
   canSaveDepartmentDraftAccess,
   defaultDepartmentForm,
+  type DepartmentFormState,
+  type DepartmentRbacScope,
+  type DepartmentRecord,
 } from './settings-page.helpers';
 
 const buildScope = (overrides?: Partial<DepartmentRbacScope>): DepartmentRbacScope => ({
@@ -42,10 +44,7 @@ describe('settings RBAC helpers', () => {
     expect(canDeleteDepartmentRecordAccess('dept-managed', scope)).toBe(false);
     expect(canDeleteDepartmentRecordAccess('dept-child', scope)).toBe(true);
     expect(
-      canDeleteDepartmentRecordAccess(
-        'dept-managed',
-        buildScope({ canDeleteAnyDepartment: true }),
-      ),
+      canDeleteDepartmentRecordAccess('dept-managed', buildScope({ canDeleteAnyDepartment: true })),
     ).toBe(true);
   });
 

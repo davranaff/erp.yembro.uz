@@ -47,8 +47,9 @@ const contentSizeClassNames: Record<CrudDrawerSize, string> = {
 };
 
 const contentBaseClassName =
-  'border-primary/16 w-full gap-0 border-l p-0 shadow-[0_32px_120px_-56px_rgba(15,23,42,0.28)]';
-const bodyBaseClassName = 'flex-1 space-y-5 overflow-y-auto bg-background px-6 py-5';
+  'border-primary/16 w-full min-h-0 gap-0 border-l p-0 shadow-[0_32px_120px_-56px_rgba(15,23,42,0.28)]';
+const bodyBaseClassName =
+  'min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain bg-background px-4 py-4 sm:space-y-5 sm:px-6 sm:py-5';
 const closeButtonBaseClassName =
   'bg-card border-border/75 shadow-[0_16px_38px_-28px_rgba(15,23,42,0.1)]';
 
@@ -75,8 +76,8 @@ export function CrudDrawer({
       data-tour={dataTour}
       className={cn(contentBaseClassName, contentSizeClassNames[size], className)}
     >
-      <SheetHeader className={cn('gap-2 px-6 py-5', headerClassName)}>
-        <SheetTitle className={cn('text-2xl tracking-[-0.04em]', titleClassName)}>
+      <SheetHeader className={cn('gap-2 px-4 py-4 sm:px-6 sm:py-5', headerClassName)}>
+        <SheetTitle className={cn('text-xl tracking-[-0.04em] sm:text-2xl', titleClassName)}>
           {title}
         </SheetTitle>
         {description ? (
@@ -87,7 +88,7 @@ export function CrudDrawer({
       </SheetHeader>
 
       {formProps ? (
-        <form {...formProps} className={cn('flex flex-1 flex-col', formProps.className)}>
+        <form {...formProps} className={cn('flex min-h-0 flex-1 flex-col', formProps.className)}>
           {body}
           {footer}
         </form>
@@ -116,18 +117,25 @@ export function CrudDrawerFooter({
   return (
     <SheetFooter
       className={cn(
-        'px-6 py-5 sm:flex-row sm:items-center',
+        'px-4 py-4 sm:flex-row sm:items-center sm:px-6 sm:py-5',
         resolvedAlign === 'between' ? 'sm:justify-between' : 'sm:justify-end',
         className,
       )}
     >
       {children ? (
-        <div className={cn('flex flex-wrap gap-2', actionsClassName)}>{children}</div>
+        <div
+          className={cn(
+            'flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:flex-wrap',
+            actionsClassName,
+          )}
+        >
+          {children}
+        </div>
       ) : null}
       <Button
         type="button"
         variant="outline"
-        className={cn(closeButtonBaseClassName, closeButtonClassName)}
+        className={cn(closeButtonBaseClassName, 'w-full sm:w-auto', closeButtonClassName)}
         onClick={onClose}
         disabled={closeDisabled}
       >

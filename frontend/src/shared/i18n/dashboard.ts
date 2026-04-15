@@ -1,4 +1,15 @@
-import type { DashboardAnalyticsResponse, DashboardOverviewResponse } from '@/shared/api';
+import type {
+  DashboardAlert,
+  DashboardAnalyticsResponse,
+  DashboardBreakdown,
+  DashboardBreakdownItem,
+  DashboardChart,
+  DashboardChartSeries,
+  DashboardMetric,
+  DashboardModuleDashboard,
+  DashboardOverviewResponse,
+  DashboardSeriesPoint,
+} from '@/shared/api';
 
 import type { TranslateFn } from './types';
 
@@ -81,7 +92,11 @@ function resolveGenericModuleChartText(chartKey: string, t: TranslateFn) {
 function resolveGenericModuleBreakdownText(breakdownKey: string, t: TranslateFn) {
   if (breakdownKey.endsWith('_expense_categories_table')) {
     return {
-      title: t('dashboard.moduleExpenseCategoriesTableTitle', undefined, 'Главные категории расходов'),
+      title: t(
+        'dashboard.moduleExpenseCategoriesTableTitle',
+        undefined,
+        'Главные категории расходов',
+      ),
       description: t(
         'dashboard.moduleExpenseCategoriesTableDescription',
         undefined,
@@ -256,7 +271,11 @@ function translateBreakdownCaption(
   return caption;
 }
 
-function translateModuleDashboard(module: any, t: TranslateFn, sectionPrefix: string): any {
+function translateModuleDashboard(
+  module: DashboardModuleDashboard,
+  t: TranslateFn,
+  sectionPrefix: string,
+): DashboardModuleDashboard {
   const sectionKey = module.key;
   return {
     ...module,
@@ -264,7 +283,7 @@ function translateModuleDashboard(module: any, t: TranslateFn, sectionPrefix: st
     description: module.description
       ? t(`${sectionPrefix}.${sectionKey}.description`, undefined, module.description)
       : module.description,
-    kpis: module.kpis.map((metric: any) => ({
+    kpis: module.kpis.map((metric: DashboardMetric) => ({
       ...metric,
       label: t(
         `${sectionPrefix}.${sectionKey}.metrics.${metric.key}.label`,
@@ -273,7 +292,7 @@ function translateModuleDashboard(module: any, t: TranslateFn, sectionPrefix: st
       ),
       unit: translateUnit(metric.unit, t),
     })),
-    charts: module.charts.map((chart: any) => ({
+    charts: module.charts.map((chart: DashboardChart) => ({
       ...chart,
       title:
         translateIfExists(t, `${sectionPrefix}.${sectionKey}.charts.${chart.key}.title`) ||
@@ -285,36 +304,41 @@ function translateModuleDashboard(module: any, t: TranslateFn, sectionPrefix: st
           chart.description
         : chart.description,
       unit: translateUnit(chart.unit, t),
-      series: chart.series.map((series: any) => ({
+      series: chart.series.map((series: DashboardChartSeries) => ({
         ...series,
         label:
-          translateIfExists(t, `${sectionPrefix}.${sectionKey}.charts.${chart.key}.series.${series.key}`) ||
-          translateGenericFinanceSeriesLabel(series.key, series.label, t),
-        points: series.points.map((point: any) => ({
+          translateIfExists(
+            t,
+            `${sectionPrefix}.${sectionKey}.charts.${chart.key}.series.${series.key}`,
+          ) || translateGenericFinanceSeriesLabel(series.key, series.label, t),
+        points: series.points.map((point: DashboardSeriesPoint) => ({
           ...point,
           label: translateChartPointLabel(sectionKey, chart.key, point.label, t),
         })),
       })),
     })),
-    tables: module.tables.map((table: any) => ({
+    tables: module.tables.map((table: DashboardBreakdown) => ({
       ...table,
       title:
         translateIfExists(t, `${sectionPrefix}.${sectionKey}.breakdowns.${table.key}.title`) ||
         resolveGenericModuleBreakdownText(table.key, t)?.title ||
         table.title,
       description: table.description
-        ? translateIfExists(t, `${sectionPrefix}.${sectionKey}.breakdowns.${table.key}.description`) ||
+        ? translateIfExists(
+            t,
+            `${sectionPrefix}.${sectionKey}.breakdowns.${table.key}.description`,
+          ) ||
           resolveGenericModuleBreakdownText(table.key, t)?.description ||
           table.description
         : table.description,
-      items: table.items.map((item: any) => ({
+      items: table.items.map((item: DashboardBreakdownItem) => ({
         ...item,
         unit: translateUnit(item.unit, t),
         label: translateModuleLabel(item.label, t),
         caption: translateBreakdownCaption(sectionKey, table.key, item.label, item.caption, t),
       })),
     })),
-    alerts: (module.alerts ?? []).map((alert: any) => ({
+    alerts: (module.alerts ?? []).map((alert: DashboardAlert) => ({
       ...alert,
       title:
         translateIfExists(t, `${sectionPrefix}.${sectionKey}.alerts.${alert.key}.title`) ||

@@ -1,12 +1,7 @@
-import { useEffect, useMemo, useState } from 'react';
-import { CalendarDays, RotateCcw } from 'lucide-react';
-import {
-  differenceInCalendarDays,
-  type Locale,
-  format,
-} from 'date-fns';
+import { differenceInCalendarDays, format, type Locale } from 'date-fns';
 import { enUS, ru, uz } from 'date-fns/locale';
-import type { DateRange } from 'react-day-picker';
+import { CalendarDays, RotateCcw } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
 
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Calendar } from '@/components/ui/calendar';
@@ -20,6 +15,8 @@ import {
 } from '@/components/ui/popover';
 import { useI18n } from '@/shared/i18n';
 import { cn } from '@/shared/lib/cn';
+
+import type { DateRange } from 'react-day-picker';
 
 type AnalyticsDateFilterProps = {
   startDate?: string;
@@ -189,14 +186,14 @@ export function AnalyticsDateFilter({
       </PopoverTrigger>
       <PopoverContent
         align="end"
-        className="w-[360px] rounded-[28px] border border-border/75 bg-background p-0 shadow-[0_24px_80px_-40px_rgba(15,23,42,0.18)] backdrop-blur-none"
+        className="w-[min(360px,calc(100vw-1rem))] max-w-[calc(100vw-1rem)] rounded-[28px] border border-border/75 bg-background p-0 shadow-[0_24px_80px_-40px_rgba(15,23,42,0.18)] backdrop-blur-none"
       >
         <PopoverHeader className="border-b border-border/70 px-5 py-4">
           <PopoverTitle>{t('dashboard.dateRangeTitle')}</PopoverTitle>
           <PopoverDescription>{t('dashboard.dateRangeDescription')}</PopoverDescription>
         </PopoverHeader>
         <div className="space-y-4 p-4">
-          <div className="bg-background rounded-3xl border border-border/75 px-4 py-3">
+          <div className="rounded-3xl border border-border/75 bg-background px-4 py-3">
             <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
               {t('dashboard.dateRangeTitle')}
             </p>
@@ -209,21 +206,26 @@ export function AnalyticsDateFilter({
             onSelect={setDraftRange}
             numberOfMonths={1}
             locale={dayPickerLocale}
-            className="bg-background rounded-2xl border border-border/75 p-2"
+            className="rounded-2xl border border-border/75 bg-background p-2"
           />
         </div>
-        <div className="flex items-center justify-between gap-2 border-t border-border/70 px-4 py-4">
+        <div className="flex flex-col-reverse gap-2 border-t border-border/70 px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
           <Button
             type="button"
             variant="outline"
             size="sm"
-            className="rounded-full"
+            className="w-full rounded-full sm:w-auto"
             onClick={handleReset}
           >
             <RotateCcw className="h-4 w-4" />
             {t('common.reset')}
           </Button>
-          <Button type="button" size="sm" className="rounded-full" onClick={handleApply}>
+          <Button
+            type="button"
+            size="sm"
+            className="w-full rounded-full sm:w-auto"
+            onClick={handleApply}
+          >
             {t('common.apply')}
           </Button>
         </div>

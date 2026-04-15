@@ -92,6 +92,10 @@ export const uploadMedicineBatchAttachment = (batchId: string, file: File) => {
 };
 
 export const getPublicMedicineBatch = (token: string) =>
-  apiClient.get<PublicMedicineBatch>(`/medicine/public/batches/${token}`, publicMedicineBatchSchema, {
-    skipAuth: true,
-  });
+  apiClient.get<PublicMedicineBatch>(
+    `/medicine/public/batches/${token}`,
+    publicMedicineBatchSchema,
+    {
+      skipAuth: true,
+    },
+  );

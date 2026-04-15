@@ -10,7 +10,7 @@
     "shadcn": "npx shadcn@latest",
     "shadcn:add": "npx shadcn@latest add",
     "shadcn:mcp": "npx shadcn@latest mcp init",
-    "lint": "eslint . --max-warnings 0",
+    "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "lint:ci": "eslint . --max-warnings 0 --no-ignore",
     "format": "prettier --write .",

@@ -1,6 +1,6 @@
-import { type AuthCredentials, type AuthSession } from './types';
-
 import { isValidUuid } from '@/shared/lib/uuid';
+
+import { type AuthCredentials, type AuthSession } from './types';
 
 const AUTH_SESSION_STORAGE_KEY = 'frontend:auth-session';
 
@@ -33,7 +33,8 @@ const normalizeSession = (value: Record<string, unknown>): AuthSession | null =>
 
   return {
     employeeId: value.employeeId.trim(),
-    organizationId: typeof value.organizationId === 'string' ? value.organizationId.trim() : undefined,
+    organizationId:
+      typeof value.organizationId === 'string' ? value.organizationId.trim() : undefined,
     departmentId: normalizeDepartmentId(value.departmentId),
     departmentModuleKey:
       typeof value.departmentModuleKey === 'string'
@@ -123,8 +124,7 @@ export const clearAuthSession = (): void => {
   saveAuthSession(null);
 };
 
-export const parseAuthHeaders = (): Record<string, string> =>
-  getAuthHeaders(loadAuthSession());
+export const parseAuthHeaders = (): Record<string, string> => getAuthHeaders(loadAuthSession());
 
 export const hydrateSession = (session: AuthCredentials): AuthSession => ({
   employeeId: session.employeeId.trim(),

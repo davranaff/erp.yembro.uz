@@ -3009,8 +3009,7 @@ const translationOverrides: Partial<Record<Language, Record<string, unknown>>> =
       quickRangesTitle: 'Быстрый период',
       sectionJumpTitle: 'Разделы',
       executiveDepartmentsTitle: 'Отделы',
-      executiveDepartmentsDescription:
-        'Сравнение отделов по оценке, выручке, выпуску и потерям.',
+      executiveDepartmentsDescription: 'Сравнение отделов по оценке, выручке, выпуску и потерям.',
       executiveRisksTitle: 'Риски и расходы',
       executiveRisksDescription:
         'Куда уходят деньги и какие сигналы требуют реакции в первую очередь.',
@@ -3876,11 +3875,9 @@ const translationOverrides: Partial<Record<Language, Record<string, unknown>>> =
       quickRangesTitle: 'Quick period',
       sectionJumpTitle: 'Sections',
       executiveDepartmentsTitle: 'Departments',
-      executiveDepartmentsDescription:
-        'Compare departments by score, revenue, output, and losses.',
+      executiveDepartmentsDescription: 'Compare departments by score, revenue, output, and losses.',
       executiveRisksTitle: 'Risks and spending',
-      executiveRisksDescription:
-        'See where money goes and which signals need immediate action.',
+      executiveRisksDescription: 'See where money goes and which signals need immediate action.',
       metricCategoryHealth: 'Health',
       metricCategoryFinance: 'Finance',
       metricCategoryFlow: 'Volume',
@@ -4325,11 +4322,9 @@ const supplementalTranslationOverrides: Partial<Record<Language, Record<string, 
       moduleAlertsDescription:
         'Сигналы, которые требуют внимания до следующего операционного цикла.',
       moduleOverviewTitle: 'Главное',
-      moduleOverviewDescription:
-        '{module}: самые важные показатели и текущая динамика.',
+      moduleOverviewDescription: '{module}: самые важные показатели и текущая динамика.',
       moduleFinanceTitle: 'Финансы',
-      moduleFinanceDescription:
-        '{module}: деньги отдела, расходы, касса и финансовый результат.',
+      moduleFinanceDescription: '{module}: деньги отдела, расходы, касса и финансовый результат.',
       moduleFinanceOverviewChartTitle: 'Деньги отдела',
       moduleFinanceOverviewChartDescription:
         'Выручка, расходы, финрезультат и денежный поток по дням.',
@@ -4340,23 +4335,18 @@ const supplementalTranslationOverrides: Partial<Record<Language, Record<string, 
       moduleExpenseCategoriesTableDescription:
         'Какие статьи расходов сильнее всего влияют на деньги отдела.',
       moduleCashAccountsTableTitle: 'Кассы отдела',
-      moduleCashAccountsTableDescription:
-        'Текущий баланс по кассам и счетам внутри отдела.',
+      moduleCashAccountsTableDescription: 'Текущий баланс по кассам и счетам внутри отдела.',
       moduleRecentExpensesTableTitle: 'Последние расходы',
-      moduleRecentExpensesTableDescription:
-        'Последние расходные операции за выбранный период.',
+      moduleRecentExpensesTableDescription: 'Последние расходные операции за выбранный период.',
       moduleFinancialResultNegativeTitle: 'Отдел работает в минус',
-      moduleFinancialResultNegativeMessage:
-        'Расходы оказались выше собственной выручки за период.',
+      moduleFinancialResultNegativeMessage: 'Расходы оказались выше собственной выручки за период.',
       moduleExpenseConcentrationTitle: 'Расходы сосредоточены в одной категории',
       moduleExpenseConcentrationMessage:
         'Одна категория занимает слишком большую долю расходов отдела.',
       moduleCashBalanceNegativeTitle: 'Касса ушла в минус',
-      moduleCashBalanceNegativeMessage:
-        'Баланс касс отдела стал отрицательным.',
+      moduleCashBalanceNegativeMessage: 'Баланс касс отдела стал отрицательным.',
       moduleEfficiencyTitle: 'Риски и эффективность',
-      moduleEfficiencyDescription:
-        '{module}: где есть отклонения и что требует реакции.',
+      moduleEfficiencyDescription: '{module}: где есть отклонения и что требует реакции.',
       moduleOperationsTitle: 'Детали и операции',
       moduleOperationsDescription:
         '{module}: расшифровка по клиентам, партиям и последним операциям.',
@@ -4514,7 +4504,8 @@ const supplementalTranslationOverrides: Partial<Record<Language, Record<string, 
             },
             department_contribution: {
               title: 'Общая оценка отделов',
-              description: 'Показывает, какие отделы сейчас тянут результат вверх, а какие проседают.',
+              description:
+                'Показывает, какие отделы сейчас тянут результат вверх, а какие проседают.',
               series: {
                 score: 'Оценка',
               },
@@ -4829,7 +4820,8 @@ const supplementalTranslationOverrides: Partial<Record<Language, Record<string, 
             },
             factory_medicine_arrivals_by_type: {
               title: 'Лекарства по типам',
-              description: 'Какие лекарства приходят на фабрику и по направлению птицы используются.',
+              description:
+                'Какие лекарства приходят на фабрику и по направлению птицы используются.',
             },
             factory_client_registry: {
               title: 'Активная клиентская база',
@@ -5097,7 +5089,8 @@ const supplementalTranslationOverrides: Partial<Record<Language, Record<string, 
         },
         inventoryMovementsList: {
           title: 'Harakatlar jurnali',
-          description: 'Bu yerda ombor bo‘yicha barcha kirim, chiqim va ko‘chirishlar ko‘rsatiladi.',
+          description:
+            'Bu yerda ombor bo‘yicha barcha kirim, chiqim va ko‘chirishlar ko‘rsatiladi.',
         },
       },
     },
@@ -5112,14 +5105,12 @@ const supplementalTranslationOverrides: Partial<Record<Language, Record<string, 
       moduleOverviewDescription:
         '{module}: asosiy natijalar, joriy oqim va bosh drayverlar tuzilmasi.',
       moduleFinanceTitle: 'Moliya',
-      moduleFinanceDescription:
-        '{module}: bo‘lim puli, xarajatlar, kassa va moliyaviy natija.',
+      moduleFinanceDescription: '{module}: bo‘lim puli, xarajatlar, kassa va moliyaviy natija.',
       moduleFinanceOverviewChartTitle: 'Bo‘lim puli',
       moduleFinanceOverviewChartDescription:
         'Tushum, xarajatlar, moliyaviy natija va pul oqimi kunlar bo‘yicha.',
       moduleExpenseCategoriesChartTitle: 'Pul qayerga ketmoqda',
-      moduleExpenseCategoriesChartDescription:
-        'Tanlangan davrdagi eng og‘ir xarajat toifalari.',
+      moduleExpenseCategoriesChartDescription: 'Tanlangan davrdagi eng og‘ir xarajat toifalari.',
       moduleExpenseCategoriesTableTitle: 'Asosiy xarajat toifalari',
       moduleExpenseCategoriesTableDescription:
         'Qaysi xarajat moddalari bo‘lim puliga eng ko‘p ta’sir qiladi.',
@@ -5127,8 +5118,7 @@ const supplementalTranslationOverrides: Partial<Record<Language, Record<string, 
       moduleCashAccountsTableDescription:
         'Bo‘lim ichidagi kassalar va hisoblar bo‘yicha joriy qoldiq.',
       moduleRecentExpensesTableTitle: 'So‘nggi xarajatlar',
-      moduleRecentExpensesTableDescription:
-        'Tanlangan davrdagi oxirgi xarajat operatsiyalari.',
+      moduleRecentExpensesTableDescription: 'Tanlangan davrdagi oxirgi xarajat operatsiyalari.',
       moduleFinancialResultNegativeTitle: 'Bo‘lim zarar bilan ishlamoqda',
       moduleFinancialResultNegativeMessage:
         'Davr bo‘yicha xarajatlar o‘z tushumidan yuqori bo‘lib qoldi.',
@@ -5136,8 +5126,7 @@ const supplementalTranslationOverrides: Partial<Record<Language, Record<string, 
       moduleExpenseConcentrationMessage:
         'Bitta toifa bo‘lim xarajatlarining juda katta ulushini egallagan.',
       moduleCashBalanceNegativeTitle: 'Kassa minusga tushib ketdi',
-      moduleCashBalanceNegativeMessage:
-        'Bo‘lim kassalari qoldig‘i manfiy holatga tushgan.',
+      moduleCashBalanceNegativeMessage: 'Bo‘lim kassalari qoldig‘i manfiy holatga tushgan.',
       moduleEfficiencyTitle: 'Samaradorlik va xatarlar',
       moduleEfficiencyDescription:
         '{module}: jarayon sifati, tor joylar va yechim talab qiladigan signallar.',
@@ -5296,7 +5285,8 @@ const supplementalTranslationOverrides: Partial<Record<Language, Record<string, 
             },
             department_contribution: {
               title: 'Bo‘limlarning umumiy bahosi',
-              description: 'Qaysi bo‘limlar natijani yuqoriga tortayotgani, qaysilari pasayayotganini ko‘rsatadi.',
+              description:
+                'Qaysi bo‘limlar natijani yuqoriga tortayotgani, qaysilari pasayayotganini ko‘rsatadi.',
               series: {
                 score: 'Baho',
               },
@@ -5339,8 +5329,7 @@ const supplementalTranslationOverrides: Partial<Record<Language, Record<string, 
             },
             departments_performance: {
               title: 'Bo‘limlar bo‘yicha umumiy ko‘rinish',
-              description:
-                'Har bir bo‘lim bo‘yicha baho, yo‘qotish, tushum va chiqish.',
+              description: 'Har bir bo‘lim bo‘yicha baho, yo‘qotish, tushum va chiqish.',
             },
             top_risk_summary: {
               title: 'Eng muhim xatarlar',
@@ -5567,7 +5556,8 @@ const supplementalTranslationOverrides: Partial<Record<Language, Record<string, 
           breakdowns: {
             feed_client_registry: {
               title: 'Faol mijozlar bazasi',
-              description: 'Xomashyo yetkazib berish va mahsulot jo‘natmalarida qatnashgan kontragentlar.',
+              description:
+                'Xomashyo yetkazib berish va mahsulot jo‘natmalarida qatnashgan kontragentlar.',
             },
             feed_low_raw_stock: {
               title: 'Qoldig‘i past xomashyo',
@@ -5633,7 +5623,8 @@ const supplementalTranslationOverrides: Partial<Record<Language, Record<string, 
             },
             medicine_recent_batches: {
               title: 'So‘nggi kirim partiyalari',
-              description: 'Shtrix-kod va yaroqlilik muddati bilan qabul qilingan oxirgi partiyalar.',
+              description:
+                'Shtrix-kod va yaroqlilik muddati bilan qabul qilingan oxirgi partiyalar.',
             },
             medicine_latest_consumptions: {
               title: 'So‘nggi sarf va berishlar',
@@ -5742,7 +5733,8 @@ const supplementalTranslationOverrides: Partial<Record<Language, Record<string, 
       steps: {
         inventoryQuickActions: {
           title: 'Quick actions',
-          description: 'Use these buttons to open simple forms for incoming, outgoing, and transfer.',
+          description:
+            'Use these buttons to open simple forms for incoming, outgoing, and transfer.',
         },
         warehousesList: {
           title: 'Warehouse list',
@@ -5779,8 +5771,7 @@ const supplementalTranslationOverrides: Partial<Record<Language, Record<string, 
       moduleCashAccountsTableDescription:
         'Current balance across the department cash accounts and tills.',
       moduleRecentExpensesTableTitle: 'Recent expenses',
-      moduleRecentExpensesTableDescription:
-        'Latest expense operations for the selected period.',
+      moduleRecentExpensesTableDescription: 'Latest expense operations for the selected period.',
       moduleFinancialResultNegativeTitle: 'The department is operating at a loss',
       moduleFinancialResultNegativeMessage:
         'Expenses ended up higher than the department’s own revenue for the period.',
@@ -5788,8 +5779,7 @@ const supplementalTranslationOverrides: Partial<Record<Language, Record<string, 
       moduleExpenseConcentrationMessage:
         'One category accounts for too much of the department expense load.',
       moduleCashBalanceNegativeTitle: 'Cash balance went negative',
-      moduleCashBalanceNegativeMessage:
-        'The department cash position fell below zero.',
+      moduleCashBalanceNegativeMessage: 'The department cash position fell below zero.',
       moduleEfficiencyTitle: 'Efficiency and risks',
       moduleEfficiencyDescription:
         '{module}: process quality, bottlenecks, and signals that require action.',
@@ -5840,8 +5830,7 @@ const supplementalTranslationOverrides: Partial<Record<Language, Record<string, 
       inventoryTransferTargetDepartmentRequired: 'Choose the destination department.',
       inventoryTransferDepartmentMismatch: 'Source and destination departments must be different.',
       inventoryTransferTargetWarehouseRequired: 'Choose the destination warehouse.',
-      inventoryTransferWarehouseMismatch:
-        'Source and destination warehouses must be different.',
+      inventoryTransferWarehouseMismatch: 'Source and destination warehouses must be different.',
       inventoryTransferRequiresCreatePermission:
         'Creating a transfer requires the `stock_movement.create` permission.',
       inventoryCreateTransfer: 'Create transfer',
@@ -5924,14 +5913,16 @@ const supplementalTranslationOverrides: Partial<Record<Language, Record<string, 
             },
             department_contribution: {
               title: 'Overall department score',
-              description: 'Shows which departments are driving the result up and which are slipping.',
+              description:
+                'Shows which departments are driving the result up and which are slipping.',
               series: {
                 score: 'Score',
               },
             },
             department_revenue: {
               title: 'Revenue by department',
-              description: 'Shows which departments generated the most revenue in the selected period.',
+              description:
+                'Shows which departments generated the most revenue in the selected period.',
               series: {
                 revenue: 'Revenue',
               },
@@ -5966,8 +5957,7 @@ const supplementalTranslationOverrides: Partial<Record<Language, Record<string, 
             },
             departments_performance: {
               title: 'Department overview',
-              description:
-                'Per-department summary of score, losses, revenue, and output.',
+              description: 'Per-department summary of score, losses, revenue, and output.',
             },
             top_risk_summary: {
               title: 'Top risks',
@@ -6013,8 +6003,7 @@ const supplementalTranslationOverrides: Partial<Record<Language, Record<string, 
           charts: {
             egg_destination_flow: {
               title: 'Where the eggs go',
-              description:
-                'Net output, client shipments, and transfers to incubation by day.',
+              description: 'Net output, client shipments, and transfers to incubation by day.',
               series: {
                 net_output: 'Net output',
                 client_shipments: 'Clients',
@@ -6032,8 +6021,7 @@ const supplementalTranslationOverrides: Partial<Record<Language, Record<string, 
           breakdowns: {
             egg_destination_balance: {
               title: 'Egg movement balance',
-              description:
-                'Where the breeder output goes: clients, incubation, losses, and stock.',
+              description: 'Where the breeder output goes: clients, incubation, losses, and stock.',
             },
             egg_client_registry: {
               title: 'Active client base',
@@ -6151,8 +6139,7 @@ const supplementalTranslationOverrides: Partial<Record<Language, Record<string, 
           breakdowns: {
             factory_feed_arrivals_by_type: {
               title: 'Feed arrivals by type',
-              description:
-                'What feed arrives to the factory and which bird types it is used for.',
+              description: 'What feed arrives to the factory and which bird types it is used for.',
             },
             factory_medicine_arrivals_by_type: {
               title: 'Medicine arrivals by type',
@@ -6193,8 +6180,7 @@ const supplementalTranslationOverrides: Partial<Record<Language, Record<string, 
           breakdowns: {
             feed_client_registry: {
               title: 'Active client base',
-              description:
-                'Counterparties involved in raw material supply and product shipments.',
+              description: 'Counterparties involved in raw material supply and product shipments.',
             },
             feed_low_raw_stock: {
               title: 'Low raw material stock',

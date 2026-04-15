@@ -133,7 +133,8 @@ export function SearchableReferenceSelect({
         limit: isMultiple ? 40 : 24,
         extraParams: referenceQueryParams,
       }),
-    enabled: Boolean(field.reference) && !useLocalOptionsOnly && (open || selectedValues.length > 0),
+    enabled:
+      Boolean(field.reference) && !useLocalOptionsOnly && (open || selectedValues.length > 0),
   });
 
   useEffect(() => {
@@ -202,7 +203,7 @@ export function SearchableReferenceSelect({
       { count: selectedOptions.length },
       `${selectedOptions.length} выбрано`,
     );
-  }, [isMultiple, resolvedPlaceholder, selectedOptions, t]);
+  }, [formatLabel, isMultiple, resolvedPlaceholder, selectedOptions, t]);
 
   const handleSelect = (optionValue: string) => {
     if (isMultiple) {

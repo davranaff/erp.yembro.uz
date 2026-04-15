@@ -5,13 +5,20 @@ module.exports = {
     es2021: true,
     node: true,
   },
-  ignorePatterns: ['**/*.config.ts', 'postcss.config.js'],
+  ignorePatterns: [
+    '**/*.config.ts',
+    'postcss.config.js',
+    'dist/**',
+    'coverage/**',
+    'playwright-report/**',
+    'test-results/**',
+  ],
   parser: '@typescript-eslint/parser',
   parserOptions: {
     ecmaVersion: 'latest',
     sourceType: 'module',
     ecmaFeatures: { jsx: true },
-    project: './tsconfig.app.json',
+    project: ['./tsconfig.app.json', './tsconfig.eslint.json'],
     tsconfigRootDir: __dirname,
   },
   plugins: ['@typescript-eslint', 'react-hooks', 'import', 'prettier'],
@@ -28,7 +35,7 @@ module.exports = {
         extensions: ['.js', '.jsx', '.ts', '.tsx'],
       },
       typescript: {
-        project: ['tsconfig.app.json'],
+        project: ['tsconfig.app.json', 'tsconfig.eslint.json'],
         alwaysTryTypes: true,
       },
     },
@@ -63,12 +70,14 @@ module.exports = {
           {
             target: './src/entities',
             from: './src/features',
-            message: 'Features should import entities only through index types or dedicated APIs, not internal module paths.',
+            message:
+              'Features should import entities only through index types or dedicated APIs, not internal module paths.',
           },
           {
             target: './src/features',
             from: './src/pages',
-            message: 'Pages may use features/entities, but avoid importing from app internals except public providers/layout.',
+            message:
+              'Pages may use features/entities, but avoid importing from app internals except public providers/layout.',
           },
         ],
       },
@@ -88,7 +97,10 @@ module.exports = {
       },
     ],
     '@typescript-eslint/no-explicit-any': 'warn',
-    '@typescript-eslint/no-unused-expressions': ['error', { allowShortCircuit: true, allowTernary: true }],
+    '@typescript-eslint/no-unused-expressions': [
+      'error',
+      { allowShortCircuit: true, allowTernary: true },
+    ],
     '@typescript-eslint/await-thenable': 'error',
     '@typescript-eslint/no-floating-promises': 'error',
     '@typescript-eslint/no-misused-promises': [

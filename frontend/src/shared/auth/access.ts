@@ -27,7 +27,10 @@ const normalizeValues = (values: readonly string[]): string[] => {
   return values.map((value) => value.trim().toLowerCase()).filter((value) => value.length > 0);
 };
 
-const hasAnyMatchingValue = (values: readonly string[], allowedValues: ReadonlySet<string>): boolean => {
+const hasAnyMatchingValue = (
+  values: readonly string[],
+  allowedValues: ReadonlySet<string>,
+): boolean => {
   return normalizeValues(values).some((value) => allowedValues.has(value));
 };
 
@@ -36,10 +39,8 @@ const hasAllValues = (values: readonly string[], requiredValues: readonly string
   return requiredValues.every((value) => normalizedValueSet.has(value.trim().toLowerCase()));
 };
 
-export const buildCrudPermission = (
-  permissionPrefix: string,
-  action: CrudAccessAction,
-): string => `${permissionPrefix.trim().toLowerCase()}.${action}`;
+export const buildCrudPermission = (permissionPrefix: string, action: CrudAccessAction): string =>
+  `${permissionPrefix.trim().toLowerCase()}.${action}`;
 
 export const hasPrivilegedAccessRole = (roles: readonly string[]): boolean => {
   return hasAnyMatchingValue(roles, PRIVILEGED_ACCESS_ROLES);
@@ -176,13 +177,15 @@ export const canAccessModule = (
   moduleConfig: BackendModuleConfig,
   departmentModuleKey?: string | null,
 ): boolean => {
-  return getAccessibleModuleResources(
-    roles,
-    permissions,
-    moduleConfig.key,
-    moduleConfig.resources,
-    departmentModuleKey,
-  ).length > 0;
+  return (
+    getAccessibleModuleResources(
+      roles,
+      permissions,
+      moduleConfig.key,
+      moduleConfig.resources,
+      departmentModuleKey,
+    ).length > 0
+  );
 };
 
 export const canAccessModuleKey = (
@@ -232,7 +235,10 @@ export const canAccessDashboard = (
   roles: readonly string[],
   permissions: readonly string[],
 ): boolean => {
-  return hasPrivilegedAccessRole(roles) || hasAnyMatchingValue(permissions, DASHBOARD_OVERVIEW_PERMISSIONS);
+  return (
+    hasPrivilegedAccessRole(roles) ||
+    hasAnyMatchingValue(permissions, DASHBOARD_OVERVIEW_PERMISSIONS)
+  );
 };
 
 export const canReadDepartmentsDirectory = (
@@ -284,33 +290,55 @@ export const canAccessRoleManagement = (
   roles: readonly string[],
   permissions: readonly string[],
 ): boolean => {
-  return hasPrivilegedAccessRole(roles) || hasAnyMatchingValue(permissions, ROLE_MANAGEMENT_READ_PERMISSIONS);
+  return (
+    hasPrivilegedAccessRole(roles) ||
+    hasAnyMatchingValue(permissions, ROLE_MANAGEMENT_READ_PERMISSIONS)
+  );
 };
 
-export const canCreateRoles = (roles: readonly string[], permissions: readonly string[]): boolean => {
-  return hasPrivilegedAccessRole(roles) || hasAnyMatchingValue(permissions, ROLE_MANAGEMENT_CREATE_PERMISSIONS);
+export const canCreateRoles = (
+  roles: readonly string[],
+  permissions: readonly string[],
+): boolean => {
+  return (
+    hasPrivilegedAccessRole(roles) ||
+    hasAnyMatchingValue(permissions, ROLE_MANAGEMENT_CREATE_PERMISSIONS)
+  );
 };
 
 export const canEditRoles = (roles: readonly string[], permissions: readonly string[]): boolean => {
-  return hasPrivilegedAccessRole(roles) || hasAnyMatchingValue(permissions, ROLE_MANAGEMENT_WRITE_PERMISSIONS);
+  return (
+    hasPrivilegedAccessRole(roles) ||
+    hasAnyMatchingValue(permissions, ROLE_MANAGEMENT_WRITE_PERMISSIONS)
+  );
 };
 
-export const canDeleteRoles = (roles: readonly string[], permissions: readonly string[]): boolean => {
-  return hasPrivilegedAccessRole(roles) || hasAnyMatchingValue(permissions, ROLE_MANAGEMENT_DELETE_PERMISSIONS);
+export const canDeleteRoles = (
+  roles: readonly string[],
+  permissions: readonly string[],
+): boolean => {
+  return (
+    hasPrivilegedAccessRole(roles) ||
+    hasAnyMatchingValue(permissions, ROLE_MANAGEMENT_DELETE_PERMISSIONS)
+  );
 };
 
 export const canReadEmployeesForRoleManagement = (
   roles: readonly string[],
   permissions: readonly string[],
 ): boolean => {
-  return hasPrivilegedAccessRole(roles) || hasAnyMatchingValue(permissions, EMPLOYEE_READ_PERMISSIONS);
+  return (
+    hasPrivilegedAccessRole(roles) || hasAnyMatchingValue(permissions, EMPLOYEE_READ_PERMISSIONS)
+  );
 };
 
 export const canWriteEmployeesForRoleManagement = (
   roles: readonly string[],
   permissions: readonly string[],
 ): boolean => {
-  return hasPrivilegedAccessRole(roles) || hasAnyMatchingValue(permissions, EMPLOYEE_WRITE_PERMISSIONS);
+  return (
+    hasPrivilegedAccessRole(roles) || hasAnyMatchingValue(permissions, EMPLOYEE_WRITE_PERMISSIONS)
+  );
 };
 
 export const canReadAuditLogs = (

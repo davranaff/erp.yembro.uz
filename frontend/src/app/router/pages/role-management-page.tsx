@@ -1,3 +1,5 @@
+import { useQueryClient } from '@tanstack/react-query';
+import { Plus, Save, ShieldCheck, Trash2, UserCog, Users2, X } from 'lucide-react';
 import {
   type MouseEvent as ReactMouseEvent,
   useDeferredValue,
@@ -5,16 +7,6 @@ import {
   useMemo,
   useState,
 } from 'react';
-import {
-  Plus,
-  Save,
-  ShieldCheck,
-  Trash2,
-  UserCog,
-  Users2,
-  X,
-} from 'lucide-react';
-import { useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 
 import { RouteStatusScreen } from '@/app/router/ui/route-status-screen';
@@ -464,19 +456,6 @@ export function RoleManagementPage() {
     },
   });
 
-  if (!canOpenPage) {
-    return (
-      <RouteStatusScreen
-        label={t('nav.roleManagement')}
-        title={t('route.forbiddenTitle')}
-        description={t('route.roleManagementForbiddenDescription')}
-        status="forbidden"
-        actionLabel={t('common.back')}
-        onAction={() => navigate(-1)}
-      />
-    );
-  }
-
   const handleSelectRole = (role: RoleRecord) => {
     setEditorMode('edit');
     setSelectedRoleId(getRoleId(role));
@@ -639,6 +618,19 @@ export function RoleManagementPage() {
     setInitialRoleFormSnapshot(null);
   };
 
+  if (!canOpenPage) {
+    return (
+      <RouteStatusScreen
+        label={t('nav.roleManagement')}
+        title={t('route.forbiddenTitle')}
+        description={t('route.roleManagementForbiddenDescription')}
+        status="forbidden"
+        actionLabel={t('common.back')}
+        onAction={() => navigate(-1)}
+      />
+    );
+  }
+
   return (
     <div className="space-y-6" data-tour="roles-page">
       <Card
@@ -681,26 +673,26 @@ export function RoleManagementPage() {
           </div>
 
           <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-          <div className={cn(softPanelClassName, 'p-4')}>
-            <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
-              {t('rolesManagement.totalRoles', undefined, 'Всего ролей')}
-            </p>
-            <p className="mt-3 text-3xl font-semibold text-foreground">{roles.length}</p>
-          </div>
-          <div className={cn(softPanelClassName, 'p-4')}>
-            <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
-              {t('rolesManagement.activeRoles', undefined, 'Активных')}
-            </p>
-            <p className="mt-3 text-3xl font-semibold text-foreground">{activeRolesCount}</p>
-          </div>
-          <div className={cn(softPanelClassName, 'p-4')}>
-            <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
-              {t('rolesManagement.permissionsPool', undefined, 'Доступные права')}
-            </p>
-            <p className="mt-3 text-3xl font-semibold text-foreground">
-              {permissionOptions.length}
-            </p>
-          </div>
+            <div className={cn(softPanelClassName, 'p-4')}>
+              <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
+                {t('rolesManagement.totalRoles', undefined, 'Всего ролей')}
+              </p>
+              <p className="mt-3 text-3xl font-semibold text-foreground">{roles.length}</p>
+            </div>
+            <div className={cn(softPanelClassName, 'p-4')}>
+              <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
+                {t('rolesManagement.activeRoles', undefined, 'Активных')}
+              </p>
+              <p className="mt-3 text-3xl font-semibold text-foreground">{activeRolesCount}</p>
+            </div>
+            <div className={cn(softPanelClassName, 'p-4')}>
+              <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
+                {t('rolesManagement.permissionsPool', undefined, 'Доступные права')}
+              </p>
+              <p className="mt-3 text-3xl font-semibold text-foreground">
+                {permissionOptions.length}
+              </p>
+            </div>
           </div>
         </CardContent>
       </Card>
@@ -904,7 +896,7 @@ export function RoleManagementPage() {
                   className={cn(softPanelClassName, 'space-y-3 p-4')}
                   data-tour="roles-permissions-preview"
                 >
-                  <div className="flex items-center justify-between gap-3">
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                     <p className="text-sm font-medium text-foreground">
                       {t('rolesManagement.currentPermissionSet', undefined, 'Текущий набор прав')}
                     </p>
@@ -1006,7 +998,7 @@ export function RoleManagementPage() {
         >
           <div className="space-y-5">
             <div
-              className="grid gap-4 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_220px]"
+              className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_220px]"
               data-tour="roles-editor-main-fields"
             >
               <div className="space-y-2">
@@ -1047,7 +1039,9 @@ export function RoleManagementPage() {
                   placeholder={t('rolesManagement.roleSlugPlaceholder', undefined, 'менеджер-hr')}
                 />
               </div>
-              <div className={cn(softPanelClassName, 'flex items-center justify-between gap-3 p-4')}>
+              <div
+                className={cn(softPanelClassName, 'flex items-center justify-between gap-3 p-4')}
+              >
                 <p className="text-sm font-medium text-foreground">{t('fields.is_active')}</p>
                 <label className="inline-flex items-center gap-3 text-sm text-foreground">
                   <input
@@ -1148,11 +1142,11 @@ export function RoleManagementPage() {
                       'Поиск по code, resource, action, description',
                     )}
                     emptySearchLabel={t(
-                        'rolesManagement.permissionsEmpty',
-                        undefined,
-                        'Справочник permissions пока пуст.',
-                      )}
-                    />
+                      'rolesManagement.permissionsEmpty',
+                      undefined,
+                      'Справочник permissions пока пуст.',
+                    )}
+                  />
                 </div>
               )}
             </div>
@@ -1290,7 +1284,7 @@ export function RoleManagementPage() {
                           key={employeeId}
                           className={cn(
                             softPanelClassName,
-                            'flex items-center justify-between gap-3 p-3.5',
+                            'flex flex-col gap-3 p-3.5 sm:flex-row sm:items-center sm:justify-between',
                             assigned && 'border-primary/28 bg-primary/8',
                           )}
                         >
@@ -1316,7 +1310,7 @@ export function RoleManagementPage() {
                           <Button
                             type="button"
                             variant={assigned ? 'default' : 'outline'}
-                            className="rounded-full"
+                            className="w-full rounded-full sm:w-auto"
                             disabled={!canWriteEmployees || employeeRoleMutation.isPending}
                             onClick={() => handleEmployeeRoleToggle(employee)}
                           >

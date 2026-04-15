@@ -1,6 +1,5 @@
 import { type ZodType, z } from 'zod';
 
-import { env } from '@/shared/config/env';
 import {
   clearAuthSession,
   hydrateSession,
@@ -8,6 +7,7 @@ import {
   parseAuthHeaders,
   saveAuthSession,
 } from '@/shared/auth';
+import { env } from '@/shared/config/env';
 
 import { ApiError, normalizeError } from './error-handler';
 
@@ -161,7 +161,8 @@ export class ApiClient {
     path: string,
     options: ApiRequestOptions<T, unknown> = {},
   ): Promise<T> {
-    const { body, responseSchema, timeoutMs, skipAuth, _retryAfterRefresh, ...requestInit } = options;
+    const { body, responseSchema, timeoutMs, skipAuth, _retryAfterRefresh, ...requestInit } =
+      options;
 
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), timeoutMs ?? env.VITE_REQUEST_TIMEOUT_MS);

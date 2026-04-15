@@ -1,11 +1,10 @@
-import { ArrowRight, Eye, EyeOff, Fingerprint, KeyRound, ShieldCheck } from 'lucide-react';
+import { ArrowRight, Eye, EyeOff, LockKeyhole, UserRound } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { z } from 'zod';
 
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { ErrorNotice } from '@/components/ui/error-notice';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -13,13 +12,15 @@ import { useApiMutation } from '@/shared/api';
 import { loginWithCredentials, type AuthLoginResponse } from '@/shared/api/auth';
 import { useAuthStore } from '@/shared/auth';
 import { ROUTES } from '@/shared/config/routes';
-import { APP_NAME, APP_VERSION } from '@/shared/constants/app';
+import { APP_NAME } from '@/shared/constants/app';
 import { buildSubmitHandler, useBaseForm } from '@/shared/forms';
 import { useI18n } from '@/shared/i18n';
 
 type RouteLocationState = {
   from?: string;
 };
+
+const logoPath = '/logo/logo.png';
 
 export function LoginPage() {
   const navigate = useNavigate();
@@ -81,158 +82,115 @@ export function LoginPage() {
   };
 
   return (
-    <section className="mx-auto flex min-h-[calc(100vh-4rem)] w-full max-w-7xl items-center justify-center px-4 py-6 sm:px-6 lg:px-8">
-      <div className="grid w-full items-stretch gap-8 lg:grid-cols-[minmax(0,1.2fr)_480px]">
-        <div className="animate-surface-in relative hidden overflow-hidden rounded-[36px] border border-border/70 bg-card p-8 shadow-[0_32px_90px_-48px_rgba(15,23,42,0.18)] lg:flex lg:flex-col lg:justify-between xl:p-10">
-          <div
-            aria-hidden="true"
-            className="pointer-events-none absolute inset-0"
-            style={{
-              background:
-                'radial-gradient(circle at 86% 12%, hsl(var(--accent) / 0.2), transparent 26%), radial-gradient(circle at 10% 0%, hsl(var(--primary) / 0.14), transparent 22%), linear-gradient(155deg, hsl(var(--card)) 0%, hsl(var(--background)) 54%, hsl(var(--secondary) / 0.62) 100%)',
+    <section className="mx-auto flex min-h-[calc(100vh-4rem)] w-full max-w-md items-center justify-center px-3 py-6 sm:px-6 sm:py-10">
+      <div className="bg-background/86 supports-[backdrop-filter]:bg-background/76 fixed left-4 top-4 z-40 rounded-[22px] border border-border/70 px-3 py-3 shadow-[0_20px_44px_-34px_rgba(15,23,42,0.18)] backdrop-blur-xl">
+        <img
+          src={logoPath}
+          alt={APP_NAME}
+          className="h-auto w-full max-w-[8.5rem] object-contain sm:max-w-[9.5rem]"
+        />
+      </div>
+
+      <Card className="animate-surface-in relative w-full overflow-hidden rounded-[34px] border-border/70 bg-card shadow-[0_32px_96px_-52px_rgba(15,23,42,0.2)]">
+        <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-primary/80 via-accent/90 to-primary/50" />
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-0"
+          style={{
+            background:
+              'radial-gradient(circle at top right, hsl(var(--accent) / 0.16), transparent 24%), radial-gradient(circle at top left, hsl(var(--primary) / 0.14), transparent 18%), radial-gradient(circle at 50% 100%, hsl(var(--secondary) / 0.18), transparent 30%)',
+          }}
+        />
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute left-1/2 top-0 h-40 w-40 -translate-x-1/2 rounded-full blur-3xl"
+          style={{ background: 'hsl(var(--primary) / 0.08)' }}
+        />
+
+        <CardContent className="relative p-5 sm:p-6">
+          <form
+            className="space-y-4"
+            onSubmit={(event) => {
+              void handleSubmit(buildSubmitHandler<LoginValues>(onSubmit))(event);
             }}
-          />
-          <div className="relative flex h-full flex-col justify-between gap-10">
-            <div className="space-y-8">
-              <Badge
-                variant="outline"
-                className="w-fit bg-background shadow-[0_14px_34px_-28px_rgba(15,23,42,0.12)]"
-              >
-                {APP_NAME} · v{APP_VERSION}
-              </Badge>
-              <div className="space-y-4">
+          >
+            <div className="space-y-4 text-center">
+              <div className="space-y-1.5">
                 <h1
-                  className="max-w-2xl text-5xl leading-none tracking-[-0.06em] text-foreground xl:text-6xl"
+                  className="text-3xl tracking-[-0.06em] text-foreground sm:text-4xl"
                   style={{ fontFamily: 'Fraunces, serif' }}
                 >
                   {t('login.title')}
                 </h1>
-                <p className="max-w-xl text-base leading-7 text-muted-foreground">
-                  {t('login.sideDescription')}
-                </p>
               </div>
             </div>
-            <div className="grid gap-4 xl:grid-cols-3">
-              <div className="rounded-[24px] border border-border/70 bg-background p-5 shadow-[0_16px_40px_-28px_rgba(15,23,42,0.12)]">
-                <div className="border-primary/18 bg-primary/8 mb-4 inline-flex h-10 w-10 items-center justify-center rounded-2xl border text-primary">
-                  <ShieldCheck className="h-5 w-5" />
-                </div>
-                <p className="text-sm font-semibold text-foreground">{t('login.cardOneTitle')}</p>
-                <p className="mt-2 text-xs leading-5 text-muted-foreground">
-                  {t('login.cardOneDescription')}
-                </p>
-              </div>
-              <div className="rounded-[24px] border border-border/70 bg-background p-5 shadow-[0_16px_40px_-28px_rgba(15,23,42,0.12)]">
-                <div className="border-primary/18 bg-primary/8 mb-4 inline-flex h-10 w-10 items-center justify-center rounded-2xl border text-primary">
-                  <KeyRound className="h-5 w-5" />
-                </div>
-                <p className="text-sm font-semibold text-foreground">{t('login.cardTwoTitle')}</p>
-                <p className="mt-2 text-xs leading-5 text-muted-foreground">
-                  {t('login.cardTwoDescription')}
-                </p>
-              </div>
-              <div className="rounded-[24px] border border-border/70 bg-background p-5 shadow-[0_16px_40px_-28px_rgba(15,23,42,0.12)]">
-                <div className="border-primary/18 bg-primary/8 mb-4 inline-flex h-10 w-10 items-center justify-center rounded-2xl border text-primary">
-                  <Fingerprint className="h-5 w-5" />
-                </div>
-                <p className="text-sm font-semibold text-foreground">{t('login.cardThreeTitle')}</p>
-                <p className="mt-2 text-xs leading-5 text-muted-foreground">
-                  {t('login.cardThreeDescription')}
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
 
-        <Card className="animate-surface-in relative overflow-hidden rounded-[36px] border-border/70 bg-card shadow-[0_32px_96px_-52px_rgba(15,23,42,0.2)]">
-          <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-primary/80 via-accent/90 to-primary/50" />
-          <div
-            aria-hidden="true"
-            className="pointer-events-none absolute right-0 top-0 h-40 w-40 rounded-full blur-3xl"
-            style={{ background: 'hsl(var(--accent) / 0.12)' }}
-          />
-          <CardHeader className="relative space-y-5 pb-6">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <Badge variant="outline" className="w-fit bg-background">
-                {t('login.formBadge')}
-              </Badge>
-              <p className="text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground">
-                {APP_NAME}
-              </p>
-            </div>
-            <div className="space-y-3">
-              <CardTitle
-                className="text-3xl tracking-[-0.06em] text-foreground sm:text-4xl"
-                style={{ fontFamily: 'Fraunces, serif' }}
-              >
-                {t('login.title')}
-              </CardTitle>
-              <CardDescription className="max-w-md text-sm leading-6">
-                {t('login.description')}
-              </CardDescription>
-            </div>
-          </CardHeader>
-          <CardContent className="relative space-y-6">
-            <form
-              className="space-y-5"
-              onSubmit={(event) => {
-                void handleSubmit(buildSubmitHandler<LoginValues>(onSubmit))(event);
-              }}
-            >
-              <div className="rounded-[28px] border border-border/70 bg-background p-4 shadow-[0_18px_44px_-34px_rgba(15,23,42,0.1)]">
-                <div className="space-y-4">
-                  <div className="space-y-2">
-                    <Label className="text-foreground/85" htmlFor="username">
-                      {t('login.username')}
-                    </Label>
+            <div className="bg-background/94 supports-[backdrop-filter]:bg-background/88 rounded-[28px] border border-border/70 p-4 shadow-[0_22px_52px_-34px_rgba(15,23,42,0.12)] backdrop-blur-xl sm:p-5">
+              <div className="space-y-5">
+                <div className="space-y-2">
+                  <Label className="text-foreground/85" htmlFor="username">
+                    {t('login.username')}
+                  </Label>
+                  <div className="relative">
+                    <span className="pointer-events-none absolute left-3 top-1/2 inline-flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-xl border border-border/70 bg-background text-muted-foreground shadow-[0_12px_24px_-22px_rgba(15,23,42,0.18)]">
+                      <UserRound className="h-4 w-4" />
+                    </span>
                     <Input
                       id="username"
                       type="text"
                       autoComplete="username"
                       autoFocus
-                      className="h-12 rounded-2xl border-border/75 bg-card"
+                      className="h-12 rounded-2xl border-border/75 bg-card pl-14"
                       {...register('username')}
                     />
-                    {errors.username ? (
-                      <p className="text-xs text-destructive">{errors.username.message}</p>
-                    ) : null}
                   </div>
-                  <div className="space-y-2">
-                    <Label className="text-foreground/85" htmlFor="password">
-                      {t('login.password')}
-                    </Label>
-                    <div className="relative">
-                      <Input
-                        id="password"
-                        type={isPasswordVisible ? 'text' : 'password'}
-                        autoComplete="current-password"
-                        className="h-12 rounded-2xl border-border/75 bg-card pr-12"
-                        {...register('password')}
-                      />
-                      <button
-                        type="button"
-                        className="absolute right-3 top-1/2 inline-flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-md text-muted-foreground transition-colors hover:text-foreground"
-                        onClick={() => setIsPasswordVisible((current) => !current)}
-                        aria-label={
-                          isPasswordVisible
-                            ? t('login.hidePassword', undefined, 'Скрыть пароль')
-                            : t('login.showPassword', undefined, 'Показать пароль')
-                        }
-                      >
-                        {isPasswordVisible ? (
-                          <EyeOff className="h-4 w-4" />
-                        ) : (
-                          <Eye className="h-4 w-4" />
-                        )}
-                      </button>
-                    </div>
-                    {errors.password ? (
-                      <p className="text-xs text-destructive">{errors.password.message}</p>
-                    ) : null}
+                  {errors.username ? (
+                    <p className="text-xs text-destructive">{errors.username.message}</p>
+                  ) : null}
+                </div>
+
+                <div className="space-y-2">
+                  <Label className="text-foreground/85" htmlFor="password">
+                    {t('login.password')}
+                  </Label>
+                  <div className="relative">
+                    <span className="pointer-events-none absolute left-3 top-1/2 inline-flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-xl border border-border/70 bg-background text-muted-foreground shadow-[0_12px_24px_-22px_rgba(15,23,42,0.18)]">
+                      <LockKeyhole className="h-4 w-4" />
+                    </span>
+                    <Input
+                      id="password"
+                      type={isPasswordVisible ? 'text' : 'password'}
+                      autoComplete="current-password"
+                      className="h-12 rounded-2xl border-border/75 bg-card pl-14 pr-12"
+                      {...register('password')}
+                    />
+                    <button
+                      type="button"
+                      className="absolute right-3 top-1/2 inline-flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-md text-muted-foreground transition-colors hover:text-foreground"
+                      onClick={() => setIsPasswordVisible((current) => !current)}
+                      aria-label={
+                        isPasswordVisible
+                          ? t('login.hidePassword', undefined, 'Скрыть пароль')
+                          : t('login.showPassword', undefined, 'Показать пароль')
+                      }
+                    >
+                      {isPasswordVisible ? (
+                        <EyeOff className="h-4 w-4" />
+                      ) : (
+                        <Eye className="h-4 w-4" />
+                      )}
+                    </button>
                   </div>
+                  {errors.password ? (
+                    <p className="text-xs text-destructive">{errors.password.message}</p>
+                  ) : null}
                 </div>
               </div>
-              {error ? <ErrorNotice error={error} /> : null}
+            </div>
+
+            {error ? <ErrorNotice error={error} /> : null}
+
+            <div className="border-primary/18 bg-background/86 supports-[backdrop-filter]:bg-background/78 rounded-[24px] border p-2 shadow-[0_18px_44px_-30px_rgba(234,88,12,0.18)] backdrop-blur-xl">
               <Button
                 type="submit"
                 className="h-12 w-full rounded-2xl text-sm font-semibold shadow-[0_24px_44px_-24px_rgba(234,88,12,0.38)]"
@@ -247,13 +205,10 @@ export function LoginPage() {
                   </>
                 )}
               </Button>
-            </form>
-            <div className="rounded-[24px] border border-border/70 bg-background px-4 py-3 text-xs leading-5 text-muted-foreground shadow-[0_16px_40px_-30px_rgba(15,23,42,0.08)]">
-              {t('login.afterLogin')}
             </div>
-          </CardContent>
-        </Card>
-      </div>
+          </form>
+        </CardContent>
+      </Card>
     </section>
   );
 }

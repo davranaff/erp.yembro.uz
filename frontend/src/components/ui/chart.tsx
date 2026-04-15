@@ -51,7 +51,7 @@ function ChartContainer({
         data-slot="chart"
         data-chart={chartId}
         className={cn(
-          "[&_.recharts-layer]:outline-hidden [&_.recharts-sector]:outline-hidden [&_.recharts-surface]:outline-hidden flex aspect-video justify-center text-xs [&_.recharts-cartesian-axis-tick_text]:fill-muted-foreground [&_.recharts-cartesian-grid_line[stroke='#ccc']]:stroke-border/50 [&_.recharts-curve.recharts-tooltip-cursor]:stroke-border [&_.recharts-dot[stroke='#fff']]:stroke-transparent [&_.recharts-polar-grid_[stroke='#ccc']]:stroke-border [&_.recharts-radial-bar-background-sector]:fill-muted [&_.recharts-rectangle.recharts-tooltip-cursor]:fill-muted [&_.recharts-reference-line_[stroke='#ccc']]:stroke-border [&_.recharts-sector[stroke='#fff']]:stroke-transparent",
+          "[&_.recharts-layer]:outline-hidden [&_.recharts-sector]:outline-hidden [&_.recharts-surface]:outline-hidden flex h-full min-h-[16rem] w-full justify-center overflow-hidden text-xs [&_.recharts-cartesian-axis-tick_text]:fill-muted-foreground [&_.recharts-cartesian-grid_line[stroke='#ccc']]:stroke-border/50 [&_.recharts-curve.recharts-tooltip-cursor]:stroke-border [&_.recharts-dot[stroke='#fff']]:stroke-transparent [&_.recharts-polar-grid_[stroke='#ccc']]:stroke-border [&_.recharts-radial-bar-background-sector]:fill-muted [&_.recharts-rectangle.recharts-tooltip-cursor]:fill-muted [&_.recharts-reference-line_[stroke='#ccc']]:stroke-border [&_.recharts-sector[stroke='#fff']]:stroke-transparent",
           className,
         )}
         {...props}
@@ -124,11 +124,11 @@ function ChartTooltipContent({
     }
 
     const [item] = payload;
-    const key = `${labelKey || item?.dataKey || item?.name || 'value'}`;
+    const key = `${labelKey || item.dataKey || item.name || 'value'}`;
     const itemConfig = getPayloadConfigFromPayload(config, item, key);
     const value =
       !labelKey && typeof label === 'string'
-        ? config[label as keyof typeof config]?.label || label
+        ? config[label as keyof typeof config].label || label
         : itemConfig?.label;
 
     if (labelFormatter) {
@@ -153,7 +153,7 @@ function ChartTooltipContent({
   return (
     <div
       className={cn(
-        'bg-card grid min-w-32 items-start gap-1.5 rounded-lg border border-border/80 px-2.5 py-1.5 text-xs shadow-[0_22px_52px_-34px_rgba(15,23,42,0.34)]',
+        'grid min-w-32 items-start gap-1.5 rounded-lg border border-border/80 bg-card px-2.5 py-1.5 text-xs shadow-[0_22px_52px_-34px_rgba(15,23,42,0.34)]',
         className,
       )}
     >
@@ -174,7 +174,7 @@ function ChartTooltipContent({
                   indicator === 'dot' && 'items-center',
                 )}
               >
-                {formatter && item?.value !== undefined && item.name ? (
+                {formatter && item.value !== undefined && item.name ? (
                   formatter(item.value, item.name, item, index, item.payload)
                 ) : (
                   <>
@@ -252,7 +252,7 @@ function ChartLegendContent({
   return (
     <div
       className={cn(
-        'flex items-center justify-center gap-4',
+        'flex flex-wrap items-center justify-center gap-x-4 gap-y-2 text-center',
         verticalAlign === 'top' ? 'pb-3' : 'pt-3',
         className,
       )}
@@ -267,7 +267,7 @@ function ChartLegendContent({
             <div
               key={item.value}
               className={cn(
-                'flex items-center gap-1.5 [&>svg]:h-3 [&>svg]:w-3 [&>svg]:text-muted-foreground',
+                'flex min-w-0 items-center gap-1.5 [&>svg]:h-3 [&>svg]:w-3 [&>svg]:text-muted-foreground',
               )}
             >
               {itemConfig?.icon && !hideIcon ? (
@@ -280,7 +280,9 @@ function ChartLegendContent({
                   }}
                 />
               )}
-              {itemConfig?.label}
+              <span className="min-w-0 break-words text-xs text-muted-foreground sm:text-sm">
+                {itemConfig?.label}
+              </span>
             </div>
           );
         })}

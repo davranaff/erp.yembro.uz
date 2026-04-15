@@ -51,7 +51,9 @@ export function RouteStatusScreen({
           >
             {title}
           </CardTitle>
-          <CardDescription className="mx-auto max-w-md text-sm leading-6">{description}</CardDescription>
+          <CardDescription className="mx-auto max-w-md text-sm leading-6">
+            {description}
+          </CardDescription>
         </CardHeader>
         <CardContent className="relative space-y-5">
           <div className="mx-auto h-2 w-32 overflow-hidden rounded-full bg-background shadow-[inset_0_1px_3px_hsl(var(--border)/0.65)]">
@@ -59,9 +61,10 @@ export function RouteStatusScreen({
               className="h-full rounded-full bg-gradient-to-r"
               style={{
                 width: isForbidden || isError ? '100%' : '50%',
-                backgroundImage: isForbidden || isError
-                  ? 'linear-gradient(to right, hsl(var(--destructive)), hsl(var(--destructive) / 0.72))'
-                  : 'linear-gradient(to right, hsl(var(--primary)), hsl(var(--accent)), hsl(var(--primary)))',
+                backgroundImage:
+                  isForbidden || isError
+                    ? 'linear-gradient(to right, hsl(var(--destructive)), hsl(var(--destructive) / 0.72))'
+                    : 'linear-gradient(to right, hsl(var(--primary)), hsl(var(--accent)), hsl(var(--primary)))',
               }}
             />
           </div>

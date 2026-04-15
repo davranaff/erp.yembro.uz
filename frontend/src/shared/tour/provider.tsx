@@ -30,6 +30,7 @@ import {
   markTourDismissed,
   saveTourProgress,
 } from './storage';
+
 import type { TourAccessContext, TourDefinition, TourStepDefinition } from './types';
 
 type TourContextValue = {
@@ -602,7 +603,7 @@ export function TourProvider({ children }: PropsWithChildren) {
       return;
     }
 
-    let disposed = false;
+    const actionState = { disposed: false };
     let pendingTimeoutId: number | null = null;
 
     const clearPendingTimeout = () => {
@@ -621,6 +622,7 @@ export function TourProvider({ children }: PropsWithChildren) {
           resolve();
         }, ms);
       });
+    const isDisposed = () => actionState.disposed;
 
     const findCurrentTarget = (): HTMLElement | null => {
       const selector = activeStep.target.trim();
@@ -629,11 +631,7 @@ export function TourProvider({ children }: PropsWithChildren) {
 
     const runStepActions = async () => {
       for (const action of actions) {
-        if (disposed || findCurrentTarget()) {
-          return;
-        }
-
-        if (action.type !== 'click') {
+        if (isDisposed() || findCurrentTarget()) {
           continue;
         }
 
@@ -641,7 +639,7 @@ export function TourProvider({ children }: PropsWithChildren) {
         const intervalMs = Math.max(40, action.intervalMs ?? STEP_ACTION_DEFAULT_INTERVAL_MS);
 
         for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
-          if (disposed || findCurrentTarget()) {
+          if (isDisposed() || findCurrentTarget()) {
             return;
           }
 
@@ -662,7 +660,7 @@ export function TourProvider({ children }: PropsWithChildren) {
     void runStepActions();
 
     return () => {
-      disposed = true;
+      actionState.disposed = true;
       clearPendingTimeout();
     };
   }, [activeStep]);

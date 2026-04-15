@@ -43,7 +43,7 @@ export function PublicMedicineBatchPage() {
       return [];
     }
     const batch = publicBatchQuery.data;
-    const supplierName = formatValue(batch.supplier?.name, emptyLabel);
+    const supplierName = formatValue(batch.supplier.name, emptyLabel);
     const arrivedQuantity = [
       formatValue(batch.received_quantity, emptyLabel),
       formatValue(batch.unit, ''),
@@ -61,17 +61,44 @@ export function PublicMedicineBatchPage() {
       .trim();
 
     return [
-      { label: t('fields.batch_code', undefined, 'Код партии'), value: formatValue(batch.batch_code, emptyLabel) },
-      { label: t('fields.barcode', undefined, 'Штрихкод'), value: formatValue(batch.barcode, emptyLabel) },
-      { label: t('fields.arrived_on', undefined, 'Дата поступления'), value: formatValue(batch.arrived_on, emptyLabel) },
-      { label: t('fields.expiry_date', undefined, 'Срок годности'), value: formatValue(batch.expiry_date, emptyLabel) },
-      { label: t('fields.received_quantity', undefined, 'Принято'), value: arrivedQuantity || emptyLabel },
-      { label: t('fields.remaining_quantity', undefined, 'Остаток'), value: remainingQuantity || emptyLabel },
+      {
+        label: t('fields.batch_code', undefined, 'Код партии'),
+        value: formatValue(batch.batch_code, emptyLabel),
+      },
+      {
+        label: t('fields.barcode', undefined, 'Штрихкод'),
+        value: formatValue(batch.barcode, emptyLabel),
+      },
+      {
+        label: t('fields.arrived_on', undefined, 'Дата поступления'),
+        value: formatValue(batch.arrived_on, emptyLabel),
+      },
+      {
+        label: t('fields.expiry_date', undefined, 'Срок годности'),
+        value: formatValue(batch.expiry_date, emptyLabel),
+      },
+      {
+        label: t('fields.received_quantity', undefined, 'Принято'),
+        value: arrivedQuantity || emptyLabel,
+      },
+      {
+        label: t('fields.remaining_quantity', undefined, 'Остаток'),
+        value: remainingQuantity || emptyLabel,
+      },
       { label: t('fields.unit_cost', undefined, 'Цена за ед.'), value: unitCost || emptyLabel },
-      { label: t('fields.department_id', undefined, 'Подразделение'), value: formatValue(batch.department?.name, emptyLabel) },
-      { label: t('fields.organization_id', undefined, 'Организация'), value: formatValue(batch.organization?.name, emptyLabel) },
+      {
+        label: t('fields.department_id', undefined, 'Подразделение'),
+        value: formatValue(batch.department.name, emptyLabel),
+      },
+      {
+        label: t('fields.organization_id', undefined, 'Организация'),
+        value: formatValue(batch.organization.name, emptyLabel),
+      },
       { label: t('fields.supplier_client_id', undefined, 'Поставщик'), value: supplierName },
-      { label: t('fields.note', undefined, 'Комментарий'), value: formatValue(batch.note, emptyLabel) },
+      {
+        label: t('fields.note', undefined, 'Комментарий'),
+        value: formatValue(batch.note, emptyLabel),
+      },
     ];
   }, [emptyLabel, publicBatchQuery.data, t]);
 
@@ -79,7 +106,9 @@ export function PublicMedicineBatchPage() {
     return (
       <Card className="w-full max-w-3xl rounded-[28px] border-border/75 bg-card">
         <CardHeader>
-          <CardTitle>{t('publicMedicine.invalidTokenTitle', undefined, 'Некорректная ссылка')}</CardTitle>
+          <CardTitle>
+            {t('publicMedicine.invalidTokenTitle', undefined, 'Некорректная ссылка')}
+          </CardTitle>
           <CardDescription>
             {t(
               'publicMedicine.invalidTokenDescription',
@@ -111,7 +140,9 @@ export function PublicMedicineBatchPage() {
         {publicBatchQuery.error ? <ErrorNotice error={publicBatchQuery.error} /> : null}
         <Card className="rounded-[28px] border-border/75 bg-card">
           <CardHeader>
-            <CardTitle>{t('publicMedicine.notFoundTitle', undefined, 'Карточка не найдена')}</CardTitle>
+            <CardTitle>
+              {t('publicMedicine.notFoundTitle', undefined, 'Карточка не найдена')}
+            </CardTitle>
             <CardDescription>
               {t(
                 'publicMedicine.notFoundDescription',
@@ -131,7 +162,10 @@ export function PublicMedicineBatchPage() {
     <Card className="w-full max-w-3xl rounded-[28px] border-border/75 bg-card shadow-[0_26px_76px_-44px_rgba(15,23,42,0.18)]">
       <CardHeader className="space-y-2">
         <CardTitle className="text-2xl tracking-[-0.03em]">
-          {formatValue(batch.medicine_type?.name, t('publicMedicine.unnamedProduct', undefined, 'Товар'))}
+          {formatValue(
+            batch.medicine_type.name,
+            t('publicMedicine.unnamedProduct', undefined, 'Товар'),
+          )}
         </CardTitle>
         <CardDescription>
           {t('publicMedicine.subtitle', undefined, 'Публичная карточка товара из ветаптеки')}

@@ -254,7 +254,8 @@ export const TOUR_DEFINITIONS: readonly TourDefinition[] = [
         titleKey: 'tour.steps.coreClientsTab.title',
         descriptionKey: 'tour.steps.coreClientsTab.description',
         titleFallback: 'Раздел клиентов',
-        descriptionFallback: 'Перейдите в клиентов, чтобы отправлять персональные и массовые уведомления.',
+        descriptionFallback:
+          'Перейдите в клиентов, чтобы отправлять персональные и массовые уведомления.',
         route: CORE_MODULE_ROUTE_MATCHER,
         requiredPermissions: ['client.read'],
         autoActions: [

@@ -7,7 +7,8 @@ import {
   type UseFormProps,
   type UseFormReturn,
 } from 'react-hook-form';
-import { type ZodTypeAny, z } from 'zod';
+
+import type { ZodTypeAny, input as ZodInput, output as ZodOutput } from 'zod';
 
 export const baseFormConfig = {
   mode: 'onSubmit',
@@ -17,8 +18,8 @@ export const baseFormConfig = {
   criteriaMode: 'all',
 } as const;
 
-export type FormInput<TSchema extends ZodTypeAny> = z.input<TSchema>;
-export type FormOutput<TSchema extends ZodTypeAny> = z.output<TSchema>;
+export type FormInput<TSchema extends ZodTypeAny> = ZodInput<TSchema>;
+export type FormOutput<TSchema extends ZodTypeAny> = ZodOutput<TSchema>;
 
 type BaseFormProps<TSchema extends ZodTypeAny> = Omit<
   UseFormProps<FormInput<TSchema>, unknown, FormOutput<TSchema>>,
@@ -40,7 +41,7 @@ export function useBaseForm<TSchema extends ZodTypeAny>(
   });
 }
 
-export const buildSubmitHandler = <TValues,>(
+export const buildSubmitHandler = <TValues>(
   onSubmit: (data: TValues) => Promise<void> | void,
 ): SubmitHandler<TValues> => {
   return (data) => onSubmit(data);

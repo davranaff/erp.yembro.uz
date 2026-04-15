@@ -1,6 +1,7 @@
 import { beforeAll, describe, expect, it } from 'vitest';
 
 import { useWorkspaceStore } from '@/shared/workspace';
+
 import { canAccessModuleKey, canReadCrudResource, getFirstAccessibleModuleKey } from './access';
 
 describe('department implicit read access', () => {
@@ -113,9 +114,7 @@ describe('department implicit read access', () => {
       (resource) => resource.permissionPrefix === 'medicine_consumption',
     );
     expect(eggMedicineConsumptionResource).toBeDefined();
-    expect(
-      canReadCrudResource([], [], 'egg', eggMedicineConsumptionResource!, 'egg'),
-    ).toBe(true);
+    expect(canReadCrudResource([], [], 'egg', eggMedicineConsumptionResource!, 'egg')).toBe(true);
 
     expect(canAccessModuleKey(medicineModule.key, [], [], 'egg')).toBe(false);
   });

@@ -1,5 +1,4 @@
-import type { RouteObject } from 'react-router-dom';
-import { Navigate } from 'react-router-dom';
+import { Navigate, type RouteObject } from 'react-router-dom';
 
 import { AppLayout } from '@/app/layouts/app-layout';
 import { PublicLayout } from '@/app/layouts/public-layout';
@@ -106,9 +105,7 @@ export const routeConfig: RouteObject[] = [
       },
       {
         path: ROUTES.app.slice(1),
-        element: (
-          <AuthenticatedRoute element={<Navigate to={ROUTES.dashboard} replace />} />
-        ),
+        element: <AuthenticatedRoute element={<Navigate to={ROUTES.dashboard} replace />} />,
       },
       {
         path: ROUTES.notFound,

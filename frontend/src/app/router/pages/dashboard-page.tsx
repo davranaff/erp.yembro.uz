@@ -3,7 +3,6 @@ import { RefreshCw } from 'lucide-react';
 import { useEffect, useMemo } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 
-import { RouteStatusScreen } from '@/app/router/ui/route-status-screen';
 import {
   AnalyticsDashboardView,
   buildAnalyticsQuickRangePresets,
@@ -12,6 +11,7 @@ import {
   type AnalyticsQuickRangePreset,
   type AnalyticsStatusTone,
 } from '@/app/router/ui/analytics-dashboard-view';
+import { RouteStatusScreen } from '@/app/router/ui/route-status-screen';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { ErrorNotice } from '@/components/ui/error-notice';
@@ -32,7 +32,7 @@ import { useI18n } from '@/shared/i18n';
 import { translateDashboardOverview } from '@/shared/i18n/dashboard';
 import { buildDepartmentTree, flattenDepartmentTree } from '@/shared/lib/departments';
 import { isValidUuid } from '@/shared/lib/uuid';
-import { useWorkspaceStore } from '@/shared/workspace';
+import { useWorkspaceStore, type BackendModuleConfig } from '@/shared/workspace';
 
 const EXECUTIVE_SUMMARY_METRIC_ORDER = [
   'health_index',
@@ -63,6 +63,14 @@ type DepartmentRecord = CrudRecord & {
 
 const EMPTY_AUTH_LIST: string[] = [];
 const dateParamPattern = /^\d{4}-\d{2}-\d{2}$/;
+
+const getWorkspaceModuleConfig = (
+  moduleMap: Record<string, BackendModuleConfig>,
+  moduleKey: string,
+): BackendModuleConfig | null =>
+  moduleKey && Object.prototype.hasOwnProperty.call(moduleMap, moduleKey)
+    ? moduleMap[moduleKey]
+    : null;
 
 const isValidDateParam = (value: string): boolean => {
   if (!dateParamPattern.test(value)) {
@@ -194,7 +202,9 @@ export function DashboardPage() {
   const today = useMemo(() => startOfDay(new Date()), []);
   const todayDate = format(today, 'yyyy-MM-dd');
   const defaultStartDate = format(subDays(today, 29), 'yyyy-MM-dd');
-  const sanitizedRequestedStartDate = isValidDateParam(requestedStartDate) ? requestedStartDate : '';
+  const sanitizedRequestedStartDate = isValidDateParam(requestedStartDate)
+    ? requestedStartDate
+    : '';
   const sanitizedRequestedEndDate = isValidDateParam(requestedEndDate) ? requestedEndDate : '';
   const hasInvalidRequestedDateRange =
     Boolean(sanitizedRequestedStartDate && sanitizedRequestedEndDate) &&
@@ -221,7 +231,7 @@ export function DashboardPage() {
           return (
             isValidUuid(departmentId) &&
             moduleKey !== '' &&
-            Boolean(workspaceModuleMap[moduleKey]?.isDepartmentAssignable)
+            Boolean(getWorkspaceModuleConfig(workspaceModuleMap, moduleKey)?.isDepartmentAssignable)
           );
         })
         .sort((leftDepartment, rightDepartment) =>
@@ -245,7 +255,8 @@ export function DashboardPage() {
     () =>
       selectedDepartmentId
         ? (allDepartments.find(
-            (department) => String(department.id ?? '') === selectedDepartmentId,
+            (department) =>
+              typeof department.id === 'string' && department.id === selectedDepartmentId,
           ) ?? null)
         : null,
     [allDepartments, selectedDepartmentId],
@@ -549,16 +560,16 @@ export function DashboardPage() {
     executiveDashboard && executiveAlerts.length > 0
       ? {
           key: 'executive_alerts',
-        title: t(
-          'dashboardData.sections.executive_dashboard.breakdowns.executive_alerts.title',
-          undefined,
-          'Что требует внимания',
-        ),
-        description: t(
-          'dashboardData.sections.executive_dashboard.breakdowns.executive_alerts.description',
-          undefined,
-          'Какие направления и проблемы нельзя откладывать.',
-        ),
+          title: t(
+            'dashboardData.sections.executive_dashboard.breakdowns.executive_alerts.title',
+            undefined,
+            'Что требует внимания',
+          ),
+          description: t(
+            'dashboardData.sections.executive_dashboard.breakdowns.executive_alerts.description',
+            undefined,
+            'Какие направления и проблемы нельзя откладывать.',
+          ),
           items: executiveAlerts.map((alert, index) => ({
             key: `${alert.key}-${index}`,
             label: alert.title,
@@ -572,9 +583,7 @@ export function DashboardPage() {
     ...EXECUTIVE_SUMMARY_METRIC_ORDER.map((metricKey) =>
       executiveMetrics.find((metric) => metric.key === metricKey),
     ).filter((metric): metric is (typeof executiveMetrics)[number] => Boolean(metric)),
-    ...executiveMetrics.filter(
-      (metric) => !EXECUTIVE_SUMMARY_METRIC_ORDER.includes(metric.key),
-    ),
+    ...executiveMetrics.filter((metric) => !EXECUTIVE_SUMMARY_METRIC_ORDER.includes(metric.key)),
   ].slice(0, EXECUTIVE_SUMMARY_METRIC_ORDER.length);
   const executiveChartMap = new Map(
     (executiveDashboard?.charts ?? []).map((chart) => [chart.key, chart] as const),
@@ -630,11 +639,7 @@ export function DashboardPage() {
   const sections = [
     buildExecutiveSection(
       'executive_overview',
-      t(
-        'dashboardData.sections.executive_dashboard.title',
-        undefined,
-        'Главное по бизнесу',
-      ),
+      t('dashboardData.sections.executive_dashboard.title', undefined, 'Главное по бизнесу'),
       t(
         'dashboardData.sections.executive_dashboard.description',
         undefined,

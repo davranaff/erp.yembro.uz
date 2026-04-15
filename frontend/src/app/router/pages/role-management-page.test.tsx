@@ -4,10 +4,11 @@ import { type ReactNode } from 'react';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { I18nProvider } from '@/shared/i18n';
-import { useAuthStore } from '@/shared/auth';
 import { baseQueryKeys } from '@/shared/api/query-keys';
 import { useApiMutation, useApiQuery } from '@/shared/api/react-query';
+import type * as ReactQueryModule from '@/shared/api/react-query';
+import { useAuthStore } from '@/shared/auth';
+import { I18nProvider } from '@/shared/i18n';
 
 import { RoleManagementPage } from './role-management-page';
 
@@ -16,9 +17,7 @@ vi.mock('@/components/ui/searchable-reference-select', () => ({
 }));
 
 vi.mock('@/shared/api/react-query', async () => {
-  const actual = await vi.importActual<typeof import('@/shared/api/react-query')>(
-    '@/shared/api/react-query',
-  );
+  const actual = await vi.importActual<typeof ReactQueryModule>('@/shared/api/react-query');
 
   return {
     ...actual,
@@ -85,7 +84,9 @@ const permissionField = {
   },
 };
 
-const createQueryState = <TData,>(overrides: Partial<QueryState<TData>> = {}): QueryState<TData> => ({
+const createQueryState = <TData,>(
+  overrides: Partial<QueryState<TData>> = {},
+): QueryState<TData> => ({
   data: undefined,
   error: null,
   isError: false,
@@ -117,11 +118,7 @@ const setAuthSession = (permissions: string[]) => {
 };
 
 const mockQueries = (queries: MockQueries) => {
-  mockedUseApiQuery.mockImplementation(((
-    options: {
-      queryKey: readonly unknown[];
-    },
-  ) => {
+  mockedUseApiQuery.mockImplementation(((options: { queryKey: readonly unknown[] }) => {
     const { queryKey } = options;
 
     if (JSON.stringify(queryKey) === JSON.stringify(baseQueryKeys.crud.meta('hr', 'roles'))) {
@@ -132,7 +129,11 @@ const mockQueries = (queries: MockQueries) => {
       return queries.roles;
     }
 
-    if (Array.isArray(queryKey) && queryKey[0] === 'roles-management' && queryKey[1] === 'employees') {
+    if (
+      Array.isArray(queryKey) &&
+      queryKey[0] === 'roles-management' &&
+      queryKey[1] === 'employees'
+    ) {
       return queries.employees;
     }
 
@@ -287,9 +288,7 @@ describe('RoleManagementPage', () => {
     await waitFor(() => {
       expect(screen.getByText('Загрузка')).toBeInTheDocument();
     });
-    expect(
-      screen.queryByText('Подходящие сотрудники не найдены.'),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByText('Подходящие сотрудники не найдены.')).not.toBeInTheDocument();
   });
 
   it('renders human permission labels for the current role even when meta options are not preloaded', async () => {

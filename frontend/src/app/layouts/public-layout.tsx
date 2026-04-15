@@ -3,7 +3,6 @@ import { Outlet } from 'react-router-dom';
 
 import { LanguageSwitcher } from '@/app/ui/language-switcher';
 
-
 type PublicLayoutProps = {
   children?: ReactNode;
 };

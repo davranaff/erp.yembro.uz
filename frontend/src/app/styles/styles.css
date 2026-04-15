@@ -54,6 +54,8 @@
 @layer base {
   html {
     min-height: 100%;
+    width: 100%;
+    overflow-x: hidden;
   }
 
   * {
@@ -62,12 +64,16 @@
 
   #root {
     min-height: 100vh;
+    width: 100%;
+    overflow-x: hidden;
   }
 
   body {
     @apply bg-background text-foreground antialiased;
     min-height: 100vh;
+    width: 100%;
     margin: 0;
+    overflow-x: hidden;
     font-family: 'Manrope', 'Avenir Next', 'Segoe UI', sans-serif;
     text-rendering: optimizeLegibility;
     background-attachment: fixed;
@@ -89,6 +95,20 @@
   ::selection {
     background: hsl(var(--accent) / 0.35);
     color: hsl(var(--foreground));
+  }
+
+  img {
+    display: block;
+    max-width: 100%;
+    height: auto;
+  }
+}
+
+@media (max-width: 640px) {
+  @layer base {
+    body {
+      background-attachment: scroll;
+    }
   }
 }
 

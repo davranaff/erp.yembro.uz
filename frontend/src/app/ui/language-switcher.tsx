@@ -13,7 +13,7 @@ export function LanguageSwitcher({ compact = false }: { compact?: boolean }) {
     <div
       aria-label={t('language.label')}
       className={cn(
-        'bg-background/99 border-border/75 inline-flex items-center gap-1 rounded-xl border p-1',
+        'bg-background/99 inline-flex items-center gap-1 rounded-xl border border-border/75 p-1',
         compact
           ? 'w-full justify-between rounded-md border-0 bg-transparent p-0 shadow-none'
           : 'shadow-[0_18px_48px_-36px_rgba(15,23,42,0.14)]',

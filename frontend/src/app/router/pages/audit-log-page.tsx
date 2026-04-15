@@ -1,5 +1,5 @@
-import { useDeferredValue, useMemo, useState } from 'react';
 import { Search, X } from 'lucide-react';
+import { useDeferredValue, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 
 import { RouteStatusScreen } from '@/app/router/ui/route-status-screen';
@@ -218,7 +218,7 @@ export function AuditLogPage() {
     enabled: canOpenPage,
   });
 
-  const auditEntries = auditQuery.data?.items ?? [];
+  const auditEntries = useMemo(() => auditQuery.data?.items ?? [], [auditQuery.data?.items]);
   const totalCount = auditQuery.data?.total ?? 0;
   const totalPages = Math.max(Math.ceil(totalCount / pageSize), 1);
   const activeFilterCount = useMemo(
@@ -325,6 +325,133 @@ export function AuditLogPage() {
     [selectedEntry],
   );
 
+  const renderAuditCards = () => {
+    if (auditQuery.isLoading) {
+      return (
+        <div className="px-4 py-14 text-center text-sm text-muted-foreground">
+          {t('common.loadingLabel')}
+        </div>
+      );
+    }
+
+    if (totalCount === 0) {
+      return (
+        <div className="px-4 py-14 text-center text-sm text-muted-foreground">
+          {t('audit.empty', undefined, 'По текущим фильтрам изменений не найдено.')}
+        </div>
+      );
+    }
+
+    return (
+      <div className="space-y-3 p-3">
+        {auditEntries.map((entry) => {
+          const changedFields = getChangedFieldNames(entry);
+          const changedFieldsPreview = changedFields.slice(0, changedFieldsPreviewLimit);
+          const hiddenChangedFieldsCount = Math.max(
+            0,
+            changedFields.length - changedFieldsPreview.length,
+          );
+          const isActive = selectedEntryId === entry.id;
+
+          return (
+            <button
+              key={entry.id}
+              type="button"
+              onClick={() => openEntryDetails(entry)}
+              data-tour="audit-open-details"
+              className={cn(
+                'w-full rounded-[22px] border p-4 text-left shadow-[0_18px_42px_-34px_rgba(15,23,42,0.14)] transition-colors',
+                isActive
+                  ? 'border-primary/30 bg-primary/5'
+                  : 'hover:border-primary/18 border-border/65 bg-card hover:bg-muted/20',
+              )}
+            >
+              <div className="flex flex-col gap-3">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div className="min-w-0 space-y-1">
+                    <p className="text-sm font-semibold text-foreground">
+                      {formatEntryTimestamp(entry.changed_at)}
+                    </p>
+                    <p className="truncate text-xs text-muted-foreground" title={entry.entity_id}>
+                      {entry.entity_id}
+                    </p>
+                  </div>
+                  <span
+                    className={cn(
+                      'inline-flex rounded-full border px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.14em]',
+                      getEntryActionBadgeClassName(entry.action),
+                    )}
+                  >
+                    {getEntryActionLabel(entry.action)}
+                  </span>
+                </div>
+
+                <div className="grid gap-3">
+                  <div className="space-y-1">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+                      {t('common.record', undefined, 'Запись')}
+                    </p>
+                    <p className="text-sm font-medium text-foreground">
+                      {humanizeKey(entry.entity_table)}
+                    </p>
+                  </div>
+
+                  <div className="space-y-1">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+                      {t('crud.auditChangedBy')}
+                    </p>
+                    <p className="text-sm text-foreground">{entry.actor_username || emptyLabel}</p>
+                  </div>
+
+                  <div className="space-y-2">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+                      {t('crud.auditChangedFields')}
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      {changedFieldsPreview.length > 0 ? (
+                        <>
+                          {changedFieldsPreview.map((fieldName) => (
+                            <span
+                              key={fieldName}
+                              className={cn(
+                                compactPillClassName,
+                                'max-w-full truncate px-2.5 py-1 shadow-none',
+                              )}
+                              title={humanizeKey(fieldName)}
+                            >
+                              {humanizeKey(fieldName)}
+                            </span>
+                          ))}
+                          {hiddenChangedFieldsCount > 0 ? (
+                            <span
+                              key={`${entry.id}-hidden-fields`}
+                              className={cn(compactPillClassName, 'px-2.5 py-1 shadow-none')}
+                              title={t(
+                                'audit.hiddenFieldsCount',
+                                { count: hiddenChangedFieldsCount },
+                                `Скрыто полей: ${hiddenChangedFieldsCount}`,
+                              )}
+                            >
+                              +{hiddenChangedFieldsCount}
+                            </span>
+                          ) : null}
+                        </>
+                      ) : (
+                        <span className={cn(compactPillClassName, 'px-2.5 py-1 shadow-none')}>
+                          {emptyLabel}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </button>
+          );
+        })}
+      </div>
+    );
+  };
+
   const renderSnapshot = (snapshot: AuditSnapshot | null | undefined, changedFields: string[]) => {
     if (!isAuditSnapshot(snapshot)) {
       return (
@@ -412,7 +539,6 @@ export function AuditLogPage() {
                 {t('nav.audit', undefined, 'Аудит')}
               </h1>
             </div>
-
           </div>
 
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
@@ -477,7 +603,7 @@ export function AuditLogPage() {
             </Button>
           </div>
         </CardHeader>
-        <CardContent className="grid gap-3 p-5 sm:grid-cols-2 xl:grid-cols-12">
+        <CardContent className="grid gap-3 p-4 sm:grid-cols-2 sm:p-5 xl:grid-cols-12">
           <div className="space-y-1.5 sm:col-span-2 xl:col-span-4" data-tour="audit-search">
             <label className="block text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
               {t('audit.searchLabel', undefined, 'Поиск')}
@@ -610,10 +736,11 @@ export function AuditLogPage() {
           ) : null}
 
           <div className={`${frostedPanelClassName} overflow-hidden`} data-tour="audit-main-table">
-            <div className="max-h-[680px] overflow-auto">
-              <table className="min-w-full border-collapse text-left text-sm">
+            <div className="sm:hidden">{renderAuditCards()}</div>
+            <div className="hidden max-h-[680px] overflow-auto overscroll-x-contain sm:block">
+              <table className="w-full min-w-[940px] border-collapse text-left text-sm">
                 <thead className="sticky top-0 z-10 bg-card">
-                  <tr className="border-b border-primary/16">
+                  <tr className="border-primary/16 border-b">
                     <th className="whitespace-nowrap px-4 py-3 text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">
                       {t('crud.auditChangedAt')}
                     </th>
@@ -675,7 +802,10 @@ export function AuditLogPage() {
                             <p className="text-sm font-medium text-foreground">
                               {humanizeKey(entry.entity_table)}
                             </p>
-                            <p className="mt-1 truncate text-xs text-muted-foreground" title={entry.entity_id}>
+                            <p
+                              className="mt-1 truncate text-xs text-muted-foreground"
+                              title={entry.entity_id}
+                            >
                               {entry.entity_id}
                             </p>
                           </div>
@@ -763,7 +893,7 @@ export function AuditLogPage() {
                   )
                 : t('crud.currentPageRangeEmpty')}
             </p>
-            <Pagination className="mx-0 w-auto sm:justify-end">
+            <Pagination className="mx-0 w-full justify-start sm:w-auto sm:justify-end">
               <PaginationContent>
                 <PaginationItem>
                   <PaginationPrevious
@@ -889,7 +1019,9 @@ export function AuditLogPage() {
                           </span>
                         ))
                       ) : (
-                        <span className={cn(compactPillClassName, 'shadow-none')}>{emptyLabel}</span>
+                        <span className={cn(compactPillClassName, 'shadow-none')}>
+                          {emptyLabel}
+                        </span>
                       )}
                     </div>
                   </div>

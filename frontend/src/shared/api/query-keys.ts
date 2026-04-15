@@ -16,8 +16,7 @@ export const baseQueryKeys = {
     module: (moduleKey: string) => ['crud', moduleKey] as const,
     meta: (moduleKey: string, resourceKey: string) =>
       ['crud', moduleKey, resourceKey, 'meta'] as const,
-    resource: (moduleKey: string, resourceKey: string) =>
-      ['crud', moduleKey, resourceKey] as const,
+    resource: (moduleKey: string, resourceKey: string) => ['crud', moduleKey, resourceKey] as const,
     item: (moduleKey: string, resourceKey: string, recordId: string) =>
       ['crud', moduleKey, resourceKey, recordId] as const,
     auditResource: (moduleKey: string, resourceKey: string) =>

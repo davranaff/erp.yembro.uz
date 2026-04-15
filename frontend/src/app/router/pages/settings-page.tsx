@@ -1,12 +1,4 @@
-import {
-  type MouseEvent as ReactMouseEvent,
-  type ReactNode,
-  useEffect,
-  useMemo,
-  useState,
-} from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useForm } from 'react-hook-form';
 import {
   Building2,
   ChevronDown,
@@ -24,6 +16,15 @@ import {
   X,
   type LucideIcon,
 } from 'lucide-react';
+import {
+  type MouseEvent as ReactMouseEvent,
+  type ReactNode,
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+} from 'react';
+import { useForm } from 'react-hook-form';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -33,6 +34,12 @@ import { ErrorNotice } from '@/components/ui/error-notice';
 import { Input } from '@/components/ui/input';
 import { Sheet } from '@/components/ui/sheet';
 import {
+  createAuthProfileUpdateSchema,
+  getMyProfile,
+  updateMyProfile,
+  type AuthProfileUpdate,
+} from '@/shared/api/auth';
+import {
   createCrudRecord,
   deleteCrudRecord,
   listCrudRecords,
@@ -40,12 +47,6 @@ import {
   type CrudListResponse,
   type CrudRecord,
 } from '@/shared/api/backend-crud';
-import {
-  createAuthProfileUpdateSchema,
-  getMyProfile,
-  updateMyProfile,
-  type AuthProfileUpdate,
-} from '@/shared/api/auth';
 import { baseQueryKeys } from '@/shared/api/query-keys';
 import { useApiMutation, useApiQuery } from '@/shared/api/react-query';
 import {
@@ -63,6 +64,7 @@ import {
   flattenDepartmentTree,
   type DepartmentTreeNode,
 } from '@/shared/lib/departments';
+
 import {
   buildDepartmentForm,
   canCreateSubdepartmentForAccess,
@@ -71,11 +73,6 @@ import {
   canManageDepartmentRecordAccess,
   canSaveDepartmentDraftAccess,
   defaultDepartmentForm,
-  DepartmentFormState,
-  DepartmentModuleRecord,
-  DepartmentRecord,
-  DepartmentSheetMode,
-  DepartmentStatusFilter,
   drawerPrimaryButtonClassName,
   getDepartmentIconLabel,
   getDepartmentLabel,
@@ -90,6 +87,11 @@ import {
   managementInputClassName,
   managementPanelClassName,
   managementPillClassName,
+  type DepartmentFormState,
+  type DepartmentModuleRecord,
+  type DepartmentRecord,
+  type DepartmentSheetMode,
+  type DepartmentStatusFilter,
   type EmployeeRecord,
   type OrganizationRecord,
   settingsAvatarTileClassName,
@@ -269,16 +271,19 @@ export function SettingsPage() {
 
     return defaultDepartmentForm.moduleKey;
   }, [assignableDepartmentModules]);
-  const resolveDepartmentModuleLabel = (moduleKey: string): string => {
-    if (!moduleKey) {
-      return t('common.empty');
-    }
+  const resolveDepartmentModuleLabel = useCallback(
+    (moduleKey: string): string => {
+      if (!moduleKey) {
+        return t('common.empty');
+      }
 
-    return (
-      departmentModuleLabelMap.get(moduleKey) ??
-      t(`modules.${moduleKey}.label`, undefined, moduleKey)
-    );
-  };
+      return (
+        departmentModuleLabelMap.get(moduleKey) ??
+        t(`modules.${moduleKey}.label`, undefined, moduleKey)
+      );
+    },
+    [departmentModuleLabelMap, t],
+  );
   const orderedDepartmentModuleKeys = useMemo(() => {
     const nextKeys: string[] = [];
     const seenKeys = new Set<string>();
@@ -376,8 +381,8 @@ export function SettingsPage() {
     }
 
     form.reset({
-      firstName: profileQuery.data.firstName ?? '',
-      lastName: profileQuery.data.lastName ?? '',
+      firstName: profileQuery.data.firstName,
+      lastName: profileQuery.data.lastName,
       email: profileQuery.data.email ?? '',
       phone: profileQuery.data.phone ?? '',
       currentPassword: '',
@@ -814,19 +819,23 @@ export function SettingsPage() {
 
   const updateProfileMutation = useApiMutation({
     mutationKey: ['auth', 'me', 'update'],
-    mutationFn: (values: AuthProfileUpdate) =>
-      updateMyProfile({
+    mutationFn: (values: AuthProfileUpdate) => {
+      const currentPassword = values.currentPassword ?? '';
+      const newPassword = values.newPassword ?? '';
+
+      return updateMyProfile({
         firstName: values.firstName.trim(),
         lastName: values.lastName.trim(),
         email: values.email?.trim() || undefined,
         phone: values.phone?.trim() || undefined,
-        currentPassword: values.currentPassword?.trim() || undefined,
-        newPassword: values.newPassword?.trim() || undefined,
-      }),
+        currentPassword: currentPassword.trim() || undefined,
+        newPassword: newPassword.trim() || undefined,
+      });
+    },
     onSuccess: (profile) => {
       form.reset({
-        firstName: profile.firstName ?? '',
-        lastName: profile.lastName ?? '',
+        firstName: profile.firstName,
+        lastName: profile.lastName,
         email: profile.email ?? '',
         phone: profile.phone ?? '',
         currentPassword: '',
@@ -834,7 +843,7 @@ export function SettingsPage() {
         confirmNewPassword: '',
       });
       setIsAccountSheetOpen(false);
-      profileQuery.refetch();
+      void profileQuery.refetch();
     },
   });
 
@@ -1268,7 +1277,11 @@ export function SettingsPage() {
       return null;
     }
 
-    return <div className="flex flex-wrap justify-end gap-2">{actions}</div>;
+    return (
+      <div className="flex flex-wrap justify-end gap-2 [&>[data-slot=button]]:w-full sm:[&>[data-slot=button]]:w-auto">
+        {actions}
+      </div>
+    );
   };
   const deleteConfirmHintLabel = t(
     'settings.deleteDepartmentConfirm',
@@ -1343,47 +1356,52 @@ export function SettingsPage() {
     value: string;
     icon: LucideIcon;
     caption?: string;
-  }> = activeTab === 'departments'
-    ? [
-        {
-          key: 'total',
-          label: t('common.totalRecords', { count: departments.length }),
-          value: String(departments.length),
-          icon: Building2,
-        },
-        {
-          key: 'active',
-          label: t('common.active'),
-          value: String(activeDepartmentCount),
-          icon: ShieldCheck,
-        },
-        {
-          key: 'roots',
-          label: t('settings.rootDepartmentsLabel', { count: rootDepartmentCount }, `Головные: ${rootDepartmentCount}`),
-          value: String(rootDepartmentCount),
-          icon: Waypoints,
-        },
-      ]
-    : [
-        {
-          key: 'username',
-          label: t('settings.username'),
-          value: profileQuery.data?.username ?? t('common.empty'),
-          icon: UserRound,
-        },
-        {
-          key: 'email',
-          label: t('settings.email'),
-          value: profileQuery.data?.email ?? t('common.empty'),
-          icon: Mail,
-        },
-        {
-          key: 'phone',
-          label: t('settings.phone'),
-          value: profileQuery.data?.phone ?? t('common.empty'),
-          icon: Phone,
-        },
-      ];
+  }> =
+    activeTab === 'departments'
+      ? [
+          {
+            key: 'total',
+            label: t('common.totalRecords', { count: departments.length }),
+            value: String(departments.length),
+            icon: Building2,
+          },
+          {
+            key: 'active',
+            label: t('common.active'),
+            value: String(activeDepartmentCount),
+            icon: ShieldCheck,
+          },
+          {
+            key: 'roots',
+            label: t(
+              'settings.rootDepartmentsLabel',
+              { count: rootDepartmentCount },
+              `Головные: ${rootDepartmentCount}`,
+            ),
+            value: String(rootDepartmentCount),
+            icon: Waypoints,
+          },
+        ]
+      : [
+          {
+            key: 'username',
+            label: t('settings.username'),
+            value: profileQuery.data?.username ?? t('common.empty'),
+            icon: UserRound,
+          },
+          {
+            key: 'email',
+            label: t('settings.email'),
+            value: profileQuery.data?.email ?? t('common.empty'),
+            icon: Mail,
+          },
+          {
+            key: 'phone',
+            label: t('settings.phone'),
+            value: profileQuery.data?.phone ?? t('common.empty'),
+            icon: Phone,
+          },
+        ];
   const activeDepartmentFilterCount =
     (departmentSearch.trim().length > 0 ? 1 : 0) +
     (departmentModuleFilter !== 'all' ? 1 : 0) +
@@ -1409,19 +1427,21 @@ export function SettingsPage() {
     const indentLevel = options?.indentLevel ?? 0;
 
     return (
-      <div
-        className="flex flex-col gap-2 lg:flex-row lg:items-start"
-        style={indentLevel > 0 ? { marginLeft: `${indentLevel * 0.95}rem` } : undefined}
-      >
+      <div className="flex min-w-0 flex-col gap-2 lg:flex-row lg:items-start">
         <button
           type="button"
           data-tour={isDepartmentDetailsTarget ? 'settings-department-details' : undefined}
           className={cn(
-            'group flex w-full items-start gap-3 rounded-2xl border px-3.5 py-3 text-left transition-[background-color,border-color,box-shadow,transform] lg:flex-1',
+            'group flex w-full min-w-0 items-start gap-3 rounded-2xl border px-3.5 py-3 text-left transition-[background-color,border-color,box-shadow,transform] lg:flex-1',
             isSelected
               ? 'bg-primary/8 border-primary/30 shadow-[0_18px_40px_-34px_rgba(234,88,12,0.24)]'
               : 'bg-background/98 hover:border-primary/18 border-border/65 shadow-[0_12px_30px_-28px_rgba(15,23,42,0.12)] hover:bg-background',
           )}
+          style={
+            indentLevel > 0
+              ? { paddingLeft: `${0.875 + Math.min(indentLevel, 4) * 0.6}rem` }
+              : undefined
+          }
           onClick={() => handleSelectDepartment(department)}
         >
           <span className="bg-background/98 flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-border/70 text-primary shadow-[0_12px_28px_-24px_rgba(15,23,42,0.12)]">
@@ -1455,7 +1475,7 @@ export function SettingsPage() {
           </span>
         </button>
 
-        {renderDepartmentActionButtons(department)}
+        <div className="w-full lg:w-auto">{renderDepartmentActionButtons(department)}</div>
       </div>
     );
   };
@@ -1498,7 +1518,7 @@ export function SettingsPage() {
             type="button"
             data-tour={isDepartmentDetailsTarget ? 'settings-department-details' : undefined}
             className={cn(
-              'rounded-2xl border px-4 py-3.5 text-left transition-[background-color,border-color,box-shadow] lg:flex-1',
+              'min-w-0 rounded-2xl border px-4 py-3.5 text-left transition-[background-color,border-color,box-shadow] lg:flex-1',
               isSelectedRoot
                 ? 'bg-primary/8 border-primary/30 shadow-[0_20px_44px_-34px_rgba(234,88,12,0.24)]'
                 : 'bg-background/98 hover:border-primary/18 border-border/65 shadow-[0_14px_34px_-28px_rgba(15,23,42,0.12)] hover:bg-background',
@@ -1530,7 +1550,7 @@ export function SettingsPage() {
             </div>
           </button>
 
-          <div className="flex flex-wrap justify-end gap-2">
+          <div className="flex w-full flex-wrap justify-start gap-2 lg:w-auto lg:justify-end">
             {renderDepartmentActionButtons(rootDepartment, { includeAssignCurrentUser: true })}
             {group.visibleDescendantNodes.length > 0 ? (
               <Button
@@ -1555,7 +1575,7 @@ export function SettingsPage() {
         </div>
 
         {isExpanded ? (
-          <div className="space-y-2 border-l border-border/50 pl-2">
+          <div className="space-y-2 border-l border-border/50 pl-2 sm:pl-3">
             {group.visibleDescendantNodes.map((departmentNode) => (
               <div key={departmentNode.id}>
                 {renderDepartmentListItem(departmentNode, {
@@ -1588,7 +1608,7 @@ export function SettingsPage() {
                   {t('settings.title', undefined, 'Настройки')}
                 </p>
                 <h1 className="text-3xl font-semibold tracking-[-0.05em] text-foreground sm:text-4xl">
-                  {activeSettingsTab?.label ?? t('settings.title', undefined, 'Настройки')}
+                  {activeSettingsTab.label}
                 </h1>
               </div>
 
@@ -1613,7 +1633,7 @@ export function SettingsPage() {
               </div>
             </div>
 
-            <div className="grid gap-3 sm:grid-cols-2 xl:w-[25rem]">
+            <div className="grid gap-3 sm:grid-cols-2 xl:w-[min(100%,25rem)]">
               {settingsHeroStats.map((item) => (
                 <SettingsOverviewTile
                   key={item.key}
@@ -1756,7 +1776,7 @@ export function SettingsPage() {
               ) : null}
 
               <div
-                className="grid gap-3 xl:grid-cols-[minmax(0,1.4fr)_minmax(210px,0.82fr)_minmax(210px,0.82fr)_auto]"
+                className="grid gap-3 md:grid-cols-2 2xl:grid-cols-[minmax(0,1.4fr)_minmax(210px,0.82fr)_minmax(210px,0.82fr)_auto]"
                 data-tour="settings-departments-filters"
               >
                 <div className={cn(managementPanelClassName, 'p-4')}>
@@ -1822,7 +1842,7 @@ export function SettingsPage() {
                   />
                 </div>
 
-                <div className="flex items-end">
+                <div className="flex items-end md:col-span-2 2xl:col-span-1">
                   <Button
                     type="button"
                     variant="outline"
@@ -1871,8 +1891,12 @@ export function SettingsPage() {
           size="wide"
           title={t('settings.profileTitle')}
           description={t('settings.description')}
-          bodyClassName="flex-1 space-y-6 overflow-y-auto bg-background px-6 py-5 xl:px-8"
-          formProps={{ onSubmit }}
+          bodyClassName="flex-1 space-y-6 overflow-y-auto bg-background px-4 py-4 sm:px-6 sm:py-5 xl:px-8"
+          formProps={{
+            onSubmit: (event) => {
+              void onSubmit(event);
+            },
+          }}
           footer={
             <CrudDrawerFooter
               closeLabel={t('common.close')}
@@ -2002,7 +2026,7 @@ export function SettingsPage() {
             undefined,
             'Заполните поля департамента и сохраните изменения.',
           )}
-          bodyClassName="flex-1 space-y-6 overflow-y-auto bg-background px-6 py-5 xl:px-8"
+          bodyClassName="flex-1 space-y-6 overflow-y-auto bg-background px-4 py-4 sm:px-6 sm:py-5 xl:px-8"
           footer={
             <CrudDrawerFooter
               closeLabel={t('common.close')}
@@ -2123,7 +2147,7 @@ export function SettingsPage() {
                       </button>
                     ))}
                   </div>
-                  <div className="bg-background/88 flex items-center gap-3 rounded-2xl border border-border/60 px-4 py-3 text-sm text-muted-foreground shadow-[0_14px_34px_-28px_rgba(15,23,42,0.12)] backdrop-blur-xl supports-[backdrop-filter]:bg-background/80">
+                  <div className="bg-background/88 flex flex-col gap-3 rounded-2xl border border-border/60 px-4 py-3 text-sm text-muted-foreground shadow-[0_14px_34px_-28px_rgba(15,23,42,0.12)] backdrop-blur-xl supports-[backdrop-filter]:bg-background/80 sm:flex-row sm:items-center">
                     <div className="supports-[backdrop-filter]:bg-background/82 flex h-9 w-9 items-center justify-center rounded-xl border border-border/60 bg-background/90 text-foreground shadow-[0_12px_28px_-22px_rgba(15,23,42,0.12)] backdrop-blur-xl">
                       {SelectedDepartmentIcon ? (
                         <SelectedDepartmentIcon className="h-4 w-4" />
@@ -2141,7 +2165,7 @@ export function SettingsPage() {
                         type="button"
                         size="sm"
                         variant="outline"
-                        className="ml-auto"
+                        className="w-full sm:ml-auto sm:w-auto"
                         onClick={() => handleDepartmentFieldChange('icon', '')}
                         disabled={isDepartmentFormReadOnly}
                       >

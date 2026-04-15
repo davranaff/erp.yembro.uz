@@ -1,6 +1,15 @@
-import { createContext, type PropsWithChildren, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import {
+  createContext,
+  type PropsWithChildren,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+} from 'react';
 
 import { messages } from './messages';
+
 import type { Language, TranslateFn, TranslateParams } from './types';
 
 const STORAGE_KEY = 'frontend:language';
@@ -79,9 +88,7 @@ export function I18nProvider({ children }: PropsWithChildren) {
   const t = useCallback<TranslateFn>(
     (key, params, fallback) => {
       const template =
-        resolveMessage(language, key) ??
-        resolveMessage(FALLBACK_LANGUAGE, key) ??
-        fallback;
+        resolveMessage(language, key) ?? resolveMessage(FALLBACK_LANGUAGE, key) ?? fallback;
 
       if (!template) {
         return key;

@@ -38,7 +38,7 @@ import {
 } from '@/shared/lib/departments';
 import { isValidUuid } from '@/shared/lib/uuid';
 import { useTour } from '@/shared/tour';
-import { useWorkspaceStore } from '@/shared/workspace';
+import { useWorkspaceStore, type BackendModuleConfig } from '@/shared/workspace';
 
 const EMPTY_AUTH_LIST: string[] = [];
 
@@ -65,9 +65,17 @@ type TopNavLinkProps = {
 };
 
 const primaryNavLinkClassName =
-  'inline-flex items-center gap-2 whitespace-nowrap rounded-full border px-4 py-2.5 text-sm font-medium transition-colors';
+  'flex w-full min-w-0 items-center gap-2 rounded-full border px-4 py-2.5 text-sm font-medium transition-colors';
 const departmentNavLinkClassName =
-  'inline-flex items-center gap-2 whitespace-nowrap rounded-full border px-3 py-2 text-sm font-medium transition-colors';
+  'flex w-full min-w-0 items-center gap-2 rounded-full border px-3 py-2 text-sm font-medium transition-colors';
+
+const getWorkspaceModuleConfig = (
+  moduleMap: Record<string, BackendModuleConfig>,
+  moduleKey: string,
+): BackendModuleConfig | null =>
+  moduleKey && Object.prototype.hasOwnProperty.call(moduleMap, moduleKey)
+    ? moduleMap[moduleKey]
+    : null;
 
 const getDepartmentLabel = (department: DepartmentNavRecord): string => {
   if (typeof department.name === 'string' && department.name) {
@@ -161,7 +169,7 @@ const buildAuditTarget = (): To => ({
 
 function TopNavLink({ to, icon: Icon, label, end = false }: TopNavLinkProps) {
   return (
-    <NavLink to={to} end={end} className="shrink-0">
+    <NavLink to={to} end={end} className="block min-w-0">
       {({ isActive }) => (
         <div
           className={cn(
@@ -172,7 +180,7 @@ function TopNavLink({ to, icon: Icon, label, end = false }: TopNavLinkProps) {
           )}
         >
           <Icon className="h-4 w-4" />
-          <span>{label}</span>
+          <span className="min-w-0 flex-1 truncate">{label}</span>
         </div>
       )}
     </NavLink>
@@ -194,7 +202,8 @@ function DepartmentNavLink({
   const moduleMap = useWorkspaceStore((state) => state.moduleMap);
   const departmentId = typeof department.id === 'string' ? department.id : '';
   const moduleKey = typeof department.module_key === 'string' ? department.module_key : '';
-  const DepartmentIcon = getDepartmentIcon(department.icon, moduleMap[moduleKey]?.icon);
+  const moduleConfig = getWorkspaceModuleConfig(moduleMap, moduleKey);
+  const DepartmentIcon = getDepartmentIcon(department.icon, moduleConfig?.icon);
   const departmentLabel = getDepartmentLabel(department);
   const navLabel = moduleKey
     ? t(`modules.${moduleKey}.label`, undefined, departmentLabel)
@@ -211,7 +220,7 @@ function DepartmentNavLink({
         currentSearchParams,
         departmentId: departmentId || undefined,
       })}
-      className="shrink-0"
+      className="block min-w-0"
     >
       <div
         className={cn(
@@ -235,7 +244,7 @@ function DepartmentNavLink({
             <Building2 className="h-3.5 w-3.5" />
           )}
         </span>
-        <span className="max-w-[12rem] truncate">{navLabel}</span>
+        <span className="min-w-0 flex-1 truncate">{navLabel}</span>
       </div>
     </NavLink>
   );
@@ -262,7 +271,8 @@ function DepartmentNavDropdown({
   const moduleMap = useWorkspaceStore((state) => state.moduleMap);
   const rootDepartment = rootNode.record;
   const moduleKey = typeof rootDepartment.module_key === 'string' ? rootDepartment.module_key : '';
-  const RootIcon = getDepartmentIcon(rootDepartment.icon, moduleMap[moduleKey]?.icon);
+  const rootModuleConfig = getWorkspaceModuleConfig(moduleMap, moduleKey);
+  const RootIcon = getDepartmentIcon(rootDepartment.icon, rootModuleConfig?.icon);
   const childNodes = useMemo(() => flattenDepartmentTree(rootNode.children), [rootNode.children]);
   const rootDepartmentLabel = rootNode.label;
   const navLabel = moduleKey
@@ -291,13 +301,13 @@ function DepartmentNavDropdown({
         >
           {RootIcon ? <RootIcon className="h-3.5 w-3.5" /> : <Building2 className="h-3.5 w-3.5" />}
         </span>
-        <span className="max-w-[12rem] truncate">{navLabel}</span>
+        <span className="min-w-0 flex-1 truncate">{navLabel}</span>
         <ChevronDown className="h-3.5 w-3.5 opacity-70" />
       </PopoverTrigger>
       <PopoverContent
         align="start"
         sideOffset={10}
-        className="w-[20rem] rounded-[28px] border border-slate-200 bg-white p-2 shadow-[0_30px_84px_-48px_rgba(15,23,42,0.18)]"
+        className="w-[min(20rem,calc(100vw-1.5rem))] max-w-[calc(100vw-1.5rem)] rounded-[28px] border border-slate-200 bg-white p-2 shadow-[0_30px_84px_-48px_rgba(15,23,42,0.18)]"
       >
         <div className="space-y-1">
           <NavLink
@@ -348,10 +358,8 @@ function DepartmentNavDropdown({
               typeof childDepartment.module_key === 'string'
                 ? childDepartment.module_key
                 : moduleKey;
-            const ChildIcon = getDepartmentIcon(
-              childDepartment.icon,
-              moduleMap[childModuleKey]?.icon,
-            );
+            const childModuleConfig = getWorkspaceModuleConfig(moduleMap, childModuleKey);
+            const ChildIcon = getDepartmentIcon(childDepartment.icon, childModuleConfig?.icon);
             const relativeDepth = Math.max(0, childNode.depth - rootNode.depth - 1);
 
             return (
@@ -452,7 +460,7 @@ function WorkspaceNavigation() {
       .filter((department) => {
         const moduleKey = typeof department.module_key === 'string' ? department.module_key : '';
         const departmentId = typeof department.id === 'string' ? department.id : '';
-        const moduleConfig = workspaceModuleMap[moduleKey];
+        const moduleConfig = getWorkspaceModuleConfig(workspaceModuleMap, moduleKey);
 
         return (
           isValidUuid(departmentId) &&
@@ -471,8 +479,12 @@ function WorkspaceNavigation() {
           typeof leftDepartment.module_key === 'string' ? leftDepartment.module_key : '';
         const rightModuleKey =
           typeof rightDepartment.module_key === 'string' ? rightDepartment.module_key : '';
-        const leftOrder = workspaceModuleMap[leftModuleKey]?.sortOrder ?? Number.MAX_SAFE_INTEGER;
-        const rightOrder = workspaceModuleMap[rightModuleKey]?.sortOrder ?? Number.MAX_SAFE_INTEGER;
+        const leftOrder =
+          getWorkspaceModuleConfig(workspaceModuleMap, leftModuleKey)?.sortOrder ??
+          Number.MAX_SAFE_INTEGER;
+        const rightOrder =
+          getWorkspaceModuleConfig(workspaceModuleMap, rightModuleKey)?.sortOrder ??
+          Number.MAX_SAFE_INTEGER;
 
         if (leftOrder !== rightOrder) {
           return leftOrder - rightOrder;
@@ -564,7 +576,8 @@ function WorkspaceNavigation() {
               ? t(
                   `modules.${currentModuleKey}.label`,
                   undefined,
-                  workspaceModuleMap[currentModuleKey]?.label ?? currentModuleKey,
+                  getWorkspaceModuleConfig(workspaceModuleMap, currentModuleKey)?.label ??
+                    currentModuleKey,
                 )
               : t('nav.dashboard', undefined, 'Дашборд');
   const currentRootDepartmentId =
@@ -583,10 +596,10 @@ function WorkspaceNavigation() {
   };
 
   return (
-    <div className="sticky top-4 z-30" data-tour="workspace-nav">
-      <div className="overflow-hidden rounded-[30px] border border-slate-200 bg-white shadow-[0_28px_84px_-54px_rgba(15,23,42,0.16)]">
-        <div className="flex flex-col gap-4 p-4 sm:p-5">
-          <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+    <div className="sticky top-3 z-30 sm:top-4" data-tour="workspace-nav">
+      <div className="overflow-hidden rounded-[26px] border border-slate-200 bg-white shadow-[0_28px_84px_-54px_rgba(15,23,42,0.16)] sm:rounded-[30px]">
+        <div className="flex flex-col gap-3 p-3 sm:gap-4 sm:p-5">
+          <div className="flex flex-col gap-3 sm:gap-4 xl:flex-row xl:items-start xl:justify-between">
             <div className="min-w-0 space-y-2">
               <Badge variant="muted" className="w-fit border-slate-200 bg-slate-50">
                 {t('nav.heading', undefined, 'Навигация')}
@@ -604,7 +617,7 @@ function WorkspaceNavigation() {
             </div>
 
             <div
-              className="flex flex-wrap items-center gap-2 self-start xl:self-auto"
+              className="flex w-full flex-wrap items-center gap-2 self-start xl:w-auto xl:self-auto"
               data-tour="workspace-session-tools"
             >
               {hasContextTour ? (
@@ -635,13 +648,13 @@ function WorkspaceNavigation() {
 
           <div className="grid gap-3 xl:grid-cols-[minmax(0,0.95fr)_minmax(0,1.55fr)]">
             <section
-              className="rounded-[24px] border border-slate-200 bg-slate-50 px-3.5 py-3.5"
+              className="min-w-0 rounded-[24px] border border-slate-200 bg-slate-50 px-3.5 py-3.5"
               data-tour="workspace-primary-nav"
             >
               <p className="mb-3 text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
                 {t('nav.heading', undefined, 'Навигация')}
               </p>
-              <div className="flex flex-wrap gap-2">
+              <div className="grid min-w-0 grid-cols-1 gap-2 sm:[grid-template-columns:repeat(auto-fit,minmax(11rem,1fr))]">
                 <AccessGate
                   access={{
                     predicate: (context) => canAccessDashboard(context.roles, context.permissions),
@@ -689,7 +702,7 @@ function WorkspaceNavigation() {
             </section>
 
             <section
-              className="rounded-[24px] border border-slate-200 bg-slate-50 px-3.5 py-3.5"
+              className="min-w-0 rounded-[24px] border border-slate-200 bg-slate-50 px-3.5 py-3.5"
               data-tour="workspace-department-nav"
             >
               <div className="mb-3 flex items-center justify-between gap-3">
@@ -706,7 +719,7 @@ function WorkspaceNavigation() {
                 ) : null}
               </div>
               {hasDepartmentNavigation ? (
-                <div className="flex items-center gap-2 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                <div className="grid min-w-0 grid-cols-1 gap-2 sm:[grid-template-columns:repeat(auto-fit,minmax(13rem,1fr))]">
                   {departmentTree.map((rootNode) =>
                     rootNode.children.length > 0 ? (
                       <DepartmentNavDropdown
@@ -756,7 +769,7 @@ export function AppLayout({ children }: AppLayoutProps) {
 
   return (
     <div className="min-h-screen bg-[radial-gradient(circle_at_top_left,hsl(var(--primary)/0.14),transparent_24%),radial-gradient(circle_at_top_right,hsl(var(--accent)/0.12),transparent_26%),radial-gradient(circle_at_bottom,hsl(var(--secondary)/0.24),transparent_34%),linear-gradient(180deg,hsl(var(--canvas)),hsl(var(--background)))]">
-      <div className="mx-auto flex min-h-screen w-full max-w-[1760px] flex-col gap-4 px-4 py-4 sm:px-6 sm:py-5 xl:px-8">
+      <div className="mx-auto flex min-h-screen w-full max-w-[1760px] flex-col gap-3 px-3 py-3 sm:gap-4 sm:px-6 sm:py-5 xl:px-8">
         {showWorkspaceNav ? <WorkspaceNavigation /> : null}
         <main className="min-w-0 flex-1">{children ?? <Outlet />}</main>
       </div>

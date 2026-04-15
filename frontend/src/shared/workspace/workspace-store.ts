@@ -91,7 +91,9 @@ const normalizeModule = (moduleConfig: WorkspaceModuleConfig): BackendModuleConf
   const resources = Array.isArray(moduleConfig.resources)
     ? moduleConfig.resources
         .map((resource) => normalizeResource(resource, moduleKey))
-        .filter((resource) => resource.key.length > 0 && resource.path.length > 0 && resource.isActive)
+        .filter(
+          (resource) => resource.key.length > 0 && resource.path.length > 0 && resource.isActive,
+        )
         .sort((left, right) =>
           left.sortOrder === right.sortOrder
             ? left.label.localeCompare(right.label)

@@ -87,9 +87,7 @@ function toNumericTooltipValues(value: unknown): number[] {
     return [];
   }
 
-  return value
-    .map((entry) => Number(entry))
-    .filter((entry) => Number.isFinite(entry));
+  return value.map((entry) => Number(entry)).filter((entry) => Number.isFinite(entry));
 }
 
 function normalizeTooltipValue(value: unknown): number {
@@ -136,11 +134,11 @@ function buildTooltipFormatter(
   const formatter: TooltipFormatter = (value, name, item, _index, payload) => {
     const safeValue = normalizeTooltipValue(value);
     const payloadRecord =
-      payload && typeof payload === 'object' && !Array.isArray(payload)
+      typeof payload === 'object' && !Array.isArray(payload)
         ? (payload as Record<string, unknown>)
         : null;
     const itemPayloadCandidate =
-      item && typeof item === 'object' && 'payload' in item
+      typeof item === 'object' && 'payload' in item
         ? (item as { payload?: unknown }).payload
         : null;
     const itemPayload =
@@ -168,7 +166,7 @@ function buildTooltipFormatter(
     const share = totalForShare > 0 ? (safeValue / totalForShare) * 100 : null;
     const rawName = typeof name === 'string' || typeof name === 'number' ? String(name) : '';
     const dataKey =
-      item && typeof item === 'object' && 'dataKey' in item
+      typeof item === 'object' && 'dataKey' in item
         ? String((item as { dataKey?: unknown }).dataKey ?? '')
         : '';
     const payloadLabel =
@@ -181,7 +179,7 @@ function buildTooltipFormatter(
       rawName;
 
     return (
-      <div className="flex min-w-[13rem] items-center justify-between gap-4">
+      <div className="flex min-w-[11rem] max-w-[min(16rem,70vw)] items-center justify-between gap-3">
         <span className="text-muted-foreground">{displayName}</span>
         <span className="font-mono font-medium tabular-nums text-foreground">
           {formatTooltipValue(value, locale, unit)}
@@ -340,6 +338,17 @@ function formatAxisTick(value: number, unit?: string | null) {
 
   return String(value);
 }
+
+function formatCategoryTick(value: string, maxLength = 14) {
+  const normalizedValue = value.trim();
+
+  if (normalizedValue.length <= maxLength) {
+    return normalizedValue;
+  }
+
+  return `${normalizedValue.slice(0, maxLength - 1)}…`;
+}
+
 function getSalesVolumeMetric(metrics: DashboardMetric[]): DashboardMetric | null {
   return (
     metrics.find((metric) => metric.key === 'sales_volume') ??
@@ -351,7 +360,7 @@ function getSalesVolumeMetric(metrics: DashboardMetric[]): DashboardMetric | nul
 
 function EmptyChartState({ label }: { label: string }) {
   return (
-    <div className="bg-card flex h-[340px] items-center justify-center rounded-[22px] border border-dashed border-primary/32 text-sm text-muted-foreground">
+    <div className="border-primary/32 flex h-[340px] items-center justify-center rounded-[22px] border border-dashed bg-card text-sm text-muted-foreground">
       {label}
     </div>
   );
@@ -366,7 +375,7 @@ function getChartKindLabel(chart: DashboardChart, t: ReturnType<typeof useI18n>[
     return t('dashboard.chartKindComposition', undefined, 'Состав');
   }
 
-  if (chart.type === 'bar' && chart.series.length === 1) {
+  if (chart.series.length === 1) {
     return t('dashboard.chartKindComparison', undefined, 'Сравнение');
   }
 
@@ -412,11 +421,20 @@ function AreaGraph({
           })}
         </defs>
         <CartesianGrid vertical={false} />
-        <XAxis dataKey="label" tickLine={false} axisLine={false} tickMargin={10} minTickGap={24} />
+        <XAxis
+          dataKey="label"
+          tickLine={false}
+          axisLine={false}
+          tickMargin={10}
+          minTickGap={24}
+          tick={{ fontSize: 11 }}
+          tickFormatter={(value) => formatCategoryTick(String(value))}
+        />
         <YAxis
           tickLine={false}
           axisLine={false}
           width={42}
+          tick={{ fontSize: 11 }}
           tickFormatter={(value) => formatAxisTick(Number(value), chart.unit)}
         />
         <ChartTooltip
@@ -468,8 +486,16 @@ function RadarGraph({
     <ChartContainer config={config} className="h-full w-full">
       <RadarChart data={data} outerRadius="70%">
         <PolarGrid />
-        <PolarAngleAxis dataKey="label" tickLine={false} />
-        <PolarRadiusAxis tickFormatter={(value) => formatAxisTick(Number(value), chart.unit)} />
+        <PolarAngleAxis
+          dataKey="label"
+          tickLine={false}
+          tick={{ fontSize: 11 }}
+          tickFormatter={(value) => formatCategoryTick(String(value), 10)}
+        />
+        <PolarRadiusAxis
+          tick={{ fontSize: 10 }}
+          tickFormatter={(value) => formatAxisTick(Number(value), chart.unit)}
+        />
         <ChartTooltip
           cursor={false}
           content={
@@ -505,8 +531,8 @@ function PieGraph({
   locale: string;
   emptyLabel: string;
 }) {
-  const baseSeries = chart.series[0];
-  const total = (baseSeries?.points ?? []).reduce((sum, point) => sum + point.value, 0);
+  const baseSeries = chart.series.length > 0 ? chart.series[0] : null;
+  const total = baseSeries ? baseSeries.points.reduce((sum, point) => sum + point.value, 0) : 0;
   const pieData = (baseSeries?.points ?? []).map((point, index) => ({
     key: `slice-${index}`,
     label: point.label,
@@ -534,11 +560,12 @@ function PieGraph({
           content={
             <ChartTooltipContent
               nameKey="key"
-              labelFormatter={(_, payload) =>
-                payload?.[0]?.payload?.label
-                  ? formatTooltipLabel(String(payload[0].payload.label))
-                  : ''
-              }
+              labelFormatter={(_, payload) => {
+                const firstPayload = payload.length > 0 ? payload[0].payload : null;
+                return firstPayload && typeof firstPayload.label === 'string'
+                  ? formatTooltipLabel(firstPayload.label)
+                  : '';
+              }}
               formatter={buildTooltipFormatter(locale, chart.unit, chart.series)}
             />
           }
@@ -584,11 +611,20 @@ function BarGraph({
     <ChartContainer config={config} className="h-full w-full">
       <BarChart data={data} margin={{ left: 8, right: 8, top: 12, bottom: 0 }}>
         <CartesianGrid vertical={false} />
-        <XAxis dataKey="label" tickLine={false} axisLine={false} tickMargin={10} minTickGap={24} />
+        <XAxis
+          dataKey="label"
+          tickLine={false}
+          axisLine={false}
+          tickMargin={10}
+          minTickGap={24}
+          tick={{ fontSize: 11 }}
+          tickFormatter={(value) => formatCategoryTick(String(value))}
+        />
         <YAxis
           tickLine={false}
           axisLine={false}
           width={42}
+          tick={{ fontSize: 11 }}
           tickFormatter={(value) => formatAxisTick(Number(value), chart.unit)}
         />
         <ChartTooltip
@@ -636,7 +672,7 @@ export function DashboardMetricGrid({ metrics }: { metrics: DashboardMetric[] })
           <div
             key={metric.key}
             className={cn(
-              'rounded-2xl border border-primary/22 bg-card px-4 py-4 shadow-[0_18px_48px_-36px_rgba(15,23,42,0.16)]',
+              'border-primary/22 rounded-2xl border bg-card px-4 py-4 shadow-[0_18px_48px_-36px_rgba(15,23,42,0.16)]',
               health !== 'neutral' && 'ring-1 ring-inset',
               health === 'good' && 'ring-emerald-200/80',
               health === 'warning' && 'ring-amber-200/80',
@@ -701,7 +737,7 @@ function RevenueCalculatorCard({ metrics }: { metrics: DashboardMetric[] }) {
   const estimatedRevenue = normalizedQuantity * averagePriceMetric.value;
 
   return (
-    <Card className="bg-card border-accent/28 shadow-[0_24px_64px_-48px_rgba(15,23,42,0.16)] md:col-span-3">
+    <Card className="border-accent/28 bg-card shadow-[0_24px_64px_-48px_rgba(15,23,42,0.16)] md:col-span-3">
       <CardHeader className="space-y-1">
         <CardTitle className="text-base font-semibold text-foreground">
           {t('dashboard.revenueCalculatorTitle')}
@@ -713,7 +749,7 @@ function RevenueCalculatorCard({ metrics }: { metrics: DashboardMetric[] }) {
           <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
             {t('dashboard.calculationVolume')}
           </p>
-          <div className="bg-card flex items-center gap-3 rounded-2xl border border-primary/22 px-4 py-3">
+          <div className="border-primary/22 flex items-center gap-3 rounded-2xl border bg-card px-4 py-3">
             <Input
               type="number"
               min="0"
@@ -727,7 +763,7 @@ function RevenueCalculatorCard({ metrics }: { metrics: DashboardMetric[] }) {
             </span>
           </div>
         </div>
-        <div className="bg-card rounded-2xl border border-accent/24 px-4 py-4">
+        <div className="border-accent/24 rounded-2xl border bg-card px-4 py-4">
           <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
             {t('dashboard.averagePrice')}
           </p>
@@ -735,7 +771,7 @@ function RevenueCalculatorCard({ metrics }: { metrics: DashboardMetric[] }) {
             {formatValue(averagePriceMetric.value, locale, averagePriceMetric.unit)}
           </p>
         </div>
-        <div className="rounded-2xl border border-primary/24 bg-card px-4 py-4 shadow-[0_14px_34px_-28px_rgba(234,88,12,0.14)]">
+        <div className="border-primary/24 rounded-2xl border bg-card px-4 py-4 shadow-[0_14px_34px_-28px_rgba(234,88,12,0.14)]">
           <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
             {t('dashboard.estimatedRevenue')}
           </p>
@@ -775,7 +811,10 @@ export function DashboardChartCard({
     pointCount <= 12;
   const shouldSpanWide =
     chart.type === 'stacked-bar' || chart.series.length >= 4 || pointCount >= 7;
-  const chartHeightClass = cn('w-full', shouldSpanWide ? 'h-[420px]' : 'h-[340px]');
+  const chartHeightClass = cn(
+    'w-full',
+    shouldSpanWide ? 'h-[320px] sm:h-[360px] xl:h-[420px]' : 'h-[260px] sm:h-[300px] xl:h-[340px]',
+  );
   const chartKindLabel = getChartKindLabel(chart, t);
 
   let content = <EmptyChartState label={t('common.noData')} />;
@@ -788,16 +827,14 @@ export function DashboardChartCard({
     content = <RadarGraph chart={chart} locale={locale} emptyLabel={t('common.noData')} />;
   } else if (chart.type === 'stacked-bar') {
     content = <BarGraph chart={chart} locale={locale} emptyLabel={t('common.noData')} stacked />;
-  } else if (chart.type === 'bar') {
-    content = <BarGraph chart={chart} locale={locale} emptyLabel={t('common.noData')} />;
   } else {
-    content = <AreaGraph chart={chart} locale={locale} emptyLabel={t('common.noData')} />;
+    content = <BarGraph chart={chart} locale={locale} emptyLabel={t('common.noData')} />;
   }
 
   return (
     <Card
       className={cn(
-        'bg-card border-primary/24 shadow-[0_24px_64px_-48px_rgba(15,23,42,0.16)]',
+        'border-primary/24 bg-card shadow-[0_24px_64px_-48px_rgba(15,23,42,0.16)]',
         shouldSpanWide && 'xl:col-span-2',
       )}
     >
@@ -805,11 +842,17 @@ export function DashboardChartCard({
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="space-y-1">
             <div className="flex flex-wrap items-center gap-2">
-              <Badge variant="outline" className="rounded-full border-primary/18 bg-background px-2.5 py-0.5 text-[10px] text-muted-foreground">
+              <Badge
+                variant="outline"
+                className="border-primary/18 rounded-full bg-background px-2.5 py-0.5 text-[10px] text-muted-foreground"
+              >
                 {chartKindLabel}
               </Badge>
               {chart.series.length > 1 ? (
-                <Badge variant="outline" className="rounded-full border-primary/18 bg-background px-2.5 py-0.5 text-[10px] text-muted-foreground">
+                <Badge
+                  variant="outline"
+                  className="border-primary/18 rounded-full bg-background px-2.5 py-0.5 text-[10px] text-muted-foreground"
+                >
                   {chart.series.length} {t('dashboard.chartSeriesLabelShort', undefined, 'сер.')}
                 </Badge>
               ) : null}
@@ -821,8 +864,8 @@ export function DashboardChartCard({
           </div>
         </div>
       </CardHeader>
-      <CardContent>
-        <div className="rounded-[24px] border border-primary/14 bg-background/50 p-3">
+      <CardContent className="px-4 pb-4 pt-0 sm:px-6 sm:pb-6">
+        <div className="border-primary/14 rounded-[24px] border bg-background/50 p-2 sm:p-3">
           <div className={chartHeightClass}>{content}</div>
         </div>
       </CardContent>
@@ -841,23 +884,32 @@ export function DashboardBreakdownCard({
 }) {
   const { locale, t } = useI18n();
   const breakdownUnit = (breakdown as { unit?: string | null }).unit;
-  const topItem = breakdown.items[0] ?? null;
-  const remainingItems = topItem ? breakdown.items.slice(1) : breakdown.items;
+  const hasTopItem = breakdown.items.length > 0;
+  const topItem = hasTopItem ? breakdown.items[0] : null;
+  const remainingItems = breakdown.items.slice(hasTopItem ? 1 : 0);
 
   return (
-    <Card className="bg-card border-accent/28 shadow-[0_24px_64px_-48px_rgba(15,23,42,0.16)]">
+    <Card className="border-accent/28 bg-card shadow-[0_24px_64px_-48px_rgba(15,23,42,0.16)]">
       <CardHeader className={cn(compact ? 'space-y-0 pb-4' : 'space-y-1')}>
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="space-y-1">
             <div className="flex flex-wrap items-center gap-2">
-              <Badge variant="outline" className="rounded-full border-primary/18 bg-background px-2.5 py-0.5 text-[10px] text-muted-foreground">
+              <Badge
+                variant="outline"
+                className="border-primary/18 rounded-full bg-background px-2.5 py-0.5 text-[10px] text-muted-foreground"
+              >
                 {t('dashboard.breakdownKindLabel', undefined, 'Список')}
               </Badge>
-              <Badge variant="outline" className="rounded-full border-primary/18 bg-background px-2.5 py-0.5 text-[10px] text-muted-foreground">
+              <Badge
+                variant="outline"
+                className="border-primary/18 rounded-full bg-background px-2.5 py-0.5 text-[10px] text-muted-foreground"
+              >
                 {breakdown.items.length} {t('dashboard.breakdownLabelShort', undefined, 'поз.')}
               </Badge>
             </div>
-            <CardTitle className="text-base font-semibold text-foreground">{breakdown.title}</CardTitle>
+            <CardTitle className="text-base font-semibold text-foreground">
+              {breakdown.title}
+            </CardTitle>
             {!compact && !minimalMode && breakdown.description ? (
               <CardDescription>{breakdown.description}</CardDescription>
             ) : null}
@@ -866,53 +918,57 @@ export function DashboardBreakdownCard({
       </CardHeader>
       <CardContent className="space-y-3">
         {breakdown.items.length === 0 ? (
-          <div className="bg-card rounded-[22px] border border-dashed border-accent/34 px-4 py-8 text-sm text-muted-foreground">
+          <div className="border-accent/34 rounded-[22px] border border-dashed bg-card px-4 py-8 text-sm text-muted-foreground">
             {t('common.noData')}
           </div>
         ) : (
           <>
-            {topItem ? (
-              <div className="rounded-[22px] border border-primary/16 bg-background/60 px-4 py-3">
+            {hasTopItem && topItem ? (
+              <div className="border-primary/16 rounded-[22px] border bg-background/60 px-4 py-3">
                 <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
                   {t('dashboard.topItemLabel', undefined, 'Главная позиция')}
                 </p>
-                <div className="mt-2 flex items-start justify-between gap-4">
-                  <div className="space-y-1">
+                <div className="mt-2 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                  <div className="min-w-0 space-y-1">
                     <p className="text-sm font-medium text-foreground">{topItem.label}</p>
                     {!minimalMode && topItem.caption ? (
                       <p className="text-xs leading-5 text-muted-foreground">{topItem.caption}</p>
                     ) : null}
                   </div>
                   <span className="font-mono text-sm font-medium tabular-nums text-foreground">
-                    {formatValue(topItem.value, locale, (topItem as { unit?: string | null }).unit ?? breakdownUnit)}
+                    {formatValue(
+                      topItem.value,
+                      locale,
+                      (topItem as { unit?: string | null }).unit ?? breakdownUnit,
+                    )}
                   </span>
                 </div>
               </div>
             ) : null}
             {remainingItems.map((item, index) => {
-            const itemUnit = (item as { unit?: string | null }).unit ?? breakdownUnit;
+              const itemUnit = (item as { unit?: string | null }).unit ?? breakdownUnit;
 
-            return (
-              <div
-                key={`${breakdown.key}-${item.label}-${index}`}
-                className="bg-card flex items-center justify-between gap-4 rounded-[22px] border border-primary/20 px-4 py-3"
-              >
-                <div className="flex items-center gap-3">
-                  <span className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-primary/10 text-[11px] font-semibold text-primary">
-                    {index + 2}
-                  </span>
-                  <div className="space-y-1">
-                    <span className="text-sm text-foreground">{item.label}</span>
-                    {!minimalMode && item.caption ? (
-                      <p className="text-xs leading-5 text-muted-foreground">{item.caption}</p>
-                    ) : null}
+              return (
+                <div
+                  key={`${breakdown.key}-${item.label}-${index}`}
+                  className="flex flex-col gap-3 rounded-[22px] border border-primary/20 bg-card px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
+                >
+                  <div className="flex min-w-0 items-center gap-3">
+                    <span className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-primary/10 text-[11px] font-semibold text-primary">
+                      {index + 2}
+                    </span>
+                    <div className="min-w-0 space-y-1">
+                      <span className="text-sm text-foreground">{item.label}</span>
+                      {!minimalMode && item.caption ? (
+                        <p className="text-xs leading-5 text-muted-foreground">{item.caption}</p>
+                      ) : null}
+                    </div>
                   </div>
+                  <span className="font-mono text-sm font-medium tabular-nums text-foreground">
+                    {formatValue(item.value, locale, itemUnit)}
+                  </span>
                 </div>
-                <span className="font-mono text-sm font-medium tabular-nums text-foreground">
-                  {formatValue(item.value, locale, itemUnit)}
-                </span>
-              </div>
-            );
+              );
             })}
           </>
         )}

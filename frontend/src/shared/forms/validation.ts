@@ -1,4 +1,5 @@
 import { z } from 'zod';
+
 import type { TranslateFn, TranslateParams } from '@/shared/i18n';
 
 type ValidationOptions = {

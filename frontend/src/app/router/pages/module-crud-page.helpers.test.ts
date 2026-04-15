@@ -126,9 +126,9 @@ describe('module crud password safety', () => {
 
 describe('module finance resource routing', () => {
   it('shows finance resources inside operational modules', () => {
-    expect(
-      shouldExposeResourceInModule('egg', { key: 'client-debts', apiModuleKey: 'core' }),
-    ).toBe(true);
+    expect(shouldExposeResourceInModule('egg', { key: 'client-debts', apiModuleKey: 'core' })).toBe(
+      true,
+    );
     expect(
       shouldExposeResourceInModule('feed', { key: 'cash-transactions', apiModuleKey: 'finance' }),
     ).toBe(true);

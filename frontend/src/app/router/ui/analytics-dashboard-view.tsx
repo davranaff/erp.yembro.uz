@@ -1,4 +1,3 @@
-import type { ReactNode } from 'react';
 import { format, startOfDay, startOfMonth, startOfQuarter, subDays } from 'date-fns';
 import {
   ArrowDownRight,
@@ -25,6 +24,8 @@ import type { DashboardMetric, DashboardSection } from '@/shared/api';
 import { useI18n } from '@/shared/i18n';
 import type { TranslateFn } from '@/shared/i18n/types';
 import { cn } from '@/shared/lib/cn';
+
+import type { ReactNode } from 'react';
 
 export type AnalyticsQuickRangePreset = {
   key: string;
@@ -424,7 +425,7 @@ function HeroMetaPill({
   icon: LucideIcon;
 }) {
   return (
-    <div className="min-w-[11rem] rounded-[20px] border border-primary/16 bg-background/90 px-4 py-3 shadow-[0_18px_38px_-30px_rgba(15,23,42,0.14)]">
+    <div className="border-primary/16 min-w-[11rem] rounded-[20px] border bg-background/90 px-4 py-3 shadow-[0_18px_38px_-30px_rgba(15,23,42,0.14)]">
       <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
         <Icon className="h-3.5 w-3.5" />
         {label}
@@ -449,7 +450,7 @@ function FilterPanelBlock({
     <div
       data-tour={dataTour}
       className={cn(
-        'rounded-[24px] border border-primary/16 bg-background/60 p-3 shadow-[0_18px_42px_-34px_rgba(15,23,42,0.14)]',
+        'border-primary/16 rounded-[24px] border bg-background/60 p-3 shadow-[0_18px_42px_-34px_rgba(15,23,42,0.14)]',
         className,
       )}
     >
@@ -491,7 +492,7 @@ function SectionJumpBar({
               key={section.key}
               type="button"
               variant="outline"
-              className="h-auto rounded-full border-primary/22 px-4 py-2 text-left"
+              className="border-primary/22 h-auto rounded-full px-4 py-2 text-left"
               onClick={() => {
                 document
                   .getElementById(`dashboard-section-${section.key}`)
@@ -505,9 +506,7 @@ function SectionJumpBar({
                 <span className="max-w-[14rem] truncate text-sm font-medium text-foreground">
                   {section.title}
                 </span>
-                <span className="text-xs text-muted-foreground">
-                  {counts.metrics} KPI
-                </span>
+                <span className="text-xs text-muted-foreground">{counts.metrics} KPI</span>
               </span>
             </Button>
           );
@@ -538,7 +537,10 @@ function SummaryMetricCard({ metric }: { metric: DashboardMetric }) {
       )}
     >
       <div className="flex items-start justify-between gap-3">
-        <Badge variant="outline" className={cn('rounded-full px-3 py-1 text-[10px]', getMetricCategoryClasses(category))}>
+        <Badge
+          variant="outline"
+          className={cn('rounded-full px-3 py-1 text-[10px]', getMetricCategoryClasses(category))}
+        >
           {getMetricCategoryLabel(category, t)}
         </Badge>
         <span
@@ -565,9 +567,7 @@ function SummaryMetricCard({ metric }: { metric: DashboardMetric }) {
       </div>
 
       <div className="mt-4 flex flex-wrap items-center gap-2">
-        <Badge className={cn('text-[10px]', getAnalyticsStatusClasses(tone))}>
-          {statusLabel}
-        </Badge>
+        <Badge className={cn('text-[10px]', getAnalyticsStatusClasses(tone))}>{statusLabel}</Badge>
         {deltaLabel ? (
           <Badge
             variant="outline"
@@ -583,16 +583,17 @@ function SummaryMetricCard({ metric }: { metric: DashboardMetric }) {
             {deltaLabel}
           </Badge>
         ) : (
-          <Badge variant="outline" className="rounded-full border-primary/18 bg-background px-3 py-1 text-[10px] text-muted-foreground">
+          <Badge
+            variant="outline"
+            className="border-primary/18 rounded-full bg-background px-3 py-1 text-[10px] text-muted-foreground"
+          >
             {t('dashboard.metricNoComparison', undefined, 'Без сравнения')}
           </Badge>
         )}
       </div>
 
       {previousValueLabel ? (
-        <p className="mt-3 text-xs text-muted-foreground">
-          {previousValueLabel}
-        </p>
+        <p className="mt-3 text-xs text-muted-foreground">{previousValueLabel}</p>
       ) : (
         <p className="mt-3 text-xs text-muted-foreground">
           {t('dashboard.metricNoComparison', undefined, 'Без сравнения')}
@@ -621,7 +622,13 @@ function SectionMetricCard({ metric }: { metric: DashboardMetric }) {
       )}
     >
       <div className="flex items-start justify-between gap-3">
-        <Badge variant="outline" className={cn('rounded-full px-2.5 py-0.5 text-[10px]', getMetricCategoryClasses(category))}>
+        <Badge
+          variant="outline"
+          className={cn(
+            'rounded-full px-2.5 py-0.5 text-[10px]',
+            getMetricCategoryClasses(category),
+          )}
+        >
           {getMetricCategoryLabel(category, t)}
         </Badge>
         <Badge className={cn('px-2 py-0.5 text-[10px]', getAnalyticsStatusClasses(tone))}>
@@ -689,10 +696,12 @@ function AnalyticsOverviewSection({
     return <EmptySectionCard title={title} caption={caption} minimalMode={minimalMode} />;
   }
 
-  const primaryChart = section.charts[0] ?? null;
-  const primaryBreakdown = section.breakdowns[0] ?? null;
-  const remainingCharts = section.charts.slice(1);
-  const remainingBreakdowns = section.breakdowns.slice(primaryBreakdown ? 1 : 0);
+  const hasPrimaryChart = section.charts.length > 0;
+  const hasPrimaryBreakdown = section.breakdowns.length > 0;
+  const primaryChart = hasPrimaryChart ? section.charts[0] : null;
+  const primaryBreakdown = hasPrimaryBreakdown ? section.breakdowns[0] : null;
+  const remainingCharts = section.charts.slice(hasPrimaryChart ? 1 : 0);
+  const remainingBreakdowns = section.breakdowns.slice(hasPrimaryBreakdown ? 1 : 0);
   const counts = getSectionCounts(section);
   const useSeparatedContentLayout =
     section.metrics.length === 0 && section.charts.length > 0 && section.breakdowns.length > 0;
@@ -700,7 +709,7 @@ function AnalyticsOverviewSection({
   return (
     <section
       id={`dashboard-section-${section.key}`}
-      className="rounded-[30px] border border-primary/22 bg-card p-4 shadow-[0_28px_82px_-58px_rgba(15,23,42,0.16)] sm:p-5"
+      className="border-primary/22 rounded-[30px] border bg-card p-4 shadow-[0_28px_82px_-58px_rgba(15,23,42,0.16)] sm:p-5"
     >
       <div className="space-y-4">
         <div className="flex flex-col gap-3 xl:flex-row xl:items-start xl:justify-between">
@@ -710,24 +719,35 @@ function AnalyticsOverviewSection({
                 {index + 1}
               </span>
               {counts.metrics > 0 ? (
-                <Badge variant="outline" className="rounded-full border-primary/18 bg-background px-3 py-1 text-[10px] text-muted-foreground">
+                <Badge
+                  variant="outline"
+                  className="border-primary/18 rounded-full bg-background px-3 py-1 text-[10px] text-muted-foreground"
+                >
                   {counts.metrics} KPI
                 </Badge>
               ) : null}
               {counts.charts > 0 ? (
-                <Badge variant="outline" className="rounded-full border-primary/18 bg-background px-3 py-1 text-[10px] text-muted-foreground">
+                <Badge
+                  variant="outline"
+                  className="border-primary/18 rounded-full bg-background px-3 py-1 text-[10px] text-muted-foreground"
+                >
                   {counts.charts} {t('dashboard.chartBlockLabelShort', undefined, 'граф.')}
                 </Badge>
               ) : null}
               {counts.breakdowns > 0 ? (
-                <Badge variant="outline" className="rounded-full border-primary/18 bg-background px-3 py-1 text-[10px] text-muted-foreground">
+                <Badge
+                  variant="outline"
+                  className="border-primary/18 rounded-full bg-background px-3 py-1 text-[10px] text-muted-foreground"
+                >
                   {counts.breakdowns} {t('dashboard.breakdownBlockLabelShort', undefined, 'списк.')}
                 </Badge>
               ) : null}
             </div>
             <div className="space-y-1">
               <h2 className="text-2xl font-semibold tracking-[-0.04em] text-foreground">{title}</h2>
-              {!minimalMode && caption ? <p className="text-sm text-muted-foreground">{caption}</p> : null}
+              {!minimalMode && caption ? (
+                <p className="text-sm text-muted-foreground">{caption}</p>
+              ) : null}
             </div>
           </div>
         </div>
@@ -752,12 +772,7 @@ function AnalyticsOverviewSection({
                 />
               ))}
             </div>
-            <div
-              className={cn(
-                'grid gap-4',
-                section.breakdowns.length > 1 && 'xl:grid-cols-2',
-              )}
-            >
+            <div className={cn('grid gap-4', section.breakdowns.length > 1 && 'xl:grid-cols-2')}>
               {section.breakdowns.map((breakdown) => (
                 <DashboardBreakdownCard
                   key={breakdown.key}
@@ -770,12 +785,12 @@ function AnalyticsOverviewSection({
           </>
         ) : (
           <>
-            {primaryChart || primaryBreakdown ? (
-              <div className={cn('grid gap-4', primaryBreakdown && 'xl:grid-cols-2')}>
-                {primaryChart ? (
+            {hasPrimaryChart || hasPrimaryBreakdown ? (
+              <div className={cn('grid gap-4', hasPrimaryBreakdown && 'xl:grid-cols-2')}>
+                {hasPrimaryChart && primaryChart ? (
                   <DashboardChartCard chart={primaryChart} compact minimalMode={minimalMode} />
                 ) : null}
-                {primaryBreakdown ? (
+                {hasPrimaryBreakdown && primaryBreakdown ? (
                   <DashboardBreakdownCard
                     breakdown={primaryBreakdown}
                     compact
@@ -833,14 +848,20 @@ export function AnalyticsDashboardView({
 }: AnalyticsDashboardViewProps) {
   const { t } = useI18n();
   const visibleSections = sections.filter((section) => hasMeaningfulSectionData(section.section));
-  const defaultQuickRangePreset =
-    quickRangePresets.find((preset) => preset.key === 'last30') ?? quickRangePresets[0] ?? null;
+  const defaultQuickRangePreset = (() => {
+    if (quickRangePresets.length === 0) {
+      return null;
+    }
+
+    const matchingPreset = quickRangePresets.find((preset) => preset.key === 'last30');
+    return matchingPreset ?? quickRangePresets[0];
+  })();
   const isCustomRangeActive = activeQuickRangeKey === '';
 
   return (
     <section className="flex w-full flex-col gap-6 py-1 sm:py-2" data-tour="dashboard-page">
       <Card
-        className="relative overflow-hidden rounded-[32px] border-primary/26 bg-card shadow-[0_30px_90px_-56px_rgba(15,23,42,0.18)]"
+        className="border-primary/26 relative overflow-hidden rounded-[32px] bg-card shadow-[0_30px_90px_-56px_rgba(15,23,42,0.18)]"
         data-tour="dashboard-hero"
       >
         <div
@@ -888,7 +909,7 @@ export function AnalyticsDashboardView({
       </Card>
 
       <Card
-        className="rounded-[30px] border-accent/28 bg-card shadow-[0_24px_80px_-52px_rgba(15,23,42,0.14)]"
+        className="border-accent/28 rounded-[30px] bg-card shadow-[0_24px_80px_-52px_rgba(15,23,42,0.14)]"
         data-tour="dashboard-filters"
       >
         {!minimalMode ? (
@@ -919,7 +940,7 @@ export function AnalyticsDashboardView({
                       'h-10 rounded-full px-4',
                       isActive
                         ? 'border-primary bg-primary text-primary-foreground shadow-[0_16px_36px_-28px_rgba(234,88,12,0.24)]'
-                        : 'border-primary/24 bg-card text-muted-foreground hover:border-primary/36 hover:bg-card',
+                        : 'border-primary/24 hover:border-primary/36 bg-card text-muted-foreground hover:bg-card',
                     )}
                     onClick={() => onQuickRangeApply(preset)}
                   >
@@ -958,7 +979,7 @@ export function AnalyticsDashboardView({
                       searchText: department.label,
                     })),
                   ]}
-                  className="flex h-11 w-full rounded-full border border-primary/24 bg-card px-4 text-sm text-foreground shadow-none outline-none transition focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                  className="border-primary/24 flex h-11 w-full rounded-full border bg-card px-4 text-sm text-foreground shadow-none outline-none transition focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                   placeholder={t('common.allDepartments')}
                   searchPlaceholder={t('common.search', undefined, 'Поиск')}
                   emptySearchLabel={t(
@@ -980,12 +1001,12 @@ export function AnalyticsDashboardView({
                   endDate={endDate}
                   onApply={onDateRangeApply}
                   resetRange={
-                    defaultQuickRangePreset
-                      ? {
+                    defaultQuickRangePreset === null
+                      ? undefined
+                      : {
                           startDate: defaultQuickRangePreset.startDate,
                           endDate: defaultQuickRangePreset.endDate,
                         }
-                      : undefined
                   }
                   triggerClassName={cn(
                     'h-11 w-full justify-start border-primary/24 bg-card px-4 text-left shadow-none',

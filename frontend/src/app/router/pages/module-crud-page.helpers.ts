@@ -225,14 +225,7 @@ const resourceUiConfigs: Record<string, ResourceUiConfig> = {
     hideOrganizationFieldWhenScoped: true,
   },
   'finance:cash-accounts': {
-    formOrder: [
-      'name',
-      'code',
-      'currency',
-      'opening_balance',
-      'note',
-      'is_active',
-    ],
+    formOrder: ['name', 'code', 'currency', 'opening_balance', 'note', 'is_active'],
     tableOrder: ['name', 'code', 'currency', 'opening_balance', 'department_id', 'is_active'],
     hideDepartmentFieldWhenScoped: true,
     hideOrganizationFieldWhenScoped: true,
@@ -818,11 +811,7 @@ export const getReferenceOptionLabel = (
     );
   }
   if (field.name === 'unit') {
-    return translate(
-      `inventory.units.${optionValue}`,
-      undefined,
-      readableLabel || optionValue,
-    );
+    return translate(`inventory.units.${optionValue}`, undefined, readableLabel || optionValue);
   }
   return readableLabel;
 };
@@ -977,7 +966,7 @@ const resolveReferenceOptionValue = (
   rawValue: string,
   reference: CrudFieldReference | null,
 ): string | null => {
-  if (!reference?.options?.length) {
+  if (!reference || reference.options.length === 0) {
     return null;
   }
   const exactOption = reference.options.find((option) => option.value === rawValue);
@@ -1150,7 +1139,7 @@ export const getDisplayValue = (
   }
 
   if (fieldInputKind === 'boolean') {
-    return value ? yesLabel : noLabel;
+    return value === true ? yesLabel : noLabel;
   }
   if (fieldInputKind === 'date') {
     return formatDateValue(value);
@@ -1231,10 +1220,11 @@ const parseFieldValue = (
 
     if (
       field.type === 'uuid' &&
-      values.some(
-        (item) =>
-          !isValidUuid(item) && !field.reference?.options?.some((option) => option.value === item),
-      )
+      values.some((item) => {
+        return (
+          !isValidUuid(item) && !field.reference?.options.some((option) => option.value === item)
+        );
+      })
     ) {
       return { ok: false, message: invalidUuidMessage };
     }

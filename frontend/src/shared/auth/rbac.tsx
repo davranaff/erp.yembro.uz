@@ -1,6 +1,7 @@
 import { type ReactNode } from 'react';
 
 import { useAuthStore } from './auth-store';
+
 import type { AuthSession } from './types';
 
 type OptionalStringList = readonly string[] | undefined;
@@ -33,7 +34,10 @@ const normalizeList = (values: OptionalStringList): string[] => {
   return values.map(normalizeValue).filter((value) => value.length > 0);
 };
 
-const hasAnyValue = (actualValues: readonly string[], requiredValues: OptionalStringList): boolean => {
+const hasAnyValue = (
+  actualValues: readonly string[],
+  requiredValues: OptionalStringList,
+): boolean => {
   const normalizedRequired = normalizeList(requiredValues);
   if (normalizedRequired.length === 0) {
     return false;
@@ -43,7 +47,10 @@ const hasAnyValue = (actualValues: readonly string[], requiredValues: OptionalSt
   return normalizedRequired.some((requiredValue) => normalizedActual.has(requiredValue));
 };
 
-const hasAllValues = (actualValues: readonly string[], requiredValues: OptionalStringList): boolean => {
+const hasAllValues = (
+  actualValues: readonly string[],
+  requiredValues: OptionalStringList,
+): boolean => {
   const normalizedRequired = normalizeList(requiredValues);
   if (normalizedRequired.length === 0) {
     return true;

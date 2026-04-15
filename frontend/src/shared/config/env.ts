@@ -1,15 +1,18 @@
 import { z } from 'zod';
 
-const baseUrlSchema = z.string().min(1).refine(
-  (value) => {
-    if (value.startsWith('/')) {
-      return true;
-    }
+const baseUrlSchema = z
+  .string()
+  .min(1)
+  .refine(
+    (value) => {
+      if (value.startsWith('/')) {
+        return true;
+      }
 
-    return z.string().url().safeParse(value).success;
-  },
-  { message: 'VITE_API_BASE_URL must be an absolute url or a relative path' },
-);
+      return z.string().url().safeParse(value).success;
+    },
+    { message: 'VITE_API_BASE_URL must be an absolute url or a relative path' },
+  );
 
 const envSchema = z.object({
   VITE_API_BASE_URL: baseUrlSchema.default('/api/v1'),

@@ -47,7 +47,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
       return;
     }
 
-    let isActive = true;
+    const requestState = { isActive: true };
     startWorkspaceLoading();
 
     void (async () => {
@@ -57,7 +57,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
           listWorkspaceModules(),
         ]);
 
-        if (!isActive) {
+        if (!requestState.isActive) {
           return;
         }
 
@@ -79,7 +79,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
           (currentSession.organizationId ?? '') === profile.organizationId &&
           (currentSession.departmentId ?? null) === (profile.departmentId ?? null) &&
           (currentSession.departmentModuleKey ?? null) === (profile.departmentModuleKey ?? null) &&
-          (currentSession.headsAnyDepartment ?? false) === (profile.headsAnyDepartment ?? false) &&
+          (currentSession.headsAnyDepartment ?? false) === profile.headsAnyDepartment &&
           (currentSession.username ?? '') === profile.username &&
           currentRoles.join(',') === nextRoles.join(',') &&
           currentPermissions.join(',') === nextPermissions.join(',');
@@ -100,10 +100,10 @@ export function AuthProvider({ children }: PropsWithChildren) {
           });
         }
 
-        const items = (workspaceResponse.items ?? []) as WorkspaceModuleConfig[];
+        const items = workspaceResponse.items as WorkspaceModuleConfig[];
         setWorkspaceModules(items);
       } catch (error) {
-        if (!isActive) {
+        if (!requestState.isActive) {
           return;
         }
         setWorkspaceError(getErrorMessage(error));
@@ -111,7 +111,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
     })();
 
     return () => {
-      isActive = false;
+      requestState.isActive = false;
     };
   }, [
     clearWorkspaceModules,

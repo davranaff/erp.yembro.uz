@@ -1,13 +1,20 @@
 import path from 'node:path';
-import { defineConfig } from 'vite';
+
 import react from '@vitejs/plugin-react';
+import { defineConfig } from 'vite';
 
 export default defineConfig(() => {
-  const apiProxySource =
-    process.env.VITE_DEV_API_PROXY_TARGET ??
-    process.env.API_PROXY_TARGET ??
-    process.env.VITE_API_BASE_URL ??
-    'http://localhost:30000/api/v1';
+  let apiProxySource = 'http://localhost:30000/api/v1';
+  for (const value of [
+    process.env.VITE_DEV_API_PROXY_TARGET,
+    process.env.API_PROXY_TARGET,
+    process.env.VITE_API_BASE_URL,
+  ]) {
+    if (typeof value === 'string' && value.length > 0) {
+      apiProxySource = value;
+      break;
+    }
+  }
 
   const apiProxyTarget = (() => {
     try {

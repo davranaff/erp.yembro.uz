@@ -69,7 +69,7 @@ export const normalizeError = (status: number, body: unknown): string => {
     (body as { error?: unknown }).error !== null &&
     typeof ((body as { error: unknown }).error as { message?: unknown }).message === 'string'
   ) {
-    return ((body as { error: { message: string } }).error).message;
+    return (body as { error: { message: string } }).error.message;
   }
 
   if (

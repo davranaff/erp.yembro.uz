@@ -3,8 +3,8 @@ import { Link } from 'react-router-dom';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { APP_NAME } from '@/shared/constants/app';
 import { ROUTES } from '@/shared/config/routes';
+import { APP_NAME } from '@/shared/constants/app';
 import { useI18n } from '@/shared/i18n';
 
 export function NotFoundPage() {
