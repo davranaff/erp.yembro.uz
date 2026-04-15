@@ -54,7 +54,7 @@ export type DepartmentFormState = {
 };
 
 export type DepartmentStatusFilter = 'all' | 'active' | 'inactive';
-export type SettingsTabKey = 'account' | 'departments';
+export type SettingsTabKey = 'account';
 export type DepartmentSheetMode = 'create' | 'edit';
 export type DepartmentRbacScope = {
   canWriteAllDepartments: boolean;

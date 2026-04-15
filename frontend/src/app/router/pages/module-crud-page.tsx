@@ -4296,7 +4296,10 @@ export function ModuleCrudPage() {
                         {activeResourceLabel}
                       </CardTitle>
                     </div>
-                    <div className="flex flex-wrap items-center gap-2">
+                    <div
+                      className="flex flex-wrap items-center gap-2"
+                      data-tour="module-summary-pills"
+                    >
                       <span className={compactPillClassName}>
                         {t('common.totalRecords', { count: totalCount })}
                       </span>
@@ -4883,9 +4886,7 @@ export function ModuleCrudPage() {
                         !isMultiReference &&
                         !isMovementItemKeyField &&
                         !isClientDebtItemKeyField &&
-                        (isDepartmentReferenceField ||
-                          isMovementWarehouseField ||
-                          field.name === 'movement_kind' ||
+                        (field.name === 'movement_kind' ||
                           field.name === 'item_type' ||
                           field.name === 'unit');
                       const compactReferenceOptions = (referenceOptions ?? []).map((option) => ({
@@ -5036,7 +5037,6 @@ export function ModuleCrudPage() {
                                 'Подходящие варианты не найдены.',
                               )}
                               translateOptionLabel={translateReferenceLabel}
-                              useLocalOptionsOnly={isDepartmentReferenceField}
                               referenceQueryParams={referenceQueryParams}
                             />
                           ) : fieldInputKind === 'json' ? (

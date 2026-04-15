@@ -161,9 +161,10 @@ async def list_visible_departments(
 )
 async def list_workspace_modules(
     db: Database = Depends(db_dependency),
+    current_actor: CurrentActor = Depends(get_current_actor),
 ) -> dict[str, Any]:
     service = DepartmentModuleService(DepartmentModuleRepository(db))
-    result = await service.list_workspace_modules()
+    result = await service.list_workspace_modules(actor=current_actor)
     if not result.ok:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,

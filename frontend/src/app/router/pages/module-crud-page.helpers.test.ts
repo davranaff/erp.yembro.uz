@@ -7,6 +7,7 @@ import {
   getDisplayValue,
   getFieldInputKind,
   getInputType,
+  getReferenceOptionLabel,
   getResourceUiConfig,
 } from './module-crud-page.helpers';
 
@@ -48,5 +49,37 @@ describe('module CRUD field helpers', () => {
 
     expect(config?.hiddenFields).toContain('department_id');
     expect(config?.hideOrganizationFieldWhenScoped).toBe(true);
+  });
+
+  it('keeps poultry types org-level in the module editor UI', () => {
+    const config = getResourceUiConfig('core', 'poultry-types');
+
+    expect(config?.tableOrder).toEqual(['name', 'code', 'description', 'is_active']);
+    expect(config?.hideOrganizationFieldWhenScoped).toBe(true);
+  });
+
+  it('translates static client debt statuses', () => {
+    const field = buildField({
+      name: 'status',
+      label: 'Status',
+      type: 'string',
+      database_type: 'character varying',
+      reference: {
+        table: '__static__',
+        column: 'value',
+        label_column: 'label',
+        options: [],
+      },
+    });
+
+    const translate = (
+      key: string,
+      _params?: Record<string, string | number>,
+      fallback?: string,
+    ) => (key === 'clientDebtStatuses.partially_paid' ? 'Частично оплачен' : (fallback ?? key));
+
+    expect(getReferenceOptionLabel(field, 'partially_paid', 'partially_paid', translate)).toBe(
+      'Частично оплачен',
+    );
   });
 });

@@ -48,6 +48,27 @@ if TYPE_CHECKING:
 WAREHOUSE_CODE_SANITIZER_RE = re.compile(r"[^A-Z0-9]+")
 CLIENT_DEBT_STATUSES = ("open", "partially_paid", "closed", "cancelled")
 HIDDEN_WORKSPACE_MODULE_KEYS = frozenset({"finance"})
+WORKSPACE_RESOURCE_READ_PRIVILEGED_ROLES = frozenset({"admin", "super_admin", "manager"})
+ORGANIZATION_SCOPED_STANDALONE_RESOURCE_KEYS = {
+    "core": frozenset(
+        {
+            "departments",
+            "clients",
+            "currencies",
+            "poultry-types",
+            "positions",
+            "roles",
+        }
+    ),
+}
+WORKSPACE_RESOURCE_ALIASES = {
+    "core": (
+        {
+            "source_module_key": "hr",
+            "resource_keys": frozenset({"positions", "roles"}),
+        },
+    ),
+}
 
 
 class OrganizationService(BaseService):
@@ -87,6 +108,89 @@ class DepartmentModuleService(BaseService):
                 normalized.append(value)
         return normalized
 
+    @staticmethod
+    def _normalize_workspace_key(value: object | None) -> str:
+        return str(value or "").strip().lower()
+
+    @classmethod
+    def _can_read_workspace_resource(
+        cls,
+        resource: dict[str, Any],
+        *,
+        actor: CurrentActor | None = None,
+    ) -> bool:
+        if actor is None:
+            return True
+
+        if WORKSPACE_RESOURCE_READ_PRIVILEGED_ROLES.intersection(actor.roles):
+            return True
+
+        permission_prefix = cls._normalize_workspace_key(resource.get("permission_prefix"))
+        if not permission_prefix:
+            return False
+
+        read_permission = f"{permission_prefix}.read"
+        return read_permission in actor.permissions or read_permission in actor.implicit_read_permissions
+
+    @classmethod
+    def _is_workspace_resource_organization_scoped(
+        cls,
+        module: dict[str, Any],
+        resource: dict[str, Any],
+    ) -> bool:
+        if bool(module.get("is_department_assignable", True)):
+            return True
+
+        module_key = cls._normalize_workspace_key(module.get("key"))
+        allowed_resource_keys = ORGANIZATION_SCOPED_STANDALONE_RESOURCE_KEYS.get(module_key)
+        if allowed_resource_keys is None:
+            return True
+
+        return cls._normalize_workspace_key(resource.get("key")) in allowed_resource_keys
+
+    @classmethod
+    def _get_module_workspace_resources(
+        cls,
+        module: dict[str, Any],
+        resources_by_module: dict[str, list[dict[str, Any]]],
+    ) -> list[dict[str, Any]]:
+        module_key = cls._normalize_workspace_key(module.get("key"))
+        combined_resources = [dict(resource) for resource in resources_by_module.get(module_key, [])]
+
+        for alias in WORKSPACE_RESOURCE_ALIASES.get(module_key, ()):
+            source_module_key = cls._normalize_workspace_key(alias.get("source_module_key"))
+            allowed_resource_keys = {
+                cls._normalize_workspace_key(resource_key)
+                for resource_key in alias.get("resource_keys", ())
+            }
+            if not source_module_key or not allowed_resource_keys:
+                continue
+
+            for resource in resources_by_module.get(source_module_key, []):
+                if cls._normalize_workspace_key(resource.get("key")) not in allowed_resource_keys:
+                    continue
+
+                aliased_resource = dict(resource)
+                aliased_resource["api_module_key"] = (
+                    cls._normalize_workspace_key(aliased_resource.get("api_module_key"))
+                    or source_module_key
+                )
+                combined_resources.append(aliased_resource)
+
+        deduplicated_resources: list[dict[str, Any]] = []
+        seen_resource_keys: set[tuple[str, str]] = set()
+        for resource in combined_resources:
+            resource_identity = (
+                cls._normalize_workspace_key(resource.get("key")),
+                cls._normalize_workspace_key(resource.get("api_module_key")),
+            )
+            if resource_identity in seen_resource_keys:
+                continue
+            seen_resource_keys.add(resource_identity)
+            deduplicated_resources.append(resource)
+
+        return deduplicated_resources
+
     def _prepare_create_payload(
         self,
         payload: dict[str, Any],
@@ -110,7 +214,11 @@ class DepartmentModuleService(BaseService):
         next_payload.pop("id", None)
         return self._prepare_create_payload(next_payload, actor=actor)
 
-    async def list_workspace_modules(self) -> Result[dict[str, Any]]:
+    async def list_workspace_modules(
+        self,
+        *,
+        actor: CurrentActor | None = None,
+    ) -> Result[dict[str, Any]]:
         modules = await self.repository.list(
             filters={"is_active": True},
             order_by=("sort_order", "name", "key", "id"),
@@ -128,10 +236,10 @@ class DepartmentModuleService(BaseService):
                 resources_by_module[module_key].append(resource)
 
         def normalize_resource_key(resource: dict[str, Any]) -> str:
-            return str(resource.get("key") or "").strip().lower()
+            return self._normalize_workspace_key(resource.get("key"))
 
         def normalize_resource_api_module_key(resource: dict[str, Any]) -> str:
-            return str(resource.get("api_module_key") or "").strip().lower()
+            return self._normalize_workspace_key(resource.get("api_module_key"))
 
         def get_resource_sort_order(resource: dict[str, Any]) -> int:
             value = resource.get("sort_order")
@@ -155,7 +263,7 @@ class DepartmentModuleService(BaseService):
                             "label": resource.get("name"),
                         }
                         for resource in sorted(
-                            resources_by_module.get(str(module.get("key") or "").strip().lower(), []),
+                            self._get_module_workspace_resources(module, resources_by_module),
                             key=lambda resource: (
                                 get_resource_sort_order(resource),
                                 str(resource.get("name") or ""),
@@ -163,6 +271,8 @@ class DepartmentModuleService(BaseService):
                                 str(resource.get("id") or ""),
                             ),
                         )
+                        if self._is_workspace_resource_organization_scoped(module, resource)
+                        and self._can_read_workspace_resource(resource, actor=actor)
                     ],
                 }
             )

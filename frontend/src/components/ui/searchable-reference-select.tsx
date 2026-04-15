@@ -75,6 +75,17 @@ const mergeOptions = (
   return [...optionMap.values()];
 };
 
+const filterOptions = (options: CrudReferenceOption[], search: string): CrudReferenceOption[] => {
+  const normalizedSearch = search.trim().toLowerCase();
+  if (!normalizedSearch) {
+    return options;
+  }
+
+  return options.filter((option) =>
+    `${option.label} ${option.value}`.toLowerCase().includes(normalizedSearch),
+  );
+};
+
 export function SearchableReferenceSelect({
   moduleKey,
   resourcePath,
@@ -94,6 +105,7 @@ export function SearchableReferenceSelect({
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState('');
   const deferredSearch = useDeferredValue(search);
+  const normalizedDeferredSearch = deferredSearch.trim().toLowerCase();
   const selectedValues = useMemo(() => {
     const normalizedValues = normalizeValues(value);
     if (field.type !== 'uuid') {
@@ -114,6 +126,11 @@ export function SearchableReferenceSelect({
   const resolvedSearchPlaceholder = searchPlaceholder ?? t('common.search', undefined, 'Поиск');
   const resolvedEmptySearchLabel =
     emptySearchLabel ?? t('common.noResults', undefined, 'Ничего не найдено');
+  const localOptions = useMemo(() => field.reference?.options ?? [], [field.reference?.options]);
+  const localFilteredOptions = useMemo(
+    () => filterOptions(localOptions, normalizedDeferredSearch),
+    [localOptions, normalizedDeferredSearch],
+  );
 
   const referenceQuery = useApiQuery({
     queryKey: toQueryKey(
@@ -122,19 +139,22 @@ export function SearchableReferenceSelect({
       moduleKey,
       resourcePath,
       field.name,
-      deferredSearch,
+      normalizedDeferredSearch,
       selectedValues.join(','),
       JSON.stringify(referenceQueryParams ?? {}),
     ),
     queryFn: () =>
       getCrudReferenceOptions(moduleKey, resourcePath, field.name, {
-        search: deferredSearch,
+        search: normalizedDeferredSearch,
         values: selectedValues,
         limit: isMultiple ? 40 : 24,
         extraParams: referenceQueryParams,
       }),
     enabled:
-      Boolean(field.reference) && !useLocalOptionsOnly && (open || selectedValues.length > 0),
+      Boolean(field.reference) &&
+      !useLocalOptionsOnly &&
+      (selectedValues.length > 0 ||
+        (open && (normalizedDeferredSearch.length > 0 || localOptions.length === 0))),
   });
 
   useEffect(() => {
@@ -144,23 +164,24 @@ export function SearchableReferenceSelect({
   }, [open]);
 
   const options = useMemo(
-    () => mergeOptions(field.reference?.options ?? [], referenceQuery.data?.options ?? []),
-    [field.reference?.options, referenceQuery.data?.options],
+    () => mergeOptions(localOptions, referenceQuery.data?.options ?? []),
+    [localOptions, referenceQuery.data?.options],
   );
   const visibleOptions = useMemo(() => {
     if (!useLocalOptionsOnly) {
-      return options;
+      return normalizedDeferredSearch
+        ? mergeOptions(localFilteredOptions, referenceQuery.data?.options ?? [])
+        : options;
     }
 
-    const normalizedSearch = search.trim().toLowerCase();
-    if (!normalizedSearch) {
-      return options;
-    }
-
-    return options.filter((option) =>
-      `${option.label} ${option.value}`.toLowerCase().includes(normalizedSearch),
-    );
-  }, [options, search, useLocalOptionsOnly]);
+    return localFilteredOptions;
+  }, [
+    localFilteredOptions,
+    normalizedDeferredSearch,
+    options,
+    referenceQuery.data?.options,
+    useLocalOptionsOnly,
+  ]);
 
   const selectedOptions = useMemo(() => {
     return selectedValues.map((selectedValue) => {

@@ -112,6 +112,18 @@
   }
 }
 
+@supports (-webkit-touch-callout: none) {
+  @media (max-width: 640px) {
+    @layer base {
+      input:not([type='checkbox']):not([type='radio']):not([type='file']),
+      textarea,
+      select {
+        font-size: 16px !important;
+      }
+    }
+  }
+}
+
 @layer utilities {
   .animate-surface-in {
     animation: surface-in 420ms cubic-bezier(0.18, 0.88, 0.32, 1) both;

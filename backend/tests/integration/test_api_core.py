@@ -77,7 +77,89 @@ async def test_workspace_modules_metadata_endpoint_returns_seeded_modules(api_cl
         str(resource.get("key") or "").strip().lower()
         for resource in module_map["core"]["resources"]
     }
-    assert {"client-debts", "currencies", "warehouses"} <= core_resource_keys
+    assert {
+        "departments",
+        "clients",
+        "currencies",
+        "poultry-types",
+        "positions",
+        "roles",
+    } <= core_resource_keys
+    assert {"organizations", "department-modules", "warehouses", "client-debts"}.isdisjoint(
+        core_resource_keys
+    )
+    core_role_resource = next(
+        resource
+        for resource in module_map["core"]["resources"]
+        if str(resource.get("key") or "").strip().lower() == "roles"
+    )
+    assert str(core_role_resource.get("api_module_key") or "").strip().lower() == "hr"
+
+
+@pytest.mark.asyncio
+async def test_workspace_modules_are_permission_gated_and_keep_core_org_scoped(api_client) -> None:
+    response = await api_client.get(
+        "/api/v1/core/workspace-modules",
+        headers={
+            "X-Employee-Id": "70111111-1111-1111-1111-111111111111",
+            "X-Roles": "viewer",
+            "X-Permissions": "currency.read,poultry_type.read",
+        },
+    )
+    assert response.status_code == 200, response.text
+
+    payload = extract_data(response)
+    module_map = {item["key"]: item for item in payload["items"]}
+    core_resource_keys = {
+        str(resource.get("key") or "").strip().lower()
+        for resource in module_map["core"]["resources"]
+    }
+
+    assert core_resource_keys == {"currencies", "poultry-types"}
+
+
+@pytest.mark.asyncio
+async def test_workspace_modules_expose_org_scoped_roles_inside_core_when_permitted(api_client) -> None:
+    response = await api_client.get(
+        "/api/v1/core/workspace-modules",
+        headers={
+            "X-Employee-Id": "70111111-1111-1111-1111-111111111111",
+            "X-Roles": "viewer",
+            "X-Permissions": "role.read",
+        },
+    )
+    assert response.status_code == 200, response.text
+
+    payload = extract_data(response)
+    module_map = {item["key"]: item for item in payload["items"]}
+    assert "core" in module_map
+    core_resources = module_map["core"]["resources"]
+    assert len(core_resources) == 1
+    assert str(core_resources[0]["key"]).strip().lower() == "roles"
+    assert str(core_resources[0].get("api_module_key") or "").strip().lower() == "hr"
+
+
+@pytest.mark.asyncio
+async def test_workspace_modules_expose_org_scoped_positions_inside_core_when_permitted(
+    api_client,
+) -> None:
+    response = await api_client.get(
+        "/api/v1/core/workspace-modules",
+        headers={
+            "X-Employee-Id": "70111111-1111-1111-1111-111111111111",
+            "X-Roles": "viewer",
+            "X-Permissions": "position.read",
+        },
+    )
+    assert response.status_code == 200, response.text
+
+    payload = extract_data(response)
+    module_map = {item["key"]: item for item in payload["items"]}
+    assert "core" in module_map
+    core_resources = module_map["core"]["resources"]
+    assert len(core_resources) == 1
+    assert str(core_resources[0]["key"]).strip().lower() == "positions"
+    assert str(core_resources[0].get("api_module_key") or "").strip().lower() == "hr"
 
 
 @pytest.mark.asyncio

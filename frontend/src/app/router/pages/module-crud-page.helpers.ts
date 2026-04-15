@@ -158,6 +158,11 @@ const resourceUiConfigs: Record<string, ResourceUiConfig> = {
     tableOrder: ['code', 'name', 'symbol', 'is_default', 'is_active'],
     hideOrganizationFieldWhenScoped: true,
   },
+  'core:poultry-types': {
+    formOrder: ['name', 'code', 'description', 'is_active'],
+    tableOrder: ['name', 'code', 'description', 'is_active'],
+    hideOrganizationFieldWhenScoped: true,
+  },
   'core:warehouses': {
     formOrder: ['department_id', 'name', 'code', 'is_default', 'is_active', 'description'],
     tableOrder: ['name', 'department_id', 'code', 'is_default', 'is_active'],
@@ -804,6 +809,13 @@ export const getReferenceOptionLabel = (
       `cashTransactionTypes.${optionValue}`,
       undefined,
       readableLabel || optionValue,
+    );
+  }
+  if (field.name === 'status') {
+    return translate(
+      `clientDebtStatuses.${optionValue}`,
+      undefined,
+      readableLabel || humanizeKey(optionValue),
     );
   }
   if (field.name === 'item_type') {

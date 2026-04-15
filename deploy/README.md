@@ -166,6 +166,35 @@ chmod +x deploy/scripts/sync-server-files.sh
 
 Если staging не нужен, его каталог можно просто не использовать.
 
+Если реальные env-файлы уже лежат локально в `.envs`, можно сразу залить их на сервер:
+
+```bash
+chmod +x deploy/scripts/merge-env.sh
+./deploy/scripts/merge-env.sh deploy@YOUR_SERVER_IP
+```
+
+Скрипт берёт:
+
+- `.envs/.env.prod` -> `/opt/yembro/prod/.env`
+- `.envs/.env.staging` -> `/opt/yembro/staging/.env`
+- `.envs/.env.edge` -> `/opt/yembro/edge/.env`
+
+По умолчанию он обновляет все три файла. Если нужен только один:
+
+```bash
+./deploy/scripts/merge-env.sh deploy@YOUR_SERVER_IP staging
+./deploy/scripts/merge-env.sh deploy@YOUR_SERVER_IP prod
+./deploy/scripts/merge-env.sh deploy@YOUR_SERVER_IP edge
+```
+
+Опционально можно передать `ssh_port` и `server_root`:
+
+```bash
+./deploy/scripts/merge-env.sh deploy@YOUR_SERVER_IP all 2222 /opt/yembro
+```
+
+Перед заменой удалённый `.env` автоматически сохраняется в `.env-backups/`.
+
 ## 5. Заполнить `.env` файлы
 
 ### `/opt/yembro/prod/.env`

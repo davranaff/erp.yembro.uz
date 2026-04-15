@@ -1,13 +1,12 @@
 import {
   BarChart3,
-  Briefcase,
+  BookOpen,
   Building2,
   CircleHelp,
   ChevronDown,
   History,
   LogOut,
   Settings,
-  ShieldCheck,
   type LucideIcon,
 } from 'lucide-react';
 import { type ReactNode, useEffect, useMemo, useState } from 'react';
@@ -24,8 +23,7 @@ import {
   AccessGate,
   canAccessDashboard,
   canAccessModuleKey,
-  canAccessRoleManagement,
-  canReadCrudResource,
+  hasPrivilegedAccessRole,
   canReadAuditLogs,
   useAuthStore,
 } from '@/shared/auth';
@@ -71,8 +69,7 @@ const primaryNavLinkClassName =
   'flex w-full min-w-0 items-center gap-2 rounded-full border px-4 py-2.5 text-sm font-medium transition-colors';
 const departmentNavLinkClassName =
   'flex w-full min-w-0 items-center gap-2 rounded-full border px-3 py-2 text-sm font-medium transition-colors';
-const HR_MODULE_KEY = 'hr';
-const POSITIONS_RESOURCE_KEY = 'positions';
+const CORE_MODULE_KEY = 'core';
 
 const getWorkspaceModuleConfig = (
   moduleMap: Record<string, BackendModuleConfig>,
@@ -164,17 +161,8 @@ const buildSettingsTarget = (): To => ({
   pathname: ROUTES.settings,
 });
 
-const buildRoleManagementTarget = (): To => ({
-  pathname: ROUTES.roleManagement,
-});
-
 const buildAuditTarget = (): To => ({
   pathname: ROUTES.audit,
-});
-
-const buildPositionsManagementTarget = (): To => ({
-  pathname: ROUTES.dashboardModule(HR_MODULE_KEY),
-  search: `?${new URLSearchParams({ resource: POSITIONS_RESOURCE_KEY }).toString()}`,
 });
 
 function TopNavLink({ to, icon: Icon, label, end = false, isActiveOverride }: TopNavLinkProps) {
@@ -451,7 +439,6 @@ function WorkspaceNavigation() {
   const isRoleManagementRoute = location.pathname === ROUTES.roleManagement;
   const isAuditRoute = location.pathname === ROUTES.audit;
   const requestedDepartmentId = currentSearchParams.get('department') ?? '';
-  const requestedResourceKey = currentSearchParams.get('resource') ?? '';
   const currentModuleKey = useMemo(() => {
     if (!location.pathname.startsWith(`${ROUTES.dashboard}/`)) {
       return '';
@@ -566,28 +553,18 @@ function WorkspaceNavigation() {
   const currentDepartmentNode = currentDepartmentId
     ? (departmentNodeMap.get(currentDepartmentId) ?? null)
     : null;
-  const hrModuleConfig = getWorkspaceModuleConfig(workspaceModuleMap, HR_MODULE_KEY);
-  const positionsResource = useMemo(
+  const currentModuleConfig = getWorkspaceModuleConfig(workspaceModuleMap, currentModuleKey);
+  const canAccessCoreModule = useMemo(
     () =>
-      hrModuleConfig?.resources.find((resource) => resource.key === POSITIONS_RESOURCE_KEY) ?? null,
-    [hrModuleConfig],
+      hasPrivilegedAccessRole(sessionRoles) ||
+      canAccessModuleKey(
+        CORE_MODULE_KEY,
+        sessionRoles,
+        sessionPermissions,
+        sessionDepartmentModuleKey,
+      ),
+    [sessionDepartmentModuleKey, sessionPermissions, sessionRoles],
   );
-  const canAccessPositionsManagement = useMemo(
-    () =>
-      positionsResource
-        ? canReadCrudResource(
-            sessionRoles,
-            sessionPermissions,
-            HR_MODULE_KEY,
-            positionsResource,
-            sessionDepartmentModuleKey,
-          )
-        : false,
-    [positionsResource, sessionDepartmentModuleKey, sessionPermissions, sessionRoles],
-  );
-  const isPositionsManagementRoute =
-    location.pathname === ROUTES.dashboardModule(HR_MODULE_KEY) &&
-    requestedResourceKey === POSITIONS_RESOURCE_KEY;
   const currentModuleRootNodes = useMemo(
     () =>
       departmentTree.filter((rootNode) => {
@@ -601,29 +578,35 @@ function WorkspaceNavigation() {
     ? currentDepartmentNode.label
     : isSettingsRoute
       ? t('nav.settings', undefined, 'Настройки')
-      : isPositionsManagementRoute
-        ? t('nav.positionManagement', undefined, 'Должности')
-        : isRoleManagementRoute
-          ? t('nav.roleManagement', undefined, 'Роли')
-          : isAuditRoute
-            ? t('nav.audit', undefined, 'Аудит')
-            : currentModuleRootNodes.length === 1
-              ? currentModuleRootNodes[0].label
-              : currentModuleKey
-                ? t(
-                    `modules.${currentModuleKey}.label`,
-                    undefined,
-                    getWorkspaceModuleConfig(workspaceModuleMap, currentModuleKey)?.label ??
-                      currentModuleKey,
-                  )
-                : t('nav.dashboard', undefined, 'Дашборд');
+      : isRoleManagementRoute
+        ? t('nav.roleManagement', undefined, 'Роли')
+        : isAuditRoute
+          ? t('nav.audit', undefined, 'Аудит')
+          : currentModuleRootNodes.length === 1
+            ? currentModuleRootNodes[0].label
+            : currentModuleKey
+              ? t(
+                  `modules.${currentModuleKey}.label`,
+                  undefined,
+                  getWorkspaceModuleConfig(workspaceModuleMap, currentModuleKey)?.label ??
+                    currentModuleKey,
+                )
+              : t('nav.dashboard', undefined, 'Дашборд');
   const currentRootDepartmentId =
     currentDepartmentNode?.rootId ??
     (currentModuleRootNodes.length === 1 ? currentModuleRootNodes[0].id : '');
   const [openDropdownDepartmentId, setOpenDropdownDepartmentId] = useState('');
   const hasDepartmentNavigation = departmentTree.length > 0;
-  const currentContextDescription = isPositionsManagementRoute
-    ? t('nav.positionManagement', undefined, 'Должности')
+  const isStandaloneModuleRoute =
+    !currentDepartmentNode &&
+    Boolean(currentModuleKey) &&
+    currentModuleConfig?.isDepartmentAssignable === false;
+  const currentContextDescription = isStandaloneModuleRoute
+    ? t(
+        `modules.${currentModuleKey}.label`,
+        undefined,
+        currentModuleConfig.label || currentModuleKey,
+      )
     : hasDepartmentNavigation
       ? t('resources.departments.label', undefined, 'Отделы')
       : t('settings.description', undefined, 'Профиль и параметры доступа.');
@@ -711,36 +694,18 @@ function WorkspaceNavigation() {
                   icon={Settings}
                   label={t('nav.settings', undefined, 'Настройки')}
                 />
-                {canAccessPositionsManagement ? (
+                {canAccessCoreModule ? (
                   <TopNavLink
-                    to={buildPositionsManagementTarget()}
-                    icon={Briefcase}
-                    label={t('nav.positionManagement', undefined, 'Должности')}
-                    isActiveOverride={(currentLocation) => {
-                      if (currentLocation.pathname !== ROUTES.dashboardModule(HR_MODULE_KEY)) {
-                        return false;
-                      }
-
-                      return (
-                        new URLSearchParams(currentLocation.search).get('resource') ===
-                        POSITIONS_RESOURCE_KEY
-                      );
-                    }}
+                    to={buildModuleTarget({
+                      moduleKey: CORE_MODULE_KEY,
+                      currentModuleKey,
+                      currentDepartmentId,
+                      currentSearchParams,
+                    })}
+                    icon={BookOpen}
+                    label={t('modules.core.label', undefined, 'Справочники')}
                   />
                 ) : null}
-                <AccessGate
-                  access={{
-                    predicate: (context) =>
-                      canAccessRoleManagement(context.roles, context.permissions),
-                  }}
-                >
-                  <TopNavLink
-                    to={buildRoleManagementTarget()}
-                    end
-                    icon={ShieldCheck}
-                    label={t('nav.roleManagement', undefined, 'Роли')}
-                  />
-                </AccessGate>
                 <AccessGate
                   access={{
                     predicate: (context) => canReadAuditLogs(context.roles, context.permissions),
@@ -756,56 +721,58 @@ function WorkspaceNavigation() {
               </div>
             </section>
 
-            <section
-              className="min-w-0 rounded-[24px] border border-slate-200 bg-slate-50 px-3.5 py-3.5"
-              data-tour="workspace-department-nav"
-            >
-              <div className="mb-3 flex items-center justify-between gap-3">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-                  {t('resources.departments.label', undefined, 'Отделы')}
-                </p>
+            <div data-tour="module-department-filter">
+              <section
+                className="min-w-0 rounded-[24px] border border-slate-200 bg-slate-50 px-3.5 py-3.5"
+                data-tour="workspace-department-nav"
+              >
+                <div className="mb-3 flex items-center justify-between gap-3">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                    {t('resources.departments.label', undefined, 'Отделы')}
+                  </p>
+                  {hasDepartmentNavigation ? (
+                    <Badge
+                      variant="outline"
+                      className="border-slate-200 bg-white normal-case tracking-normal"
+                    >
+                      {departmentTree.length}
+                    </Badge>
+                  ) : null}
+                </div>
                 {hasDepartmentNavigation ? (
-                  <Badge
-                    variant="outline"
-                    className="border-slate-200 bg-white normal-case tracking-normal"
-                  >
-                    {departmentTree.length}
-                  </Badge>
-                ) : null}
-              </div>
-              {hasDepartmentNavigation ? (
-                <div className="grid min-w-0 grid-cols-1 gap-2 sm:[grid-template-columns:repeat(auto-fit,minmax(13rem,1fr))]">
-                  {departmentTree.map((rootNode) =>
-                    rootNode.children.length > 0 ? (
-                      <DepartmentNavDropdown
-                        key={rootNode.id}
-                        rootNode={rootNode}
-                        currentDepartmentId={currentDepartmentId}
-                        currentRootDepartmentId={currentRootDepartmentId}
-                        currentModuleKey={currentModuleKey}
-                        currentSearchParams={currentSearchParams}
-                        isOpen={openDropdownDepartmentId === rootNode.id}
-                        onOpenChange={(nextOpen) => {
-                          setOpenDropdownDepartmentId(nextOpen ? rootNode.id : '');
-                        }}
-                      />
-                    ) : (
-                      <DepartmentNavLink
-                        key={rootNode.id}
-                        currentDepartmentId={currentDepartmentId}
-                        currentModuleKey={currentModuleKey}
-                        currentSearchParams={currentSearchParams}
-                        department={rootNode.record}
-                      />
-                    ),
-                  )}
-                </div>
-              ) : (
-                <div className="rounded-2xl border border-dashed border-slate-200 bg-white px-4 py-4 text-sm text-muted-foreground">
-                  {t('crud.currentPageRangeEmpty', undefined, 'На этой странице пока нет строк.')}
-                </div>
-              )}
-            </section>
+                  <div className="grid min-w-0 grid-cols-1 gap-2 sm:[grid-template-columns:repeat(auto-fit,minmax(13rem,1fr))]">
+                    {departmentTree.map((rootNode) =>
+                      rootNode.children.length > 0 ? (
+                        <DepartmentNavDropdown
+                          key={rootNode.id}
+                          rootNode={rootNode}
+                          currentDepartmentId={currentDepartmentId}
+                          currentRootDepartmentId={currentRootDepartmentId}
+                          currentModuleKey={currentModuleKey}
+                          currentSearchParams={currentSearchParams}
+                          isOpen={openDropdownDepartmentId === rootNode.id}
+                          onOpenChange={(nextOpen) => {
+                            setOpenDropdownDepartmentId(nextOpen ? rootNode.id : '');
+                          }}
+                        />
+                      ) : (
+                        <DepartmentNavLink
+                          key={rootNode.id}
+                          currentDepartmentId={currentDepartmentId}
+                          currentModuleKey={currentModuleKey}
+                          currentSearchParams={currentSearchParams}
+                          department={rootNode.record}
+                        />
+                      ),
+                    )}
+                  </div>
+                ) : (
+                  <div className="rounded-2xl border border-dashed border-slate-200 bg-white px-4 py-4 text-sm text-muted-foreground">
+                    {t('crud.currentPageRangeEmpty', undefined, 'На этой странице пока нет строк.')}
+                  </div>
+                )}
+              </section>
+            </div>
           </div>
         </div>
       </div>
