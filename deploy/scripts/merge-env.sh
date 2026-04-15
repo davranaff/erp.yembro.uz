@@ -91,6 +91,7 @@ sync_env_file() {
   local backup_dir
   local tmp_file
   local timestamp
+  local remote_owner_group
 
   source_file="$(resolve_source_file "${environment}")"
   remote_dir="$(resolve_remote_dir "${environment}")"
@@ -106,18 +107,26 @@ sync_env_file() {
 
   "${SSH_CMD[@]}" "${TARGET}" "mkdir -p '${remote_dir}' '${backup_dir}'"
 
+  remote_owner_group="$("${SSH_CMD[@]}" "${TARGET}" "\
+    if [ -f '${remote_file}' ]; then \
+      stat -c '%u:%g' '${remote_file}'; \
+    else \
+      stat -c '%u:%g' '${remote_dir}'; \
+    fi")"
+
   if "${SSH_CMD[@]}" "${TARGET}" "test -f '${remote_file}'"; then
     "${SSH_CMD[@]}" "${TARGET}" \
       "cp '${remote_file}' '${backup_dir}/.env.${timestamp}'"
   fi
 
-  rsync -az -e "${RSYNC_SSH}" \
+  rsync -az --no-owner --no-group -e "${RSYNC_SSH}" \
     "${source_file}" \
     "${TARGET}:${tmp_file}"
 
   "${SSH_CMD[@]}" "${TARGET}" "\
     mv '${tmp_file}' '${remote_file}' && \
-    chmod 600 '${remote_file}'"
+    chmod 600 '${remote_file}' && \
+    if [ \"\$(id -u)\" = '0' ]; then chown '${remote_owner_group}' '${remote_file}'; fi"
 
   echo "Synced ${source_file} -> ${TARGET}:${remote_file}"
 }

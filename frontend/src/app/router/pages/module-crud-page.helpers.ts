@@ -861,6 +861,64 @@ export const buildDepartmentScope = (
   return scope;
 };
 
+type DepartmentOptionCandidate = {
+  id: string;
+};
+
+export const resolveDefaultDepartmentSelection = (
+  actorDepartmentId: string | null | undefined,
+  departmentOptions: readonly DepartmentOptionCandidate[],
+): string => {
+  const normalizedActorDepartmentId =
+    typeof actorDepartmentId === 'string' ? actorDepartmentId : '';
+  if (normalizedActorDepartmentId) {
+    const actorDepartmentOption = departmentOptions.find(
+      (department) => department.id === normalizedActorDepartmentId,
+    );
+    if (actorDepartmentOption) {
+      return actorDepartmentOption.id;
+    }
+  }
+
+  return departmentOptions[0]?.id ?? '';
+};
+
+export const resolveDefaultFormDepartmentId = (
+  selectedDepartmentId: string,
+  actorDepartmentId: string | null | undefined,
+  selectableDepartmentIds: ReadonlySet<string>,
+  selectableDepartmentOptions: readonly DepartmentOptionCandidate[],
+  scopedDepartmentIds: ReadonlySet<string>,
+): string => {
+  if (selectedDepartmentId && selectableDepartmentIds.has(selectedDepartmentId)) {
+    return selectedDepartmentId;
+  }
+
+  const normalizedActorDepartmentId =
+    typeof actorDepartmentId === 'string' ? actorDepartmentId : '';
+  const actorDepartmentIsInScope =
+    !selectedDepartmentId ||
+    scopedDepartmentIds.size === 0 ||
+    scopedDepartmentIds.has(normalizedActorDepartmentId);
+  if (
+    normalizedActorDepartmentId &&
+    selectableDepartmentIds.has(normalizedActorDepartmentId) &&
+    actorDepartmentIsInScope
+  ) {
+    return normalizedActorDepartmentId;
+  }
+
+  const scopedDepartmentOption =
+    selectedDepartmentId && scopedDepartmentIds.size > 0
+      ? selectableDepartmentOptions.find((department) => scopedDepartmentIds.has(department.id))
+      : null;
+  if (scopedDepartmentOption) {
+    return scopedDepartmentOption.id;
+  }
+
+  return selectableDepartmentOptions[0]?.id ?? '';
+};
+
 export const getRecordId = (record: CrudRecord | null | undefined, idColumn: string): string => {
   const candidate = record?.[idColumn];
   if (typeof candidate === 'string' || typeof candidate === 'number') {

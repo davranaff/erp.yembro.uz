@@ -9,6 +9,8 @@ import {
   getInputType,
   getReferenceOptionLabel,
   getResourceUiConfig,
+  resolveDefaultDepartmentSelection,
+  resolveDefaultFormDepartmentId,
 } from './module-crud-page.helpers';
 
 const buildField = (overrides?: Partial<CrudFieldMeta>): CrudFieldMeta => ({
@@ -81,5 +83,43 @@ describe('module CRUD field helpers', () => {
     expect(getReferenceOptionLabel(field, 'partially_paid', 'partially_paid', translate)).toBe(
       'Частично оплачен',
     );
+  });
+
+  it('keeps parent departments selectable for module scope filters', () => {
+    expect(
+      resolveDefaultDepartmentSelection('', [
+        { id: 'root-department' },
+        { id: 'child-department' },
+      ]),
+    ).toBe('root-department');
+
+    expect(
+      resolveDefaultDepartmentSelection('root-department', [
+        { id: 'root-department' },
+        { id: 'child-department' },
+      ]),
+    ).toBe('root-department');
+  });
+
+  it('prefills form department from a leaf inside the selected scope', () => {
+    expect(
+      resolveDefaultFormDepartmentId(
+        'root-department',
+        '',
+        new Set(['child-a', 'child-b']),
+        [{ id: 'child-a' }, { id: 'child-b' }],
+        new Set(['root-department', 'child-a', 'child-b']),
+      ),
+    ).toBe('child-a');
+
+    expect(
+      resolveDefaultFormDepartmentId(
+        'root-department',
+        'child-b',
+        new Set(['child-a', 'child-b']),
+        [{ id: 'child-a' }, { id: 'child-b' }],
+        new Set(['root-department', 'child-a', 'child-b']),
+      ),
+    ).toBe('child-b');
   });
 });

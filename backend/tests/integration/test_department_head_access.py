@@ -163,3 +163,20 @@ async def test_visible_departments_returns_all_departments_for_department_manage
     assert HOME_CHILD_DEPARTMENT_ID in visible_ids
     assert UNRELATED_DEPARTMENT_ID in visible_ids
     assert SECOND_ORGANIZATION_DEPARTMENT_ID not in visible_ids
+
+
+@pytest.mark.asyncio
+async def test_visible_departments_returns_all_departments_for_admin_role(api_client) -> None:
+    response = await api_client.get(
+        VISIBLE_DEPARTMENTS_PATH,
+        headers=_headers(role="admin"),
+    )
+    assert response.status_code == 200, response.text
+
+    payload = extract_data(response)
+    visible_ids = {item["id"] for item in payload["items"]}
+
+    assert HOME_DEPARTMENT_ID in visible_ids
+    assert HOME_CHILD_DEPARTMENT_ID in visible_ids
+    assert UNRELATED_DEPARTMENT_ID in visible_ids
+    assert SECOND_ORGANIZATION_DEPARTMENT_ID not in visible_ids

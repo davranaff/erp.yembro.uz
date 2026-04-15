@@ -147,6 +147,8 @@ import {
   isMultiReferenceField,
   isStructuredAuditValue,
   resolveResourceCategoryGroupId,
+  resolveDefaultDepartmentSelection,
+  resolveDefaultFormDepartmentId,
   shouldExposeResourceInModule,
   sortFieldsByPreferredOrder,
   type AuditSnapshot,
@@ -520,6 +522,7 @@ export function ModuleCrudPage() {
     [availableDepartments],
   );
   const departmentOptions = useMemo(() => flattenDepartmentTree(departmentTree), [departmentTree]);
+  const departmentFilterOptions = departmentOptions;
   const selectableDepartmentOptions = useMemo(
     () => departmentOptions.filter((department) => department.children.length === 0),
     [departmentOptions],
@@ -533,14 +536,14 @@ export function ModuleCrudPage() {
     [selectableDepartmentOptions],
   );
   const availableDepartmentIds = useMemo(
-    () => new Set(departmentOptions.map((department) => department.id)),
-    [departmentOptions],
+    () => new Set(departmentFilterOptions.map((department) => department.id)),
+    [departmentFilterOptions],
   );
-  const supportsDepartmentFilter = selectableDepartmentOptions.length > 0;
+  const supportsDepartmentFilter = departmentFilterOptions.length > 0;
   const selectedDepartmentId =
     supportsDepartmentFilter &&
     isValidUuid(requestedDepartmentId) &&
-    selectableDepartmentIds.has(requestedDepartmentId)
+    availableDepartmentIds.has(requestedDepartmentId)
       ? requestedDepartmentId
       : '';
   const moduleStatsQuery = useApiQuery({
@@ -698,11 +701,13 @@ export function ModuleCrudPage() {
   const actorEmployeeId = authSession?.employeeId ?? actorProfileQuery.data?.employeeId ?? '';
   const currentDepartmentOrganizationId =
     typeof currentDepartment?.organization_id === 'string' ? currentDepartment.organization_id : '';
-  const fallbackDepartmentId =
-    selectedDepartmentId ||
-    (typeof actorDepartmentId === 'string' && availableDepartmentIds.has(actorDepartmentId)
-      ? actorDepartmentId
-      : '');
+  const fallbackDepartmentId = resolveDefaultFormDepartmentId(
+    selectedDepartmentId,
+    actorDepartmentId,
+    selectableDepartmentIds,
+    selectableDepartmentOptions,
+    scopedDepartmentIds,
+  );
   const fallbackOrganizationId = currentDepartmentOrganizationId || actorOrganizationId;
   const moduleLabel = moduleConfig
     ? t(`modules.${moduleConfig.key}.label`, undefined, moduleConfig.label)
@@ -1781,17 +1786,15 @@ export function ModuleCrudPage() {
     if (
       !supportsDepartmentFilter ||
       requestedDepartmentId ||
-      selectableDepartmentOptions.length === 0
+      departmentFilterOptions.length === 0
     ) {
       return;
     }
 
-    const defaultDepartmentId =
-      typeof actorDepartmentId === 'string' && selectableDepartmentIds.has(actorDepartmentId)
-        ? actorDepartmentId
-        : selectableDepartmentOptions.length > 0
-          ? selectableDepartmentOptions[0].id
-          : '';
+    const defaultDepartmentId = resolveDefaultDepartmentSelection(
+      actorDepartmentId,
+      departmentFilterOptions,
+    );
     if (!defaultDepartmentId) {
       return;
     }
@@ -1806,8 +1809,7 @@ export function ModuleCrudPage() {
     );
   }, [
     actorDepartmentId,
-    selectableDepartmentIds,
-    selectableDepartmentOptions,
+    departmentFilterOptions,
     requestedDepartmentId,
     setSearchParams,
     supportsDepartmentFilter,
