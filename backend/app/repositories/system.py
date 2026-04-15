@@ -98,4 +98,101 @@ class AuditLogRepository(BaseRepository[dict[str, object]]):
         return [dict(row) for row in rows]
 
 
-__all__ = ["AuditLogRepository"]
+class TelegramRecipientRepository(BaseRepository[dict[str, object]]):
+    table = "telegram_recipients"
+
+    async def get_by_telegram_account(
+        self,
+        *,
+        telegram_user_id: str,
+        telegram_chat_id: str,
+    ) -> dict[str, object] | None:
+        row = await self.db.fetchrow(
+            """
+            SELECT *
+            FROM telegram_recipients
+            WHERE telegram_user_id = $1
+               OR telegram_chat_id = $2
+            ORDER BY updated_at DESC, created_at DESC, id DESC
+            LIMIT 1
+            """,
+            telegram_user_id,
+            telegram_chat_id,
+        )
+        return dict(row) if row is not None else None
+
+    async def deactivate_other_bindings_for_user(
+        self,
+        *,
+        user_id: str,
+        keep_id: str | None = None,
+        updated_at: datetime,
+    ) -> list[dict[str, object]]:
+        if keep_id:
+            rows = await self.db.fetch(
+                """
+                UPDATE telegram_recipients
+                SET is_active = $1,
+                    updated_at = $2
+                WHERE user_id = $3
+                  AND id <> $4
+                  AND is_active = true
+                RETURNING *
+                """,
+                False,
+                updated_at,
+                user_id,
+                keep_id,
+            )
+        else:
+            rows = await self.db.fetch(
+                """
+                UPDATE telegram_recipients
+                SET is_active = $1,
+                    updated_at = $2
+                WHERE user_id = $3
+                  AND is_active = true
+                RETURNING *
+                """,
+                False,
+                updated_at,
+                user_id,
+            )
+        return [dict(row) for row in rows]
+
+    async def list_active_admin_recipients(
+        self,
+        *,
+        organization_id: str,
+    ) -> list[dict[str, object]]:
+        rows = await self.db.fetch(
+            """
+            SELECT DISTINCT
+                tr.id,
+                tr.telegram_chat_id,
+                tr.telegram_user_id,
+                tr.user_id,
+                tr.organization_id,
+                e.organization_key AS employee_username,
+                e.first_name AS employee_first_name,
+                e.last_name AS employee_last_name
+            FROM telegram_recipients AS tr
+            INNER JOIN employees AS e
+              ON e.id = tr.user_id
+            INNER JOIN employee_roles AS er
+              ON er.employee_id = e.id
+            INNER JOIN roles AS r
+              ON r.id = er.role_id
+            WHERE tr.organization_id = $1
+              AND tr.is_active = true
+              AND e.is_active = true
+              AND r.is_active = true
+              AND lower(r.slug) = 'admin'
+            ORDER BY tr.id
+            """,
+            organization_id,
+        )
+        return [dict(row) for row in rows]
+
+
+__all__ = ["AuditLogRepository", "TelegramRecipientRepository"]

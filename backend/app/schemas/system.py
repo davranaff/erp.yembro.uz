@@ -4,7 +4,7 @@ from datetime import datetime
 from typing import Any
 from uuid import UUID
 
-from app.schemas.base import IDSchema
+from app.schemas.base import BaseSchema, IDSchema
 
 
 class AuditLogReadSchema(IDSchema):
@@ -20,3 +20,8 @@ class AuditLogReadSchema(IDSchema):
     after_data: dict[str, Any] | None = None
     context_data: dict[str, Any] | None = None
     changed_at: datetime
+
+
+class TelegramDeepLinkSchema(BaseSchema):
+    url: str
+    expires_at: datetime

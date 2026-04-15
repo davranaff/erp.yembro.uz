@@ -11,6 +11,7 @@ from app.models import Base
 from app.repositories.base import BaseRepository
 from app.repositories.core import CurrencyRepository
 from app.repositories.system import AuditLogRepository
+from app.services.telegram_alerts import enqueue_operational_admin_alert
 from app.utils.audit import build_changed_fields, normalize_audit_snapshot, normalize_audit_value
 from app.utils.result import Result
 
@@ -840,6 +841,14 @@ class BaseService(ABC):
                 after_data=after_snapshot,
                 actor=actor,
             )
+            await enqueue_operational_admin_alert(
+                action="create",
+                entity_table=self.repository.table,
+                entity_id=str(entity.get(self.repository.id_column)),
+                actor_username=(actor.username if actor is not None else None),
+                before_data=None,
+                after_data=after_snapshot,
+            )
         return Result.ok_result(self._map_read(entity))
 
     async def create_many_safe(self, payloads: list[Any]) -> Result[list[Any]]:
@@ -1000,6 +1009,14 @@ class BaseService(ABC):
                     before_data=before_snapshot,
                     after_data=None,
                     actor=actor,
+                )
+                await enqueue_operational_admin_alert(
+                    action="delete",
+                    entity_table=self.repository.table,
+                    entity_id=str(entity_id),
+                    actor_username=(actor.username if actor is not None else None),
+                    before_data=before_snapshot,
+                    after_data=None,
                 )
         return Result.ok_result(deleted)
 

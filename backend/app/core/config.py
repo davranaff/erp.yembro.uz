@@ -119,6 +119,17 @@ class Settings(BaseSettings):
         default=None,
         validation_alias=AliasChoices("APP_TELEGRAM_PARSE_MODE", "TELEGRAM_PARSE_MODE"),
     )
+    telegram_webhook_secret: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices("APP_TELEGRAM_WEBHOOK_SECRET", "TELEGRAM_WEBHOOK_SECRET"),
+    )
+    telegram_link_token_ttl_minutes: int = Field(
+        default=30,
+        validation_alias=AliasChoices(
+            "APP_TELEGRAM_LINK_TOKEN_TTL_MINUTES",
+            "TELEGRAM_LINK_TOKEN_TTL_MINUTES",
+        ),
+    )
 
     model_config = SettingsConfigDict(
         env_file=(".env", "../.env"),

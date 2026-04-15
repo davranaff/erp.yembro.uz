@@ -41,7 +41,7 @@ from app.models.slaughter import (
     SlaughterSemiProduct,
     SlaughterSemiProductShipment,
 )
-from app.models.system import AuditLog
+from app.models.system import AuditLog, TelegramRecipient
 
 __all__ = [
     "Base",
@@ -93,4 +93,5 @@ __all__ = [
     "MedicineBatch",
     "MedicineConsumption",
     "AuditLog",
+    "TelegramRecipient",
 ]
