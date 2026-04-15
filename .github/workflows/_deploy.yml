@@ -12,6 +12,12 @@ on:
       image_alias:
         required: true
         type: string
+      frontend_api_base_url:
+        required: true
+        type: string
+      public_base_url:
+        required: true
+        type: string
 
 jobs:
   deploy:
@@ -23,7 +29,6 @@ jobs:
       cancel-in-progress: false
     permissions:
       contents: read
-      packages: write
 
     steps:
       - name: Check out repository
@@ -34,20 +39,154 @@ jobs:
 
       - name: Prepare image metadata
         id: meta
+        env:
+          REGISTRY_BACKEND_REPO: ${{ vars.REGISTRY_BACKEND_REPO }}
+          REGISTRY_FRONTEND_REPO: ${{ vars.REGISTRY_FRONTEND_REPO }}
         run: |
           set -Eeuo pipefail
-          repo="${GITHUB_REPOSITORY,,}"
-          echo "backend_image=ghcr.io/${repo}/backend" >> "${GITHUB_OUTPUT}"
-          echo "frontend_image=ghcr.io/${repo}/frontend" >> "${GITHUB_OUTPUT}"
+          sanitize_repo() {
+            printf '%s' "$1" \
+              | tr '[:upper:]' '[:lower:]' \
+              | tr -d '\r\n' \
+              | sed 's/^[[:space:]]*//; s/[[:space:]]*$//'
+          }
+
+          validate_repo() {
+            local value="$1"
+            local name="$2"
+
+            if [[ -z "${value}" ]]; then
+              echo "${name} GitHub variable must not be empty" >&2
+              exit 1
+            fi
+
+            if [[ "${value}" =~ [[:space:]] ]]; then
+              echo "${name} must not contain whitespace: '${value}'" >&2
+              exit 1
+            fi
+
+            if [[ ! "${value}" =~ ^[a-z0-9._/-]+$ ]]; then
+              echo "${name} has invalid format: '${value}'" >&2
+              exit 1
+            fi
+          }
+
+          backend_repo="$(sanitize_repo "${REGISTRY_BACKEND_REPO}")"
+          frontend_repo="$(sanitize_repo "${REGISTRY_FRONTEND_REPO}")"
+          if [[ -z "${backend_repo}" || -z "${frontend_repo}" ]]; then
+            echo "REGISTRY_BACKEND_REPO and REGISTRY_FRONTEND_REPO GitHub vars must be configured" >&2
+            exit 1
+          fi
+          validate_repo "${backend_repo}" "REGISTRY_BACKEND_REPO"
+          validate_repo "${frontend_repo}" "REGISTRY_FRONTEND_REPO"
+          echo "backend_image=${backend_repo}" >> "${GITHUB_OUTPUT}"
+          echo "frontend_image=${frontend_repo}" >> "${GITHUB_OUTPUT}"
           echo "sha_tag=sha-${GITHUB_SHA}" >> "${GITHUB_OUTPUT}"
           echo "alias_tag=${{ inputs.image_alias }}" >> "${GITHUB_OUTPUT}"
 
-      - name: Log in to GHCR
+      - name: Validate deploy configuration
+        id: deploy_config
+        env:
+          REGISTRY_HOST: ${{ vars.REGISTRY_HOST }}
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_PORT: ${{ secrets.DEPLOY_PORT }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+          PUBLIC_BASE_URL: ${{ inputs.public_base_url }}
+        run: |
+          set -Eeuo pipefail
+
+          sanitize_single_line() {
+            printf '%s' "$1" \
+              | tr -d '\r\n' \
+              | sed 's/^[[:space:]]*//; s/[[:space:]]*$//'
+          }
+
+          require_raw_value() {
+            local value="$1"
+            local name="$2"
+
+            if [[ -z "${value}" ]]; then
+              echo "${name} must be configured" >&2
+              exit 1
+            fi
+
+            if [[ "${value}" == "${name}="* ]]; then
+              echo "${name} must contain only the raw value, not '${name}=...'" >&2
+              exit 1
+            fi
+          }
+
+          registry_host="$(sanitize_single_line "${REGISTRY_HOST}")"
+          deploy_host="$(sanitize_single_line "${DEPLOY_HOST}")"
+          deploy_port="$(sanitize_single_line "${DEPLOY_PORT}")"
+          deploy_user="$(sanitize_single_line "${DEPLOY_USER}")"
+          public_base_url="$(sanitize_single_line "${PUBLIC_BASE_URL}")"
+
+          require_raw_value "${registry_host}" "REGISTRY_HOST"
+          require_raw_value "${deploy_host}" "DEPLOY_HOST"
+          require_raw_value "${deploy_port}" "DEPLOY_PORT"
+          require_raw_value "${deploy_user}" "DEPLOY_USER"
+          require_raw_value "${public_base_url}" "PUBLIC_BASE_URL"
+
+          if [[ "${registry_host}" =~ [[:space:]] || ! "${registry_host}" =~ ^[a-z0-9.-]+$ ]]; then
+            echo "REGISTRY_HOST must be a plain hostname like 'registry.example.com'" >&2
+            exit 1
+          fi
+
+          if [[ "${deploy_host}" =~ [[:space:]] || ! "${deploy_host}" =~ ^[a-zA-Z0-9.-]+$ ]]; then
+            echo "DEPLOY_HOST must be a plain hostname or IP like '173.249.24.241', without protocol or extra text" >&2
+            exit 1
+          fi
+
+          if [[ ! "${deploy_port}" =~ ^[0-9]+$ ]]; then
+            echo "DEPLOY_PORT must be numeric, for example '22'" >&2
+            exit 1
+          fi
+
+          if [[ "${deploy_user}" =~ [[:space:]] || ! "${deploy_user}" =~ ^[a-z_][a-z0-9_-]*$ ]]; then
+            echo "DEPLOY_USER must be a plain SSH username like 'deploy'" >&2
+            exit 1
+          fi
+
+          if [[ "${public_base_url}" =~ [[:space:]] || ! "${public_base_url}" =~ ^https?://[a-zA-Z0-9.-]+(/.*)?$ ]]; then
+            echo "PUBLIC_BASE_URL must be a full URL like 'https://staging.example.com'" >&2
+            exit 1
+          fi
+
+          known_hosts="$(
+            printf '%s\n' "${DEPLOY_KNOWN_HOSTS}" \
+              | tr -d '\r' \
+              | sed '/^[[:space:]]*#/d; /^[[:space:]]*$/d'
+          )"
+
+          if [[ -z "${known_hosts}" ]]; then
+            echo "DEPLOY_KNOWN_HOSTS must contain one or more ssh-keyscan lines" >&2
+            exit 1
+          fi
+
+          if grep -q '^DEPLOY_KNOWN_HOSTS=' <<<"${known_hosts}"; then
+            echo "DEPLOY_KNOWN_HOSTS must contain only known_hosts lines, not 'DEPLOY_KNOWN_HOSTS=...'" >&2
+            exit 1
+          fi
+
+          echo "registry_host=${registry_host}" >> "${GITHUB_OUTPUT}"
+          echo "deploy_host=${deploy_host}" >> "${GITHUB_OUTPUT}"
+          echo "deploy_port=${deploy_port}" >> "${GITHUB_OUTPUT}"
+          echo "deploy_user=${deploy_user}" >> "${GITHUB_OUTPUT}"
+          echo "public_base_url=${public_base_url}" >> "${GITHUB_OUTPUT}"
+          {
+            echo "known_hosts<<EOF"
+            printf '%s\n' "${known_hosts}"
+            echo "EOF"
+          } >> "${GITHUB_OUTPUT}"
+
+      - name: Log in to container registry
         uses: docker/login-action@v3
         with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+          registry: ${{ steps.deploy_config.outputs.registry_host }}
+          username: ${{ secrets.REGISTRY_USERNAME }}
+          password: ${{ secrets.REGISTRY_PASSWORD }}
 
       - name: Build and push backend image
         uses: docker/build-push-action@v6
@@ -68,7 +207,7 @@ jobs:
           file: ./frontend/Dockerfile
           push: true
           build-args: |
-            VITE_API_BASE_URL=/api/v1
+            VITE_API_BASE_URL=${{ inputs.frontend_api_base_url }}
             VITE_AUTH_LOGIN_ENDPOINT=/auth/login
             VITE_REQUEST_TIMEOUT_MS=15000
             VITE_APP_NAME=Yembro
@@ -85,7 +224,7 @@ jobs:
 
       - name: Configure known hosts
         env:
-          DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+          DEPLOY_KNOWN_HOSTS: ${{ steps.deploy_config.outputs.known_hosts }}
         run: |
           set -Eeuo pipefail
           mkdir -p ~/.ssh
@@ -95,9 +234,9 @@ jobs:
 
       - name: Sync deployment assets to server
         env:
-          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
-          DEPLOY_PORT: ${{ secrets.DEPLOY_PORT }}
-          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          DEPLOY_HOST: ${{ steps.deploy_config.outputs.deploy_host }}
+          DEPLOY_PORT: ${{ steps.deploy_config.outputs.deploy_port }}
+          DEPLOY_USER: ${{ steps.deploy_config.outputs.deploy_user }}
         run: |
           set -Eeuo pipefail
           port="${DEPLOY_PORT:-22}"
@@ -141,18 +280,20 @@ jobs:
 
       - name: Deploy on remote server
         env:
-          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
-          DEPLOY_PORT: ${{ secrets.DEPLOY_PORT }}
-          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
-          GHCR_PULL_USERNAME: ${{ secrets.GHCR_PULL_USERNAME }}
-          GHCR_PULL_TOKEN: ${{ secrets.GHCR_PULL_TOKEN }}
+          DEPLOY_HOST: ${{ steps.deploy_config.outputs.deploy_host }}
+          DEPLOY_PORT: ${{ steps.deploy_config.outputs.deploy_port }}
+          DEPLOY_USER: ${{ steps.deploy_config.outputs.deploy_user }}
+          REGISTRY_HOST: ${{ steps.deploy_config.outputs.registry_host }}
+          REGISTRY_USERNAME: ${{ secrets.REGISTRY_USERNAME }}
+          REGISTRY_PASSWORD: ${{ secrets.REGISTRY_PASSWORD }}
           BACKEND_IMAGE: ${{ steps.meta.outputs.backend_image }}:${{ steps.meta.outputs.sha_tag }}
           FRONTEND_IMAGE: ${{ steps.meta.outputs.frontend_image }}:${{ steps.meta.outputs.sha_tag }}
         run: |
           set -Eeuo pipefail
           port="${DEPLOY_PORT:-22}"
-          ghcr_user_quoted="$(printf '%q' "${GHCR_PULL_USERNAME}")"
-          ghcr_token_quoted="$(printf '%q' "${GHCR_PULL_TOKEN}")"
+          registry_host_quoted="$(printf '%q' "${REGISTRY_HOST}")"
+          registry_user_quoted="$(printf '%q' "${REGISTRY_USERNAME}")"
+          registry_password_quoted="$(printf '%q' "${REGISTRY_PASSWORD}")"
           backend_image_quoted="$(printf '%q' "${BACKEND_IMAGE}")"
           frontend_image_quoted="$(printf '%q' "${FRONTEND_IMAGE}")"
 
@@ -160,13 +301,13 @@ jobs:
           set -Eeuo pipefail
           cd '${{ inputs.deploy_path }}'
           chmod +x deploy/scripts/*.sh
-          printf '%s' ${ghcr_token_quoted} | docker login ghcr.io -u ${ghcr_user_quoted} --password-stdin
+          printf '%s' ${registry_password_quoted} | docker login ${registry_host_quoted} -u ${registry_user_quoted} --password-stdin
           BACKEND_IMAGE=${backend_image_quoted} FRONTEND_IMAGE=${frontend_image_quoted} EDGE_DIR='/opt/yembro/edge' ./deploy/scripts/deploy.sh '${{ inputs.environment_name }}'
           EOF
 
       - name: Validate public health endpoint
         env:
-          PUBLIC_BASE_URL: ${{ secrets.PUBLIC_BASE_URL }}
+          PUBLIC_BASE_URL: ${{ steps.deploy_config.outputs.public_base_url }}
         run: |
           set -Eeuo pipefail
           curl --fail --silent --show-error --retry 12 --retry-all-errors --retry-delay 5 \

@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+from typing import Annotated
+
 from pydantic import AliasChoices, Field, field_validator
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 
 class Settings(BaseSettings):
@@ -60,6 +62,10 @@ class Settings(BaseSettings):
     public_web_base_url: str = Field(
         default="http://localhost:30080",
         validation_alias=AliasChoices("APP_PUBLIC_WEB_BASE_URL", "PUBLIC_WEB_BASE_URL"),
+    )
+    cors_allow_origins: Annotated[list[str], NoDecode] = Field(
+        default_factory=list,
+        validation_alias=AliasChoices("APP_CORS_ALLOW_ORIGINS", "CORS_ALLOW_ORIGINS"),
     )
     medicine_qr_token_ttl_days: int = Field(
         default=365,
@@ -143,6 +149,19 @@ class Settings(BaseSettings):
         if normalized not in {"auto", "local", "s3"}:
             return "auto"
         return normalized
+
+    @field_validator("cors_allow_origins", mode="before")
+    @classmethod
+    def _normalize_cors_allow_origins(cls, value: object) -> list[str]:
+        if value is None:
+            return []
+        if isinstance(value, str):
+            parts = [part.strip() for part in value.replace("\n", ",").split(",")]
+            return [part for part in parts if part]
+        if isinstance(value, (list, tuple, set)):
+            return [str(item).strip() for item in value if str(item).strip()]
+        normalized = str(value).strip()
+        return [normalized] if normalized else []
 
     @property
     def sqlalchemy_database_url(self) -> str:

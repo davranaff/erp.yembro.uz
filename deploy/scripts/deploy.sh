@@ -34,8 +34,14 @@ fi
 
 set -a
 source ./.env
+compose_project_name="${COMPOSE_PROJECT_NAME:-}"
+edge_compose_project_name=""
 if [[ -f "${EDGE_DIR}/.env" ]]; then
   source "${EDGE_DIR}/.env"
+  edge_compose_project_name="${COMPOSE_PROJECT_NAME:-}"
+fi
+if [[ -n "${compose_project_name}" ]]; then
+  export COMPOSE_PROJECT_NAME="${compose_project_name}"
 fi
 set +a
 
@@ -52,6 +58,10 @@ EOF
 
 docker network create "${PROD_PUBLIC_NETWORK_NAME:-yembro_prod_public}" >/dev/null 2>&1 || true
 docker network create "${STAGING_PUBLIC_NETWORK_NAME:-yembro_staging_public}" >/dev/null 2>&1 || true
+docker network create "${INTERNAL_NETWORK_NAME}" >/dev/null 2>&1 || true
+docker volume create "${POSTGRES_VOLUME_NAME}" >/dev/null 2>&1 || true
+docker volume create "${REDIS_VOLUME_NAME}" >/dev/null 2>&1 || true
+docker volume create "${UPLOADS_VOLUME_NAME}" >/dev/null 2>&1 || true
 
 compose_args=(
   --env-file .env
@@ -72,7 +82,8 @@ if [[ -f "${EDGE_DIR}/compose.edge.yml" && -f "${EDGE_DIR}/.env" ]]; then
     --env-file "${EDGE_DIR}/.env"
     -f "${EDGE_DIR}/compose.edge.yml"
   )
-  docker compose "${edge_compose_args[@]}" up -d proxy
+  COMPOSE_PROJECT_NAME="${edge_compose_project_name:-yembro-edge}" \
+    docker compose "${edge_compose_args[@]}" up -d proxy
 fi
 
 service_is_ready() {

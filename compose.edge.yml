@@ -13,6 +13,7 @@ services:
     networks:
       - prod_public
       - staging_public
+      - registry_public
     restart: unless-stopped
     healthcheck:
       test:
@@ -39,3 +40,6 @@ networks:
   staging_public:
     external: true
     name: ${STAGING_PUBLIC_NETWORK_NAME:-yembro_staging_public}
+  registry_public:
+    external: true
+    name: ${REGISTRY_PUBLIC_NETWORK_NAME:-yembro_registry_public}

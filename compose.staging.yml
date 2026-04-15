@@ -13,14 +13,19 @@ services:
 
 volumes:
   postgres_data:
+    external: true
     name: ${POSTGRES_VOLUME_NAME:-postgres_data_staging}
   redis_data:
+    external: true
     name: ${REDIS_VOLUME_NAME:-redis_data_staging}
   uploads_data:
+    external: true
     name: ${UPLOADS_VOLUME_NAME:-uploads_staging}
 
 networks:
   internal:
+    external: true
     name: ${INTERNAL_NETWORK_NAME:-yembro_staging_internal}
   public:
+    external: true
     name: ${PUBLIC_NETWORK_NAME:-yembro_staging_public}

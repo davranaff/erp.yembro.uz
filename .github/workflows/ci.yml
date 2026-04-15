@@ -1,0 +1,13 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches-ignore:
+      - main
+      - production
+  workflow_dispatch:
+
+jobs:
+  tests:
+    uses: ./.github/workflows/_test.yml
