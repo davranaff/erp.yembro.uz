@@ -72,6 +72,24 @@ def _coerce_sqlite_value(table_name: str, column_name: str, value: object) -> ob
 def _normalize_sqlite_args(args: tuple[object, ...]) -> tuple[object, ...]:
     normalized: list[object] = []
     for value in args:
+        if isinstance(value, UUID):
+            normalized.append(str(value))
+            continue
+        if isinstance(value, Decimal):
+            normalized.append(str(value))
+            continue
+        if isinstance(value, datetime):
+            normalized.append(value.isoformat(sep=" "))
+            continue
+        if isinstance(value, date):
+            normalized.append(value.isoformat())
+            continue
+        if isinstance(value, time):
+            normalized.append(value.isoformat())
+            continue
+        if isinstance(value, bool):
+            normalized.append(int(value))
+            continue
         if isinstance(value, (list, dict)):
             normalized.append(json.dumps(value))
             continue

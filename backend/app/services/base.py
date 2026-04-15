@@ -321,7 +321,7 @@ class BaseService(ABC):
             except (NotImplementedError, AttributeError):
                 python_type = None
 
-            if python_type not in {date, datetime}:
+            if python_type not in {date, datetime, time}:
                 continue
 
             raw_value = next_payload[column_name]
@@ -388,6 +388,29 @@ class BaseService(ABC):
                         continue
                     except ValueError as exc:
                         raise ValidationError(f'Field "{column_name}" has an invalid value.') from exc
+
+            if python_type is time:
+                if isinstance(raw_value, time):
+                    continue
+                if isinstance(raw_value, datetime):
+                    next_payload[column_name] = raw_value.time().replace(tzinfo=None)
+                    continue
+
+                if not isinstance(raw_value, str):
+                    raise ValidationError(f'Field "{column_name}" has an invalid value.')
+
+                value_text = raw_value.strip()
+                if value_text == "":
+                    if column.nullable:
+                        next_payload[column_name] = None
+                        continue
+                    raise ValidationError(f'Field "{column_name}" is required.')
+
+                try:
+                    next_payload[column_name] = time.fromisoformat(value_text)
+                    continue
+                except ValueError as exc:
+                    raise ValidationError(f'Field "{column_name}" has an invalid value.') from exc
 
         return next_payload
 
@@ -497,6 +520,9 @@ class BaseService(ABC):
             return True
         return bool({"super_admin", "admin", "manager"}.intersection(actor.roles))
 
+    def _uses_department_scope(self) -> bool:
+        return self.repository.has_column("department_id")
+
     @staticmethod
     def _is_empty_scope_value(value: Any) -> bool:
         if value is None:
@@ -547,7 +573,7 @@ class BaseService(ABC):
             scoped_filters["organization_id"] = []
             return scoped_filters
 
-        if not self.repository.has_column("department_id"):
+        if not self._uses_department_scope():
             return scoped_filters
         if self._actor_bypasses_department_scope(actor):
             return scoped_filters
@@ -591,7 +617,7 @@ class BaseService(ABC):
         if str(entity_organization_id) != actor.organization_id:
             raise AccessDeniedError("You can only access records inside your organization")
 
-        if not self.repository.has_column("department_id"):
+        if not self._uses_department_scope():
             return
         if self._actor_bypasses_department_scope(actor):
             return
@@ -634,7 +660,7 @@ class BaseService(ABC):
             ):
                 raise ValidationError("organization_id is required")
 
-        if self.repository.has_column("department_id"):
+        if self._uses_department_scope():
             current_department_value = next_payload.get("department_id")
             if self._is_empty_scope_value(current_department_value):
                 if actor is not None and actor.department_id:
@@ -672,7 +698,7 @@ class BaseService(ABC):
         if (
             actor is not None
             and not self._actor_bypasses_department_scope(actor)
-            and self.repository.has_column("department_id")
+            and self._uses_department_scope()
             and "department_id" in next_payload
         ):
             if next_payload["department_id"] is None or str(next_payload["department_id"]) != str(actor.department_id):

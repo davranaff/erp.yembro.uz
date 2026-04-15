@@ -10,6 +10,7 @@ export {
   CommandList,
   CommandSeparator,
 } from './command';
+export { ConfirmDialog } from './confirm-dialog';
 export { CrudDrawer, CrudDrawerFooter } from './crud-drawer';
 export { CustomSelect, type CustomSelectOption } from './custom-select';
 export { ErrorNotice } from './error-notice';

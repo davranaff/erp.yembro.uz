@@ -65,6 +65,7 @@ export type CrudFieldType =
   | 'number'
   | 'boolean'
   | 'date'
+  | 'time'
   | 'datetime'
   | 'json';
 

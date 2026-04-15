@@ -1,5 +1,6 @@
 import {
   BarChart3,
+  Briefcase,
   Building2,
   CircleHelp,
   ChevronDown,
@@ -24,6 +25,7 @@ import {
   canAccessDashboard,
   canAccessModuleKey,
   canAccessRoleManagement,
+  canReadCrudResource,
   canReadAuditLogs,
   useAuthStore,
 } from '@/shared/auth';
@@ -62,12 +64,15 @@ type TopNavLinkProps = {
   icon: LucideIcon;
   label: string;
   end?: boolean;
+  isActiveOverride?: (location: ReturnType<typeof useLocation>) => boolean;
 };
 
 const primaryNavLinkClassName =
   'flex w-full min-w-0 items-center gap-2 rounded-full border px-4 py-2.5 text-sm font-medium transition-colors';
 const departmentNavLinkClassName =
   'flex w-full min-w-0 items-center gap-2 rounded-full border px-3 py-2 text-sm font-medium transition-colors';
+const HR_MODULE_KEY = 'hr';
+const POSITIONS_RESOURCE_KEY = 'positions';
 
 const getWorkspaceModuleConfig = (
   moduleMap: Record<string, BackendModuleConfig>,
@@ -167,14 +172,21 @@ const buildAuditTarget = (): To => ({
   pathname: ROUTES.audit,
 });
 
-function TopNavLink({ to, icon: Icon, label, end = false }: TopNavLinkProps) {
+const buildPositionsManagementTarget = (): To => ({
+  pathname: ROUTES.dashboardModule(HR_MODULE_KEY),
+  search: `?${new URLSearchParams({ resource: POSITIONS_RESOURCE_KEY }).toString()}`,
+});
+
+function TopNavLink({ to, icon: Icon, label, end = false, isActiveOverride }: TopNavLinkProps) {
+  const location = useLocation();
+
   return (
     <NavLink to={to} end={end} className="block min-w-0">
       {({ isActive }) => (
         <div
           className={cn(
             primaryNavLinkClassName,
-            isActive
+            (isActiveOverride ? isActiveOverride(location) : isActive)
               ? 'border-primary/30 bg-primary/10 text-foreground shadow-[0_16px_40px_-28px_rgba(234,88,12,0.18)]'
               : 'border-slate-200 bg-white text-muted-foreground shadow-[0_14px_34px_-28px_rgba(15,23,42,0.12)] hover:border-slate-300 hover:bg-slate-50 hover:text-foreground',
           )}
@@ -439,6 +451,7 @@ function WorkspaceNavigation() {
   const isRoleManagementRoute = location.pathname === ROUTES.roleManagement;
   const isAuditRoute = location.pathname === ROUTES.audit;
   const requestedDepartmentId = currentSearchParams.get('department') ?? '';
+  const requestedResourceKey = currentSearchParams.get('resource') ?? '';
   const currentModuleKey = useMemo(() => {
     if (!location.pathname.startsWith(`${ROUTES.dashboard}/`)) {
       return '';
@@ -553,6 +566,28 @@ function WorkspaceNavigation() {
   const currentDepartmentNode = currentDepartmentId
     ? (departmentNodeMap.get(currentDepartmentId) ?? null)
     : null;
+  const hrModuleConfig = getWorkspaceModuleConfig(workspaceModuleMap, HR_MODULE_KEY);
+  const positionsResource = useMemo(
+    () =>
+      hrModuleConfig?.resources.find((resource) => resource.key === POSITIONS_RESOURCE_KEY) ?? null,
+    [hrModuleConfig],
+  );
+  const canAccessPositionsManagement = useMemo(
+    () =>
+      positionsResource
+        ? canReadCrudResource(
+            sessionRoles,
+            sessionPermissions,
+            HR_MODULE_KEY,
+            positionsResource,
+            sessionDepartmentModuleKey,
+          )
+        : false,
+    [positionsResource, sessionDepartmentModuleKey, sessionPermissions, sessionRoles],
+  );
+  const isPositionsManagementRoute =
+    location.pathname === ROUTES.dashboardModule(HR_MODULE_KEY) &&
+    requestedResourceKey === POSITIONS_RESOURCE_KEY;
   const currentModuleRootNodes = useMemo(
     () =>
       departmentTree.filter((rootNode) => {
@@ -566,25 +601,32 @@ function WorkspaceNavigation() {
     ? currentDepartmentNode.label
     : isSettingsRoute
       ? t('nav.settings', undefined, 'Настройки')
-      : isRoleManagementRoute
-        ? t('nav.roleManagement', undefined, 'Роли')
-        : isAuditRoute
-          ? t('nav.audit', undefined, 'Аудит')
-          : currentModuleRootNodes.length === 1
-            ? currentModuleRootNodes[0].label
-            : currentModuleKey
-              ? t(
-                  `modules.${currentModuleKey}.label`,
-                  undefined,
-                  getWorkspaceModuleConfig(workspaceModuleMap, currentModuleKey)?.label ??
-                    currentModuleKey,
-                )
-              : t('nav.dashboard', undefined, 'Дашборд');
+      : isPositionsManagementRoute
+        ? t('nav.positionManagement', undefined, 'Должности')
+        : isRoleManagementRoute
+          ? t('nav.roleManagement', undefined, 'Роли')
+          : isAuditRoute
+            ? t('nav.audit', undefined, 'Аудит')
+            : currentModuleRootNodes.length === 1
+              ? currentModuleRootNodes[0].label
+              : currentModuleKey
+                ? t(
+                    `modules.${currentModuleKey}.label`,
+                    undefined,
+                    getWorkspaceModuleConfig(workspaceModuleMap, currentModuleKey)?.label ??
+                      currentModuleKey,
+                  )
+                : t('nav.dashboard', undefined, 'Дашборд');
   const currentRootDepartmentId =
     currentDepartmentNode?.rootId ??
     (currentModuleRootNodes.length === 1 ? currentModuleRootNodes[0].id : '');
   const [openDropdownDepartmentId, setOpenDropdownDepartmentId] = useState('');
   const hasDepartmentNavigation = departmentTree.length > 0;
+  const currentContextDescription = isPositionsManagementRoute
+    ? t('nav.positionManagement', undefined, 'Должности')
+    : hasDepartmentNavigation
+      ? t('resources.departments.label', undefined, 'Отделы')
+      : t('settings.description', undefined, 'Профиль и параметры доступа.');
 
   useEffect(() => {
     setOpenDropdownDepartmentId('');
@@ -608,11 +650,7 @@ function WorkspaceNavigation() {
                 <p className="truncate text-xl font-semibold tracking-[-0.03em] text-foreground">
                   {currentDepartmentLabel || t('nav.dashboard', undefined, 'Дашборд')}
                 </p>
-                <p className="text-sm text-muted-foreground">
-                  {hasDepartmentNavigation
-                    ? t('resources.departments.label', undefined, 'Отделы')
-                    : t('settings.description', undefined, 'Профиль и параметры доступа.')}
-                </p>
+                <p className="text-sm text-muted-foreground">{currentContextDescription}</p>
               </div>
             </div>
 
@@ -673,6 +711,23 @@ function WorkspaceNavigation() {
                   icon={Settings}
                   label={t('nav.settings', undefined, 'Настройки')}
                 />
+                {canAccessPositionsManagement ? (
+                  <TopNavLink
+                    to={buildPositionsManagementTarget()}
+                    icon={Briefcase}
+                    label={t('nav.positionManagement', undefined, 'Должности')}
+                    isActiveOverride={(currentLocation) => {
+                      if (currentLocation.pathname !== ROUTES.dashboardModule(HR_MODULE_KEY)) {
+                        return false;
+                      }
+
+                      return (
+                        new URLSearchParams(currentLocation.search).get('resource') ===
+                        POSITIONS_RESOURCE_KEY
+                      );
+                    }}
+                  />
+                ) : null}
                 <AccessGate
                   access={{
                     predicate: (context) =>

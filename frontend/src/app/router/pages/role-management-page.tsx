@@ -12,6 +12,7 @@ import { useNavigate } from 'react-router-dom';
 import { RouteStatusScreen } from '@/app/router/ui/route-status-screen';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { CrudDrawer, CrudDrawerFooter } from '@/components/ui/crud-drawer';
 import { ErrorNotice } from '@/components/ui/error-notice';
 import { Input } from '@/components/ui/input';
@@ -253,6 +254,7 @@ export function RoleManagementPage() {
   const [assignmentError, setAssignmentError] = useState('');
   const [deleteConfirmRoleId, setDeleteConfirmRoleId] = useState('');
   const [isRoleDrawerOpen, setIsRoleDrawerOpen] = useState(false);
+  const [isUnsavedRoleDialogOpen, setIsUnsavedRoleDialogOpen] = useState(false);
   const [isAssignmentsDrawerOpen, setIsAssignmentsDrawerOpen] = useState(false);
   const deferredEmployeeSearch = useDeferredValue(employeeSearch);
 
@@ -604,18 +606,23 @@ export function RoleManagementPage() {
     undefined,
     'Есть несохранённые изменения. Закрыть форму без сохранения?',
   );
+  const closeRoleDrawer = () => {
+    setIsUnsavedRoleDialogOpen(false);
+    setDeleteConfirmRoleId('');
+    setIsRoleDrawerOpen(false);
+    setInitialRoleFormSnapshot(null);
+  };
   const requestCloseRoleDrawer = () => {
     if (saveRoleMutation.isPending || deleteRoleMutation.isPending) {
       return;
     }
 
-    if (isRoleFormDirty && !window.confirm(unsavedRoleFormWarningMessage)) {
+    if (isRoleFormDirty) {
+      setIsUnsavedRoleDialogOpen(true);
       return;
     }
 
-    setDeleteConfirmRoleId('');
-    setIsRoleDrawerOpen(false);
-    setInitialRoleFormSnapshot(null);
+    closeRoleDrawer();
   };
 
   if (!canOpenPage) {
@@ -939,6 +946,7 @@ export function RoleManagementPage() {
         open={isRoleDrawerOpen}
         onOpenChange={(open) => {
           if (open) {
+            setIsUnsavedRoleDialogOpen(false);
             setIsRoleDrawerOpen(true);
             setInitialRoleFormSnapshot(
               (currentSnapshot) => currentSnapshot ?? cloneRoleFormState(roleForm),
@@ -1175,6 +1183,16 @@ export function RoleManagementPage() {
           </div>
         </CrudDrawer>
       </Sheet>
+      <ConfirmDialog
+        open={isUnsavedRoleDialogOpen}
+        onOpenChange={setIsUnsavedRoleDialogOpen}
+        title={t('common.unsavedChangesTitle', undefined, 'Несохранённые изменения')}
+        description={unsavedRoleFormWarningMessage}
+        cancelLabel={t('common.stay', undefined, 'Остаться')}
+        confirmLabel={t('common.discard', undefined, 'Не сохранять')}
+        confirmVariant="destructive"
+        onConfirm={closeRoleDrawer}
+      />
 
       <Sheet
         open={isAssignmentsDrawerOpen}

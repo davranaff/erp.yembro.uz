@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from decimal import Decimal
-from datetime import date, datetime
+from datetime import date, datetime, time
 from typing import Any, Callable, TypeVar
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -105,7 +105,7 @@ def _is_non_text_reference_column(column: Any) -> bool:
     except (NotImplementedError, AttributeError):
         return False
 
-    return python_type in {date, datetime, int, float, Decimal}
+    return python_type in {date, datetime, time, int, float, Decimal}
 
 
 def _fallback_reference_label_columns(
@@ -164,6 +164,8 @@ def _map_field_type(data_type: str, udt_name: str) -> str:
         return "date"
     if "timestamp" in normalized:
         return "datetime"
+    if normalized.startswith("time"):
+        return "time"
     if normalized in {"json", "jsonb", "array"} or normalized_udt.startswith("_"):
         return "json"
     if normalized == "uuid":

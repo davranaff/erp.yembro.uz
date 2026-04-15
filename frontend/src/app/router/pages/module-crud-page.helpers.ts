@@ -48,7 +48,7 @@ const FINANCE_RESOURCE_PERMISSION_PREFIXES = new Set([
   'client_debt',
   'currency',
 ]);
-const PEOPLE_RESOURCE_PERMISSION_PREFIXES = new Set(['employee', 'client']);
+const PEOPLE_RESOURCE_PERMISSION_PREFIXES = new Set(['employee', 'position', 'client']);
 const PEOPLE_RESOURCE_KEYS = new Set(['factory-clients']);
 export const isPasswordFieldName = (fieldName: string): boolean =>
   fieldName.toLowerCase().includes('password');
@@ -140,6 +140,12 @@ const resourceUiConfigs: Record<string, ResourceUiConfig> = {
   'hr:roles': {
     formOrder: ['name', 'slug', 'description', 'permission_ids', 'is_active'],
     tableOrder: ['name', 'slug', 'description', 'is_active'],
+    hideOrganizationFieldWhenScoped: true,
+  },
+  'hr:positions': {
+    formOrder: ['title', 'slug', 'description', 'min_salary', 'max_salary', 'is_active'],
+    tableOrder: ['title', 'slug', 'min_salary', 'max_salary', 'is_active'],
+    hiddenFields: ['department_id'],
     hideOrganizationFieldWhenScoped: true,
   },
   'hr:permissions': {
@@ -425,6 +431,7 @@ type FieldInputKind =
   | 'number'
   | 'boolean'
   | 'date'
+  | 'time'
   | 'datetime'
   | 'json';
 
@@ -522,6 +529,9 @@ export const getFieldInputKind = (field: CrudFieldMeta): FieldInputKind => {
     DATE_FIELD_SUFFIXES.some((suffix) => fieldName.endsWith(suffix))
   ) {
     return 'date';
+  }
+  if (field.type === 'time' || databaseType.startsWith('time')) {
+    return 'time';
   }
   if (field.type === 'datetime' || databaseType.includes('timestamp')) {
     return 'datetime';
@@ -861,6 +871,8 @@ export const getInputType = (field: CrudFieldMeta): string => {
       return 'number';
     case 'date':
       return 'date';
+    case 'time':
+      return 'time';
     case 'datetime':
       return 'datetime-local';
     default:
@@ -888,6 +900,21 @@ export const formatDateTimeDisplayValue = (value: unknown): string => {
   return normalized ? normalized.replace('T', ' ') : EMPTY_TEXT;
 };
 
+const formatTimeValue = (value: unknown): string => {
+  if (typeof value !== 'string') {
+    return EMPTY_TEXT;
+  }
+  const normalized = value.trim();
+  if (!normalized) {
+    return EMPTY_TEXT;
+  }
+  if (normalized.includes('T')) {
+    const timePart = normalized.split('T')[1] ?? normalized;
+    return timePart.slice(0, 5);
+  }
+  return normalized.slice(0, 5);
+};
+
 export const getInputProps = (field: CrudFieldMeta) => {
   const fieldInputKind = getFieldInputKind(field);
   switch (fieldInputKind) {
@@ -902,8 +929,11 @@ export const getInputProps = (field: CrudFieldMeta) => {
     case 'password':
       return { autoComplete: 'new-password' };
     case 'date':
+    case 'time':
     case 'datetime':
-      return { autoComplete: 'off' };
+      return fieldInputKind === 'time'
+        ? { autoComplete: 'off', step: '60' }
+        : { autoComplete: 'off' };
     default:
       return {};
   }
@@ -1026,6 +1056,10 @@ export const buildFormValues = (fields: CrudFieldMeta[], record: CrudRecord | nu
       values[field.name] = formatDateValue(currentValue);
       continue;
     }
+    if (fieldInputKind === 'time') {
+      values[field.name] = formatTimeValue(currentValue);
+      continue;
+    }
     if (fieldInputKind === 'datetime') {
       values[field.name] = formatDateTimeValue(currentValue);
       continue;
@@ -1143,6 +1177,9 @@ export const getDisplayValue = (
   }
   if (fieldInputKind === 'date') {
     return formatDateValue(value);
+  }
+  if (fieldInputKind === 'time') {
+    return formatTimeValue(value);
   }
   if (fieldInputKind === 'datetime') {
     return formatDateTimeDisplayValue(value);

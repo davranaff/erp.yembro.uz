@@ -306,6 +306,31 @@ class PositionService(BaseService):
     def __init__(self, repository: PositionRepository) -> None:
         super().__init__(repository=repository)
 
+    def _uses_department_scope(self) -> bool:
+        return False
+
+    async def _before_create(
+        self,
+        data: dict[str, Any],
+        *,
+        actor=None,
+    ) -> dict[str, Any]:
+        next_data = dict(data)
+        next_data["department_id"] = None
+        return next_data
+
+    async def _before_update(
+        self,
+        entity_id: Any,
+        data: dict[str, Any],
+        *,
+        existing: dict[str, Any],
+        actor=None,
+    ) -> dict[str, Any]:
+        next_data = dict(data)
+        next_data["department_id"] = None
+        return next_data
+
 
 class RoleService(BaseService):
     read_schema = RoleReadSchema

@@ -36,6 +36,7 @@ import { buildModuleAnalyticsPresentation } from '@/app/router/ui/module-analyti
 import { RouteStatusScreen } from '@/app/router/ui/route-status-screen';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { CrudDrawer, CrudDrawerFooter } from '@/components/ui/crud-drawer';
 import { CustomSelect } from '@/components/ui/custom-select';
 import { ErrorNotice } from '@/components/ui/error-notice';
@@ -369,6 +370,7 @@ export function ModuleCrudPage() {
   const [deleteConfirmRecordId, setDeleteConfirmRecordId] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [isFormSheetOpen, setIsFormSheetOpen] = useState(false);
+  const [isUnsavedChangesDialogOpen, setIsUnsavedChangesDialogOpen] = useState(false);
   const [initialFormValuesSnapshot, setInitialFormValuesSnapshot] = useState<FormValues | null>(
     null,
   );
@@ -2182,18 +2184,23 @@ export function ModuleCrudPage() {
     undefined,
     'Есть несохранённые изменения. Закрыть форму без сохранения?',
   );
+  const closeFormSheet = useCallback(() => {
+    setIsUnsavedChangesDialogOpen(false);
+    setIsFormSheetOpen(false);
+    setInitialFormValuesSnapshot(null);
+    setDeleteConfirmRecordId('');
+  }, []);
   const requestCloseFormSheet = () => {
     if (pendingAction) {
       return;
     }
 
-    if (isFormDirty && !window.confirm(unsavedFormWarningMessage)) {
+    if (isFormDirty) {
+      setIsUnsavedChangesDialogOpen(true);
       return;
     }
 
-    setIsFormSheetOpen(false);
-    setInitialFormValuesSnapshot(null);
-    setDeleteConfirmRecordId('');
+    closeFormSheet();
   };
   const resetClientNotificationState = useCallback(() => {
     setClientNotificationTargetId('');
@@ -4687,6 +4694,7 @@ export function ModuleCrudPage() {
                 open={isFormSheetOpen}
                 onOpenChange={(open) => {
                   if (open) {
+                    setIsUnsavedChangesDialogOpen(false);
                     setIsFormSheetOpen(true);
                     setInitialFormValuesSnapshot(
                       (currentSnapshot) => currentSnapshot ?? cloneFormValues(formValues),
@@ -5061,6 +5069,16 @@ export function ModuleCrudPage() {
                   </div>
                 </CrudDrawer>
               </Sheet>
+              <ConfirmDialog
+                open={isUnsavedChangesDialogOpen}
+                onOpenChange={setIsUnsavedChangesDialogOpen}
+                title={t('common.unsavedChangesTitle', undefined, 'Несохранённые изменения')}
+                description={unsavedFormWarningMessage}
+                cancelLabel={t('common.stay', undefined, 'Остаться')}
+                confirmLabel={t('common.discard', undefined, 'Не сохранять')}
+                confirmVariant="destructive"
+                onConfirm={closeFormSheet}
+              />
 
               <Sheet
                 open={isAuditSheetOpen}
