@@ -41,6 +41,7 @@ export {
   hasAllPermissionCodes,
   hasAnyPermissionCode,
   hasPermissionCode,
+  hasModuleManagerRole,
   hasPrivilegedAccessRole,
 } from './access';
 export { useAuthStore } from './auth-store';

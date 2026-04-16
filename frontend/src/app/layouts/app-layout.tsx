@@ -23,6 +23,7 @@ import {
   AccessGate,
   canAccessDashboard,
   canAccessModuleKey,
+  hasModuleManagerRole,
   hasPrivilegedAccessRole,
   canReadAuditLogs,
   useAuthStore,
@@ -557,6 +558,7 @@ function WorkspaceNavigation() {
   const canAccessCoreModule = useMemo(
     () =>
       hasPrivilegedAccessRole(sessionRoles) ||
+      hasModuleManagerRole(sessionRoles) ||
       canAccessModuleKey(
         CORE_MODULE_KEY,
         sessionRoles,
