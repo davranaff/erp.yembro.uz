@@ -1023,16 +1023,6 @@ class StockMovementService(BaseService):
                     },
                 },
                 {
-                    "name": "unit",
-                    "reference": {
-                        "table": "__static__",
-                        "column": "value",
-                        "label_column": "label",
-                        "multiple": False,
-                        "options": _build_static_reference_options(["pcs", "kg", "ltr"]),
-                    },
-                },
-                {
                     "name": "item_key",
                     "reference": {
                         "table": ITEM_KEY_REFERENCE_TABLE,

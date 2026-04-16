@@ -822,10 +822,6 @@ class ClientDebtService(BaseService):
         super().__init__(repository=repository)
 
     @staticmethod
-    def _build_static_reference_options(values: list[str]) -> list[dict[str, str]]:
-        return [{"value": value, "label": value} for value in values]
-
-    @staticmethod
     def _normalize_decimal(raw_value: object | None, *, field_name: str) -> Decimal:
         try:
             return Decimal(str(raw_value))
@@ -882,16 +878,6 @@ class ClientDebtService(BaseService):
                         "label_column": "label",
                         "multiple": False,
                         "options": self._build_static_reference_options(sorted(ITEM_TYPES)),
-                    },
-                },
-                {
-                    "name": "unit",
-                    "reference": {
-                        "table": "__static__",
-                        "column": "value",
-                        "label_column": "label",
-                        "multiple": False,
-                        "options": self._build_static_reference_options(["pcs", "kg", "ltr"]),
                     },
                 },
                 {
