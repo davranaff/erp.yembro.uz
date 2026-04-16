@@ -188,12 +188,9 @@ def _build_module_role_templates(
     for module in modules:
         module_key = _normalize_value(module.get("key"))
         module_name = str(module.get("name") or module_key).strip() or module_key
-        resources = [
-            resource
-            for resource in resources_by_module.get(module_key, [])
-            if _is_operational_resource(resource)
-        ]
-        if not module_key or not resources:
+        all_resources = resources_by_module.get(module_key, [])
+        operational_resources = [r for r in all_resources if _is_operational_resource(r)]
+        if not module_key or not all_resources:
             continue
 
         read_permission_codes: set[str] = set()
@@ -205,7 +202,7 @@ def _build_module_role_templates(
         )
 
         mutable_permission_prefixes: set[str] = set()
-        for resource in resources:
+        for resource in operational_resources:
             permission_prefix = _normalize_value(resource.get("permission_prefix"))
             if not permission_prefix:
                 continue
@@ -224,7 +221,14 @@ def _build_module_role_templates(
 
             if level_slug == "manager":
                 for prefix in CORE_VIEWER_PERMISSION_PREFIXES:
-                    permission_codes.add(f"{prefix}.read")
+                    for action in ("read", "create", "write", "delete"):
+                        permission_codes.add(f"{prefix}.{action}")
+                for resource in all_resources:
+                    permission_prefix = _normalize_value(resource.get("permission_prefix"))
+                    if not permission_prefix:
+                        continue
+                    for action in ("read", "create", "write", "delete"):
+                        permission_codes.add(f"{permission_prefix}.{action}")
 
             templates.append(
                 RoleTemplate(
