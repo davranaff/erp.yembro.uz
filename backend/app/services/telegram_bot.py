@@ -280,27 +280,43 @@ class TelegramBotService:
         if message is None or getattr(message, "chat", None) is None:
             return
 
-        token = self.extract_start_token(getattr(message, "text", None))
-        if not token:
+        message_text = str(getattr(message, "text", "") or "").strip()
+        chat = message.chat
+        chat_id = str(getattr(chat, "id"))
+
+        token = self.extract_start_token(message_text)
+        if token is None:
+            if message_text.lower().startswith("/start"):
+                await self.gateway.send_message(
+                    chat_id=chat_id,
+                    text=(
+                        "Salom! Men Yembro ERP botiman.\n\n"
+                        "Bildirishnomalar olish uchun ERP tizimidan "
+                        "Telegram ulanish havolasini oling."
+                    ),
+                )
             return
 
         employee = await self._resolve_employee_from_start_token(token)
         if employee is None:
+            await self.gateway.send_message(
+                chat_id=chat_id,
+                text="Havola eskirgan yoki noto'g'ri. Iltimos, yangi havola oling.",
+            )
             return
 
         from_user = getattr(message, "from_user", None)
-        chat = message.chat
         await self._upsert_recipient_binding(
             employee=employee,
             telegram_user_id=str(getattr(from_user, "id", "") or getattr(chat, "id")),
-            telegram_chat_id=str(getattr(chat, "id")),
+            telegram_chat_id=chat_id,
             telegram_username=str(getattr(from_user, "username", "") or "").strip() or None,
             telegram_first_name=str(getattr(from_user, "first_name", "") or "").strip() or None,
             telegram_last_name=str(getattr(from_user, "last_name", "") or "").strip() or None,
             telegram_language_code=str(getattr(from_user, "language_code", "") or "").strip() or None,
             chat_type=str(getattr(chat, "type", "private") or "private").strip() or "private",
         )
-        await self._send_confirmation(chat_id=str(getattr(chat, "id")))
+        await self._send_confirmation(chat_id=chat_id)
 
 
 __all__ = ["TELEGRAM_LINK_TOKEN_TYPE", "TelegramBotService"]
