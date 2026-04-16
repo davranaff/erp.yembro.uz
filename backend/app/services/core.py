@@ -52,7 +52,7 @@ if TYPE_CHECKING:
 WAREHOUSE_CODE_SANITIZER_RE = re.compile(r"[^A-Z0-9]+")
 CLIENT_DEBT_STATUSES = ("open", "partially_paid", "closed", "cancelled")
 HIDDEN_WORKSPACE_MODULE_KEYS = frozenset({"finance"})
-WORKSPACE_RESOURCE_READ_PRIVILEGED_ROLES = frozenset({"admin", "super_admin", "manager"})
+WORKSPACE_RESOURCE_READ_PRIVILEGED_SLUGS = frozenset({"admin", "super_admin", "manager"})
 ORGANIZATION_SCOPED_STANDALONE_RESOURCE_KEYS = {
     "core": frozenset(
         {
@@ -133,7 +133,10 @@ class DepartmentModuleService(BaseService):
         if actor is None:
             return True
 
-        if WORKSPACE_RESOURCE_READ_PRIVILEGED_ROLES.intersection(actor.roles):
+        if any(
+            role in WORKSPACE_RESOURCE_READ_PRIVILEGED_SLUGS or role.endswith("-manager")
+            for role in actor.roles
+        ):
             return True
 
         permission_prefix = cls._normalize_workspace_key(resource.get("permission_prefix"))

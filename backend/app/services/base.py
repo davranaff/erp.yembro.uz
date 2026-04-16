@@ -547,7 +547,11 @@ class BaseService(ABC):
     def _actor_bypasses_department_scope(actor: CurrentActor | None) -> bool:
         if actor is None:
             return True
-        return bool({"super_admin", "admin", "manager"}.intersection(actor.roles))
+        privileged = {"super_admin", "admin", "manager"}
+        return any(
+            role in privileged or role.endswith("-manager")
+            for role in actor.roles
+        )
 
     def _uses_department_scope(self) -> bool:
         return self.repository.has_column("department_id")

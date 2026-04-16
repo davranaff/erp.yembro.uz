@@ -43,7 +43,10 @@ def _now_utc() -> datetime:
 
 
 def _actor_bypasses_department_scope(actor: CurrentActor) -> bool:
-    return bool(PRIVILEGED_SCOPE_ROLES.intersection(actor.roles))
+    return any(
+        role in PRIVILEGED_SCOPE_ROLES or role.endswith("-manager")
+        for role in actor.roles
+    )
 
 
 def _sanitize_filename(filename: str, *, fallback: str = "file") -> str:

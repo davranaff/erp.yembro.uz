@@ -44,7 +44,10 @@ export const buildCrudPermission = (permissionPrefix: string, action: CrudAccess
   `${permissionPrefix.trim().toLowerCase()}.${action}`;
 
 export const hasPrivilegedAccessRole = (roles: readonly string[]): boolean => {
-  return hasAnyMatchingValue(roles, PRIVILEGED_ACCESS_ROLES);
+  const normalized = normalizeValues(roles);
+  return normalized.some(
+    (role) => PRIVILEGED_ACCESS_ROLES.has(role) || role.endsWith('-manager'),
+  );
 };
 
 export const hasPermissionCode = (permissions: readonly string[], permission: string): boolean => {
