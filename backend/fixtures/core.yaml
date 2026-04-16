@@ -215,6 +215,16 @@ workspace_resources:
   sort_order: 35
   is_head_visible: false
   is_active: true
+- id: "32000000-0000-0000-0000-000000000102"
+  module_key: "core"
+  key: "expense-categories"
+  name: "Категории расходов"
+  path: "expense-categories"
+  description: "Справочник категорий расходов"
+  permission_prefix: "expense_category"
+  sort_order: 45
+  is_head_visible: false
+  is_active: true
 - id: "32000000-0000-0000-0000-000000000007"
   module_key: "egg"
   key: "production"
