@@ -191,7 +191,12 @@ export const canAccessModule = (
   const primaryResources = moduleConfig.resources.filter(
     (r) => !sharedPrefixes.has(r.permissionPrefix),
   );
-  const resourcesToCheck = primaryResources.length > 0 ? primaryResources : moduleConfig.resources;
+  const resourcesToCheck =
+    primaryResources.length > 0
+      ? primaryResources
+      : moduleConfig.isDepartmentAssignable
+        ? []
+        : moduleConfig.resources;
 
   return (
     getAccessibleModuleResources(
