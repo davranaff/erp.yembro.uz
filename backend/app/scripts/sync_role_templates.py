@@ -14,27 +14,15 @@ from app.repositories.hr import RoleRepository
 from app.scripts.sync_permissions import sync_permissions_for_organizations
 
 
-CORE_VIEWER_SLUG = "core-viewer"
-CORE_VIEWER_NAME = "Справочники — просмотр"
-CORE_VIEWER_DESCRIPTION = "Просмотр организационных справочников без доступа к ролям и правам."
 CORE_VIEWER_PERMISSION_PREFIXES = ("department", "client", "currency", "poultry_type", "position")
-FINANCE_RESOURCE_PERMISSION_PREFIXES = frozenset(
-    {
-        "expense_category",
-        "expense",
-        "cash_account",
-        "cash_transaction",
-        "client_debt",
-        "currency",
-    }
-)
-PEOPLE_RESOURCE_PERMISSION_PREFIXES = frozenset({"employee", "position", "client"})
-PEOPLE_RESOURCE_KEYS = frozenset({"factory-clients"})
-MODULE_ROLE_LEVELS: tuple[tuple[str, str, str, tuple[str, ...]], ...] = (
-    ("viewer", "Просмотр", "Просмотр записей и аналитики модуля.", ("read",)),
-    ("operator", "Оператор", "Работа с записями модуля без удаления.", ("read", "create", "write")),
-    ("manager", "Менеджер", "Полное управление записями модуля.", ("read", "create", "write", "delete")),
-)
+MODULE_ROLE_LABEL_UZ: dict[str, str] = {
+    "egg": "Maточnik boshlig'i",
+    "incubation": "Inkubatsiya boshlig'i",
+    "factory": "Fabrika boshlig'i",
+    "feed": "Yem-xashak boshlig'i",
+    "medicine": "Vet dorixona boshlig'i",
+    "slaughter": "So'yish sexi boshlig'i",
+}
 
 
 @dataclass(frozen=True, slots=True)
@@ -95,17 +83,6 @@ def _is_read_only_resource(resource: dict[str, Any]) -> bool:
     return "analytics" in resource_key or permission_prefix.endswith("_analytics")
 
 
-def _is_operational_resource(resource: dict[str, Any]) -> bool:
-    resource_key = _normalize_value(resource.get("key"))
-    permission_prefix = _normalize_value(resource.get("permission_prefix"))
-
-    if permission_prefix in FINANCE_RESOURCE_PERMISSION_PREFIXES:
-        return False
-    if permission_prefix in PEOPLE_RESOURCE_PERMISSION_PREFIXES:
-        return False
-    if resource_key in PEOPLE_RESOURCE_KEYS:
-        return False
-    return True
 
 
 async def _fetch_organizations(
@@ -168,18 +145,7 @@ async def _fetch_workspace_resources(db: Database) -> dict[str, list[dict[str, A
     return dict(resources_by_module)
 
 
-def _build_core_viewer_template() -> RoleTemplate:
-    return RoleTemplate(
-        slug=CORE_VIEWER_SLUG,
-        name=CORE_VIEWER_NAME,
-        description=CORE_VIEWER_DESCRIPTION,
-        permission_codes=tuple(
-            sorted(f"{permission_prefix}.read" for permission_prefix in CORE_VIEWER_PERMISSION_PREFIXES)
-        ),
-    )
-
-
-def _build_module_role_templates(
+def _build_role_templates(
     modules: list[dict[str, Any]],
     resources_by_module: dict[str, list[dict[str, Any]]],
 ) -> list[RoleTemplate]:
@@ -187,66 +153,44 @@ def _build_module_role_templates(
 
     for module in modules:
         module_key = _normalize_value(module.get("key"))
-        module_name = str(module.get("name") or module_key).strip() or module_key
         all_resources = resources_by_module.get(module_key, [])
-        operational_resources = [r for r in all_resources if _is_operational_resource(r)]
         if not module_key or not all_resources:
             continue
 
-        read_permission_codes: set[str] = set()
-        read_permission_codes.update(
+        permission_codes: set[str] = set()
+
+        permission_codes.update(
             _parse_permission_collection(module.get("implicit_read_permissions"))
         )
-        read_permission_codes.update(
+        permission_codes.update(
             _parse_permission_collection(module.get("analytics_read_permissions"))
         )
 
-        mutable_permission_prefixes: set[str] = set()
-        for resource in operational_resources:
+        for resource in all_resources:
             permission_prefix = _normalize_value(resource.get("permission_prefix"))
             if not permission_prefix:
                 continue
-
-            read_permission_codes.add(f"{permission_prefix}.read")
-            if not _is_read_only_resource(resource):
-                mutable_permission_prefixes.add(permission_prefix)
-
-        for level_slug, level_name, level_description, actions in MODULE_ROLE_LEVELS:
-            permission_codes = set(read_permission_codes)
-            for permission_prefix in mutable_permission_prefixes:
-                for action in actions:
-                    if action == "read":
-                        continue
+            if _is_read_only_resource(resource):
+                permission_codes.add(f"{permission_prefix}.read")
+            else:
+                for action in ("read", "create", "write", "delete"):
                     permission_codes.add(f"{permission_prefix}.{action}")
 
-            if level_slug == "manager":
-                for prefix in CORE_VIEWER_PERMISSION_PREFIXES:
-                    for action in ("read", "create", "write", "delete"):
-                        permission_codes.add(f"{prefix}.{action}")
-                for resource in all_resources:
-                    permission_prefix = _normalize_value(resource.get("permission_prefix"))
-                    if not permission_prefix:
-                        continue
-                    for action in ("read", "create", "write", "delete"):
-                        permission_codes.add(f"{permission_prefix}.{action}")
+        for prefix in CORE_VIEWER_PERMISSION_PREFIXES:
+            for action in ("read", "create", "write", "delete"):
+                permission_codes.add(f"{prefix}.{action}")
 
-            templates.append(
-                RoleTemplate(
-                    slug=f"{module_key}-{level_slug}",
-                    name=f"{module_name} — {level_name}",
-                    description=f"{level_description} Модуль: {module_name}.",
-                    permission_codes=tuple(sorted(permission_codes)),
-                )
+        label = MODULE_ROLE_LABEL_UZ.get(module_key, f"{module_key} boshlig'i")
+        templates.append(
+            RoleTemplate(
+                slug=f"{module_key}-manager",
+                name=label,
+                description=f"Bo'lim boshlig'i — to'liq huquq. Modul: {module_key}.",
+                permission_codes=tuple(sorted(permission_codes)),
             )
+        )
 
     return templates
-
-
-def _build_role_templates(
-    modules: list[dict[str, Any]],
-    resources_by_module: dict[str, list[dict[str, Any]]],
-) -> list[RoleTemplate]:
-    return [_build_core_viewer_template(), *_build_module_role_templates(modules, resources_by_module)]
 
 
 async def _fetch_existing_roles(

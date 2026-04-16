@@ -28,27 +28,13 @@ async def _get_role_permission_codes(sqlite_db, organization_id: str, slug: str)
 
 
 @pytest.mark.asyncio
-async def test_sync_role_templates_creates_core_viewer_and_module_manager_roles(sqlite_db) -> None:
+async def test_sync_role_templates_creates_module_manager_roles(sqlite_db) -> None:
     stats = await sync_role_templates_for_organizations(
         sqlite_db,
         organization_ids=[PRIMARY_ORGANIZATION_ID],
     )
 
     assert stats.organizations_total == 1
-
-    core_viewer_codes = await _get_role_permission_codes(
-        sqlite_db,
-        PRIMARY_ORGANIZATION_ID,
-        "core-viewer",
-    )
-    assert {
-        "department.read",
-        "client.read",
-        "currency.read",
-        "poultry_type.read",
-        "position.read",
-    }.issubset(core_viewer_codes)
-    assert "role.read" not in core_viewer_codes
 
     egg_manager_codes = await _get_role_permission_codes(
         sqlite_db,
@@ -57,11 +43,18 @@ async def test_sync_role_templates_creates_core_viewer_and_module_manager_roles(
     )
     assert {
         "egg_production.read",
+        "egg_production.create",
+        "egg_production.write",
         "egg_production.delete",
-        "egg_shipment.delete",
         "warehouse.read",
-        # managers get справочники (core-viewer) permissions
+        "warehouse.create",
+        "warehouse.write",
+        "warehouse.delete",
+        # manager gets full справочник access
         "department.read",
+        "department.create",
+        "department.write",
+        "department.delete",
         "client.read",
         "currency.read",
         "poultry_type.read",
