@@ -63,6 +63,10 @@ class Settings(BaseSettings):
         default="http://localhost:30080",
         validation_alias=AliasChoices("APP_PUBLIC_WEB_BASE_URL", "PUBLIC_WEB_BASE_URL"),
     )
+    public_api_base_url: str = Field(
+        default="http://localhost:30000",
+        validation_alias=AliasChoices("APP_PUBLIC_API_BASE_URL", "PUBLIC_API_BASE_URL"),
+    )
     cors_allow_origins: Annotated[list[str], NoDecode] = Field(
         default_factory=list,
         validation_alias=AliasChoices("APP_CORS_ALLOW_ORIGINS", "CORS_ALLOW_ORIGINS"),

@@ -43,6 +43,7 @@ export type CrudListOptions = {
   offset?: number;
   orderBy?: string;
   search?: string;
+  departmentId?: string;
 };
 
 export type CrudReferenceOption = {
@@ -217,6 +218,7 @@ export const listCrudRecords = (
     offset: options.offset,
     order_by: options.orderBy,
     search: options.search?.trim() || undefined,
+    department_id: options.departmentId?.trim() || undefined,
   });
   return apiClient.get<CrudListResponse>(`/${moduleKey}/${path}`);
 };

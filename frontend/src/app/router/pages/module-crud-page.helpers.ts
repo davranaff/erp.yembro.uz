@@ -163,6 +163,16 @@ const resourceUiConfigs: Record<string, ResourceUiConfig> = {
     tableOrder: ['name', 'code', 'description', 'is_active'],
     hideOrganizationFieldWhenScoped: true,
   },
+  'core:measurement-units': {
+    formOrder: ['code', 'name', 'description', 'sort_order', 'is_active'],
+    tableOrder: ['code', 'name', 'description', 'sort_order', 'is_active'],
+    hideOrganizationFieldWhenScoped: true,
+  },
+  'core:client-categories': {
+    formOrder: ['code', 'name', 'description', 'sort_order', 'is_active'],
+    tableOrder: ['code', 'name', 'description', 'sort_order', 'is_active'],
+    hideOrganizationFieldWhenScoped: true,
+  },
   'core:warehouses': {
     formOrder: ['department_id', 'name', 'code', 'is_default', 'is_active', 'description'],
     tableOrder: ['name', 'department_id', 'code', 'is_default', 'is_active'],
@@ -277,17 +287,10 @@ const resourceUiConfigs: Record<string, ResourceUiConfig> = {
       'average_weight_kg',
       'unit_price',
       'currency',
-      'invoice_no',
       'note',
     ],
-    tableOrder: [
-      'arrived_on',
-      'supplier_client_id',
-      'birds_count',
-      'average_weight_kg',
-      'invoice_no',
-    ],
-    hiddenFields: ['is_active'],
+    tableOrder: ['arrived_on', 'supplier_client_id', 'birds_count', 'average_weight_kg'],
+    hiddenFields: ['is_active', 'invoice_no'],
     hideDepartmentFieldWhenScoped: true,
     hideOrganizationFieldWhenScoped: true,
   },
@@ -339,11 +342,11 @@ const resourceUiConfigs: Record<string, ResourceUiConfig> = {
       'unit',
       'unit_price',
       'currency',
-      'invoice_no',
       'created_by',
       'note',
     ],
-    tableOrder: ['shipped_on', 'semi_product_id', 'client_id', 'quantity', 'invoice_no'],
+    tableOrder: ['shipped_on', 'semi_product_id', 'client_id', 'quantity'],
+    hiddenFields: ['invoice_no'],
     hideDepartmentFieldWhenScoped: true,
     hideOrganizationFieldWhenScoped: true,
   },
@@ -374,6 +377,24 @@ const resourceUiConfigs: Record<string, ResourceUiConfig> = {
     hiddenFields: ['counterparty_department_id', 'reference_table', 'reference_id'],
     hideDepartmentFieldWhenScoped: true,
     hideOrganizationFieldWhenScoped: true,
+  },
+  'egg:shipments': {
+    hiddenFields: ['invoice_no'],
+  },
+  'incubation:chick-shipments': {
+    hiddenFields: ['invoice_no'],
+  },
+  'feed:raw-arrivals': {
+    hiddenFields: ['invoice_no'],
+  },
+  'feed:product-shipments': {
+    hiddenFields: ['invoice_no'],
+  },
+  'feed:production-batches': {
+    hiddenFields: ['invoice_no'],
+  },
+  'medicine:arrivals': {
+    hiddenFields: ['invoice_no'],
   },
   'medicine:batches': {
     formOrder: [
@@ -743,6 +764,57 @@ export const resolveResourceCategoryGroupId = (
   }
   return 'operations';
 };
+
+const RESOURCE_ICON_KEY_MAP: Record<string, string> = {
+  arrivals: 'PackagePlus',
+  'medicine-arrivals': 'PackagePlus',
+  'feed-arrivals': 'PackagePlus',
+  'chick-arrivals': 'PackagePlus',
+  'raw-arrivals': 'PackagePlus',
+  consumptions: 'PackageMinus',
+  'medicine-consumptions': 'PackageMinus',
+  'feed-consumptions': 'PackageMinus',
+  'raw-consumptions': 'PackageMinus',
+  batches: 'Barcode',
+  'production-batches': 'Barcode',
+  types: 'Tag',
+  production: 'Factory',
+  shipments: 'Truck',
+  'chick-shipments': 'Truck',
+  'product-shipments': 'Truck',
+  'semi-product-shipments': 'Truck',
+  'stock-movements': 'ArrowRightLeft',
+  warehouses: 'Warehouse',
+  clients: 'Users',
+  'factory-clients': 'Users',
+  'client-debts': 'Receipt',
+  employees: 'UserCog',
+  positions: 'Briefcase',
+  'expense-categories': 'FolderOpen',
+  expenses: 'CreditCard',
+  'cash-accounts': 'Landmark',
+  'cash-transactions': 'ArrowLeftRight',
+  currencies: 'CircleDollarSign',
+  organizations: 'Building2',
+  departments: 'Network',
+  'department-modules': 'LayoutGrid',
+  'poultry-types': 'Bird',
+  'measurement-units': 'Ruler',
+  'client-categories': 'Tags',
+  roles: 'ShieldCheck',
+  permissions: 'KeyRound',
+  'monthly-analytics': 'CalendarDays',
+  'factory-monthly-analytics': 'CalendarDays',
+  runs: 'IterationCcw',
+  formulas: 'FlaskConical',
+  ingredients: 'Leaf',
+  'formula-ingredients': 'FlaskRound',
+  processings: 'Scissors',
+  'semi-products': 'Package',
+};
+
+export const resolveResourceIconKey = (resourceKey: string): string =>
+  RESOURCE_ICON_KEY_MAP[resourceKey] ?? 'FileText';
 
 export const shouldExposeResourceInModule = (
   moduleKey: string,

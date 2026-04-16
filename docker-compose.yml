@@ -3,6 +3,7 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+      target: builder
     env_file:
       - ./.env
     depends_on:

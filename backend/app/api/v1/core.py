@@ -22,6 +22,8 @@ from app.repositories.core import (
     DepartmentModuleRepository,
     DepartmentRepository,
     OrganizationRepository,
+    ClientCategoryRepository,
+    MeasurementUnitRepository,
     PoultryTypeRepository,
     WarehouseRepository,
 )
@@ -37,7 +39,9 @@ from app.services.core import (
     CurrencyService,
     DepartmentModuleService,
     DepartmentService,
+    ClientCategoryService,
     OrganizationService,
+    MeasurementUnitService,
     PoultryTypeService,
     WarehouseService,
 )
@@ -346,6 +350,24 @@ router.include_router(
     )
 )
 
+router.include_router(
+    build_crud_router(
+        prefix="measurement-units",
+        service_factory=lambda db: MeasurementUnitService(MeasurementUnitRepository(db)),
+        permission_prefix="measurement_unit",
+        tags=["measurement-unit"],
+    )
+)
+
+router.include_router(
+    build_crud_router(
+        prefix="client-categories",
+        service_factory=lambda db: ClientCategoryService(ClientCategoryRepository(db)),
+        permission_prefix="client_category",
+        tags=["client-category"],
+    )
+)
+
 register_module_stats_route(
     router,
     module="core",
@@ -360,6 +382,8 @@ register_module_stats_route(
         ModuleStatsTable(key="client_debts", label="Client Debts", table="client_debts"),
         ModuleStatsTable(key="currencies", label="Currencies", table="currencies"),
         ModuleStatsTable(key="poultry_types", label="Poultry Types", table="poultry_types"),
+        ModuleStatsTable(key="measurement_units", label="Measurement Units", table="measurement_units"),
+        ModuleStatsTable(key="client_categories", label="Client Categories", table="client_categories"),
     ),
 )
 

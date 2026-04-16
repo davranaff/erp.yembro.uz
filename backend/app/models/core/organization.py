@@ -136,6 +136,18 @@ class Organization(Base, IDMixin, TimestampMixin):
         cascade="all, delete-orphan",
         lazy="selectin",
     )
+    measurement_units: Mapped[List["MeasurementUnit"]] = relationship(
+        "MeasurementUnit",
+        back_populates="organization",
+        cascade="all, delete-orphan",
+        lazy="selectin",
+    )
+    client_categories: Mapped[List["ClientCategory"]] = relationship(
+        "ClientCategory",
+        back_populates="organization",
+        cascade="all, delete-orphan",
+        lazy="selectin",
+    )
     feed_types: Mapped[List["FeedType"]] = relationship(
         "FeedType",
         back_populates="organization",

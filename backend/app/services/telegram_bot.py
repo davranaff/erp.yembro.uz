@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+import logging
 from datetime import datetime, timedelta, timezone
 from typing import Any
 from uuid import UUID, uuid4
 
+import httpx
 from aiogram import Bot
 from aiogram.types import Update
 
@@ -13,6 +15,8 @@ from app.repositories.system import TelegramRecipientRepository
 from app.services.client_notifications import TelegramNotificationGateway
 from app.utils.auth_tokens import TokenError, create_signed_token, decode_signed_token
 
+
+logger = logging.getLogger(__name__)
 
 TELEGRAM_LINK_TOKEN_TYPE = "telegram_link"
 
@@ -197,6 +201,69 @@ class TelegramBotService:
             updated_at=now,
         )
         return recipient
+
+    def _build_webhook_url(self) -> str:
+        base = str(self.settings.public_api_base_url or "").strip().rstrip("/")
+        if not base:
+            raise RuntimeError(
+                "APP_PUBLIC_API_BASE_URL is not configured — "
+                "cannot build Telegram webhook URL"
+            )
+        return f"{base}/api/v1/system/telegram/webhook"
+
+    async def register_webhook(self) -> dict[str, Any]:
+        self._ensure_webhook_configured()
+        webhook_url = self._build_webhook_url()
+        api_base = str(self.settings.telegram_api_base_url or "https://api.telegram.org").strip().rstrip("/")
+        endpoint = f"{api_base}/bot{self._bot_token}/setWebhook"
+        payload = {
+            "url": webhook_url,
+            "secret_token": self._webhook_secret,
+            "allowed_updates": ["message"],
+            "drop_pending_updates": False,
+        }
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            response = await client.post(endpoint, json=payload)
+        body = response.json()
+        ok = bool(body.get("ok"))
+        description = str(body.get("description") or "")
+        if ok:
+            logger.info("Telegram webhook registered: %s", webhook_url)
+        else:
+            logger.error("Telegram setWebhook failed: %s", description)
+        return {"ok": ok, "description": description, "webhook_url": webhook_url}
+
+    async def delete_webhook(self) -> dict[str, Any]:
+        self._ensure_bot_configured()
+        api_base = str(self.settings.telegram_api_base_url or "https://api.telegram.org").strip().rstrip("/")
+        endpoint = f"{api_base}/bot{self._bot_token}/deleteWebhook"
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            response = await client.post(endpoint, json={"drop_pending_updates": False})
+        body = response.json()
+        ok = bool(body.get("ok"))
+        description = str(body.get("description") or "")
+        if ok:
+            logger.info("Telegram webhook deleted")
+        else:
+            logger.error("Telegram deleteWebhook failed: %s", description)
+        return {"ok": ok, "description": description}
+
+    async def get_webhook_info(self) -> dict[str, Any]:
+        self._ensure_bot_configured()
+        api_base = str(self.settings.telegram_api_base_url or "https://api.telegram.org").strip().rstrip("/")
+        endpoint = f"{api_base}/bot{self._bot_token}/getWebhookInfo"
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            response = await client.get(endpoint)
+        body = response.json()
+        result = body.get("result", {})
+        return {
+            "ok": bool(body.get("ok")),
+            "url": result.get("url", ""),
+            "has_custom_certificate": result.get("has_custom_certificate", False),
+            "pending_update_count": result.get("pending_update_count", 0),
+            "last_error_date": result.get("last_error_date"),
+            "last_error_message": result.get("last_error_message"),
+        }
 
     async def process_webhook_update(
         self,

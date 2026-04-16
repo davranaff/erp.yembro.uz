@@ -14,6 +14,8 @@ from app.repositories.core import (
     CurrencyRepository,
     DepartmentRepository,
     DepartmentModuleRepository,
+    ClientCategoryRepository,
+    MeasurementUnitRepository,
     OrganizationRepository,
     PoultryTypeRepository,
     WarehouseRepository,
@@ -25,6 +27,8 @@ from app.schemas.core import (
     CurrencyReadSchema,
     DepartmentReadSchema,
     DepartmentModuleReadSchema,
+    ClientCategoryReadSchema,
+    MeasurementUnitReadSchema,
     OrganizationReadSchema,
     PoultryTypeReadSchema,
     WarehouseReadSchema,
@@ -55,6 +59,8 @@ ORGANIZATION_SCOPED_STANDALONE_RESOURCE_KEYS = {
             "departments",
             "clients",
             "currencies",
+            "measurement-units",
+            "client-categories",
             "poultry-types",
             "positions",
             "roles",
@@ -1309,6 +1315,98 @@ class PoultryTypeService(BaseService):
 
     def __init__(self, repository: PoultryTypeRepository) -> None:
         super().__init__(repository=repository)
+
+
+class MeasurementUnitService(BaseService):
+    read_schema = MeasurementUnitReadSchema
+
+    def __init__(self, repository: MeasurementUnitRepository) -> None:
+        super().__init__(repository=repository)
+
+    def _normalize_payload(self, payload: dict[str, Any]) -> dict[str, Any]:
+        next_payload = dict(payload)
+
+        if "code" in next_payload and next_payload["code"] is not None:
+            normalized_code = str(next_payload["code"]).strip().lower()
+            if not normalized_code:
+                raise ValidationError("code is required")
+            next_payload["code"] = normalized_code
+
+        if "name" in next_payload and next_payload["name"] is not None:
+            normalized_name = str(next_payload["name"]).strip()
+            if not normalized_name:
+                raise ValidationError("name is required")
+            next_payload["name"] = normalized_name
+
+        if "description" in next_payload:
+            normalized_description = str(next_payload["description"] or "").strip()
+            next_payload["description"] = normalized_description or None
+
+        return next_payload
+
+    async def _before_create(
+        self,
+        data: dict[str, Any],
+        *,
+        actor: CurrentActor | None = None,
+    ) -> dict[str, Any]:
+        return self._normalize_payload(data)
+
+    async def _before_update(
+        self,
+        entity_id: Any,
+        data: dict[str, Any],
+        *,
+        existing: dict[str, Any] | None = None,
+        actor: CurrentActor | None = None,
+    ) -> dict[str, Any]:
+        return self._normalize_payload(data)
+
+
+class ClientCategoryService(BaseService):
+    read_schema = ClientCategoryReadSchema
+
+    def __init__(self, repository: ClientCategoryRepository) -> None:
+        super().__init__(repository=repository)
+
+    def _normalize_payload(self, payload: dict[str, Any]) -> dict[str, Any]:
+        next_payload = dict(payload)
+
+        if "code" in next_payload and next_payload["code"] is not None:
+            normalized_code = str(next_payload["code"]).strip().lower()
+            if not normalized_code:
+                raise ValidationError("code is required")
+            next_payload["code"] = normalized_code
+
+        if "name" in next_payload and next_payload["name"] is not None:
+            normalized_name = str(next_payload["name"]).strip()
+            if not normalized_name:
+                raise ValidationError("name is required")
+            next_payload["name"] = normalized_name
+
+        if "description" in next_payload:
+            normalized_description = str(next_payload["description"] or "").strip()
+            next_payload["description"] = normalized_description or None
+
+        return next_payload
+
+    async def _before_create(
+        self,
+        data: dict[str, Any],
+        *,
+        actor: CurrentActor | None = None,
+    ) -> dict[str, Any]:
+        return self._normalize_payload(data)
+
+    async def _before_update(
+        self,
+        entity_id: Any,
+        data: dict[str, Any],
+        *,
+        existing: dict[str, Any] | None = None,
+        actor: CurrentActor | None = None,
+    ) -> dict[str, Any]:
+        return self._normalize_payload(data)
 
 
 class WarehouseService(BaseService):

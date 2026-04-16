@@ -39,6 +39,14 @@ class PoultryTypeRepository(BaseRepository[dict[str, object]]):
     table = "poultry_types"
 
 
+class MeasurementUnitRepository(BaseRepository[dict[str, object]]):
+    table = "measurement_units"
+
+
+class ClientCategoryRepository(BaseRepository[dict[str, object]]):
+    table = "client_categories"
+
+
 __all__ = [
     "OrganizationRepository",
     "DepartmentModuleRepository",
@@ -49,4 +57,6 @@ __all__ = [
     "ClientDebtRepository",
     "CurrencyRepository",
     "PoultryTypeRepository",
+    "MeasurementUnitRepository",
+    "ClientCategoryRepository",
 ]

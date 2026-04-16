@@ -720,11 +720,17 @@ def build_crud_router(
         offset: int = Query(default=0, ge=0),
         order_by: str | None = Query(default=None),
         search: str | None = Query(default=None, min_length=1),
+        department_id: str | None = Query(default=None),
         current_actor: CurrentActor = Depends(get_current_actor),
         db: Database = Depends(db_dependency),
     ) -> dict[str, Any]:
         service = service_factory(db)
+        filters: dict[str, Any] | None = None
+        normalized_department_id = str(department_id or "").strip()
+        if normalized_department_id and service._uses_department_scope():
+            filters = {"department_id": normalized_department_id}
         result = await service.list_with_pagination(
+            filters=filters,
             search=search,
             limit=limit,
             offset=offset,

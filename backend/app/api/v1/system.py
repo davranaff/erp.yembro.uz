@@ -109,3 +109,60 @@ async def telegram_webhook(
             detail=str(exc),
         ) from exc
     return {"ok": True}
+
+
+@router.post(
+    "/telegram/webhook/register",
+    status_code=status.HTTP_200_OK,
+    dependencies=[Depends(require_access("system.manage", roles=("admin", "super_admin")))],
+)
+async def register_telegram_webhook(
+    db: Database = Depends(db_dependency),
+) -> dict[str, Any]:
+    service = TelegramBotService(db)
+    try:
+        result = await service.register_webhook()
+    except RuntimeError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=str(exc),
+        ) from exc
+    return result
+
+
+@router.delete(
+    "/telegram/webhook",
+    status_code=status.HTTP_200_OK,
+    dependencies=[Depends(require_access("system.manage", roles=("admin", "super_admin")))],
+)
+async def delete_telegram_webhook(
+    db: Database = Depends(db_dependency),
+) -> dict[str, Any]:
+    service = TelegramBotService(db)
+    try:
+        result = await service.delete_webhook()
+    except RuntimeError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=str(exc),
+        ) from exc
+    return result
+
+
+@router.get(
+    "/telegram/webhook/info",
+    status_code=status.HTTP_200_OK,
+    dependencies=[Depends(require_access("system.manage", roles=("admin", "super_admin")))],
+)
+async def get_telegram_webhook_info(
+    db: Database = Depends(db_dependency),
+) -> dict[str, Any]:
+    service = TelegramBotService(db)
+    try:
+        result = await service.get_webhook_info()
+    except RuntimeError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=str(exc),
+        ) from exc
+    return result

@@ -33,6 +33,8 @@ FIXTURE_LOAD_ORDER = [
     "client_debts",
     "currencies",
     "poultry_types",
+    "measurement_units",
+    "client_categories",
     "positions",
     "roles",
     "permissions",

@@ -103,11 +103,22 @@ class BaseService(ABC):
                 {
                     "name": "unit",
                     "reference": {
-                        "table": "__static__",
-                        "column": "value",
-                        "label_column": "label",
+                        "table": "measurement_units",
+                        "column": "code",
+                        "label_column": "name",
                         "multiple": False,
-                        "options": self._build_static_reference_options(["pcs", "kg", "ltr"]),
+                    },
+                }
+            )
+        if self.repository.has_column("category"):
+            fields.append(
+                {
+                    "name": "category",
+                    "reference": {
+                        "table": "client_categories",
+                        "column": "code",
+                        "label_column": "name",
+                        "multiple": False,
                     },
                 }
             )

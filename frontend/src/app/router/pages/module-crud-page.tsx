@@ -1,18 +1,54 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { format, subDays } from 'date-fns';
 import {
+  ArrowLeftRight,
+  ArrowRightLeft,
+  Barcode,
   BarChart3,
+  Bird,
+  Briefcase,
+  Building2,
+  CalendarDays,
+  Check,
+  ChevronDown,
+  CircleDollarSign,
   Copy,
+  CreditCard,
   Download,
   ExternalLink,
+  Factory,
+  FileText,
+  FlaskConical,
+  FlaskRound,
+  FolderOpen,
   History,
+  IterationCcw,
+  KeyRound,
+  Landmark,
+  LayoutGrid,
+  Leaf,
+  Network,
+  Package,
+  PackageMinus,
+  PackagePlus,
   Paperclip,
   Pencil,
   Plus,
   Printer,
   QrCode,
+  Receipt,
+  Ruler,
+  Scissors,
   Send,
+  ShieldCheck,
+  Tag,
+  Tags,
   Trash2,
+  Truck,
+  UserCog,
+  Users,
+  Wallet,
+  Warehouse,
 } from 'lucide-react';
 import {
   type ChangeEvent as ReactChangeEvent,
@@ -50,6 +86,7 @@ import {
   PaginationNext,
   PaginationPrevious,
 } from '@/components/ui/pagination';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { SearchableReferenceSelect } from '@/components/ui/searchable-reference-select';
 import { Sheet, SheetContent, SheetFooter, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { getMyProfile } from '@/shared/api/auth';
@@ -147,6 +184,7 @@ import {
   isMultiReferenceField,
   isStructuredAuditValue,
   resolveResourceCategoryGroupId,
+  resolveResourceIconKey,
   resolveDefaultDepartmentSelection,
   resolveDefaultFormDepartmentId,
   shouldExposeResourceInModule,
@@ -164,6 +202,56 @@ const parseDecimalValue = (value: string): number => {
   const normalized = value.trim().replace(',', '.');
   const parsed = Number.parseFloat(normalized);
   return Number.isFinite(parsed) ? parsed : Number.NaN;
+};
+
+const LUCIDE_ICON_MAP: Record<string, React.ComponentType<{ className?: string }>> = {
+  PackagePlus,
+  PackageMinus,
+  Barcode,
+  Tag,
+  Factory,
+  Truck,
+  ArrowRightLeft,
+  Warehouse,
+  Users,
+  Receipt,
+  UserCog,
+  Briefcase,
+  FolderOpen,
+  CreditCard,
+  Landmark,
+  ArrowLeftRight,
+  CircleDollarSign,
+  Building2,
+  Network,
+  LayoutGrid,
+  Bird,
+  Ruler,
+  Tags,
+  ShieldCheck,
+  KeyRound,
+  CalendarDays,
+  IterationCcw,
+  FlaskConical,
+  Leaf,
+  FlaskRound,
+  Scissors,
+  Package,
+  FileText,
+};
+
+const getResourceIcon = (resourceKey: string): React.ComponentType<{ className?: string }> => {
+  const iconKey = resolveResourceIconKey(resourceKey);
+  return LUCIDE_ICON_MAP[iconKey] ?? FileText;
+};
+
+const GROUP_ICON_MAP: Record<
+  ResourceCategoryGroupId,
+  React.ComponentType<{ className?: string }>
+> = {
+  finance: Wallet,
+  people_clients: Users,
+  operations: LayoutGrid,
 };
 
 type WarehouseRecord = CrudRecord & {
@@ -1137,8 +1225,14 @@ export function ModuleCrudPage() {
   });
 
   const listQuery = useApiQuery<CrudListResponse>({
-    queryKey: baseQueryKeys.crud.resource(moduleKey || 'unknown', activeResource?.key ?? 'unknown'),
-    queryFn: () => listCrudRecords(resourceModuleKey, activeResource!.path),
+    queryKey: [
+      ...baseQueryKeys.crud.resource(moduleKey || 'unknown', activeResource?.key ?? 'unknown'),
+      selectedDepartmentId || 'all',
+    ],
+    queryFn: () =>
+      listCrudRecords(resourceModuleKey, activeResource!.path, {
+        departmentId: selectedDepartmentId || undefined,
+      }),
     enabled: Boolean(
       moduleConfig && activeResource && activeView === 'records' && hasAnyResourceAccess,
     ),
@@ -4117,32 +4211,69 @@ export function ModuleCrudPage() {
               {groupedAvailableResources.length > 0 ? (
                 <div className="space-y-3">
                   {groupedAvailableResources.length > 1 ? (
-                    <div className="flex flex-wrap gap-2" data-tour="module-resource-group-switch">
-                      {groupedAvailableResources.map((group) => (
-                        <Button
-                          key={`group-switch:${group.id}`}
-                          type="button"
-                          variant={
-                            group.id === effectiveSelectedResourceGroupId ? 'default' : 'outline'
-                          }
+                    <div
+                      className="flex items-center gap-2"
+                      data-tour="module-resource-group-switch"
+                    >
+                      <Popover>
+                        <PopoverTrigger
                           className={cn(
-                            'rounded-full',
-                            group.id === effectiveSelectedResourceGroupId
-                              ? 'shadow-[0_18px_42px_-28px_rgba(234,88,12,0.42)]'
-                              : 'border-border/75 bg-card shadow-[0_16px_36px_-28px_rgba(15,23,42,0.1)]',
+                            'inline-flex items-center gap-2 rounded-full border border-border/75 bg-card px-4 py-2.5 text-sm font-medium shadow-[0_16px_38px_-28px_rgba(15,23,42,0.1)] transition-colors hover:bg-background',
                           )}
-                          onClick={() => setSelectedResourceGroupId(group.id)}
-                          data-tour={
-                            group.id === 'people_clients'
-                              ? 'module-resource-group-people-clients'
-                              : group.id === 'operations'
-                                ? 'module-resource-group-operations'
-                                : undefined
-                          }
                         >
-                          {group.label}
-                        </Button>
-                      ))}
+                          {(() => {
+                            const ActiveGroupIcon =
+                              GROUP_ICON_MAP[
+                                effectiveSelectedResourceGroupId as ResourceCategoryGroupId
+                              ];
+                            return <ActiveGroupIcon className="h-4 w-4 text-muted-foreground" />;
+                          })()}
+                          <span>
+                            {groupedAvailableResources.find(
+                              (g) => g.id === effectiveSelectedResourceGroupId,
+                            )?.label ?? ''}
+                          </span>
+                          <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
+                        </PopoverTrigger>
+                        <PopoverContent
+                          align="start"
+                          sideOffset={8}
+                          className="w-auto min-w-[200px] rounded-2xl border border-border/80 p-2"
+                        >
+                          <div className="flex flex-col gap-1">
+                            {groupedAvailableResources.map((group) => {
+                              const ResolvedGroupIcon = GROUP_ICON_MAP[group.id];
+                              const isActive = group.id === effectiveSelectedResourceGroupId;
+                              return (
+                                <button
+                                  key={`group-switch:${group.id}`}
+                                  type="button"
+                                  className={cn(
+                                    'flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-medium transition-colors',
+                                    isActive
+                                      ? 'bg-primary/10 text-primary'
+                                      : 'text-foreground hover:bg-muted',
+                                  )}
+                                  onClick={() => setSelectedResourceGroupId(group.id)}
+                                  data-tour={
+                                    group.id === 'people_clients'
+                                      ? 'module-resource-group-people-clients'
+                                      : group.id === 'operations'
+                                        ? 'module-resource-group-operations'
+                                        : undefined
+                                  }
+                                >
+                                  <ResolvedGroupIcon className="h-4 w-4 shrink-0" />
+                                  <span className="flex-1">{group.label}</span>
+                                  {isActive ? (
+                                    <Check className="h-4 w-4 shrink-0 text-primary" />
+                                  ) : null}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </PopoverContent>
+                      </Popover>
                     </div>
                   ) : null}
 
@@ -4152,40 +4283,44 @@ export function ModuleCrudPage() {
                       data-tour="module-resource-tabs"
                     >
                       <div className="flex flex-wrap gap-2">
-                        {visibleResourceGroup.resources.map((resource) => (
-                          <Button
-                            key={`${visibleResourceGroup.id}:${resource.key}`}
-                            type="button"
-                            variant={resource.key === activeResource?.key ? 'default' : 'outline'}
-                            className={cn(
-                              'rounded-full',
-                              resource.key === activeResource?.key
-                                ? 'shadow-[0_18px_42px_-28px_rgba(234,88,12,0.42)]'
-                                : 'border-border/75 bg-card shadow-[0_16px_36px_-28px_rgba(15,23,42,0.1)]',
-                            )}
-                            onClick={() => handleResourceSelect(resource.key)}
-                            data-tour={
-                              resource.apiModuleKey === 'core' && resource.path === 'clients'
-                                ? 'module-tab-core-clients'
-                                : resource.apiModuleKey === 'core' &&
-                                    resource.path === 'client-debts'
-                                  ? 'module-tab-core-client-debts'
+                        {visibleResourceGroup.resources.map((resource) => {
+                          const ResourceIcon = getResourceIcon(resource.key);
+                          return (
+                            <Button
+                              key={`${visibleResourceGroup.id}:${resource.key}`}
+                              type="button"
+                              variant={resource.key === activeResource?.key ? 'default' : 'outline'}
+                              className={cn(
+                                'rounded-full',
+                                resource.key === activeResource?.key
+                                  ? 'shadow-[0_18px_42px_-28px_rgba(234,88,12,0.42)]'
+                                  : 'border-border/75 bg-card shadow-[0_16px_36px_-28px_rgba(15,23,42,0.1)]',
+                              )}
+                              onClick={() => handleResourceSelect(resource.key)}
+                              data-tour={
+                                resource.apiModuleKey === 'core' && resource.path === 'clients'
+                                  ? 'module-tab-core-clients'
                                   : resource.apiModuleKey === 'core' &&
-                                      resource.path === 'warehouses'
-                                    ? 'module-tab-core-warehouses'
-                                    : resource.apiModuleKey === 'inventory' &&
-                                        resource.path === 'movements'
-                                      ? 'module-tab-inventory-movements'
-                                      : undefined
-                            }
-                          >
-                            {t(
-                              `resources.${resource.translationKey ?? resource.key}.label`,
-                              undefined,
-                              resource.label,
-                            )}
-                          </Button>
-                        ))}
+                                      resource.path === 'client-debts'
+                                    ? 'module-tab-core-client-debts'
+                                    : resource.apiModuleKey === 'core' &&
+                                        resource.path === 'warehouses'
+                                      ? 'module-tab-core-warehouses'
+                                      : resource.apiModuleKey === 'inventory' &&
+                                          resource.path === 'movements'
+                                        ? 'module-tab-inventory-movements'
+                                        : undefined
+                              }
+                            >
+                              <ResourceIcon className="h-4 w-4" />
+                              {t(
+                                `resources.${resource.translationKey ?? resource.key}.label`,
+                                undefined,
+                                resource.label,
+                              )}
+                            </Button>
+                          );
+                        })}
                       </div>
                     </div>
                   ) : null}

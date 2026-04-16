@@ -182,6 +182,46 @@ class PoultryTypeListResponse(CRUDListResponse[PoultryTypeReadSchema]):
     """Paginated poultry type response."""
 
 
+class MeasurementUnitCreateSchema(OpenSchema, BaseCreateSchema):
+    """Input payload to create measurement unit."""
+
+
+class MeasurementUnitUpdateSchema(OpenSchema, BaseUpdateSchema):
+    """Input payload to update measurement unit."""
+
+
+class MeasurementUnitReadSchema(OpenSchema, BaseReadSchema):
+    """Readable measurement unit response."""
+
+
+class MeasurementUnitListParams(CRUDBaseParams):
+    """Pagination + query params for measurement unit list."""
+
+
+class MeasurementUnitListResponse(CRUDListResponse[MeasurementUnitReadSchema]):
+    """Paginated measurement unit response."""
+
+
+class ClientCategoryCreateSchema(OpenSchema, BaseCreateSchema):
+    """Input payload to create client category."""
+
+
+class ClientCategoryUpdateSchema(OpenSchema, BaseUpdateSchema):
+    """Input payload to update client category."""
+
+
+class ClientCategoryReadSchema(OpenSchema, BaseReadSchema):
+    """Readable client category response."""
+
+
+class ClientCategoryListParams(CRUDBaseParams):
+    """Pagination + query params for client category list."""
+
+
+class ClientCategoryListResponse(CRUDListResponse[ClientCategoryReadSchema]):
+    """Paginated client category response."""
+
+
 __all__ = [
     "OrganizationCreateSchema",
     "OrganizationUpdateSchema",
@@ -226,4 +266,14 @@ __all__ = [
     "PoultryTypeReadSchema",
     "PoultryTypeListParams",
     "PoultryTypeListResponse",
+    "MeasurementUnitCreateSchema",
+    "MeasurementUnitUpdateSchema",
+    "MeasurementUnitReadSchema",
+    "MeasurementUnitListParams",
+    "MeasurementUnitListResponse",
+    "ClientCategoryCreateSchema",
+    "ClientCategoryUpdateSchema",
+    "ClientCategoryReadSchema",
+    "ClientCategoryListParams",
+    "ClientCategoryListResponse",
 ]
