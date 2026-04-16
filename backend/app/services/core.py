@@ -133,10 +133,7 @@ class DepartmentModuleService(BaseService):
         if actor is None:
             return True
 
-        if any(
-            role in WORKSPACE_RESOURCE_READ_PRIVILEGED_SLUGS or role.endswith("-manager")
-            for role in actor.roles
-        ):
+        if WORKSPACE_RESOURCE_READ_PRIVILEGED_SLUGS.intersection(actor.roles):
             return True
 
         permission_prefix = cls._normalize_workspace_key(resource.get("permission_prefix"))
