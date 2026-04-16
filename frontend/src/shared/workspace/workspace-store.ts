@@ -125,12 +125,17 @@ const buildSharedPermissionPrefixes = (modules: BackendModuleConfig[]): Set<stri
   const prefixCount = new Map<string, number>();
   for (const module of modules) {
     for (const resource of module.resources) {
-      prefixCount.set(resource.permissionPrefix, (prefixCount.get(resource.permissionPrefix) ?? 0) + 1);
+      prefixCount.set(
+        resource.permissionPrefix,
+        (prefixCount.get(resource.permissionPrefix) ?? 0) + 1,
+      );
     }
   }
   const shared = new Set<string>();
   for (const [prefix, count] of prefixCount) {
-    if (count > 1) shared.add(prefix);
+    if (count > 1) {
+      shared.add(prefix);
+    }
   }
   return shared;
 };

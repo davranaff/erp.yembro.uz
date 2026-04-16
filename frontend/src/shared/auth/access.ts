@@ -178,7 +178,9 @@ export const canAccessModule = (
   moduleConfig: BackendModuleConfig,
   departmentModuleKey?: string | null,
 ): boolean => {
-  if (hasPrivilegedAccessRole(roles)) return true;
+  if (hasPrivilegedAccessRole(roles)) {
+    return true;
+  }
 
   const sharedPrefixes = getSharedPermissionPrefixes();
   const primaryResources = moduleConfig.resources.filter(
