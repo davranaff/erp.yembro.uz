@@ -1,6 +1,7 @@
 import {
   getBackendModuleMap,
   getBackendModules,
+  getSharedPermissionPrefixes,
   type BackendModuleConfig,
   type BackendResourceConfig,
 } from '@/shared/config/backend-modules';
@@ -177,12 +178,20 @@ export const canAccessModule = (
   moduleConfig: BackendModuleConfig,
   departmentModuleKey?: string | null,
 ): boolean => {
+  if (hasPrivilegedAccessRole(roles)) return true;
+
+  const sharedPrefixes = getSharedPermissionPrefixes();
+  const primaryResources = moduleConfig.resources.filter(
+    (r) => !sharedPrefixes.has(r.permissionPrefix),
+  );
+  const resourcesToCheck = primaryResources.length > 0 ? primaryResources : moduleConfig.resources;
+
   return (
     getAccessibleModuleResources(
       roles,
       permissions,
       moduleConfig.key,
-      moduleConfig.resources,
+      resourcesToCheck,
       departmentModuleKey,
     ).length > 0
   );

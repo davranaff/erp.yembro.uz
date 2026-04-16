@@ -10,3 +10,6 @@ export const getBackendModules = (): BackendModuleConfig[] => useWorkspaceStore.
 
 export const getBackendModuleMap = (): Record<string, BackendModuleConfig> =>
   useWorkspaceStore.getState().moduleMap;
+
+export const getSharedPermissionPrefixes = (): Set<string> =>
+  useWorkspaceStore.getState().sharedPermissionPrefixes;

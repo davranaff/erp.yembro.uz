@@ -40,6 +40,7 @@ type WorkspaceStore = {
   reloadToken: number;
   modules: BackendModuleConfig[];
   moduleMap: Record<string, BackendModuleConfig>;
+  sharedPermissionPrefixes: Set<string>;
   startLoading: () => void;
   setModules: (modules: WorkspaceModuleConfig[]) => void;
   setError: (message: string) => void;
@@ -120,6 +121,20 @@ const normalizeModule = (moduleConfig: WorkspaceModuleConfig): BackendModuleConf
 const buildModuleMap = (modules: BackendModuleConfig[]): Record<string, BackendModuleConfig> =>
   Object.fromEntries(modules.map((moduleConfig) => [moduleConfig.key, moduleConfig]));
 
+const buildSharedPermissionPrefixes = (modules: BackendModuleConfig[]): Set<string> => {
+  const prefixCount = new Map<string, number>();
+  for (const module of modules) {
+    for (const resource of module.resources) {
+      prefixCount.set(resource.permissionPrefix, (prefixCount.get(resource.permissionPrefix) ?? 0) + 1);
+    }
+  }
+  const shared = new Set<string>();
+  for (const [prefix, count] of prefixCount) {
+    if (count > 1) shared.add(prefix);
+  }
+  return shared;
+};
+
 export const useWorkspaceStore = create<WorkspaceStore>((set) => ({
   isLoaded: false,
   status: 'idle',
@@ -127,6 +142,7 @@ export const useWorkspaceStore = create<WorkspaceStore>((set) => ({
   reloadToken: 0,
   modules: [],
   moduleMap: {},
+  sharedPermissionPrefixes: new Set<string>(),
   startLoading: () =>
     set((state) => ({
       isLoaded: state.modules.length > 0,
@@ -149,6 +165,7 @@ export const useWorkspaceStore = create<WorkspaceStore>((set) => ({
       error: null,
       modules: normalizedModules,
       moduleMap: buildModuleMap(normalizedModules),
+      sharedPermissionPrefixes: buildSharedPermissionPrefixes(normalizedModules),
     });
   },
   setError: (message) =>
@@ -168,5 +185,6 @@ export const useWorkspaceStore = create<WorkspaceStore>((set) => ({
       error: null,
       modules: [],
       moduleMap: {},
+      sharedPermissionPrefixes: new Set<string>(),
     }),
 }));
