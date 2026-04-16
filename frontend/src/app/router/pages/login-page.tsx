@@ -83,9 +83,7 @@ export function LoginPage() {
 
   return (
     <section className="mx-auto flex min-h-[calc(100vh-4rem)] w-full max-w-md items-center justify-center px-3 py-6 sm:px-6 sm:py-10">
-      <div
-        className="bg-background/86 supports-[backdrop-filter]:bg-background/76 fixed left-4 top-4 z-40 rounded-[22px] border border-border/70 px-3 py-3 shadow-[0_20px_44px_-34px_rgba(15,23,42,0.18)] backdrop-blur-xl"
-      >
+      <div className="bg-background/86 supports-[backdrop-filter]:bg-background/76 fixed left-4 top-4 z-40 rounded-[22px] border border-border/70 px-3 py-3 shadow-[0_20px_44px_-34px_rgba(15,23,42,0.18)] backdrop-blur-xl">
         <img
           src={logoPath}
           alt={APP_NAME}
@@ -93,9 +91,7 @@ export function LoginPage() {
         />
       </div>
 
-      <Card
-        className="animate-surface-in relative w-full overflow-hidden rounded-[34px] border-border/70 bg-card shadow-[0_32px_96px_-52px_rgba(15,23,42,0.2)]"
-      >
+      <Card className="animate-surface-in relative w-full overflow-hidden rounded-[34px] border-border/70 bg-card shadow-[0_32px_96px_-52px_rgba(15,23,42,0.2)]">
         <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-primary/80 via-accent/90 to-primary/50" />
         <div
           aria-hidden="true"
@@ -129,9 +125,7 @@ export function LoginPage() {
               </div>
             </div>
 
-            <div
-              className="bg-background/94 supports-[backdrop-filter]:bg-background/88 rounded-[28px] border border-border/70 p-4 shadow-[0_22px_52px_-34px_rgba(15,23,42,0.12)] backdrop-blur-xl sm:p-5"
-            >
+            <div className="bg-background/94 supports-[backdrop-filter]:bg-background/88 rounded-[28px] border border-border/70 p-4 shadow-[0_22px_52px_-34px_rgba(15,23,42,0.12)] backdrop-blur-xl sm:p-5">
               <div className="space-y-5">
                 <div className="space-y-2">
                   <Label className="text-foreground/85" htmlFor="username">
@@ -196,9 +190,7 @@ export function LoginPage() {
 
             {error ? <ErrorNotice error={error} /> : null}
 
-            <div
-              className="border-primary/18 bg-background/86 supports-[backdrop-filter]:bg-background/78 rounded-[24px] border p-2 shadow-[0_18px_44px_-30px_rgba(234,88,12,0.18)] backdrop-blur-xl"
-            >
+            <div className="border-primary/18 bg-background/86 supports-[backdrop-filter]:bg-background/78 rounded-[24px] border p-2 shadow-[0_18px_44px_-30px_rgba(234,88,12,0.18)] backdrop-blur-xl">
               <Button
                 type="submit"
                 className="h-12 w-full rounded-2xl text-sm font-semibold shadow-[0_24px_44px_-24px_rgba(234,88,12,0.38)]"
