@@ -56,11 +56,16 @@ WORKSPACE_RESOURCE_READ_PRIVILEGED_ROLES = frozenset({"admin", "super_admin", "m
 ORGANIZATION_SCOPED_STANDALONE_RESOURCE_KEYS = {
     "core": frozenset(
         {
+            "organizations",
             "departments",
+            "warehouses",
+            "department-modules",
             "clients",
+            "client-debts",
+            "client-categories",
             "currencies",
             "measurement-units",
-            "client-categories",
+            "expense-categories",
             "poultry-types",
             "positions",
             "roles",
