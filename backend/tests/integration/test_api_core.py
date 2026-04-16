@@ -78,16 +78,20 @@ async def test_workspace_modules_metadata_endpoint_returns_seeded_modules(api_cl
         for resource in module_map["core"]["resources"]
     }
     assert {
+        "organizations",
         "departments",
+        "warehouses",
+        "department-modules",
         "clients",
+        "client-debts",
+        "client-categories",
         "currencies",
+        "measurement-units",
+        "expense-categories",
         "poultry-types",
         "positions",
         "roles",
     } <= core_resource_keys
-    assert {"organizations", "department-modules", "warehouses", "client-debts"}.isdisjoint(
-        core_resource_keys
-    )
     core_role_resource = next(
         resource
         for resource in module_map["core"]["resources"]
