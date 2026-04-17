@@ -27,6 +27,7 @@ import {
   Landmark,
   LayoutGrid,
   Leaf,
+  Loader2,
   Network,
   Package,
   PackageMinus,
@@ -4924,17 +4925,14 @@ export function ModuleCrudPage() {
                           className="shadow-[0_18px_42px_-28px_rgba(234,88,12,0.42)]"
                           disabled={pendingAction}
                         >
-                          {selectedRecordId ? (
-                            <>
-                              <Pencil className="h-4 w-4" />
-                              {t('common.save')}
-                            </>
+                          {pendingAction ? (
+                            <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+                          ) : selectedRecordId ? (
+                            <Pencil className="h-4 w-4" />
                           ) : (
-                            <>
-                              <Plus className="h-4 w-4" />
-                              {t('common.create')}
-                            </>
+                            <Plus className="h-4 w-4" />
                           )}
+                          {selectedRecordId ? t('common.save') : t('common.create')}
                         </Button>
                       ) : null}
                       {canCreateActiveResource ? (
