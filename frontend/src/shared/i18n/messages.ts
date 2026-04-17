@@ -446,6 +446,7 @@ const baseMessages: Record<Language, Record<string, unknown>> = {
       noBreakdownData: 'Нет данных',
       noDataTitle: 'Нет данных за выбранный период',
       noDataDescription: 'Измените период или выберите другой отдел, чтобы увидеть показатели.',
+      noDataHint: 'Данные появятся здесь, как только в выбранном периоде будут операции.',
       moduleUnavailable: 'Для этого раздела аналитика пока недоступна.',
       revenueCalculatorTitle: 'Расчёт выручки',
       revenueCalculatorDescription:
@@ -1549,6 +1550,8 @@ const baseMessages: Record<Language, Record<string, unknown>> = {
       noBreakdownData: 'Maʼlumot yo‘q',
       noDataTitle: "Tanlangan davr bo'yicha ma'lumot yo'q",
       noDataDescription: "Ko'rsatkichlarni ko'rish uchun davrni yoki bo'limni o'zgartiring.",
+      noDataHint:
+        'Tanlangan davrda operatsiyalar paydo bo‘lishi bilan ma’lumotlar shu yerda ko‘rinadi.',
       moduleUnavailable: "Bu bo'lim uchun tahlil hozircha mavjud emas.",
       revenueCalculatorTitle: 'Tushum hisob-kitobi',
       revenueCalculatorDescription:
@@ -2669,6 +2672,7 @@ const baseMessages: Record<Language, Record<string, unknown>> = {
       noBreakdownData: 'No data',
       noDataTitle: 'No data for the selected period',
       noDataDescription: 'Change the period or choose another department to see the metrics.',
+      noDataHint: 'Data will appear here as soon as the selected period has activity.',
       moduleUnavailable: 'Analytics is not available for this section yet.',
       revenueCalculatorTitle: 'Revenue calculator',
       revenueCalculatorDescription:

@@ -2,6 +2,7 @@ import { format, startOfDay, startOfMonth, startOfQuarter, subDays } from 'date-
 import {
   ArrowDownRight,
   ArrowUpRight,
+  BarChart3,
   Building2,
   CalendarRange,
   Clock3,
@@ -20,6 +21,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { CustomSelect } from '@/components/ui/custom-select';
+import { EmptyState } from '@/components/ui/empty-state';
 import type { DashboardMetric, DashboardSection } from '@/shared/api';
 import { useI18n } from '@/shared/i18n';
 import type { TranslateFn } from '@/shared/i18n/types';
@@ -661,8 +663,16 @@ function EmptySectionCard({
         <CardTitle className="text-xl tracking-[-0.03em] text-foreground">{title}</CardTitle>
         {!minimalMode && caption ? <CardDescription>{caption}</CardDescription> : null}
       </CardHeader>
-      <CardContent className="flex min-h-[16rem] items-center justify-center text-sm text-muted-foreground">
-        {t('dashboard.noDataTitle')}
+      <CardContent className="flex min-h-[16rem] items-center justify-center">
+        <EmptyState
+          icon={BarChart3}
+          title={t('dashboard.noDataTitle')}
+          description={t(
+            'dashboard.noDataHint',
+            undefined,
+            'Данные появятся здесь, как только в выбранном периоде будут операции.',
+          )}
+        />
       </CardContent>
     </Card>
   );
