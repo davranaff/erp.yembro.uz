@@ -75,7 +75,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { CrudDrawer, CrudDrawerFooter } from '@/components/ui/crud-drawer';
 import { CustomSelect } from '@/components/ui/custom-select';
+import { EmptyState } from '@/components/ui/empty-state';
 import { ErrorNotice } from '@/components/ui/error-notice';
+import { InlineLoader } from '@/components/ui/inline-loader';
 import { Input } from '@/components/ui/input';
 import {
   Pagination,
@@ -3518,13 +3520,16 @@ export function ModuleCrudPage() {
     <div className={`${frostedPanelClassName} overflow-hidden`}>
       <div className="max-h-[680px] overflow-y-auto p-3 sm:hidden">
         {listQuery.isLoading ? (
-          <div className="px-4 py-14 text-center text-sm text-muted-foreground">
-            {t('common.loadingLabel')}
-          </div>
+          <InlineLoader label={t('crud.loadingRecords', undefined, 'Загружаем данные…')} />
         ) : totalCount === 0 ? (
-          <div className="px-4 py-14 text-center text-sm text-muted-foreground">
-            {t('crud.emptyResource', { resource: activeResourceLabel })}
-          </div>
+          <EmptyState
+            title={t('crud.emptyResource', { resource: activeResourceLabel })}
+            description={t(
+              'crud.emptyHint',
+              undefined,
+              'Создайте первую запись или измените фильтры, чтобы увидеть данные.',
+            )}
+          />
         ) : (
           <div className="space-y-3">
             {paginatedRecords.map((record) => {
@@ -3689,11 +3694,15 @@ export function ModuleCrudPage() {
             })}
             {totalCount === 0 && !listQuery.isLoading ? (
               <tr>
-                <td
-                  colSpan={tableFields.length + (hasRecordActions ? 1 : 0)}
-                  className="px-5 py-14 text-center text-muted-foreground"
-                >
-                  {t('crud.emptyResource', { resource: activeResourceLabel })}
+                <td colSpan={tableFields.length + (hasRecordActions ? 1 : 0)} className="px-5 py-2">
+                  <EmptyState
+                    title={t('crud.emptyResource', { resource: activeResourceLabel })}
+                    description={t(
+                      'crud.emptyHint',
+                      undefined,
+                      'Создайте первую запись или измените фильтры, чтобы увидеть данные.',
+                    )}
+                  />
                 </td>
               </tr>
             ) : null}
@@ -3817,13 +3826,16 @@ export function ModuleCrudPage() {
       >
         <div className="max-h-[680px] overflow-y-auto p-3 sm:hidden">
           {listQuery.isLoading ? (
-            <div className="px-4 py-14 text-center text-sm text-muted-foreground">
-              {t('common.loadingLabel')}
-            </div>
+            <InlineLoader label={t('crud.loadingRecords', undefined, 'Загружаем данные…')} />
           ) : paginatedRecords.length === 0 ? (
-            <div className="px-4 py-14 text-center text-sm text-muted-foreground">
-              {t('crud.emptyResource', { resource: activeResourceLabel })}
-            </div>
+            <EmptyState
+              title={t('crud.emptyResource', { resource: activeResourceLabel })}
+              description={t(
+                'crud.emptyHint',
+                undefined,
+                'Создайте первую запись или измените фильтры, чтобы увидеть данные.',
+              )}
+            />
           ) : (
             <div className="space-y-3">
               {paginatedRecords.map((record) => {
@@ -4064,11 +4076,15 @@ export function ModuleCrudPage() {
               })}
               {paginatedRecords.length === 0 && !listQuery.isLoading ? (
                 <tr>
-                  <td
-                    colSpan={hasRecordActions ? 7 : 6}
-                    className="px-5 py-14 text-center text-muted-foreground"
-                  >
-                    {t('crud.emptyResource', { resource: activeResourceLabel })}
+                  <td colSpan={hasRecordActions ? 7 : 6} className="px-5 py-2">
+                    <EmptyState
+                      title={t('crud.emptyResource', { resource: activeResourceLabel })}
+                      description={t(
+                        'crud.emptyHint',
+                        undefined,
+                        'Создайте первую запись или измените фильтры, чтобы увидеть данные.',
+                      )}
+                    />
                   </td>
                 </tr>
               ) : null}
@@ -4363,8 +4379,10 @@ export function ModuleCrudPage() {
       {activeView === 'stats' ? (
         <div className="space-y-6">
           {moduleStatsQuery.isLoading ? (
-            <div className="rounded-[28px] border border-border/75 bg-card px-6 py-12 text-center text-sm text-muted-foreground shadow-[0_24px_72px_-48px_rgba(15,23,42,0.14)]">
-              {t('common.loadingLabel')}
+            <div className="rounded-[28px] border border-border/75 bg-card shadow-[0_24px_72px_-48px_rgba(15,23,42,0.14)]">
+              <InlineLoader
+                label={t('dashboard.loadingAnalytics', undefined, 'Готовим аналитику…')}
+              />
             </div>
           ) : null}
           {moduleStatsQuery.error ? (
@@ -5290,10 +5308,10 @@ export function ModuleCrudPage() {
 
                   <div className="space-y-4" data-tour="module-audit-history">
                     {auditHistoryQuery.isLoading ? (
-                      <div
-                        className={`${frostedPanelClassName} px-4 py-8 text-sm text-muted-foreground`}
-                      >
-                        {t('common.loadingLabel')}
+                      <div className={frostedPanelClassName}>
+                        <InlineLoader
+                          label={t('crud.loadingAuditHistory', undefined, 'Загружаем историю…')}
+                        />
                       </div>
                     ) : null}
 
@@ -5304,10 +5322,16 @@ export function ModuleCrudPage() {
                     {!auditHistoryQuery.isLoading &&
                     !auditHistoryQuery.error &&
                     auditHistoryItems.length === 0 ? (
-                      <div
-                        className={`${frostedPanelClassName} px-4 py-8 text-sm text-muted-foreground`}
-                      >
-                        {t('crud.auditEmpty')}
+                      <div className={frostedPanelClassName}>
+                        <EmptyState
+                          icon={History}
+                          title={t('crud.auditEmpty')}
+                          description={t(
+                            'crud.auditEmptyHint',
+                            undefined,
+                            'Изменения по этой записи появятся здесь автоматически.',
+                          )}
+                        />
                       </div>
                     ) : null}
 

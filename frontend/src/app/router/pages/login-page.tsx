@@ -1,4 +1,4 @@
-import { ArrowRight, Eye, EyeOff, LockKeyhole, UserRound } from 'lucide-react';
+import { ArrowRight, Eye, EyeOff, Loader2, LockKeyhole, UserRound } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { z } from 'zod';
@@ -197,7 +197,10 @@ export function LoginPage() {
                 disabled={isPending || !canSubmit}
               >
                 {isPending ? (
-                  t('login.pending')
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+                    {t('login.pending')}
+                  </>
                 ) : (
                   <>
                     {t('login.submit')}
