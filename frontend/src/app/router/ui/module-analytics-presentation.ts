@@ -41,8 +41,6 @@ const COMMERCIAL_RESULT_KEYS = [
   'shipment_revenue',
   'product_shipped',
   'shipment_volume',
-  'chicks_dispatched',
-  'sent_to_slaughter',
 ];
 
 const FINANCE_KEYS = [
@@ -74,16 +72,16 @@ const RISK_KEYS = [
 ];
 
 const HEADLINE_CHART_PATTERN =
-  /(output|flow|arrival|arrivals|hatch|product_flow|semi_flow|revenue|dispatch|shipment|chicks|birds)/i;
+  /(output|flow|hatch|product_flow|semi_flow|revenue|dispatch|shipment|chicks|birds)/i;
 
 const FINANCE_CHART_PATTERN = /(finance_overview|expense_categories)$/i;
-const EFFICIENCY_CHART_PATTERN = /(loss|quality|yield|rate|stock|expiry|consumption)/i;
+const EFFICIENCY_CHART_PATTERN = /(loss|quality|yield|rate|stock|expiry)/i;
 
 const FINANCE_BREAKDOWN_PATTERN = /(expense_categories_table|cash_accounts|recent_expenses)$/i;
 const STRATEGIC_BREAKDOWN_PATTERN =
   /(client|clients|product|products|parts|mix|formula|supplier|top)/i;
 const RISK_BREAKDOWN_PATTERN = /(low|expiry|critical|active)/i;
-const RECENT_BREAKDOWN_PATTERN = /(recent|latest|dispatch|shipment|arrival|transfer|batch)/i;
+const RECENT_BREAKDOWN_PATTERN = /(recent|latest|dispatch|shipment|transfer|batch)/i;
 const MODULE_SUMMARY_METRIC_LIMIT = 5;
 
 const MODULE_ANALYTICS_BLUEPRINTS: Record<string, ModuleAnalyticsBlueprint> = {
@@ -122,7 +120,7 @@ const MODULE_ANALYTICS_BLUEPRINTS: Record<string, ModuleAnalyticsBlueprint> = {
         titleFallback: 'Риски и эффективность',
         descriptionKey: 'dashboard.moduleEfficiencyDescription',
         descriptionFallback: '{module}: потери, остаток и ресурсы, которые требуют внимания.',
-        metricKeys: ['loss_rate', 'current_stock', 'feed_consumed', 'medicine_consumed'],
+        metricKeys: ['loss_rate', 'current_stock', 'medicine_consumed'],
         chartKeys: ['egg_loss_rate'],
         breakdownKeys: ['module_alerts'],
       },
@@ -132,8 +130,8 @@ const MODULE_ANALYTICS_BLUEPRINTS: Record<string, ModuleAnalyticsBlueprint> = {
     summaryMetricKeys: [
       'chicks_hatched',
       'hatch_rate',
-      'sales_revenue',
-      'financial_result',
+      'fertility_pct',
+      'hof_pct',
       'active_alerts',
     ],
     sections: [
@@ -143,7 +141,7 @@ const MODULE_ANALYTICS_BLUEPRINTS: Record<string, ModuleAnalyticsBlueprint> = {
         titleFallback: 'Главное',
         descriptionKey: 'dashboard.moduleOverviewDescription',
         descriptionFallback: '{module}: вход яиц, вывод птенцов и основной сбыт.',
-        metricKeys: ['eggs_set', 'chicks_hatched', 'chicks_dispatched'],
+        metricKeys: ['eggs_set', 'chicks_hatched', 'saleable_chick_yield_pct', 'chicks_dispatched'],
         chartKeys: ['incubation_egg_arrivals', 'incubation_hatch'],
         breakdownKeys: ['incubation_sources', 'incubation_clients'],
       },
@@ -163,7 +161,7 @@ const MODULE_ANALYTICS_BLUEPRINTS: Record<string, ModuleAnalyticsBlueprint> = {
         titleFallback: 'Риски и эффективность',
         descriptionKey: 'dashboard.moduleEfficiencyDescription',
         descriptionFallback: '{module}: выводимость, качество партии и активные циклы.',
-        metricKeys: ['hatch_rate', 'grade_1_share', 'bad_eggs', 'eggs_arrived'],
+        metricKeys: ['hatch_rate', 'fertility_pct', 'hof_pct', 'bad_eggs'],
         chartKeys: ['incubation_yield', 'incubation_quality'],
         breakdownKeys: ['module_alerts', 'incubation_active_batches'],
       },
@@ -171,10 +169,10 @@ const MODULE_ANALYTICS_BLUEPRINTS: Record<string, ModuleAnalyticsBlueprint> = {
   },
   factory: {
     summaryMetricKeys: [
-      'chicks_stock',
-      'sent_to_slaughter',
-      'critical_stock_items',
-      'financial_result',
+      'total_birds',
+      'mortality_rate',
+      'total_shipped',
+      'shipment_revenue',
       'active_alerts',
     ],
     sections: [
@@ -183,10 +181,37 @@ const MODULE_ANALYTICS_BLUEPRINTS: Record<string, ModuleAnalyticsBlueprint> = {
         titleKey: 'dashboard.moduleOverviewTitle',
         titleFallback: 'Главное',
         descriptionKey: 'dashboard.moduleOverviewDescription',
-        descriptionFallback: '{module}: движение поголовья и опорные ресурсы для выращивания.',
-        metricKeys: ['chicks_arrived', 'chicks_stock', 'sent_to_slaughter'],
-        chartKeys: ['factory_chicks_flow'],
-        breakdownKeys: ['factory_feed_arrivals_by_type', 'factory_medicine_arrivals_by_type'],
+        descriptionFallback: '{module}: поголовье, падёж и набор веса.',
+        metricKeys: [
+          'total_birds',
+          'livability_pct',
+          'fcr',
+          'avg_weight_per_bird',
+          'water_feed_ratio',
+          'mortality_rate',
+        ],
+        chartKeys: ['factory_mortality_trend', 'factory_weight_gain'],
+        breakdownKeys: ['factory_flock_performance'],
+      },
+      {
+        id: 'operations',
+        titleKey: 'dashboard.moduleOperationsTitle',
+        titleFallback: 'Операции',
+        descriptionKey: 'dashboard.moduleOperationsDescription',
+        descriptionFallback: '{module}: корм, лекарства, отгрузки и вакцинация.',
+        metricKeys: [
+          'feed_consumed',
+          'total_shipped',
+          'shipment_revenue',
+          'vacc_compliance_pct',
+          'vacc_overdue',
+        ],
+        chartKeys: ['factory_feed_consumption', 'factory_shipments_flow'],
+        breakdownKeys: [
+          'factory_top_clients',
+          'factory_medicine_usage_by_type',
+          'factory_shipment_clients',
+        ],
       },
       {
         id: 'finance',
@@ -203,8 +228,8 @@ const MODULE_ANALYTICS_BLUEPRINTS: Record<string, ModuleAnalyticsBlueprint> = {
         titleKey: 'dashboard.moduleEfficiencyTitle',
         titleFallback: 'Риски и эффективность',
         descriptionKey: 'dashboard.moduleEfficiencyDescription',
-        descriptionFallback: '{module}: остатки и ресурсные сигналы, которые нельзя пропустить.',
-        metricKeys: ['critical_stock_items', 'feed_arrived', 'medicine_arrived'],
+        descriptionFallback: '{module}: падёж, вакцинации и ресурсные сигналы.',
+        metricKeys: ['mortality_rate', 'vacc_overdue'],
         chartKeys: [],
         breakdownKeys: ['module_alerts'],
       },
@@ -214,8 +239,8 @@ const MODULE_ANALYTICS_BLUEPRINTS: Record<string, ModuleAnalyticsBlueprint> = {
     summaryMetricKeys: [
       'product_output',
       'shipment_rate',
+      'shrinkage_pct',
       'sales_revenue',
-      'financial_result',
       'active_alerts',
     ],
     sections: [
@@ -225,7 +250,7 @@ const MODULE_ANALYTICS_BLUEPRINTS: Record<string, ModuleAnalyticsBlueprint> = {
         titleFallback: 'Главное',
         descriptionKey: 'dashboard.moduleOverviewDescription',
         descriptionFallback: '{module}: выпуск, отгрузка и коммерческий результат по продукту.',
-        metricKeys: ['product_output', 'product_shipped', 'sales_revenue'],
+        metricKeys: ['product_output', 'product_shipped', 'shrinkage_pct', 'sales_revenue'],
         chartKeys: ['feed_product_flow', 'feed_revenue'],
         breakdownKeys: ['feed_formulas', 'feed_clients'],
       },
@@ -245,7 +270,7 @@ const MODULE_ANALYTICS_BLUEPRINTS: Record<string, ModuleAnalyticsBlueprint> = {
         titleFallback: 'Риски и эффективность',
         descriptionKey: 'dashboard.moduleEfficiencyDescription',
         descriptionFallback: '{module}: загрузка сырья, реализация выпуска и узкие места склада.',
-        metricKeys: ['shipment_rate', 'stock_total', 'raw_arrivals', 'raw_consumed'],
+        metricKeys: ['shipment_rate', 'shrinkage_pct', 'stock_total'],
         chartKeys: ['feed_shipment_rate', 'feed_raw_flow'],
         breakdownKeys: ['module_alerts', 'feed_low_raw_stock'],
       },
@@ -254,9 +279,9 @@ const MODULE_ANALYTICS_BLUEPRINTS: Record<string, ModuleAnalyticsBlueprint> = {
   vet_pharmacy: {
     summaryMetricKeys: [
       'current_stock',
+      'stock_value_uzs',
+      'value_at_risk_uzs',
       'expired_batches',
-      'turnover_rate',
-      'financial_result',
       'active_alerts',
     ],
     sections: [
@@ -266,7 +291,7 @@ const MODULE_ANALYTICS_BLUEPRINTS: Record<string, ModuleAnalyticsBlueprint> = {
         titleFallback: 'Главное',
         descriptionKey: 'dashboard.moduleOverviewDescription',
         descriptionFallback: '{module}: остатки, движение лекарств и самые важные партии.',
-        metricKeys: ['medicine_arrivals', 'medicine_consumed', 'current_stock'],
+        metricKeys: ['current_stock', 'stock_value_uzs', 'medicine_consumed'],
         chartKeys: ['medicine_stock', 'medicine_flow'],
         breakdownKeys: ['medicine_expiry_batches'],
       },
@@ -287,7 +312,13 @@ const MODULE_ANALYTICS_BLUEPRINTS: Record<string, ModuleAnalyticsBlueprint> = {
         descriptionKey: 'dashboard.moduleEfficiencyDescription',
         descriptionFallback:
           '{module}: сроки годности, оборачиваемость и проблемные сигналы склада.',
-        metricKeys: ['expired_batches', 'expiring_batches', 'turnover_rate'],
+        metricKeys: [
+          'expired_batches',
+          'expiring_batches',
+          'value_at_risk_uzs',
+          'expired_value_uzs',
+          'turnover_rate',
+        ],
         chartKeys: ['medicine_expiry', 'medicine_turnover_rate'],
         breakdownKeys: ['module_alerts'],
       },
@@ -296,9 +327,9 @@ const MODULE_ANALYTICS_BLUEPRINTS: Record<string, ModuleAnalyticsBlueprint> = {
   slaughterhouse: {
     summaryMetricKeys: [
       'birds_processed',
-      'process_rate',
+      'dressing_yield_pct',
+      'first_sort_weight_share_pct',
       'shipment_revenue',
-      'financial_result',
       'active_alerts',
     ],
     sections: [
@@ -308,7 +339,12 @@ const MODULE_ANALYTICS_BLUEPRINTS: Record<string, ModuleAnalyticsBlueprint> = {
         titleFallback: 'Главное',
         descriptionKey: 'dashboard.moduleOverviewDescription',
         descriptionFallback: '{module}: переработка птицы, выпуск полуфабриката и основной сбыт.',
-        metricKeys: ['birds_arrived', 'birds_processed', 'semi_product_output'],
+        metricKeys: [
+          'birds_processed',
+          'dressing_yield_pct',
+          'first_sort_weight_share_pct',
+          'semi_product_output',
+        ],
         chartKeys: ['slaughter_flow', 'slaughter_semi_flow'],
         breakdownKeys: ['slaughter_top_products', 'slaughter_clients'],
       },
@@ -328,9 +364,29 @@ const MODULE_ANALYTICS_BLUEPRINTS: Record<string, ModuleAnalyticsBlueprint> = {
         titleFallback: 'Риски и эффективность',
         descriptionKey: 'dashboard.moduleEfficiencyDescription',
         descriptionFallback: '{module}: качество сортировки, переработка и проблемные сигналы.',
-        metricKeys: ['process_rate', 'first_sort_share', 'bad_total', 'shipment_volume'],
+        metricKeys: [
+          'process_rate',
+          'first_sort_weight_share_pct',
+          'bad_weight_share_pct',
+          'shipment_volume',
+        ],
         chartKeys: ['slaughter_quality', 'slaughter_process_rate'],
         breakdownKeys: ['module_alerts'],
+      },
+      {
+        id: 'quality',
+        titleKey: 'dashboard.moduleQualityTitle',
+        titleFallback: 'Контроль качества и тренд',
+        descriptionKey: 'dashboard.moduleQualityDescription',
+        descriptionFallback: '{module}: статус контроля качества и помесячный тренд выпуска.',
+        metricKeys: [
+          'quality_checks_passed',
+          'quality_checks_failed',
+          'quality_checks_pending',
+          'quality_pass_rate',
+        ],
+        chartKeys: ['slaughter_monthly_trend'],
+        breakdownKeys: ['slaughter_recent_quality_checks'],
       },
     ],
   },

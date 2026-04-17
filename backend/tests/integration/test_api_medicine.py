@@ -6,9 +6,7 @@ from tests.helpers import extract_data, make_auth_headers, run_crud_flow
 
 
 MEDICINE_RESOURCES = [
-    ("/api/v1/medicine/arrivals", "medicine_arrival"),
     ("/api/v1/medicine/batches", "medicine_batch"),
-    ("/api/v1/medicine/consumptions", "medicine_consumption"),
     ("/api/v1/medicine/types", "medicine_type"),
 ]
 HOME_BATCH_ID = "70707070-7070-7070-7070-707070707070"

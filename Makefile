@@ -79,3 +79,9 @@ permissions-sync-codes-only:
 
 permissions-check:
 	docker compose -f $(COMPOSE_FILE) exec -T api python -m app.scripts.sync_permissions --dry-run --fail-on-diff
+
+roles-sync:
+	docker compose -f $(COMPOSE_FILE) exec -T api python -m app.scripts.sync_role_templates
+
+roles-sync-dry:
+	docker compose -f $(COMPOSE_FILE) exec -T api python -m app.scripts.sync_role_templates --dry-run

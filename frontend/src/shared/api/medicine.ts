@@ -37,7 +37,6 @@ export const publicMedicineBatchSchema = z.object({
     id: z.string().trim().min(1),
     name: z.string().nullable().optional(),
     code: z.string().nullable().optional(),
-    unit: z.string().nullable().optional(),
     description: z.string().nullable().optional(),
   }),
   department: z.object({

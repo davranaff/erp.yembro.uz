@@ -90,7 +90,13 @@ export function CustomSelect({
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger className={cn(triggerBaseClassName, className)} disabled={disabled}>
+      <PopoverTrigger
+        className={cn(triggerBaseClassName, className)}
+        disabled={disabled}
+        aria-label={triggerLabel}
+        aria-haspopup="listbox"
+        aria-expanded={open}
+      >
         <span
           className={cn(
             'min-w-0 flex-1 truncate whitespace-pre-wrap',

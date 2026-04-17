@@ -19,9 +19,19 @@ class CashTransactionRepository(BaseRepository[dict[str, object]]):
     table = "cash_transactions"
 
 
+class SupplierDebtRepository(BaseRepository[dict[str, object]]):
+    table = "supplier_debts"
+
+
+class DebtPaymentRepository(BaseRepository[dict[str, object]]):
+    table = "debt_payments"
+
+
 __all__ = [
     "ExpenseCategoryRepository",
     "ExpenseRepository",
     "CashAccountRepository",
     "CashTransactionRepository",
+    "SupplierDebtRepository",
+    "DebtPaymentRepository",
 ]

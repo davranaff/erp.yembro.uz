@@ -8,7 +8,6 @@ from tests.helpers import build_create_payload, extract_data, make_auth_headers,
 FEED_RESOURCES = [
     ("/api/v1/feed/types", "feed_type"),
     ("/api/v1/feed/ingredients", "feed_ingredient"),
-    ("/api/v1/feed/arrivals", "feed_arrival"),
     ("/api/v1/feed/formulas", "feed_formula"),
     ("/api/v1/feed/formula-ingredients", "feed_formula_ingredient"),
     ("/api/v1/feed/raw-arrivals", "feed_raw_arrival"),
@@ -39,27 +38,3 @@ async def test_feed_ingredient_delete_returns_descriptive_conflict_for_real_depe
     assert "formula ingredients (2)" in message
     assert "raw arrivals (2)" in message
     assert "raw consumptions (" in message
-
-
-@pytest.mark.asyncio
-async def test_feed_arrival_create_autofills_organization_and_department_from_actor(api_client) -> None:
-    headers = make_auth_headers("feed_arrival")
-    me_response = await api_client.get("/api/v1/auth/me", headers=headers)
-    assert me_response.status_code == 200, me_response.text
-    me_payload = extract_data(me_response)
-
-    payload = await build_create_payload(api_client, "/api/v1/feed/arrivals")
-    payload.pop("organization_id", None)
-    payload.pop("department_id", None)
-
-    create_response = await api_client.post("/api/v1/feed/arrivals", json=payload, headers=headers)
-    assert create_response.status_code == 201, create_response.text
-    created = extract_data(create_response)
-    assert created["organization_id"] == me_payload["organizationId"]
-    assert created["department_id"] == me_payload["departmentId"]
-
-    delete_response = await api_client.delete(
-        f"/api/v1/feed/arrivals/{created['id']}",
-        headers=headers,
-    )
-    assert delete_response.status_code == 200, delete_response.text

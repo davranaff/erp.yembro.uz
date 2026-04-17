@@ -38,6 +38,7 @@ type WorkspaceStore = {
   status: 'idle' | 'loading' | 'ready' | 'error';
   error: string | null;
   reloadToken: number;
+  lastLoadedAt: number | null;
   modules: BackendModuleConfig[];
   moduleMap: Record<string, BackendModuleConfig>;
   sharedPermissionPrefixes: Set<string>;
@@ -45,6 +46,7 @@ type WorkspaceStore = {
   setModules: (modules: WorkspaceModuleConfig[]) => void;
   setError: (message: string) => void;
   requestReload: () => void;
+  requestReloadIfStale: (maxAgeMs: number) => void;
   clearModules: () => void;
 };
 
@@ -140,11 +142,12 @@ const buildSharedPermissionPrefixes = (modules: BackendModuleConfig[]): Set<stri
   return shared;
 };
 
-export const useWorkspaceStore = create<WorkspaceStore>((set) => ({
+export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
   isLoaded: false,
   status: 'idle',
   error: null,
   reloadToken: 0,
+  lastLoadedAt: null,
   modules: [],
   moduleMap: {},
   sharedPermissionPrefixes: new Set<string>(),
@@ -168,6 +171,7 @@ export const useWorkspaceStore = create<WorkspaceStore>((set) => ({
       isLoaded: true,
       status: 'ready',
       error: null,
+      lastLoadedAt: Date.now(),
       modules: normalizedModules,
       moduleMap: buildModuleMap(normalizedModules),
       sharedPermissionPrefixes: buildSharedPermissionPrefixes(normalizedModules),
@@ -183,11 +187,23 @@ export const useWorkspaceStore = create<WorkspaceStore>((set) => ({
     set((state) => ({
       reloadToken: state.reloadToken + 1,
     })),
+  requestReloadIfStale: (maxAgeMs) => {
+    const state = get();
+    if (state.status === 'loading') {
+      return;
+    }
+    const loadedAt = state.lastLoadedAt;
+    if (loadedAt !== null && Date.now() - loadedAt < maxAgeMs) {
+      return;
+    }
+    set({ reloadToken: state.reloadToken + 1 });
+  },
   clearModules: () =>
     set({
       isLoaded: false,
       status: 'idle',
       error: null,
+      lastLoadedAt: null,
       modules: [],
       moduleMap: {},
       sharedPermissionPrefixes: new Set<string>(),

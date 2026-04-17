@@ -140,40 +140,19 @@ async def test_dashboard_analytics_exposes_full_factory_operational_flow(api_cli
 
     kpis = {item["key"] for item in factory_module["kpis"]}
     assert {
-        "chicks_arrived",
-        "feed_arrived",
-        "medicine_arrived",
-        "client_base",
-        "chicks_stock",
-        "sent_to_slaughter",
+        "total_birds",
+        "livability_pct",
+        "fcr",
+        "avg_weight_per_bird",
+        "mortality_rate",
+        "total_shipped",
+        "shipment_revenue",
+        "feed_consumed",
         "total_expenses",
         "financial_result",
         "net_cashflow",
         "cash_balance",
     } <= kpis
-
-    chart_keys = {chart["key"] for chart in factory_module["charts"]}
-    assert {
-        "factory_chicks",
-        "factory_chicks_flow",
-        "factory_feed_types",
-        "factory_medicine_types",
-        "factory_finance_overview",
-        "factory_expense_categories",
-    } <= chart_keys
-
-    table_keys = {table["key"] for table in factory_module["tables"]}
-    assert {
-        "factory_clients",
-        "factory_feed_arrivals_by_type",
-        "factory_medicine_arrivals_by_type",
-        "factory_client_registry",
-        "factory_recent_arrivals",
-        "factory_recent_transfers",
-        "factory_expense_categories_table",
-        "factory_cash_accounts",
-        "factory_recent_expenses",
-    } <= table_keys
 
 
 @pytest.mark.asyncio

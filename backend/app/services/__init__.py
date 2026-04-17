@@ -7,22 +7,25 @@ from app.services.core import (
     WarehouseService,
 )
 from app.services.egg import EggMonthlyAnalyticsService, EggProductionService, EggShipmentService
-from app.services.finance import ExpenseCategoryService, ExpenseService
+from app.services.finance import (
+    CashAccountService,
+    CashTransactionService,
+    DebtPaymentService,
+    ExpenseCategoryService,
+    ExpenseService,
+    SupplierDebtService,
+)
 from app.services.feed import (
-    FeedArrivalService,
     FeedFormulaIngredientService,
     FeedFormulaService,
     FeedIngredientService,
     FeedProductShipmentService,
     FeedProductionBatchService,
-    FeedRawArrivalService,
-    FeedRawConsumptionService,
     FeedTypeService,
 )
 from app.services.hr import EmployeeService, PermissionService, PositionService, RoleService
 from app.services.inventory import StockMovementService
 from app.services.incubation import (
-    ChickArrivalService,
     ChickShipmentService,
     FactoryMonthlyAnalyticsService,
     IncubationBatchService,
@@ -30,14 +33,13 @@ from app.services.incubation import (
     IncubationRunService,
 )
 from app.services.medicine import (
-    MedicineArrivalService,
     MedicineBatchService,
-    MedicineConsumptionService,
     MedicineTypeService,
 )
 from app.services.slaughter import (
-    SlaughterArrivalService,
+    SlaughterMonthlyAnalyticsService,
     SlaughterProcessingService,
+    SlaughterQualityCheckService,
     SlaughterSemiProductShipmentService,
     SlaughterSemiProductService,
 )
@@ -55,32 +57,31 @@ __all__ = [
     "EggShipmentService",
     "ExpenseCategoryService",
     "ExpenseService",
-    "FeedArrivalService",
+    "CashAccountService",
+    "CashTransactionService",
+    "SupplierDebtService",
+    "DebtPaymentService",
     "FeedFormulaIngredientService",
     "FeedFormulaService",
     "FeedIngredientService",
     "FeedProductShipmentService",
     "FeedProductionBatchService",
-    "FeedRawArrivalService",
-    "FeedRawConsumptionService",
     "FeedTypeService",
     "EmployeeService",
     "PermissionService",
     "PositionService",
     "RoleService",
     "StockMovementService",
-    "ChickArrivalService",
     "ChickShipmentService",
     "FactoryMonthlyAnalyticsService",
     "IncubationBatchService",
     "IncubationMonthlyAnalyticsService",
     "IncubationRunService",
-    "MedicineArrivalService",
     "MedicineBatchService",
-    "MedicineConsumptionService",
     "MedicineTypeService",
-    "SlaughterArrivalService",
+    "SlaughterMonthlyAnalyticsService",
     "SlaughterProcessingService",
+    "SlaughterQualityCheckService",
     "SlaughterSemiProductShipmentService",
     "SlaughterSemiProductService",
     "AuditLogService",

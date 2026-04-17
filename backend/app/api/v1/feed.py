@@ -5,25 +5,25 @@ from fastapi import APIRouter
 from app.api.crud import build_crud_router
 from app.api.module_stats import ModuleStatsTable, register_module_stats_route
 from app.repositories.feed import (
-    FeedArrivalRepository,
-    FeedConsumptionRepository,
     FeedFormulaIngredientRepository,
     FeedFormulaRepository,
     FeedIngredientRepository,
+    FeedMonthlyAnalyticsRepository,
     FeedProductionBatchRepository,
+    FeedProductionQualityCheckRepository,
     FeedProductShipmentRepository,
     FeedRawArrivalRepository,
     FeedRawConsumptionRepository,
     FeedTypeRepository,
 )
 from app.services.feed import (
-    FeedArrivalService,
-    FeedConsumptionService,
     FeedFormulaIngredientService,
     FeedFormulaService,
     FeedIngredientService,
+    FeedMonthlyAnalyticsService,
     FeedProductShipmentService,
     FeedProductionBatchService,
+    FeedProductionQualityCheckService,
     FeedRawArrivalService,
     FeedRawConsumptionService,
     FeedTypeService,
@@ -47,24 +47,6 @@ router.include_router(
         service_factory=lambda db: FeedIngredientService(FeedIngredientRepository(db)),
         permission_prefix="feed_ingredient",
         tags=["feed-ingredient"],
-    )
-)
-
-router.include_router(
-    build_crud_router(
-        prefix="arrivals",
-        service_factory=lambda db: FeedArrivalService(FeedArrivalRepository(db)),
-        permission_prefix="feed_arrival",
-        tags=["feed-arrival"],
-    )
-)
-
-router.include_router(
-    build_crud_router(
-        prefix="consumptions",
-        service_factory=lambda db: FeedConsumptionService(FeedConsumptionRepository(db)),
-        permission_prefix="feed_consumption",
-        tags=["feed-consumption"],
     )
 )
 
@@ -97,6 +79,15 @@ router.include_router(
 
 router.include_router(
     build_crud_router(
+        prefix="raw-consumptions",
+        service_factory=lambda db: FeedRawConsumptionService(FeedRawConsumptionRepository(db)),
+        permission_prefix="feed_raw_consumption",
+        tags=["feed-raw-consumption"],
+    )
+)
+
+router.include_router(
+    build_crud_router(
         prefix="production-batches",
         service_factory=lambda db: FeedProductionBatchService(FeedProductionBatchRepository(db)),
         permission_prefix="feed_production_batch",
@@ -106,10 +97,12 @@ router.include_router(
 
 router.include_router(
     build_crud_router(
-        prefix="raw-consumptions",
-        service_factory=lambda db: FeedRawConsumptionService(FeedRawConsumptionRepository(db)),
-        permission_prefix="feed_raw_consumption",
-        tags=["feed-raw-consumption"],
+        prefix="quality-checks",
+        service_factory=lambda db: FeedProductionQualityCheckService(
+            FeedProductionQualityCheckRepository(db)
+        ),
+        permission_prefix="feed_production_quality_check",
+        tags=["feed-production-quality-check"],
     )
 )
 
@@ -122,6 +115,15 @@ router.include_router(
     )
 )
 
+router.include_router(
+    build_crud_router(
+        prefix="monthly-analytics",
+        service_factory=lambda db: FeedMonthlyAnalyticsService(FeedMonthlyAnalyticsRepository(db)),
+        permission_prefix="feed_monthly_analytics",
+        tags=["feed-monthly-analytics"],
+    )
+)
+
 register_module_stats_route(
     router,
     module="feed",
@@ -129,19 +131,16 @@ register_module_stats_route(
     tables=(
         ModuleStatsTable(key="types", label="Types", table="feed_types"),
         ModuleStatsTable(key="ingredients", label="Ingredients", table="feed_ingredients"),
-        ModuleStatsTable(key="arrivals", label="Arrivals", table="feed_arrivals"),
-        ModuleStatsTable(key="consumptions", label="Consumptions", table="feed_consumptions"),
         ModuleStatsTable(key="formulas", label="Formulas", table="feed_formulas"),
         ModuleStatsTable(
             key="formula_ingredients",
             label="Formula Ingredients",
             table="feed_formula_ingredients",
         ),
-        ModuleStatsTable(key="raw_arrivals", label="Raw Arrivals", table="feed_raw_arrivals"),
         ModuleStatsTable(
-            key="production_batches",
-            label="Production Batches",
-            table="feed_production_batches",
+            key="raw_arrivals",
+            label="Raw Arrivals",
+            table="feed_raw_arrivals",
         ),
         ModuleStatsTable(
             key="raw_consumptions",
@@ -149,9 +148,24 @@ register_module_stats_route(
             table="feed_raw_consumptions",
         ),
         ModuleStatsTable(
+            key="production_batches",
+            label="Production Batches",
+            table="feed_production_batches",
+        ),
+        ModuleStatsTable(
+            key="quality_checks",
+            label="Quality Checks",
+            table="feed_production_quality_checks",
+        ),
+        ModuleStatsTable(
             key="product_shipments",
             label="Product Shipments",
             table="feed_product_shipments",
+        ),
+        ModuleStatsTable(
+            key="monthly_analytics",
+            label="Monthly Analytics",
+            table="feed_monthly_analytics",
         ),
     ),
 )

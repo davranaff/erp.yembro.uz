@@ -34,7 +34,7 @@ from app.schemas.core import (
     WarehouseReadSchema,
     WorkspaceModuleMetaSchema,
 )
-from app.scripts.sync_permissions import sync_permissions_for_organizations
+from app.scripts.sync_role_templates import sync_role_templates_for_organizations
 from app.services.base import BaseService
 from app.services.inventory import (
     ITEM_KEY_REFERENCE_TABLE,
@@ -62,6 +62,8 @@ ORGANIZATION_SCOPED_STANDALONE_RESOURCE_KEYS = {
             "department-modules",
             "clients",
             "client-debts",
+            "supplier-debts",
+            "debt-payments",
             "client-categories",
             "currencies",
             "measurement-units",
@@ -788,10 +790,9 @@ class DepartmentService(BaseService):
                 organization_id = str(actor.organization_id or "").strip()
 
             if result.ok and organization_id:
-                await sync_permissions_for_organizations(
+                await sync_role_templates_for_organizations(
                     self.repository.db,
                     organization_ids=[organization_id],
-                    sync_privileged_roles=False,
                     dry_run=False,
                 )
             return result

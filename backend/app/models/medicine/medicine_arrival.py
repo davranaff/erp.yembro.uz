@@ -5,8 +5,7 @@ from decimal import Decimal
 from uuid import UUID
 
 from sqlalchemy import CheckConstraint, Date, ForeignKey, Numeric, String, Text, UniqueConstraint
-from sqlalchemy.ext.hybrid import hybrid_property
-from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy.orm import Mapped, mapped_column
 
 from ..base import Base, IDMixin, TimestampMixin
 
@@ -47,17 +46,6 @@ class MedicineArrival(Base, IDMixin, TimestampMixin):
     invoice_no: Mapped[str | None] = mapped_column(String(120), nullable=True)
     note: Mapped[str | None] = mapped_column(Text, nullable=True)
 
-    organization: Mapped["Organization"] = relationship("Organization", back_populates="medicine_arrivals")
-    department: Mapped["Department"] = relationship("Department", back_populates="medicine_arrivals")
-    poultry_type: Mapped["PoultryType | None"] = relationship("PoultryType", back_populates="medicine_arrivals")
-    medicine_type: Mapped["MedicineType"] = relationship("MedicineType", back_populates="medicine_arrivals")
-    supplier_client: Mapped["Client | None"] = relationship("Client", back_populates="medicine_arrivals")
-    medicine_batches: Mapped[list["MedicineBatch"]] = relationship(
-        "MedicineBatch",
-        back_populates="arrival",
-        lazy="selectin",
-    )
-
     __table_args__ = (
         UniqueConstraint(
             "organization_id",
@@ -67,11 +55,8 @@ class MedicineArrival(Base, IDMixin, TimestampMixin):
             name="uq_medicine_arrival_invoice",
         ),
         CheckConstraint("quantity >= 0", name="ck_medicine_arrival_quantity_non_negative"),
-        CheckConstraint("unit_price IS NULL OR unit_price >= 0", name="ck_medicine_arrival_unit_price_non_negative"),
+        CheckConstraint(
+            "unit_price IS NULL OR unit_price >= 0",
+            name="ck_medicine_arrival_unit_price_non_negative",
+        ),
     )
-
-    @hybrid_property
-    def effective_amount(self) -> Decimal:
-        if self.unit_price is None:
-            return Decimal(0)
-        return (self.unit_price * self.quantity).quantize(Decimal("0.01"))

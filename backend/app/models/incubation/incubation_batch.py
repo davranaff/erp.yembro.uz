@@ -23,6 +23,11 @@ class IncubationBatch(Base, IDMixin, TimestampMixin):
         nullable=False,
         index=True,
     )
+    warehouse_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("warehouses.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
     source_client_id: Mapped[UUID | None] = mapped_column(
         ForeignKey("clients.id", ondelete="SET NULL"),
         nullable=True,
@@ -42,6 +47,7 @@ class IncubationBatch(Base, IDMixin, TimestampMixin):
 
     organization: Mapped["Organization"] = relationship("Organization", back_populates="incubation_batches")
     department: Mapped["Department"] = relationship("Department", back_populates="incubation_batches")
+    warehouse: Mapped["Warehouse | None"] = relationship("Warehouse")
     source_client: Mapped["Client | None"] = relationship("Client", back_populates="incubation_source_batches")
     production: Mapped["EggProduction | None"] = relationship("EggProduction")
     runs: Mapped[List["IncubationRun"]] = relationship(

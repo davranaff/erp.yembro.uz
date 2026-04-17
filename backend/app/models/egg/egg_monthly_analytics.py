@@ -28,6 +28,13 @@ class EggMonthlyAnalytics(Base, IDMixin, TimestampMixin):
     broken_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     shipped_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     rejected_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    large_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
+    medium_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
+    small_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
+    defective_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
+    quality_passed_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
+    quality_failed_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
+    quality_pending_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
     revenue: Mapped[Decimal] = mapped_column(Numeric(16, 2), nullable=False, default=0)
     currency: Mapped[str] = mapped_column(String(8), nullable=False)
 
@@ -40,6 +47,13 @@ class EggMonthlyAnalytics(Base, IDMixin, TimestampMixin):
         CheckConstraint("broken_count >= 0", name="ck_egg_monthly_broken_count_non_negative"),
         CheckConstraint("shipped_count >= 0", name="ck_egg_monthly_shipped_count_non_negative"),
         CheckConstraint("rejected_count >= 0", name="ck_egg_monthly_rejected_count_non_negative"),
+        CheckConstraint("large_count >= 0", name="ck_egg_monthly_large_count_non_negative"),
+        CheckConstraint("medium_count >= 0", name="ck_egg_monthly_medium_count_non_negative"),
+        CheckConstraint("small_count >= 0", name="ck_egg_monthly_small_count_non_negative"),
+        CheckConstraint("defective_count >= 0", name="ck_egg_monthly_defective_count_non_negative"),
+        CheckConstraint("quality_passed_count >= 0", name="ck_egg_monthly_quality_passed_count_non_negative"),
+        CheckConstraint("quality_failed_count >= 0", name="ck_egg_monthly_quality_failed_count_non_negative"),
+        CheckConstraint("quality_pending_count >= 0", name="ck_egg_monthly_quality_pending_count_non_negative"),
         CheckConstraint("revenue >= 0", name="ck_egg_monthly_revenue_non_negative"),
     )
 

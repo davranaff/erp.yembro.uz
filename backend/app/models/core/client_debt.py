@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import date
 from decimal import Decimal
+from typing import List
 from uuid import UUID
 
 from sqlalchemy import (
@@ -53,6 +54,12 @@ class ClientDebt(Base, IDMixin, TimestampMixin):
     organization: Mapped["Organization"] = relationship("Organization", lazy="selectin")
     department: Mapped["Department"] = relationship("Department", lazy="selectin")
     client: Mapped["Client"] = relationship("Client", lazy="selectin")
+    payments: Mapped[List["DebtPayment"]] = relationship(
+        "DebtPayment",
+        back_populates="client_debt",
+        lazy="selectin",
+        cascade="all, delete-orphan",
+    )
 
     __table_args__ = (
         UniqueConstraint(

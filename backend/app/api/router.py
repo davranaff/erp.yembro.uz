@@ -15,6 +15,7 @@ from app.api.v1.inventory import router as inventory_router
 from app.api.v1.medicine import router as medicine_router
 from app.api.v1.system import router as system_router
 from app.api.v1.slaughter import router as slaughter_router
+from app.api.v1.factory import router as factory_router
 
 api_router = APIRouter(prefix="/api/v1")
 api_router.include_router(auth_router)
@@ -30,3 +31,4 @@ api_router.include_router(incubation_router)
 api_router.include_router(inventory_router)
 api_router.include_router(medicine_router)
 api_router.include_router(slaughter_router)
+api_router.include_router(factory_router)

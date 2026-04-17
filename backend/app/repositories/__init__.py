@@ -8,22 +8,25 @@ from app.repositories.core import (
     WarehouseRepository,
 )
 from app.repositories.egg import EggMonthlyAnalyticsRepository, EggProductionRepository, EggShipmentRepository
-from app.repositories.finance import ExpenseCategoryRepository, ExpenseRepository
+from app.repositories.finance import (
+    CashAccountRepository,
+    CashTransactionRepository,
+    DebtPaymentRepository,
+    ExpenseCategoryRepository,
+    ExpenseRepository,
+    SupplierDebtRepository,
+)
 from app.repositories.feed import (
-    FeedArrivalRepository,
     FeedFormulaIngredientRepository,
     FeedFormulaRepository,
     FeedIngredientRepository,
     FeedProductionBatchRepository,
     FeedProductShipmentRepository,
-    FeedRawArrivalRepository,
-    FeedRawConsumptionRepository,
     FeedTypeRepository,
 )
 from app.repositories.hr import EmployeeRepository, PermissionRepository, PositionRepository, RoleRepository
 from app.repositories.inventory import StockMovementRepository
 from app.repositories.incubation import (
-    ChickArrivalRepository,
     ChickShipmentRepository,
     FactoryMonthlyAnalyticsRepository,
     IncubationBatchRepository,
@@ -31,14 +34,13 @@ from app.repositories.incubation import (
     IncubationRunRepository,
 )
 from app.repositories.medicine import (
-    MedicineArrivalRepository,
     MedicineBatchRepository,
-    MedicineConsumptionRepository,
     MedicineTypeRepository,
 )
 from app.repositories.slaughter import (
-    SlaughterArrivalRepository,
+    SlaughterMonthlyAnalyticsRepository,
     SlaughterProcessingRepository,
+    SlaughterQualityCheckRepository,
     SlaughterSemiProductRepository,
     SlaughterSemiProductShipmentRepository,
 )
@@ -57,32 +59,31 @@ __all__ = [
     "EggMonthlyAnalyticsRepository",
     "ExpenseCategoryRepository",
     "ExpenseRepository",
+    "CashAccountRepository",
+    "CashTransactionRepository",
+    "SupplierDebtRepository",
+    "DebtPaymentRepository",
     "FeedTypeRepository",
     "FeedIngredientRepository",
-    "FeedArrivalRepository",
     "FeedFormulaRepository",
     "FeedFormulaIngredientRepository",
-    "FeedRawArrivalRepository",
     "FeedProductionBatchRepository",
-    "FeedRawConsumptionRepository",
     "FeedProductShipmentRepository",
     "EmployeeRepository",
     "PositionRepository",
     "RoleRepository",
     "PermissionRepository",
     "StockMovementRepository",
-    "ChickArrivalRepository",
     "ChickShipmentRepository",
     "IncubationBatchRepository",
     "IncubationRunRepository",
     "IncubationMonthlyAnalyticsRepository",
     "FactoryMonthlyAnalyticsRepository",
-    "MedicineArrivalRepository",
     "MedicineBatchRepository",
-    "MedicineConsumptionRepository",
     "MedicineTypeRepository",
-    "SlaughterArrivalRepository",
+    "SlaughterMonthlyAnalyticsRepository",
     "SlaughterProcessingRepository",
+    "SlaughterQualityCheckRepository",
     "SlaughterSemiProductRepository",
     "SlaughterSemiProductShipmentRepository",
     "AuditLogRepository",

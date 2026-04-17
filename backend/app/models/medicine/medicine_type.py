@@ -19,16 +19,10 @@ class MedicineType(Base, IDMixin, TimestampMixin):
     )
     name: Mapped[str] = mapped_column(String(140), nullable=False)
     code: Mapped[str] = mapped_column(String(80), nullable=False, index=True)
-    unit: Mapped[str] = mapped_column(String(20), nullable=False, default="pcs", server_default="pcs")
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default="true")
 
     organization: Mapped["Organization"] = relationship("Organization", back_populates="medicine_types")
-    medicine_arrivals: Mapped[List["MedicineArrival"]] = relationship(
-        "MedicineArrival",
-        back_populates="medicine_type",
-        lazy="selectin",
-    )
     medicine_batches: Mapped[List["MedicineBatch"]] = relationship(
         "MedicineBatch",
         back_populates="medicine_type",

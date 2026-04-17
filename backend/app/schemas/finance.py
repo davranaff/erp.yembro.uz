@@ -90,6 +90,46 @@ class CashTransactionListResponse(CRUDListResponse[CashTransactionReadSchema]):
     """Paginated cash transaction response."""
 
 
+class SupplierDebtCreateSchema(OpenSchema, BaseCreateSchema):
+    """Input payload to create supplier debt (accounts payable)."""
+
+
+class SupplierDebtUpdateSchema(OpenSchema, BaseUpdateSchema):
+    """Input payload to update supplier debt."""
+
+
+class SupplierDebtReadSchema(OpenSchema, BaseReadSchema):
+    """Readable supplier debt response."""
+
+
+class SupplierDebtListParams(CRUDBaseParams):
+    """Pagination + query params for supplier debt list."""
+
+
+class SupplierDebtListResponse(CRUDListResponse[SupplierDebtReadSchema]):
+    """Paginated supplier debt response."""
+
+
+class DebtPaymentCreateSchema(OpenSchema, BaseCreateSchema):
+    """Input payload to create debt payment."""
+
+
+class DebtPaymentUpdateSchema(OpenSchema, BaseUpdateSchema):
+    """Input payload to update debt payment."""
+
+
+class DebtPaymentReadSchema(OpenSchema, BaseReadSchema):
+    """Readable debt payment response."""
+
+
+class DebtPaymentListParams(CRUDBaseParams):
+    """Pagination + query params for debt payment list."""
+
+
+class DebtPaymentListResponse(CRUDListResponse[DebtPaymentReadSchema]):
+    """Paginated debt payment response."""
+
+
 __all__ = [
     "ExpenseCategoryCreateSchema",
     "ExpenseCategoryUpdateSchema",
@@ -111,4 +151,14 @@ __all__ = [
     "CashTransactionReadSchema",
     "CashTransactionListParams",
     "CashTransactionListResponse",
+    "SupplierDebtCreateSchema",
+    "SupplierDebtUpdateSchema",
+    "SupplierDebtReadSchema",
+    "SupplierDebtListParams",
+    "SupplierDebtListResponse",
+    "DebtPaymentCreateSchema",
+    "DebtPaymentUpdateSchema",
+    "DebtPaymentReadSchema",
+    "DebtPaymentListParams",
+    "DebtPaymentListResponse",
 ]

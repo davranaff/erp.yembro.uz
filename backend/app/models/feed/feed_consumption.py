@@ -5,7 +5,7 @@ from decimal import Decimal
 from uuid import UUID
 
 from sqlalchemy import CheckConstraint, Date, ForeignKey, Numeric, String, Text
-from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy.orm import Mapped, mapped_column
 
 from ..base import Base, IDMixin, TimestampMixin
 
@@ -38,12 +38,6 @@ class FeedConsumption(Base, IDMixin, TimestampMixin):
     unit: Mapped[str] = mapped_column(String(20), nullable=False, default="kg", server_default="kg")
     note: Mapped[str | None] = mapped_column(Text, nullable=True)
 
-    organization: Mapped["Organization"] = relationship("Organization")
-    department: Mapped["Department"] = relationship("Department")
-    poultry_type: Mapped["PoultryType | None"] = relationship("PoultryType")
-    feed_type: Mapped["FeedType"] = relationship("FeedType")
-
     __table_args__ = (
         CheckConstraint("quantity > 0", name="ck_feed_consumption_quantity_positive"),
     )
-

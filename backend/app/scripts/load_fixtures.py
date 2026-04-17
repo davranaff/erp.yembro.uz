@@ -31,6 +31,8 @@ FIXTURE_LOAD_ORDER = [
     "warehouses",
     "clients",
     "client_debts",
+    "supplier_debts",
+    "debt_payments",
     "currencies",
     "poultry_types",
     "measurement_units",
@@ -50,10 +52,10 @@ FIXTURE_LOAD_ORDER = [
     "cash_transactions",
     "feed_types",
     "feed_ingredients",
-    "feed_arrivals",
-    "feed_consumptions",
     "feed_formulas",
     "feed_formula_ingredients",
+    "feed_arrivals",
+    "feed_consumptions",
     "feed_raw_arrivals",
     "feed_production_batches",
     "feed_raw_consumptions",
@@ -64,13 +66,16 @@ FIXTURE_LOAD_ORDER = [
     "chick_arrivals",
     "incubation_monthly_analytics",
     "factory_monthly_analytics",
+    "factory_flocks",
+    "factory_daily_logs",
+    "factory_shipments",
     "medicine_types",
-    "medicine_arrivals",
     "medicine_batches",
-    "medicine_consumptions",
-    "slaughter_arrivals",
+    "factory_medicine_usages",
+    "factory_vaccination_plans",
     "slaughter_processings",
     "slaughter_semi_products",
+    "slaughter_quality_checks",
     "slaughter_semi_product_shipments",
     "stock_movements",
 ]
@@ -586,11 +591,6 @@ def _build_generated_stock_movements(
     rows_by_table: dict[str, list[dict[str, object]]],
 ) -> list[dict[str, object]]:
     stock_rows = list(rows_by_table.get("stock_movements", []))
-    run_by_id = {
-        str(row["id"]): row
-        for row in rows_by_table.get("incubation_runs", [])
-        if row.get("id") is not None
-    }
     formula_feed_type_by_id = {
         str(row["id"]): str(row["feed_type_id"])
         for row in rows_by_table.get("feed_formulas", [])
@@ -695,97 +695,6 @@ def _build_generated_stock_movements(
         if movement is not None:
             stock_rows.append(movement)
 
-    for row in rows_by_table.get("chick_arrivals", []):
-        quantity = _decimal_value(row.get("chicks_count"))
-        run_id = row.get("run_id")
-        if run_id is not None:
-            run_row = run_by_id.get(str(run_id))
-            if run_row is None:
-                raise ValueError(f"Unknown incubation run for chick arrival: {run_id}")
-            movement = _stock_movement_row(
-                organization_id=row["organization_id"],
-                department_id=run_row["department_id"],
-                counterparty_department_id=row["department_id"],
-                item_type="chick",
-                item_key=f"chick_run:{run_id}",
-                movement_kind="transfer_out",
-                quantity=quantity,
-                unit="pcs",
-                occurred_on=row["arrived_on"],
-                reference_table="chick_arrivals",
-                reference_id=row["id"],
-                note="Transfer from incubation run",
-            )
-            if movement is not None:
-                stock_rows.append(movement)
-
-        movement = _stock_movement_row(
-            organization_id=row["organization_id"],
-            department_id=row["department_id"],
-            item_type="chick",
-            item_key=f"chick_arrival:{row['id']}",
-            movement_kind="incoming",
-            quantity=quantity,
-            unit="pcs",
-            occurred_on=row["arrived_on"],
-            reference_table="chick_arrivals",
-            reference_id=row["id"],
-            note=row.get("note"),
-        )
-        if movement is not None:
-            stock_rows.append(movement)
-
-    for row in rows_by_table.get("feed_arrivals", []):
-        movement = _stock_movement_row(
-            organization_id=row["organization_id"],
-            department_id=row["department_id"],
-            item_type="feed",
-            item_key=f"feed_product:{row['feed_type_id']}",
-            movement_kind="incoming",
-            quantity=_decimal_value(row.get("quantity")),
-            unit=row.get("unit") or "kg",
-            occurred_on=row["arrived_on"],
-            reference_table="feed_arrivals",
-            reference_id=row["id"],
-            note=row.get("invoice_no"),
-        )
-        if movement is not None:
-            stock_rows.append(movement)
-
-    for row in rows_by_table.get("feed_consumptions", []):
-        movement = _stock_movement_row(
-            organization_id=row["organization_id"],
-            department_id=row["department_id"],
-            item_type="feed",
-            item_key=f"feed_product:{row['feed_type_id']}",
-            movement_kind="outgoing",
-            quantity=_decimal_value(row.get("quantity")),
-            unit=row.get("unit") or "kg",
-            occurred_on=row["consumed_on"],
-            reference_table="feed_consumptions",
-            reference_id=row["id"],
-            note=row.get("note"),
-        )
-        if movement is not None:
-            stock_rows.append(movement)
-
-    for row in rows_by_table.get("feed_raw_arrivals", []):
-        movement = _stock_movement_row(
-            organization_id=row["organization_id"],
-            department_id=row["department_id"],
-            item_type="feed",
-            item_key=f"feed_raw:{row['ingredient_id']}",
-            movement_kind="incoming",
-            quantity=_decimal_value(row.get("quantity")),
-            unit=row.get("unit") or "kg",
-            occurred_on=row["arrived_on"],
-            reference_table="feed_raw_arrivals",
-            reference_id=row["id"],
-            note=row.get("lot_no"),
-        )
-        if movement is not None:
-            stock_rows.append(movement)
-
     for row in rows_by_table.get("feed_production_batches", []):
         formula_id = str(row.get("formula_id") or "")
         feed_type_id = formula_feed_type_by_id.get(formula_id)
@@ -803,23 +712,6 @@ def _build_generated_stock_movements(
             reference_table="feed_production_batches",
             reference_id=row["id"],
             note=row.get("batch_code"),
-        )
-        if movement is not None:
-            stock_rows.append(movement)
-
-    for row in rows_by_table.get("feed_raw_consumptions", []):
-        movement = _stock_movement_row(
-            organization_id=row["organization_id"],
-            department_id=row["department_id"],
-            item_type="feed",
-            item_key=f"feed_raw:{row['ingredient_id']}",
-            movement_kind="outgoing",
-            quantity=_decimal_value(row.get("quantity")),
-            unit=row.get("unit") or "kg",
-            occurred_on=row["consumed_on"],
-            reference_table="feed_raw_consumptions",
-            reference_id=row["id"],
-            note=row.get("note"),
         )
         if movement is not None:
             stock_rows.append(movement)
@@ -854,46 +746,6 @@ def _build_generated_stock_movements(
             reference_table="medicine_batches",
             reference_id=row["id"],
             note=row.get("batch_code"),
-        )
-        if movement is not None:
-            stock_rows.append(movement)
-
-    for row in rows_by_table.get("medicine_consumptions", []):
-        batch_id = row.get("batch_id")
-        if batch_id is None:
-            continue
-        movement = _stock_movement_row(
-            organization_id=row["organization_id"],
-            department_id=row["department_id"],
-            item_type="medicine",
-            item_key=f"medicine_batch:{batch_id}",
-            movement_kind="outgoing",
-            quantity=_decimal_value(row.get("quantity")),
-            unit=row.get("unit") or "pcs",
-            occurred_on=row["consumed_on"],
-            reference_table="medicine_consumptions",
-            reference_id=row["id"],
-            note=row.get("purpose"),
-        )
-        if movement is not None:
-            stock_rows.append(movement)
-
-    for row in rows_by_table.get("slaughter_arrivals", []):
-        chick_arrival_id = row.get("chick_arrival_id")
-        if chick_arrival_id is None:
-            continue
-        movement = _stock_movement_row(
-            organization_id=row["organization_id"],
-            department_id=row["department_id"],
-            item_type="chick",
-            item_key=f"chick_arrival:{chick_arrival_id}",
-            movement_kind="outgoing",
-            quantity=_decimal_value(row.get("birds_count")),
-            unit="pcs",
-            occurred_on=row["arrived_on"],
-            reference_table="slaughter_arrivals",
-            reference_id=row["id"],
-            note=row.get("invoice_no"),
         )
         if movement is not None:
             stock_rows.append(movement)
@@ -961,6 +813,31 @@ def _normalize_datetime(value: str) -> datetime:
     return datetime.fromisoformat(value)
 
 
+def _coerce_legacy_value(value: object) -> object:
+    if value is None:
+        return None
+    if isinstance(value, (int, float, bool, date, datetime, UUID)):
+        return value
+    s = str(value)
+    if re.match(r"^\d{4}-\d{2}-\d{2}$", s):
+        return date.fromisoformat(s)
+    try:
+        return UUID(s)
+    except (ValueError, AttributeError):
+        pass
+    if isinstance(value, (int, float)):
+        return value
+    try:
+        if "." in s:
+            return float(s)
+        return int(s)
+    except ValueError:
+        pass
+    if s.lower() in ("true", "false"):
+        return s.lower() == "true"
+    return s
+
+
 def _coerce_value(table_name: str, column_name: str, value: object, table: Table) -> object:
     if value is None:
         return None
@@ -1025,7 +902,14 @@ async def _truncate_and_load(rows_by_table: dict[str, list[dict[str, object]]]) 
     try:
         all_tables = Base.metadata.tables
         known_tables = set(all_tables)
-        unknown_tables = sorted(set(rows_by_table) - known_tables)
+        legacy_tables = {
+            "feed_arrivals",
+            "feed_consumptions",
+            "feed_raw_arrivals",
+            "feed_raw_consumptions",
+            "chick_arrivals",
+        }
+        unknown_tables = sorted(set(rows_by_table) - known_tables - legacy_tables)
         if unknown_tables:
             raise ValueError(f"Unknown fixture tables: {', '.join(unknown_tables)}")
 
@@ -1033,7 +917,8 @@ async def _truncate_and_load(rows_by_table: dict[str, list[dict[str, object]]]) 
         if missing_in_load_order:
             raise ValueError(f"Fixture load order is not defined for: {', '.join(missing_in_load_order)}")
 
-        quoted_tables = ", ".join(_quote_identifier(table_name) for table_name in all_tables)
+        all_table_names = set(all_tables) | (legacy_tables & set(rows_by_table))
+        quoted_tables = ", ".join(_quote_identifier(t) for t in all_table_names)
         inserted_counts: dict[str, int] = {}
 
         async with db.pool.acquire() as conn:
@@ -1045,14 +930,19 @@ async def _truncate_and_load(rows_by_table: dict[str, list[dict[str, object]]]) 
                     if not rows:
                         continue
 
-                    table = all_tables[table_name]
+                    table = all_tables.get(table_name)
 
                     for row in rows:
                         columns = list(row.keys())
-                        prepared_values = [
-                            _coerce_value(table_name, column_name, row[column_name], table)
-                            for column_name in columns
-                        ]
+                        if table is not None:
+                            prepared_values = [
+                                _coerce_value(table_name, column_name, row[column_name], table)
+                                for column_name in columns
+                            ]
+                        else:
+                            prepared_values = [
+                                _coerce_legacy_value(row[c]) for c in columns
+                            ]
                         quoted_columns = ", ".join(_quote_identifier(column_name) for column_name in columns)
                         placeholders = ", ".join(f"${index}" for index in range(1, len(columns) + 1))
                         query = (

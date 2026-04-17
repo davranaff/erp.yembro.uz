@@ -105,26 +105,6 @@ class Department(Base, IDMixin, TimestampMixin):
         back_populates="department",
         lazy="selectin",
     )
-    chick_arrivals: Mapped[List["ChickArrival"]] = relationship(
-        "ChickArrival",
-        back_populates="department",
-        lazy="selectin",
-    )
-    feed_arrivals: Mapped[List["FeedArrival"]] = relationship(
-        "FeedArrival",
-        back_populates="department",
-        lazy="selectin",
-    )
-    feed_raw_arrivals: Mapped[List["FeedRawArrival"]] = relationship(
-        "FeedRawArrival",
-        back_populates="department",
-        lazy="selectin",
-    )
-    feed_raw_consumptions: Mapped[List["FeedRawConsumption"]] = relationship(
-        "FeedRawConsumption",
-        back_populates="department",
-        lazy="selectin",
-    )
     feed_production_batches: Mapped[List["FeedProductionBatch"]] = relationship(
         "FeedProductionBatch",
         back_populates="department",
@@ -132,16 +112,6 @@ class Department(Base, IDMixin, TimestampMixin):
     )
     feed_product_shipments: Mapped[List["FeedProductShipment"]] = relationship(
         "FeedProductShipment",
-        back_populates="department",
-        lazy="selectin",
-    )
-    medicine_arrivals: Mapped[List["MedicineArrival"]] = relationship(
-        "MedicineArrival",
-        back_populates="department",
-        lazy="selectin",
-    )
-    slaughter_arrivals: Mapped[List["SlaughterArrival"]] = relationship(
-        "SlaughterArrival",
         back_populates="department",
         lazy="selectin",
     )
@@ -160,13 +130,13 @@ class Department(Base, IDMixin, TimestampMixin):
         back_populates="department",
         lazy="selectin",
     )
-    medicine_batches: Mapped[List["MedicineBatch"]] = relationship(
-        "MedicineBatch",
+    slaughter_monthly_analytics: Mapped[List["SlaughterMonthlyAnalytics"]] = relationship(
+        "SlaughterMonthlyAnalytics",
         back_populates="department",
         lazy="selectin",
     )
-    medicine_consumptions: Mapped[List["MedicineConsumption"]] = relationship(
-        "MedicineConsumption",
+    medicine_batches: Mapped[List["MedicineBatch"]] = relationship(
+        "MedicineBatch",
         back_populates="department",
         lazy="selectin",
     )
@@ -192,6 +162,36 @@ class Department(Base, IDMixin, TimestampMixin):
     )
     incubation_monthly_analytics: Mapped[List["IncubationMonthlyAnalytics"]] = relationship(
         "IncubationMonthlyAnalytics",
+        back_populates="department",
+        lazy="selectin",
+    )
+    factory_flocks: Mapped[List["FactoryFlock"]] = relationship(
+        "FactoryFlock",
+        back_populates="department",
+        lazy="selectin",
+    )
+    factory_daily_logs: Mapped[List["FactoryDailyLog"]] = relationship(
+        "FactoryDailyLog",
+        back_populates="department",
+        lazy="selectin",
+    )
+    factory_shipments: Mapped[List["FactoryShipment"]] = relationship(
+        "FactoryShipment",
+        back_populates="department",
+        lazy="selectin",
+    )
+    factory_medicine_usages: Mapped[List["FactoryMedicineUsage"]] = relationship(
+        "FactoryMedicineUsage",
+        back_populates="department",
+        lazy="selectin",
+    )
+    factory_vaccination_plans: Mapped[List["FactoryVaccinationPlan"]] = relationship(
+        "FactoryVaccinationPlan",
+        back_populates="department",
+        lazy="selectin",
+    )
+    clients: Mapped[List["Client"]] = relationship(
+        "Client",
         back_populates="department",
         lazy="selectin",
     )

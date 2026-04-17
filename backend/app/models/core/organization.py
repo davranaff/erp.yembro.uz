@@ -178,30 +178,6 @@ class Organization(Base, IDMixin, TimestampMixin):
         cascade="all, delete-orphan",
         lazy="selectin",
     )
-    chick_arrivals: Mapped[List["ChickArrival"]] = relationship(
-        "ChickArrival",
-        back_populates="organization",
-        cascade="all, delete-orphan",
-        lazy="selectin",
-    )
-    feed_arrivals: Mapped[List["FeedArrival"]] = relationship(
-        "FeedArrival",
-        back_populates="organization",
-        cascade="all, delete-orphan",
-        lazy="selectin",
-    )
-    medicine_arrivals: Mapped[List["MedicineArrival"]] = relationship(
-        "MedicineArrival",
-        back_populates="organization",
-        cascade="all, delete-orphan",
-        lazy="selectin",
-    )
-    slaughter_arrivals: Mapped[List["SlaughterArrival"]] = relationship(
-        "SlaughterArrival",
-        back_populates="organization",
-        cascade="all, delete-orphan",
-        lazy="selectin",
-    )
     slaughter_processings: Mapped[List["SlaughterProcessing"]] = relationship(
         "SlaughterProcessing",
         back_populates="organization",
@@ -220,26 +196,14 @@ class Organization(Base, IDMixin, TimestampMixin):
         cascade="all, delete-orphan",
         lazy="selectin",
     )
+    slaughter_monthly_analytics: Mapped[List["SlaughterMonthlyAnalytics"]] = relationship(
+        "SlaughterMonthlyAnalytics",
+        back_populates="organization",
+        cascade="all, delete-orphan",
+        lazy="selectin",
+    )
     medicine_batches: Mapped[List["MedicineBatch"]] = relationship(
         "MedicineBatch",
-        back_populates="organization",
-        cascade="all, delete-orphan",
-        lazy="selectin",
-    )
-    medicine_consumptions: Mapped[List["MedicineConsumption"]] = relationship(
-        "MedicineConsumption",
-        back_populates="organization",
-        cascade="all, delete-orphan",
-        lazy="selectin",
-    )
-    feed_raw_arrivals: Mapped[List["FeedRawArrival"]] = relationship(
-        "FeedRawArrival",
-        back_populates="organization",
-        cascade="all, delete-orphan",
-        lazy="selectin",
-    )
-    feed_raw_consumptions: Mapped[List["FeedRawConsumption"]] = relationship(
-        "FeedRawConsumption",
         back_populates="organization",
         cascade="all, delete-orphan",
         lazy="selectin",
@@ -258,6 +222,36 @@ class Organization(Base, IDMixin, TimestampMixin):
     )
     factory_monthly_analytics: Mapped[List["FactoryMonthlyAnalytics"]] = relationship(
         "FactoryMonthlyAnalytics",
+        back_populates="organization",
+        cascade="all, delete-orphan",
+        lazy="selectin",
+    )
+    factory_medicine_usages: Mapped[List["FactoryMedicineUsage"]] = relationship(
+        "FactoryMedicineUsage",
+        back_populates="organization",
+        cascade="all, delete-orphan",
+        lazy="selectin",
+    )
+    factory_vaccination_plans: Mapped[List["FactoryVaccinationPlan"]] = relationship(
+        "FactoryVaccinationPlan",
+        back_populates="organization",
+        cascade="all, delete-orphan",
+        lazy="selectin",
+    )
+    factory_flocks: Mapped[List["FactoryFlock"]] = relationship(
+        "FactoryFlock",
+        back_populates="organization",
+        cascade="all, delete-orphan",
+        lazy="selectin",
+    )
+    factory_daily_logs: Mapped[List["FactoryDailyLog"]] = relationship(
+        "FactoryDailyLog",
+        back_populates="organization",
+        cascade="all, delete-orphan",
+        lazy="selectin",
+    )
+    factory_shipments: Mapped[List["FactoryShipment"]] = relationship(
+        "FactoryShipment",
         back_populates="organization",
         cascade="all, delete-orphan",
         lazy="selectin",

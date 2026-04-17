@@ -261,22 +261,6 @@ async def _upsert_factory_monthly_analytics(db: Database, *, start: date, end: d
         start,
         end,
     )
-    medicine_rows = await db.fetch(
-        """
-        SELECT
-            organization_id,
-            department_id,
-            poultry_type_id,
-            COALESCE(SUM(quantity), 0) AS medicines_arrived
-        FROM medicine_arrivals
-        WHERE arrived_on >= $1
-          AND arrived_on < $2
-        GROUP BY organization_id, department_id, poultry_type_id
-        """,
-        start,
-        end,
-    )
-
     merged: dict[tuple[str, str | None, str | None], dict[str, object]] = defaultdict(
         lambda: {
             "chicks_arrived": 0,
@@ -302,14 +286,6 @@ async def _upsert_factory_monthly_analytics(db: Database, *, start: date, end: d
             str(row["poultry_type_id"]) if row["poultry_type_id"] is not None else None,
         )
         merged[key]["feed_quantity"] = Decimal(str(row["feed_quantity"] or 0)).quantize(Decimal("0.001"))
-
-    for row in medicine_rows:
-        key = (
-            str(row["organization_id"]),
-            str(row["department_id"]) if row["department_id"] is not None else None,
-            str(row["poultry_type_id"]) if row["poultry_type_id"] is not None else None,
-        )
-        merged[key]["medicines_arrived"] = Decimal(str(row["medicines_arrived"] or 0)).quantize(Decimal("0.001"))
 
     upserted = 0
     for (organization_id, department_id, poultry_type_id), metrics in merged.items():

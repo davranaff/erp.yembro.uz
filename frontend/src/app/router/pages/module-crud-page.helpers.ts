@@ -7,13 +7,21 @@ export type FormValues = Record<string, string | boolean | string[]>;
 export type FormErrors = Record<string, string>;
 export type SubmitMode = 'create' | 'update';
 export type ModuleViewMode = 'records' | 'stats';
-export type ResourceCategoryGroupId = 'finance' | 'people_clients' | 'operations';
+export type ResourceCategoryGroupId =
+  | 'finance'
+  | 'people_clients'
+  | 'warehouse'
+  | 'operations'
+  | 'catalogs'
+  | 'analytics';
+export type ResourceDetailPanelKey = 'debt_summary';
 export type ResourceUiConfig = {
   formOrder?: string[];
   tableOrder?: string[];
   hiddenFields?: string[];
   hideDepartmentFieldWhenScoped?: boolean;
   hideOrganizationFieldWhenScoped?: boolean;
+  detailPanelKey?: ResourceDetailPanelKey;
 };
 export type DepartmentRecord = CrudRecord & {
   id?: string;
@@ -27,6 +35,7 @@ export type AuditSnapshot = Record<string, unknown>;
 export type ResourceCategoryCandidate = {
   key: string;
   permissionPrefix: string;
+  moduleKey?: string;
 };
 
 export const EMPTY_TEXT = '';
@@ -46,10 +55,25 @@ const FINANCE_RESOURCE_PERMISSION_PREFIXES = new Set([
   'cash_account',
   'cash_transaction',
   'client_debt',
+  'supplier_debt',
+  'debt_payment',
   'currency',
 ]);
 const PEOPLE_RESOURCE_PERMISSION_PREFIXES = new Set(['employee', 'position', 'client']);
 const PEOPLE_RESOURCE_KEYS = new Set(['factory-clients']);
+const WAREHOUSE_RESOURCE_PERMISSION_PREFIXES = new Set(['warehouse', 'stock_movement']);
+const CATALOG_MODULE_RESOURCE_KEYS = new Set<string>([
+  'feed:types',
+  'feed:ingredients',
+  'feed:formulas',
+  'feed:formula-ingredients',
+  'medicine:types',
+  'core:poultry-types',
+  'core:measurement-units',
+  'core:client-categories',
+  'hr:roles',
+  'hr:permissions',
+]);
 export const isPasswordFieldName = (fieldName: string): boolean =>
   fieldName.toLowerCase().includes('password');
 export const getDefaultInventoryItemTypeForModule = (
@@ -211,6 +235,67 @@ const resourceUiConfigs: Record<string, ResourceUiConfig> = {
     ],
     hideDepartmentFieldWhenScoped: true,
     hideOrganizationFieldWhenScoped: true,
+    detailPanelKey: 'debt_summary',
+  },
+  'finance:supplier-debts': {
+    formOrder: [
+      'client_id',
+      'department_id',
+      'item_type',
+      'item_key',
+      'quantity',
+      'unit',
+      'amount_total',
+      'amount_paid',
+      'currency',
+      'issued_on',
+      'due_on',
+      'status',
+      'note',
+      'is_active',
+    ],
+    tableOrder: [
+      'issued_on',
+      'due_on',
+      'client_id',
+      'item_type',
+      'item_key',
+      'quantity',
+      'unit',
+      'amount_total',
+      'amount_paid',
+      'currency',
+      'status',
+    ],
+    hideDepartmentFieldWhenScoped: true,
+    hideOrganizationFieldWhenScoped: true,
+    detailPanelKey: 'debt_summary',
+  },
+  'finance:debt-payments': {
+    formOrder: [
+      'client_debt_id',
+      'supplier_debt_id',
+      'direction',
+      'amount',
+      'currency',
+      'paid_on',
+      'method',
+      'cash_account_id',
+      'reference_no',
+      'note',
+      'is_active',
+    ],
+    tableOrder: [
+      'paid_on',
+      'direction',
+      'amount',
+      'currency',
+      'method',
+      'reference_no',
+      'cash_account_id',
+    ],
+    hideDepartmentFieldWhenScoped: true,
+    hideOrganizationFieldWhenScoped: true,
   },
   'finance:expense-categories': {
     formOrder: ['name', 'code', 'description', 'is_active'],
@@ -278,26 +363,19 @@ const resourceUiConfigs: Record<string, ResourceUiConfig> = {
     hiddenFields: ['expense_id'],
     hideOrganizationFieldWhenScoped: true,
   },
-  'slaughter:arrivals': {
-    formOrder: [
-      'arrived_on',
-      'supplier_client_id',
-      'poultry_type_id',
-      'birds_count',
-      'average_weight_kg',
-      'unit_price',
-      'currency',
-      'note',
-    ],
-    tableOrder: ['arrived_on', 'supplier_client_id', 'birds_count', 'average_weight_kg'],
-    hiddenFields: ['is_active', 'invoice_no'],
-    hideDepartmentFieldWhenScoped: true,
-    hideOrganizationFieldWhenScoped: true,
-  },
   'slaughter:processings': {
     formOrder: [
+      'source_type',
+      'factory_shipment_id',
+      'supplier_client_id',
+      'arrived_on',
+      'birds_received',
+      'arrival_total_weight_kg',
+      'arrival_unit_price',
+      'arrival_currency',
+      'arrival_invoice_no',
+      'poultry_type_id',
       'processed_on',
-      'arrival_id',
       'processed_by',
       'birds_processed',
       'first_sort_count',
@@ -309,6 +387,9 @@ const resourceUiConfigs: Record<string, ResourceUiConfig> = {
       'note',
     ],
     tableOrder: [
+      'arrived_on',
+      'source_type',
+      'birds_received',
       'processed_on',
       'birds_processed',
       'first_sort_count',
@@ -322,6 +403,7 @@ const resourceUiConfigs: Record<string, ResourceUiConfig> = {
     formOrder: [
       'produced_on',
       'processing_id',
+      'warehouse_id',
       'part_name',
       'quality',
       'quantity',
@@ -337,6 +419,7 @@ const resourceUiConfigs: Record<string, ResourceUiConfig> = {
     formOrder: [
       'shipped_on',
       'semi_product_id',
+      'warehouse_id',
       'client_id',
       'quantity',
       'unit',
@@ -347,6 +430,12 @@ const resourceUiConfigs: Record<string, ResourceUiConfig> = {
     ],
     tableOrder: ['shipped_on', 'semi_product_id', 'client_id', 'quantity'],
     hiddenFields: ['invoice_no'],
+    hideDepartmentFieldWhenScoped: true,
+    hideOrganizationFieldWhenScoped: true,
+  },
+  'slaughter:slaughter-quality-checks': {
+    formOrder: ['checked_on', 'semi_product_id', 'status', 'grade', 'inspector_id', 'notes'],
+    tableOrder: ['checked_on', 'semi_product_id', 'status', 'grade', 'inspector_id'],
     hideDepartmentFieldWhenScoped: true,
     hideOrganizationFieldWhenScoped: true,
   },
@@ -378,30 +467,324 @@ const resourceUiConfigs: Record<string, ResourceUiConfig> = {
     hideDepartmentFieldWhenScoped: true,
     hideOrganizationFieldWhenScoped: true,
   },
+  'egg:productions': {
+    formOrder: [
+      'produced_on',
+      'warehouse_id',
+      'eggs_collected',
+      'eggs_broken',
+      'eggs_rejected',
+      'total_shelled',
+      'note',
+    ],
+    hideDepartmentFieldWhenScoped: true,
+    hideOrganizationFieldWhenScoped: true,
+  },
   'egg:shipments': {
+    formOrder: [
+      'shipped_on',
+      'production_id',
+      'warehouse_id',
+      'client_id',
+      'eggs_count',
+      'eggs_broken',
+      'unit',
+      'unit_price',
+      'currency',
+      'note',
+    ],
     hiddenFields: ['invoice_no'],
+    hideDepartmentFieldWhenScoped: true,
+    hideOrganizationFieldWhenScoped: true,
+  },
+  'egg:egg-quality-checks': {
+    formOrder: ['checked_on', 'production_id', 'status', 'grade', 'inspector_id', 'notes'],
+    tableOrder: ['checked_on', 'production_id', 'status', 'grade', 'inspector_id'],
+    hideDepartmentFieldWhenScoped: true,
+    hideOrganizationFieldWhenScoped: true,
+  },
+  'incubation:batches': {
+    formOrder: [
+      'arrived_on',
+      'batch_code',
+      'warehouse_id',
+      'source_client_id',
+      'production_id',
+      'eggs_arrived',
+      'expected_hatch_on',
+      'note',
+      'is_active',
+    ],
+    hideDepartmentFieldWhenScoped: true,
+    hideOrganizationFieldWhenScoped: true,
+  },
+  'incubation:runs': {
+    formOrder: [
+      'start_date',
+      'end_date',
+      'batch_id',
+      'warehouse_id',
+      'eggs_set',
+      'grade_1_count',
+      'grade_2_count',
+      'bad_eggs_count',
+      'chicks_hatched',
+      'chicks_destroyed',
+      'note',
+    ],
+    hideDepartmentFieldWhenScoped: true,
+    hideOrganizationFieldWhenScoped: true,
   },
   'incubation:chick-shipments': {
+    formOrder: [
+      'shipped_on',
+      'run_id',
+      'warehouse_id',
+      'client_id',
+      'chicks_count',
+      'unit_price',
+      'currency',
+      'note',
+    ],
     hiddenFields: ['invoice_no'],
+    hideDepartmentFieldWhenScoped: true,
+    hideOrganizationFieldWhenScoped: true,
   },
   'feed:raw-arrivals': {
-    hiddenFields: ['invoice_no'],
+    formOrder: [
+      'arrived_on',
+      'ingredient_id',
+      'warehouse_id',
+      'supplier_client_id',
+      'quantity',
+      'unit',
+      'unit_price',
+      'currency',
+      'invoice_no',
+      'note',
+    ],
+    tableOrder: [
+      'arrived_on',
+      'ingredient_id',
+      'supplier_client_id',
+      'quantity',
+      'unit_price',
+      'currency',
+    ],
+    hideDepartmentFieldWhenScoped: true,
+    hideOrganizationFieldWhenScoped: true,
+  },
+  'feed:raw-consumptions': {
+    formOrder: [
+      'consumed_on',
+      'production_batch_id',
+      'ingredient_id',
+      'warehouse_id',
+      'quantity',
+      'unit',
+      'note',
+    ],
+    tableOrder: ['consumed_on', 'production_batch_id', 'ingredient_id', 'quantity'],
+    hideDepartmentFieldWhenScoped: true,
+    hideOrganizationFieldWhenScoped: true,
+  },
+  'feed:quality-checks': {
+    formOrder: ['checked_on', 'production_batch_id', 'status', 'grade', 'inspector_id', 'notes'],
+    tableOrder: ['checked_on', 'production_batch_id', 'status', 'grade', 'inspector_id'],
+    hideDepartmentFieldWhenScoped: true,
+    hideOrganizationFieldWhenScoped: true,
+  },
+  'feed:monthly-analytics': {
+    formOrder: [
+      'month_start',
+      'feed_type_id',
+      'raw_arrivals_kg',
+      'raw_consumptions_kg',
+      'produced_kg',
+      'shipped_kg',
+      'shipped_amount',
+      'purchased_amount',
+      'quality_passed_count',
+      'quality_failed_count',
+      'quality_pending_count',
+      'currency',
+      'note',
+    ],
+    tableOrder: [
+      'month_start',
+      'feed_type_id',
+      'produced_kg',
+      'shipped_kg',
+      'shipped_amount',
+      'quality_passed_count',
+      'quality_failed_count',
+    ],
+    hideDepartmentFieldWhenScoped: true,
+    hideOrganizationFieldWhenScoped: true,
   },
   'feed:product-shipments': {
+    formOrder: [
+      'shipped_on',
+      'feed_type_id',
+      'warehouse_id',
+      'production_batch_id',
+      'client_id',
+      'quantity',
+      'unit',
+      'unit_price',
+      'currency',
+      'note',
+    ],
     hiddenFields: ['invoice_no'],
+    hideDepartmentFieldWhenScoped: true,
+    hideOrganizationFieldWhenScoped: true,
   },
   'feed:production-batches': {
+    formOrder: [
+      'started_on',
+      'finished_on',
+      'formula_id',
+      'warehouse_id',
+      'batch_code',
+      'planned_output',
+      'actual_output',
+      'unit',
+      'note',
+    ],
     hiddenFields: ['invoice_no'],
+    hideDepartmentFieldWhenScoped: true,
+    hideOrganizationFieldWhenScoped: true,
   },
-  'medicine:arrivals': {
+  'factory:flocks': {
+    formOrder: [
+      'arrived_on',
+      'flock_code',
+      'warehouse_id',
+      'poultry_type_id',
+      'source_client_id',
+      'initial_count',
+      'current_count',
+      'status',
+      'note',
+      'is_active',
+    ],
+    tableOrder: [
+      'arrived_on',
+      'flock_code',
+      'initial_count',
+      'current_count',
+      'status',
+      'poultry_type_id',
+    ],
+    hideDepartmentFieldWhenScoped: true,
+    hideOrganizationFieldWhenScoped: true,
+  },
+  'factory:daily-logs': {
+    formOrder: [
+      'log_date',
+      'flock_id',
+      'mortality_count',
+      'sick_count',
+      'healthy_count',
+      'feed_type_id',
+      'feed_consumed_kg',
+      'feed_cost',
+      'water_consumed_liters',
+      'avg_weight_kg',
+      'temperature',
+      'note',
+    ],
+    tableOrder: [
+      'log_date',
+      'flock_id',
+      'mortality_count',
+      'sick_count',
+      'healthy_count',
+      'feed_consumed_kg',
+      'avg_weight_kg',
+      'temperature',
+    ],
+    hideDepartmentFieldWhenScoped: true,
+    hideOrganizationFieldWhenScoped: true,
+  },
+  'factory:shipments': {
+    formOrder: [
+      'shipped_on',
+      'flock_id',
+      'warehouse_id',
+      'client_id',
+      'birds_count',
+      'total_weight_kg',
+      'unit_price',
+      'currency',
+      'note',
+    ],
+    tableOrder: [
+      'shipped_on',
+      'flock_id',
+      'client_id',
+      'birds_count',
+      'total_weight_kg',
+      'unit_price',
+      'currency',
+    ],
     hiddenFields: ['invoice_no'],
+    hideDepartmentFieldWhenScoped: true,
+    hideOrganizationFieldWhenScoped: true,
+  },
+  'factory:medicine-usages': {
+    formOrder: [
+      'usage_date',
+      'flock_id',
+      'medicine_type_id',
+      'medicine_batch_id',
+      'quantity',
+      'unit_cost',
+      'total_cost',
+      'measurement_unit_id',
+      'note',
+    ],
+    tableOrder: [
+      'usage_date',
+      'flock_id',
+      'medicine_type_id',
+      'quantity',
+      'unit_cost',
+      'total_cost',
+    ],
+    hideDepartmentFieldWhenScoped: true,
+    hideOrganizationFieldWhenScoped: true,
+  },
+  'factory:vaccination-plans': {
+    formOrder: [
+      'flock_id',
+      'medicine_type_id',
+      'day_of_life',
+      'planned_date',
+      'is_completed',
+      'completed_date',
+      'note',
+    ],
+    tableOrder: [
+      'flock_id',
+      'medicine_type_id',
+      'day_of_life',
+      'planned_date',
+      'is_completed',
+      'completed_date',
+    ],
+    hideDepartmentFieldWhenScoped: true,
+    hideOrganizationFieldWhenScoped: true,
+  },
+  'medicine:types': {
+    hiddenFields: ['unit'],
   },
   'medicine:batches': {
     formOrder: [
       'arrived_on',
       'expiry_date',
       'medicine_type_id',
-      'arrival_id',
+      'warehouse_id',
       'supplier_client_id',
       'batch_code',
       'barcode',
@@ -423,6 +806,7 @@ const resourceUiConfigs: Record<string, ResourceUiConfig> = {
       'supplier_client_id',
     ],
     hiddenFields: [
+      'arrival_id',
       'qr_public_token',
       'qr_token_expires_at',
       'qr_generated_at',
@@ -753,6 +1137,15 @@ export const getResourceUiConfig = (
 export const resolveResourceCategoryGroupId = (
   resource: ResourceCategoryCandidate,
 ): ResourceCategoryGroupId => {
+  if (resource.key.endsWith('-analytics')) {
+    return 'analytics';
+  }
+  if (
+    resource.moduleKey &&
+    CATALOG_MODULE_RESOURCE_KEYS.has(`${resource.moduleKey}:${resource.key}`)
+  ) {
+    return 'catalogs';
+  }
   if (FINANCE_RESOURCE_PERMISSION_PREFIXES.has(resource.permissionPrefix)) {
     return 'finance';
   }
@@ -762,19 +1155,13 @@ export const resolveResourceCategoryGroupId = (
   ) {
     return 'people_clients';
   }
+  if (WAREHOUSE_RESOURCE_PERMISSION_PREFIXES.has(resource.permissionPrefix)) {
+    return 'warehouse';
+  }
   return 'operations';
 };
 
 const RESOURCE_ICON_KEY_MAP: Record<string, string> = {
-  arrivals: 'PackagePlus',
-  'medicine-arrivals': 'PackagePlus',
-  'feed-arrivals': 'PackagePlus',
-  'chick-arrivals': 'PackagePlus',
-  'raw-arrivals': 'PackagePlus',
-  consumptions: 'PackageMinus',
-  'medicine-consumptions': 'PackageMinus',
-  'feed-consumptions': 'PackageMinus',
-  'raw-consumptions': 'PackageMinus',
   batches: 'Barcode',
   'production-batches': 'Barcode',
   types: 'Tag',
@@ -788,6 +1175,8 @@ const RESOURCE_ICON_KEY_MAP: Record<string, string> = {
   clients: 'Users',
   'factory-clients': 'Users',
   'client-debts': 'Receipt',
+  'supplier-debts': 'ReceiptText',
+  'debt-payments': 'HandCoins',
   employees: 'UserCog',
   positions: 'Briefcase',
   'expense-categories': 'FolderOpen',
@@ -811,6 +1200,10 @@ const RESOURCE_ICON_KEY_MAP: Record<string, string> = {
   'formula-ingredients': 'FlaskRound',
   processings: 'Scissors',
   'semi-products': 'Package',
+  flocks: 'Bird',
+  'daily-logs': 'ClipboardList',
+  'medicine-usages': 'Pill',
+  'vaccination-plans': 'Syringe',
 };
 
 export const resolveResourceIconKey = (resourceKey: string): string =>

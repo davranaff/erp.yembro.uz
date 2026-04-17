@@ -5,7 +5,6 @@ from fastapi import APIRouter
 from app.api.crud import build_crud_router
 from app.api.module_stats import ModuleStatsTable, register_module_stats_route
 from app.repositories.incubation import (
-    ChickArrivalRepository,
     ChickShipmentRepository,
     FactoryMonthlyAnalyticsRepository,
     IncubationBatchRepository,
@@ -13,7 +12,6 @@ from app.repositories.incubation import (
     IncubationRunRepository,
 )
 from app.services.incubation import (
-    ChickArrivalService,
     ChickShipmentService,
     FactoryMonthlyAnalyticsService,
     IncubationBatchService,
@@ -23,15 +21,6 @@ from app.services.incubation import (
 
 
 router = APIRouter(prefix="/incubation", tags=["incubation"])
-
-router.include_router(
-    build_crud_router(
-        prefix="chick-arrivals",
-        service_factory=lambda db: ChickArrivalService(ChickArrivalRepository(db)),
-        permission_prefix="chick_arrival",
-        tags=["chick-arrival"],
-    )
-)
 
 router.include_router(
     build_crud_router(
@@ -83,7 +72,6 @@ register_module_stats_route(
     module="incubation",
     label="Incubation",
     tables=(
-        ModuleStatsTable(key="chick_arrivals", label="Chick Arrivals", table="chick_arrivals"),
         ModuleStatsTable(key="chick_shipments", label="Chick Shipments", table="chick_shipments"),
         ModuleStatsTable(key="batches", label="Batches", table="incubation_batches"),
         ModuleStatsTable(key="runs", label="Runs", table="incubation_runs"),

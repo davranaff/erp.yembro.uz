@@ -192,47 +192,6 @@ async def build_create_payload(api_client: AsyncClient, path: str) -> dict[str, 
         # Keep generated payload safely within remaining stock limits.
         payload["chicks_count"] = 1
 
-    if path.endswith("/slaughter/arrivals"):
-        payload["birds_count"] = 1
-
-        chick_arrivals = await _list_items(api_client, "/api/v1/incubation/chick-arrivals")
-        slaughter_arrivals = await _list_items(api_client, "/api/v1/slaughter/arrivals")
-
-        consumed_by_arrival: dict[str, float] = {}
-        for arrival in slaughter_arrivals:
-            chick_arrival_id = str(arrival.get("chick_arrival_id") or "").strip()
-            if not chick_arrival_id:
-                continue
-            consumed_by_arrival[chick_arrival_id] = consumed_by_arrival.get(chick_arrival_id, 0.0) + float(
-                arrival.get("birds_count") or 0
-            )
-
-        target_department_id = str(payload.get("department_id") or "").strip()
-        target_organization_id = str(payload.get("organization_id") or "").strip()
-
-        preferred_id: str | None = None
-        fallback_id: str | None = None
-        for chick_arrival in chick_arrivals:
-            chick_arrival_id = str(chick_arrival.get("id") or "").strip()
-            if not chick_arrival_id:
-                continue
-            available = float(chick_arrival.get("chicks_count") or 0) - consumed_by_arrival.get(chick_arrival_id, 0.0)
-            if available < 1:
-                continue
-
-            same_org = str(chick_arrival.get("organization_id") or "").strip() == target_organization_id
-            if not same_org:
-                continue
-
-            same_department = str(chick_arrival.get("department_id") or "").strip() == target_department_id
-            if same_department:
-                preferred_id = chick_arrival_id
-                break
-            if fallback_id is None:
-                fallback_id = chick_arrival_id
-
-        payload["chick_arrival_id"] = preferred_id or fallback_id or payload.get("chick_arrival_id")
-
     return payload
 
 

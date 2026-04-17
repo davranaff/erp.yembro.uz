@@ -16,15 +16,11 @@ from app.core.config import get_settings
 from app.core.exceptions import ValidationError
 from app.db.pool import Database
 from app.repositories.medicine import (
-    MedicineArrivalRepository,
     MedicineBatchRepository,
-    MedicineConsumptionRepository,
     MedicineTypeRepository,
 )
 from app.services.medicine import (
-    MedicineArrivalService,
     MedicineBatchService,
-    MedicineConsumptionService,
     MedicineTypeService,
 )
 from app.services.storage import get_storage_service
@@ -141,7 +137,6 @@ def _build_public_batch_payload(
             "id": str(row["medicine_type_id"]),
             "name": row.get("medicine_type_name"),
             "code": row.get("medicine_type_code"),
-            "unit": row.get("medicine_type_unit"),
             "description": row.get("medicine_type_description"),
         },
         "department": {
@@ -234,7 +229,6 @@ async def _get_public_batch_row(
             mb.*,
             mt.name AS medicine_type_name,
             mt.code AS medicine_type_code,
-            mt.unit AS medicine_type_unit,
             mt.description AS medicine_type_description,
             d.name AS department_name,
             d.code AS department_code,
@@ -487,28 +481,10 @@ async def download_public_batch_attachment(
 
 router.include_router(
     build_crud_router(
-        prefix="arrivals",
-        service_factory=lambda db: MedicineArrivalService(MedicineArrivalRepository(db)),
-        permission_prefix="medicine_arrival",
-        tags=["medicine-arrival"],
-    )
-)
-
-router.include_router(
-    build_crud_router(
         prefix="batches",
         service_factory=lambda db: MedicineBatchService(MedicineBatchRepository(db)),
         permission_prefix="medicine_batch",
         tags=["medicine-batch"],
-    )
-)
-
-router.include_router(
-    build_crud_router(
-        prefix="consumptions",
-        service_factory=lambda db: MedicineConsumptionService(MedicineConsumptionRepository(db)),
-        permission_prefix="medicine_consumption",
-        tags=["medicine-consumption"],
     )
 )
 
@@ -526,9 +502,7 @@ register_module_stats_route(
     module="medicine",
     label="Medicine",
     tables=(
-        ModuleStatsTable(key="arrivals", label="Arrivals", table="medicine_arrivals"),
         ModuleStatsTable(key="batches", label="Batches", table="medicine_batches"),
-        ModuleStatsTable(key="consumptions", label="Consumptions", table="medicine_consumptions"),
         ModuleStatsTable(key="types", label="Types", table="medicine_types"),
     ),
 )

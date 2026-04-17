@@ -10,26 +10,6 @@ from app.schemas.base import (
 )
 
 
-class ChickArrivalCreateSchema(OpenSchema, BaseCreateSchema):
-    """Input payload to create chick arrival."""
-
-
-class ChickArrivalUpdateSchema(OpenSchema, BaseUpdateSchema):
-    """Input payload to update chick arrival."""
-
-
-class ChickArrivalReadSchema(OpenSchema, BaseReadSchema):
-    """Readable chick arrival response."""
-
-
-class ChickArrivalListParams(CRUDBaseParams):
-    """Pagination + query params for chick arrival list."""
-
-
-class ChickArrivalListResponse(CRUDListResponse[ChickArrivalReadSchema]):
-    """Paginated chick arrival response."""
-
-
 class ChickShipmentCreateSchema(OpenSchema, BaseCreateSchema):
     """Input payload to create chick shipment."""
 
@@ -131,11 +111,6 @@ class FactoryMonthlyAnalyticsListResponse(CRUDListResponse[FactoryMonthlyAnalyti
 
 
 __all__ = [
-    "ChickArrivalCreateSchema",
-    "ChickArrivalUpdateSchema",
-    "ChickArrivalReadSchema",
-    "ChickArrivalListParams",
-    "ChickArrivalListResponse",
     "ChickShipmentCreateSchema",
     "ChickShipmentUpdateSchema",
     "ChickShipmentReadSchema",

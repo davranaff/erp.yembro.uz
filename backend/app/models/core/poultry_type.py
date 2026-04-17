@@ -23,28 +23,8 @@ class PoultryType(Base, IDMixin, TimestampMixin):
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default="true")
 
     organization: Mapped["Organization"] = relationship("Organization", back_populates="poultry_types")
-    chick_arrivals: Mapped[list["ChickArrival"]] = relationship(
-        "ChickArrival",
-        back_populates="poultry_type",
-        lazy="selectin",
-    )
     feed_types: Mapped[list["FeedType"]] = relationship(
         "FeedType",
-        back_populates="poultry_type",
-        lazy="selectin",
-    )
-    feed_arrivals: Mapped[list["FeedArrival"]] = relationship(
-        "FeedArrival",
-        back_populates="poultry_type",
-        lazy="selectin",
-    )
-    medicine_arrivals: Mapped[list["MedicineArrival"]] = relationship(
-        "MedicineArrival",
-        back_populates="poultry_type",
-        lazy="selectin",
-    )
-    slaughter_arrivals: Mapped[list["SlaughterArrival"]] = relationship(
-        "SlaughterArrival",
         back_populates="poultry_type",
         lazy="selectin",
     )
@@ -58,13 +38,13 @@ class PoultryType(Base, IDMixin, TimestampMixin):
         back_populates="poultry_type",
         lazy="selectin",
     )
-    medicine_consumptions: Mapped[list["MedicineConsumption"]] = relationship(
-        "MedicineConsumption",
+    factory_monthly_analytics: Mapped[list["FactoryMonthlyAnalytics"]] = relationship(
+        "FactoryMonthlyAnalytics",
         back_populates="poultry_type",
         lazy="selectin",
     )
-    factory_monthly_analytics: Mapped[list["FactoryMonthlyAnalytics"]] = relationship(
-        "FactoryMonthlyAnalytics",
+    slaughter_monthly_analytics: Mapped[list["SlaughterMonthlyAnalytics"]] = relationship(
+        "SlaughterMonthlyAnalytics",
         back_populates="poultry_type",
         lazy="selectin",
     )

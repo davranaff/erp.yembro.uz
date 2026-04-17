@@ -24,6 +24,11 @@ class SlaughterSemiProductShipment(Base, IDMixin, TimestampMixin):
         nullable=False,
         index=True,
     )
+    warehouse_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("warehouses.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
     semi_product_id: Mapped[UUID] = mapped_column(
         ForeignKey("slaughter_semi_products.id", ondelete="RESTRICT"),
         nullable=False,
@@ -54,6 +59,7 @@ class SlaughterSemiProductShipment(Base, IDMixin, TimestampMixin):
         back_populates="shipments",
     )
     client: Mapped["Client"] = relationship("Client", back_populates="slaughter_semi_product_shipments")
+    warehouse: Mapped["Warehouse | None"] = relationship("Warehouse")
     created_by_employee: Mapped["Employee | None"] = relationship("Employee", lazy="selectin")
 
     __table_args__ = (

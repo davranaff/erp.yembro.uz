@@ -6,7 +6,6 @@ import { canAccessModuleKey, canReadCrudResource, getFirstAccessibleModuleKey } 
 
 describe('department implicit read access', () => {
   let eggModule = useWorkspaceStore.getState().moduleMap.egg;
-  let medicineModule = useWorkspaceStore.getState().moduleMap.medicine;
 
   beforeAll(() => {
     useWorkspaceStore.getState().setModules([
@@ -23,27 +22,10 @@ describe('department implicit read access', () => {
           'egg_production.read',
           'egg_shipment.read',
           'egg_monthly_analytics.read',
-          'feed_consumption.read',
-          'medicine_consumption.read',
           'warehouse.read',
         ],
-        analytics_read_permissions: [
-          'egg_production.read',
-          'egg_shipment.read',
-          'feed_consumption.read',
-          'medicine_consumption.read',
-        ],
+        analytics_read_permissions: ['egg_production.read', 'egg_shipment.read'],
         resources: [
-          {
-            id: 'egg-med',
-            module_key: 'egg',
-            key: 'medicine-consumptions',
-            label: 'Расход лекарств',
-            path: 'consumptions',
-            permission_prefix: 'medicine_consumption',
-            api_module_key: 'medicine',
-            is_head_visible: false,
-          },
           {
             id: 'egg-client',
             module_key: 'egg',
@@ -76,47 +58,31 @@ describe('department implicit read access', () => {
         is_department_assignable: true,
         analytics_section_key: 'vet_pharmacy',
         implicit_read_permissions: [
-          'medicine_arrival.read',
-          'medicine_consumption.read',
           'medicine_batch.read',
           'medicine_type.read',
+          'stock_movement.read',
+          'warehouse.read',
         ],
-        analytics_read_permissions: [
-          'medicine_arrival.read',
-          'medicine_consumption.read',
-          'medicine_batch.read',
-          'medicine_type.read',
-        ],
+        analytics_read_permissions: ['medicine_batch.read', 'medicine_type.read'],
         resources: [
           {
-            id: 'med-arr',
+            id: 'med-batch',
             module_key: 'medicine',
-            key: 'arrivals',
-            label: 'Приход лекарств',
-            path: 'arrivals',
-            permission_prefix: 'medicine_arrival',
+            key: 'batches',
+            label: 'Партии',
+            path: 'batches',
+            permission_prefix: 'medicine_batch',
             is_head_visible: false,
           },
         ],
       },
     ]);
     eggModule = useWorkspaceStore.getState().moduleMap.egg;
-    medicineModule = useWorkspaceStore.getState().moduleMap.medicine;
   });
 
   it('opens the employee department module without explicit read permissions', () => {
     expect(canAccessModuleKey('egg', [], [], 'egg')).toBe(true);
     expect(getFirstAccessibleModuleKey([], [], 'egg')).toBe('egg');
-  });
-
-  it('keeps cross-api resources available only inside the owning department module', () => {
-    const eggMedicineConsumptionResource = eggModule.resources.find(
-      (resource) => resource.permissionPrefix === 'medicine_consumption',
-    );
-    expect(eggMedicineConsumptionResource).toBeDefined();
-    expect(canReadCrudResource([], [], 'egg', eggMedicineConsumptionResource!, 'egg')).toBe(true);
-
-    expect(canAccessModuleKey(medicineModule.key, [], [], 'egg')).toBe(false);
   });
 
   it('does not auto-grant shared read resources like clients', () => {

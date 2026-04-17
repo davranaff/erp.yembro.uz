@@ -25,16 +25,6 @@ class FeedIngredient(Base, IDMixin, TimestampMixin):
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default="true")
 
     organization: Mapped["Organization"] = relationship("Organization", back_populates="feed_ingredients")
-    arrivals: Mapped[List["FeedRawArrival"]] = relationship(
-        "FeedRawArrival",
-        back_populates="ingredient",
-        lazy="selectin",
-    )
-    consumptions: Mapped[List["FeedRawConsumption"]] = relationship(
-        "FeedRawConsumption",
-        back_populates="ingredient",
-        lazy="selectin",
-    )
     formula_items: Mapped[List["FeedFormulaIngredient"]] = relationship(
         "FeedFormulaIngredient",
         back_populates="ingredient",

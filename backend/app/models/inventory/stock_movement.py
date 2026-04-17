@@ -60,7 +60,7 @@ class StockMovement(Base, IDMixin, TimestampMixin):
         ),
         CheckConstraint("quantity > 0", name="ck_stock_movement_quantity_positive"),
         CheckConstraint(
-            "item_type IN ('egg', 'chick', 'feed', 'medicine', 'semi_product')",
+            "item_type IN ('egg', 'chick', 'feed', 'feed_raw', 'medicine', 'semi_product')",
             name="ck_stock_movement_item_type_allowed",
         ),
         CheckConstraint(

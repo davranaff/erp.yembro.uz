@@ -10,26 +10,6 @@ from app.schemas.base import (
 )
 
 
-class MedicineArrivalCreateSchema(OpenSchema, BaseCreateSchema):
-    """Input payload to create medicine arrival."""
-
-
-class MedicineArrivalUpdateSchema(OpenSchema, BaseUpdateSchema):
-    """Input payload to update medicine arrival."""
-
-
-class MedicineArrivalReadSchema(OpenSchema, BaseReadSchema):
-    """Readable medicine arrival response."""
-
-
-class MedicineArrivalListParams(CRUDBaseParams):
-    """Pagination + query params for medicine arrival list."""
-
-
-class MedicineArrivalListResponse(CRUDListResponse[MedicineArrivalReadSchema]):
-    """Paginated medicine arrival response."""
-
-
 class MedicineBatchCreateSchema(OpenSchema, BaseCreateSchema):
     """Input payload to create medicine batch."""
 
@@ -48,26 +28,6 @@ class MedicineBatchListParams(CRUDBaseParams):
 
 class MedicineBatchListResponse(CRUDListResponse[MedicineBatchReadSchema]):
     """Paginated medicine batch response."""
-
-
-class MedicineConsumptionCreateSchema(OpenSchema, BaseCreateSchema):
-    """Input payload to create medicine consumption."""
-
-
-class MedicineConsumptionUpdateSchema(OpenSchema, BaseUpdateSchema):
-    """Input payload to update medicine consumption."""
-
-
-class MedicineConsumptionReadSchema(OpenSchema, BaseReadSchema):
-    """Readable medicine consumption response."""
-
-
-class MedicineConsumptionListParams(CRUDBaseParams):
-    """Pagination + query params for medicine consumption list."""
-
-
-class MedicineConsumptionListResponse(CRUDListResponse[MedicineConsumptionReadSchema]):
-    """Paginated medicine consumption response."""
 
 
 class MedicineTypeCreateSchema(OpenSchema, BaseCreateSchema):
@@ -91,21 +51,11 @@ class MedicineTypeListResponse(CRUDListResponse[MedicineTypeReadSchema]):
 
 
 __all__ = [
-    "MedicineArrivalCreateSchema",
-    "MedicineArrivalUpdateSchema",
-    "MedicineArrivalReadSchema",
-    "MedicineArrivalListParams",
-    "MedicineArrivalListResponse",
     "MedicineBatchCreateSchema",
     "MedicineBatchUpdateSchema",
     "MedicineBatchReadSchema",
     "MedicineBatchListParams",
     "MedicineBatchListResponse",
-    "MedicineConsumptionCreateSchema",
-    "MedicineConsumptionUpdateSchema",
-    "MedicineConsumptionReadSchema",
-    "MedicineConsumptionListParams",
-    "MedicineConsumptionListResponse",
     "MedicineTypeCreateSchema",
     "MedicineTypeUpdateSchema",
     "MedicineTypeReadSchema",

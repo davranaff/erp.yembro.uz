@@ -24,19 +24,35 @@ class EggProduction(Base, IDMixin, TimestampMixin):
         nullable=False,
         index=True,
     )
+    warehouse_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("warehouses.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
     produced_on: Mapped[date] = mapped_column(Date, nullable=False, index=True)
     eggs_collected: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     eggs_broken: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     eggs_rejected: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     total_shelled: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    eggs_large: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
+    eggs_medium: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
+    eggs_small: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
+    eggs_defective: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
     note: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     organization: Mapped["Organization"] = relationship("Organization", back_populates="egg_productions")
     department: Mapped["Department"] = relationship("Department", back_populates="egg_productions")
+    warehouse: Mapped["Warehouse | None"] = relationship("Warehouse")
     shipments: Mapped[List["EggShipment"]] = relationship(
         "EggShipment",
         back_populates="production",
         lazy="selectin",
+    )
+    quality_checks: Mapped[List["EggQualityCheck"]] = relationship(
+        "EggQualityCheck",
+        back_populates="production",
+        lazy="selectin",
+        cascade="all, delete-orphan",
     )
 
     __table_args__ = (
@@ -45,6 +61,10 @@ class EggProduction(Base, IDMixin, TimestampMixin):
         CheckConstraint("eggs_broken >= 0", name="ck_egg_prod_eggs_broken_non_negative"),
         CheckConstraint("eggs_rejected >= 0", name="ck_egg_prod_eggs_rejected_non_negative"),
         CheckConstraint("total_shelled >= 0", name="ck_egg_prod_total_shelled_non_negative"),
+        CheckConstraint("eggs_large >= 0", name="ck_egg_prod_eggs_large_non_negative"),
+        CheckConstraint("eggs_medium >= 0", name="ck_egg_prod_eggs_medium_non_negative"),
+        CheckConstraint("eggs_small >= 0", name="ck_egg_prod_eggs_small_non_negative"),
+        CheckConstraint("eggs_defective >= 0", name="ck_egg_prod_eggs_defective_non_negative"),
         CheckConstraint(
             "eggs_broken + eggs_rejected <= eggs_collected",
             name="ck_egg_prod_broken_plus_rejected_not_greater_collected",

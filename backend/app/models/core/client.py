@@ -17,6 +17,11 @@ class Client(Base, IDMixin, TimestampMixin):
         nullable=False,
         index=True,
     )
+    department_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("departments.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
     first_name: Mapped[str] = mapped_column(String(120), nullable=False, index=True)
     last_name: Mapped[str] = mapped_column(String(120), nullable=False, index=True)
     email: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
@@ -29,6 +34,7 @@ class Client(Base, IDMixin, TimestampMixin):
     address: Mapped[str | None] = mapped_column(String(255), nullable=True)
 
     organization: Mapped["Organization"] = relationship("Organization", back_populates="clients")
+    department: Mapped["Department | None"] = relationship("Department", back_populates="clients")
     egg_shipments: Mapped[list["EggShipment"]] = relationship(
         "EggShipment",
         back_populates="client",
@@ -40,43 +46,13 @@ class Client(Base, IDMixin, TimestampMixin):
         Index("uq_client_org_code", "organization_id", "client_code", unique=True),
     )
 
-    chick_arrivals: Mapped[List["ChickArrival"]] = relationship(
-        "ChickArrival",
-        back_populates="source_client",
-        lazy="selectin",
-    )
-    feed_arrivals: Mapped[List["FeedArrival"]] = relationship(
-        "FeedArrival",
-        back_populates="supplier_client",
-        lazy="selectin",
-    )
-    feed_raw_arrivals: Mapped[List["FeedRawArrival"]] = relationship(
-        "FeedRawArrival",
-        back_populates="supplier_client",
-        lazy="selectin",
-    )
     feed_product_shipments: Mapped[List["FeedProductShipment"]] = relationship(
         "FeedProductShipment",
         back_populates="client",
         lazy="selectin",
     )
-    medicine_arrivals: Mapped[List["MedicineArrival"]] = relationship(
-        "MedicineArrival",
-        back_populates="supplier_client",
-        lazy="selectin",
-    )
     medicine_batches: Mapped[List["MedicineBatch"]] = relationship(
         "MedicineBatch",
-        back_populates="supplier_client",
-        lazy="selectin",
-    )
-    medicine_consumptions: Mapped[List["MedicineConsumption"]] = relationship(
-        "MedicineConsumption",
-        back_populates="client",
-        lazy="selectin",
-    )
-    slaughter_arrivals: Mapped[List["SlaughterArrival"]] = relationship(
-        "SlaughterArrival",
         back_populates="supplier_client",
         lazy="selectin",
     )
@@ -93,6 +69,16 @@ class Client(Base, IDMixin, TimestampMixin):
     )
     chick_shipments: Mapped[List["ChickShipment"]] = relationship(
         "ChickShipment",
+        back_populates="client",
+        lazy="selectin",
+    )
+    factory_source_flocks: Mapped[List["FactoryFlock"]] = relationship(
+        "FactoryFlock",
+        back_populates="source_client",
+        lazy="selectin",
+    )
+    factory_shipments: Mapped[List["FactoryShipment"]] = relationship(
+        "FactoryShipment",
         back_populates="client",
         lazy="selectin",
     )

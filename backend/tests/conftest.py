@@ -184,6 +184,30 @@ def _sqlite_split_part(value: object, delimiter: object, index: object) -> str:
     return parts[position]
 
 
+def _sqlite_left(value: object, length: object) -> str | None:
+    if value is None:
+        return None
+    try:
+        n = int(length)
+    except (TypeError, ValueError):
+        return str(value)
+    if n <= 0:
+        return ""
+    return str(value)[:n]
+
+
+def _sqlite_right(value: object, length: object) -> str | None:
+    if value is None:
+        return None
+    try:
+        n = int(length)
+    except (TypeError, ValueError):
+        return str(value)
+    if n <= 0:
+        return ""
+    return str(value)[-n:]
+
+
 def _prepare_sqlite_database(path: str) -> None:
     engine = create_engine(f"sqlite:///{path}")
     Base.metadata.create_all(engine)
@@ -212,7 +236,50 @@ def _prepare_sqlite_database(path: str) -> None:
                     values,
                 )
 
+        _seed_passed_quality_checks(conn, rows_by_table)
+
         conn.commit()
+
+
+def _seed_passed_quality_checks(
+    conn: sqlite3.Connection,
+    rows_by_table: dict[str, list[dict[str, object]]],
+) -> None:
+    from uuid import uuid4
+
+    for production in rows_by_table.get("egg_production", []):
+        qc_id = str(uuid4())
+        conn.execute(
+            'INSERT INTO "egg_quality_checks" '
+            '(id, organization_id, department_id, production_id, checked_on, status, grade) '
+            "VALUES (?, ?, ?, ?, ?, ?, ?)",
+            (
+                qc_id,
+                str(production["organization_id"]),
+                str(production["department_id"]),
+                str(production["id"]),
+                str(production.get("produced_on")),
+                "passed",
+                "large",
+            ),
+        )
+
+    for batch in rows_by_table.get("feed_production_batches", []):
+        qc_id = str(uuid4())
+        conn.execute(
+            'INSERT INTO "feed_production_quality_checks" '
+            '(id, organization_id, department_id, production_batch_id, checked_on, status, grade) '
+            "VALUES (?, ?, ?, ?, ?, ?, ?)",
+            (
+                qc_id,
+                str(batch["organization_id"]),
+                str(batch["department_id"]),
+                str(batch["id"]),
+                str(batch.get("started_on")),
+                "passed",
+                "first",
+            ),
+        )
 
 
 class AioSQLiteDatabase(Database):
@@ -255,6 +322,8 @@ class AioSQLiteDatabase(Database):
         await conn.create_function("BTRIM", -1, _sqlite_btrim)
         await conn.create_function("GREATEST", -1, _sqlite_greatest)
         await conn.create_function("split_part", 3, _sqlite_split_part)
+        await conn.create_function("LEFT", 2, _sqlite_left)
+        await conn.create_function("RIGHT", 2, _sqlite_right)
         return conn
 
     def _get_active_sqlite_connection(self) -> aiosqlite.Connection | None:

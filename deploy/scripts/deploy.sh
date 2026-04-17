@@ -77,6 +77,11 @@ if [[ "${RUN_MIGRATIONS}" == "1" ]]; then
 fi
 docker compose "${compose_args[@]}" up -d api worker scheduler frontend
 
+if [[ "${RUN_MIGRATIONS}" == "1" ]]; then
+  docker compose "${compose_args[@]}" exec -T api python -m app.scripts.sync_role_templates || \
+    echo "WARN: sync_role_templates failed (existing orgs may lack module-manager roles)" >&2
+fi
+
 if [[ -f "${EDGE_DIR}/compose.edge.yml" && -f "${EDGE_DIR}/.env" ]]; then
   edge_compose_args=(
     --env-file "${EDGE_DIR}/.env"

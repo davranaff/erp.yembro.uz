@@ -11,6 +11,10 @@ class EggShipmentRepository(BaseRepository[dict[str, object]]):
     table = "egg_shipments"
 
 
+class EggQualityCheckRepository(BaseRepository[dict[str, object]]):
+    table = "egg_quality_checks"
+
+
 class EggMonthlyAnalyticsRepository(BaseRepository[dict[str, object]]):
     table = "egg_monthly_analytics"
 
@@ -18,5 +22,6 @@ class EggMonthlyAnalyticsRepository(BaseRepository[dict[str, object]]):
 __all__ = [
     "EggProductionRepository",
     "EggShipmentRepository",
+    "EggQualityCheckRepository",
     "EggMonthlyAnalyticsRepository",
 ]

@@ -5,8 +5,7 @@ from decimal import Decimal
 from uuid import UUID
 
 from sqlalchemy import CheckConstraint, Date, ForeignKey, Integer, Numeric, String, Text
-from sqlalchemy.ext.hybrid import hybrid_property
-from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy.orm import Mapped, mapped_column
 
 from ..base import Base, IDMixin, TimestampMixin
 
@@ -50,20 +49,10 @@ class ChickArrival(Base, IDMixin, TimestampMixin):
     currency: Mapped[str] = mapped_column(String(8), nullable=False)
     note: Mapped[str | None] = mapped_column(Text, nullable=True)
 
-    organization: Mapped["Organization"] = relationship("Organization", back_populates="chick_arrivals")
-    department: Mapped["Department"] = relationship("Department", back_populates="chick_arrivals")
-    poultry_type: Mapped["PoultryType | None"] = relationship("PoultryType", back_populates="chick_arrivals")
-    source_client: Mapped["Client | None"] = relationship("Client", back_populates="chick_arrivals")
-    run: Mapped["IncubationRun | None"] = relationship("IncubationRun")
-    chick_shipment: Mapped["ChickShipment | None"] = relationship("ChickShipment")
-
     __table_args__ = (
         CheckConstraint("chicks_count >= 0", name="ck_chick_arrival_chicks_count_non_negative"),
-        CheckConstraint("unit_price IS NULL OR unit_price >= 0", name="ck_chick_arrival_unit_price_non_negative"),
+        CheckConstraint(
+            "unit_price IS NULL OR unit_price >= 0",
+            name="ck_chick_arrival_unit_price_non_negative",
+        ),
     )
-
-    @hybrid_property
-    def effective_amount(self) -> Decimal:
-        if self.unit_price is None:
-            return Decimal(0)
-        return (self.unit_price * self.chicks_count).quantize(Decimal("0.01"))

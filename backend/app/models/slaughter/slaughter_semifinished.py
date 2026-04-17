@@ -23,6 +23,11 @@ class SlaughterSemiProduct(Base, IDMixin, TimestampMixin):
         nullable=False,
         index=True,
     )
+    warehouse_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("warehouses.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
     processing_id: Mapped[UUID] = mapped_column(
         ForeignKey("slaughter_processings.id", ondelete="RESTRICT"),
         nullable=False,
@@ -45,10 +50,17 @@ class SlaughterSemiProduct(Base, IDMixin, TimestampMixin):
     department: Mapped["Department"] = relationship("Department", back_populates="slaughter_semi_products")
     processing: Mapped["SlaughterProcessing"] = relationship("SlaughterProcessing", back_populates="semifinished_items")
     poultry_type: Mapped["PoultryType | None"] = relationship("PoultryType", back_populates="slaughter_semi_products")
+    warehouse: Mapped["Warehouse | None"] = relationship("Warehouse")
     shipments: Mapped[list["SlaughterSemiProductShipment"]] = relationship(
         "SlaughterSemiProductShipment",
         back_populates="semi_product",
         lazy="selectin",
+    )
+    quality_checks: Mapped[list["SlaughterQualityCheck"]] = relationship(
+        "SlaughterQualityCheck",
+        back_populates="semi_product",
+        lazy="selectin",
+        cascade="all, delete-orphan",
     )
 
     __table_args__ = (

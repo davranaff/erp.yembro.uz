@@ -79,18 +79,6 @@ async def test_department_assignment_grants_implicit_read_for_own_module(api_cli
     assert response.status_code == 200, response.text
 
     response = await api_client.get(
-        "/api/v1/medicine/consumptions",
-        headers=_bearer_headers(access_token),
-    )
-    assert response.status_code == 200, response.text
-
-    response = await api_client.get(
-        "/api/v1/medicine/arrivals",
-        headers=_bearer_headers(access_token),
-    )
-    assert response.status_code == 403, response.text
-
-    response = await api_client.get(
         "/api/v1/feed/ingredients",
         headers=_bearer_headers(access_token),
     )

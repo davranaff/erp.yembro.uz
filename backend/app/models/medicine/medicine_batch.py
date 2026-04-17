@@ -24,14 +24,14 @@ class MedicineBatch(Base, IDMixin, TimestampMixin):
         nullable=False,
         index=True,
     )
+    warehouse_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("warehouses.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
     medicine_type_id: Mapped[UUID] = mapped_column(
         ForeignKey("medicine_types.id", ondelete="RESTRICT"),
         nullable=False,
-        index=True,
-    )
-    arrival_id: Mapped[UUID | None] = mapped_column(
-        ForeignKey("medicine_arrivals.id", ondelete="SET NULL"),
-        nullable=True,
         index=True,
     )
     supplier_client_id: Mapped[UUID | None] = mapped_column(
@@ -63,13 +63,8 @@ class MedicineBatch(Base, IDMixin, TimestampMixin):
     organization: Mapped["Organization"] = relationship("Organization", back_populates="medicine_batches")
     department: Mapped["Department"] = relationship("Department", back_populates="medicine_batches")
     medicine_type: Mapped["MedicineType"] = relationship("MedicineType", back_populates="medicine_batches")
-    arrival: Mapped["MedicineArrival | None"] = relationship("MedicineArrival", back_populates="medicine_batches")
     supplier_client: Mapped["Client | None"] = relationship("Client", back_populates="medicine_batches")
-    consumptions: Mapped[list["MedicineConsumption"]] = relationship(
-        "MedicineConsumption",
-        back_populates="batch",
-        lazy="selectin",
-    )
+    warehouse: Mapped["Warehouse | None"] = relationship("Warehouse")
 
     __table_args__ = (
         UniqueConstraint("organization_id", "batch_code", name="uq_medicine_batch_org_code"),

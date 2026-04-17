@@ -34,8 +34,8 @@ department_modules:
   sort_order: 20
   is_department_assignable: true
   analytics_section_key: "egg_farm"
-  implicit_read_permissions: '["egg_production.read", "egg_shipment.read", "egg_monthly_analytics.read", "feed_consumption.read", "medicine_consumption.read", "stock_movement.read", "warehouse.read"]'
-  analytics_read_permissions: '["egg_production.read", "egg_shipment.read", "feed_consumption.read", "medicine_consumption.read"]'
+  implicit_read_permissions: '["egg_production.read", "egg_shipment.read", "egg_quality_check.read", "egg_monthly_analytics.read", "stock_movement.read", "warehouse.read"]'
+  analytics_read_permissions: '["egg_production.read", "egg_shipment.read"]'
   is_active: true
 - id: "31222222-2222-2222-2222-222222222222"
   key: "incubation"
@@ -51,13 +51,13 @@ department_modules:
 - id: "31333333-3333-3333-3333-333333333333"
   key: "factory"
   name: "Фабрика"
-  description: "Птенцы, корма, лекарства и клиентская база"
+  description: "Партии птенцов, ежедневный учёт, отгрузка бройлеров"
   icon: "factory"
   sort_order: 40
   is_department_assignable: true
   analytics_section_key: "factory"
-  implicit_read_permissions: '["chick_arrival.read", "feed_arrival.read", "medicine_arrival.read", "stock_movement.read", "warehouse.read"]'
-  analytics_read_permissions: '["chick_arrival.read", "feed_arrival.read", "medicine_arrival.read"]'
+  implicit_read_permissions: '["factory_flock.read", "factory_daily_log.read", "factory_shipment.read", "factory_medicine_usage.read", "factory_vaccination_plan.read", "stock_movement.read", "warehouse.read"]'
+  analytics_read_permissions: '["factory_flock.read", "factory_shipment.read"]'
   is_active: true
 - id: "31444444-4444-4444-4444-444444444444"
   key: "feed"
@@ -67,8 +67,8 @@ department_modules:
   sort_order: 50
   is_department_assignable: true
   analytics_section_key: "feed_mill"
-  implicit_read_permissions: '["feed_type.read", "feed_ingredient.read", "feed_formula.read", "feed_formula_ingredient.read", "feed_raw_arrival.read", "feed_production_batch.read", "feed_raw_consumption.read", "feed_product_shipment.read", "stock_movement.read", "warehouse.read"]'
-  analytics_read_permissions: '["feed_ingredient.read", "feed_formula.read", "feed_formula_ingredient.read", "feed_raw_arrival.read", "feed_production_batch.read", "feed_raw_consumption.read", "feed_product_shipment.read"]'
+  implicit_read_permissions: '["feed_type.read", "feed_ingredient.read", "feed_formula.read", "feed_formula_ingredient.read", "feed_raw_arrival.read", "feed_raw_consumption.read", "feed_production_batch.read", "feed_production_quality_check.read", "feed_product_shipment.read", "feed_monthly_analytics.read", "stock_movement.read", "warehouse.read"]'
+  analytics_read_permissions: '["feed_ingredient.read", "feed_formula.read", "feed_formula_ingredient.read", "feed_raw_arrival.read", "feed_raw_consumption.read", "feed_production_batch.read", "feed_production_quality_check.read", "feed_product_shipment.read", "feed_monthly_analytics.read"]'
   is_active: true
 - id: "31555555-5555-5555-5555-555555555555"
   key: "medicine"
@@ -78,8 +78,8 @@ department_modules:
   sort_order: 60
   is_department_assignable: true
   analytics_section_key: "vet_pharmacy"
-  implicit_read_permissions: '["medicine_arrival.read", "medicine_consumption.read", "medicine_batch.read", "medicine_type.read", "stock_movement.read", "warehouse.read"]'
-  analytics_read_permissions: '["medicine_arrival.read", "medicine_batch.read", "medicine_consumption.read", "medicine_type.read"]'
+  implicit_read_permissions: '["medicine_batch.read", "medicine_type.read", "stock_movement.read", "warehouse.read"]'
+  analytics_read_permissions: '["medicine_batch.read", "medicine_type.read"]'
   is_active: true
 - id: "31666666-6666-6666-6666-666666666666"
   key: "slaughter"
@@ -89,8 +89,8 @@ department_modules:
   sort_order: 70
   is_department_assignable: true
   analytics_section_key: "slaughterhouse"
-  implicit_read_permissions: '["slaughter_arrival.read", "slaughter_processing.read", "slaughter_semi_product.read", "slaughter_semi_product_shipment.read", "stock_movement.read", "warehouse.read"]'
-  analytics_read_permissions: '["slaughter_arrival.read", "slaughter_processing.read", "slaughter_semi_product.read", "slaughter_semi_product_shipment.read"]'
+  implicit_read_permissions: '["slaughter_processing.read", "slaughter_semi_product.read", "slaughter_semi_product_shipment.read", "stock_movement.read", "warehouse.read"]'
+  analytics_read_permissions: '["slaughter_processing.read", "slaughter_semi_product.read", "slaughter_semi_product_shipment.read"]'
   is_active: true
 - id: "31000000-0000-0000-0000-000000000002"
   key: "finance"
@@ -245,6 +245,16 @@ workspace_resources:
   sort_order: 20
   is_head_visible: false
   is_active: true
+- id: "32000000-0000-0000-0000-000000000189"
+  module_key: "egg"
+  key: "egg-quality-checks"
+  name: "Контроль качества"
+  path: "quality-checks"
+  description: "Проверка партий яиц"
+  permission_prefix: "egg_quality_check"
+  sort_order: 25
+  is_head_visible: true
+  is_active: true
 - id: "32000000-0000-0000-0000-000000000009"
   module_key: "egg"
   key: "monthly-analytics"
@@ -253,28 +263,6 @@ workspace_resources:
   description: "Сводные месячные показатели"
   permission_prefix: "egg_monthly_analytics"
   sort_order: 30
-  is_head_visible: false
-  is_active: true
-- id: "32000000-0000-0000-0000-000000000010"
-  module_key: "egg"
-  key: "feed-consumptions"
-  name: "Расход корма"
-  path: "consumptions"
-  description: "Фактический расход корма внутри маточника"
-  permission_prefix: "feed_consumption"
-  api_module_key: "feed"
-  sort_order: 40
-  is_head_visible: false
-  is_active: true
-- id: "32000000-0000-0000-0000-000000000011"
-  module_key: "egg"
-  key: "medicine-consumptions"
-  name: "Расход лекарств"
-  path: "consumptions"
-  description: "Списания лекарств по департаменту маточника"
-  permission_prefix: "medicine_consumption"
-  api_module_key: "medicine"
-  sort_order: 50
   is_head_visible: false
   is_active: true
 - id: "32000000-0000-0000-0000-000000000181"
@@ -525,37 +513,59 @@ workspace_resources:
   sort_order: 80
   is_head_visible: true
   is_active: true
-- id: "32000000-0000-0000-0000-000000000025"
+- id: "32000000-0000-0000-0000-000000000200"
   module_key: "factory"
-  key: "chick-arrivals"
-  name: "Приход птенцов"
-  path: "chick-arrivals"
-  description: "Поступление птенцов на фабрику"
-  permission_prefix: "chick_arrival"
-  api_module_key: "incubation"
+  key: "flocks"
+  name: "Партии птенцов"
+  path: "flocks"
+  description: "Партии птенцов на фабрике"
+  permission_prefix: "factory_flock"
+  api_module_key: "factory"
   sort_order: 10
   is_head_visible: false
   is_active: true
-- id: "32000000-0000-0000-0000-000000000026"
+- id: "32000000-0000-0000-0000-000000000201"
   module_key: "factory"
-  key: "feed-arrivals"
-  name: "Приход кормов"
-  path: "arrivals"
-  description: "Поступление кормов на фабрику"
-  permission_prefix: "feed_arrival"
-  api_module_key: "feed"
+  key: "daily-logs"
+  name: "Ежедневный учёт"
+  path: "daily-logs"
+  description: "Ежедневный учёт партии: падёж, корм, вес"
+  permission_prefix: "factory_daily_log"
+  api_module_key: "factory"
   sort_order: 20
   is_head_visible: false
   is_active: true
-- id: "32000000-0000-0000-0000-000000000027"
+- id: "32000000-0000-0000-0000-000000000202"
   module_key: "factory"
-  key: "medicine-arrivals"
-  name: "Приход лекарств"
-  path: "arrivals"
-  description: "Поступление лекарств на фабрику"
-  permission_prefix: "medicine_arrival"
-  api_module_key: "medicine"
+  key: "shipments"
+  name: "Отгрузка бройлеров"
+  path: "shipments"
+  description: "Отгрузка выращенных бройлеров клиентам"
+  permission_prefix: "factory_shipment"
+  api_module_key: "factory"
   sort_order: 30
+  is_head_visible: false
+  is_active: true
+- id: "32000000-0000-0000-0000-000000000203"
+  module_key: "factory"
+  key: "medicine-usages"
+  name: "Расход лекарств"
+  path: "medicine-usages"
+  description: "Учёт расхода лекарств по партиям"
+  permission_prefix: "factory_medicine_usage"
+  api_module_key: "factory"
+  sort_order: 25
+  is_head_visible: false
+  is_active: true
+- id: "32000000-0000-0000-0000-000000000205"
+  module_key: "factory"
+  key: "vaccination-plans"
+  name: "Календарь вакцинации"
+  path: "vaccination-plans"
+  description: "План и отметки вакцинации по партиям"
+  permission_prefix: "factory_vaccination_plan"
+  api_module_key: "factory"
+  sort_order: 28
   is_head_visible: false
   is_active: true
 - id: "32000000-0000-0000-0000-000000000075"
@@ -705,7 +715,7 @@ workspace_resources:
   description: "Закупка и поступление сырья"
   permission_prefix: "feed_raw_arrival"
   sort_order: 40
-  is_head_visible: false
+  is_head_visible: true
   is_active: true
 - id: "32000000-0000-0000-0000-000000000037"
   module_key: "feed"
@@ -715,7 +725,17 @@ workspace_resources:
   description: "Выпуск готового продукта по партиям"
   permission_prefix: "feed_production_batch"
   sort_order: 50
-  is_head_visible: false
+  is_head_visible: true
+  is_active: true
+- id: "32000000-0000-0000-0000-000000000190"
+  module_key: "feed"
+  key: "quality-checks"
+  name: "Контроль качества"
+  path: "quality-checks"
+  description: "Контроль качества партий готового корма"
+  permission_prefix: "feed_production_quality_check"
+  sort_order: 55
+  is_head_visible: true
   is_active: true
 - id: "32000000-0000-0000-0000-000000000038"
   module_key: "feed"
@@ -725,7 +745,7 @@ workspace_resources:
   description: "Списание сырья в производство"
   permission_prefix: "feed_raw_consumption"
   sort_order: 60
-  is_head_visible: false
+  is_head_visible: true
   is_active: true
 - id: "32000000-0000-0000-0000-000000000039"
   module_key: "feed"
@@ -735,7 +755,17 @@ workspace_resources:
   description: "Отгрузка готового продукта клиентам"
   permission_prefix: "feed_product_shipment"
   sort_order: 70
-  is_head_visible: false
+  is_head_visible: true
+  is_active: true
+- id: "32000000-0000-0000-0000-000000000191"
+  module_key: "feed"
+  key: "monthly-analytics"
+  name: "Помесячная аналитика"
+  path: "monthly-analytics"
+  description: "Помесячная аналитика корма"
+  permission_prefix: "feed_monthly_analytics"
+  sort_order: 72
+  is_head_visible: true
   is_active: true
 - id: "32000000-0000-0000-0000-000000000077"
   module_key: "feed"
@@ -835,26 +865,6 @@ workspace_resources:
   api_module_key: "finance"
   sort_order: 120
   is_head_visible: true
-  is_active: true
-- id: "32000000-0000-0000-0000-000000000045"
-  module_key: "medicine"
-  key: "arrivals"
-  name: "Приход лекарств"
-  path: "arrivals"
-  description: "Поступление лекарственных средств"
-  permission_prefix: "medicine_arrival"
-  sort_order: 10
-  is_head_visible: false
-  is_active: true
-- id: "32000000-0000-0000-0000-000000000046"
-  module_key: "medicine"
-  key: "consumptions"
-  name: "Уход лекарств"
-  path: "consumptions"
-  description: "Использование и списание лекарств"
-  permission_prefix: "medicine_consumption"
-  sort_order: 20
-  is_head_visible: false
   is_active: true
 - id: "32000000-0000-0000-0000-000000000047"
   module_key: "medicine"
@@ -975,25 +985,15 @@ workspace_resources:
   sort_order: 90
   is_head_visible: true
   is_active: true
-- id: "32000000-0000-0000-0000-000000000054"
-  module_key: "slaughter"
-  key: "arrivals"
-  name: "Приход птицы"
-  path: "arrivals"
-  description: "Поступление живой птицы"
-  permission_prefix: "slaughter_arrival"
-  sort_order: 10
-  is_head_visible: false
-  is_active: true
 - id: "32000000-0000-0000-0000-000000000055"
   module_key: "slaughter"
   key: "processings"
-  name: "Сортировка и разделка"
+  name: "Приход и переработка"
   path: "processings"
-  description: "Первый сорт, второй сорт и операции разделки"
+  description: "Поступление птицы, сортировка и разделка"
   permission_prefix: "slaughter_processing"
-  sort_order: 20
-  is_head_visible: false
+  sort_order: 10
+  is_head_visible: true
   is_active: true
 - id: "32000000-0000-0000-0000-000000000056"
   module_key: "slaughter"
@@ -1014,6 +1014,26 @@ workspace_resources:
   permission_prefix: "slaughter_semi_product_shipment"
   sort_order: 40
   is_head_visible: false
+  is_active: true
+- id: "32000000-0000-0000-0000-000000000187"
+  module_key: "slaughter"
+  key: "slaughter-quality-checks"
+  name: "Контроль качества"
+  path: "quality-checks"
+  description: "Приёмочный контроль качества полуфабрикатов"
+  permission_prefix: "slaughter_quality_check"
+  sort_order: 35
+  is_head_visible: true
+  is_active: true
+- id: "32000000-0000-0000-0000-000000000188"
+  module_key: "slaughter"
+  key: "slaughter-monthly-analytics"
+  name: "Помесячная аналитика"
+  path: "monthly-analytics"
+  description: "Показатели убоя по месяцам"
+  permission_prefix: "slaughter_monthly_analytics"
+  sort_order: 36
+  is_head_visible: true
   is_active: true
 - id: "32000000-0000-0000-0000-000000000079"
   module_key: "slaughter"
@@ -1300,6 +1320,7 @@ departments:
 clients:
 - id: "77777777-7777-7777-7777-777777777777"
   organization_id: "11111111-1111-1111-1111-111111111111"
+  department_id: "44444444-4444-4444-4444-444444444444"
   first_name: "Azizbek"
   last_name: "Rasulov"
   email: "azizbek.rasulov@agrotaminot.uz"
@@ -1312,6 +1333,7 @@ clients:
   address: "Toshkent, Sergeli"
 - id: "88888888-8888-8888-8888-888888888888"
   organization_id: "11111111-1111-1111-1111-111111111111"
+  department_id: "55555555-5555-5555-5555-555555555555"
   first_name: "Dilafruz"
   last_name: "Karimova"
   email: "dilafruz.karimova@siyobsavdo.uz"
@@ -1335,6 +1357,7 @@ clients:
   address: "Buxoro, Gijduvon"
 - id: "12121212-1212-1212-1212-121212121212"
   organization_id: "11111111-1111-1111-1111-111111111111"
+  department_id: "55555555-5555-5555-5555-555555555555"
   first_name: "Javohir"
   last_name: "Abdullayev"
   email: "javohir.toirov@vodiydon.uz"
@@ -1630,6 +1653,8 @@ client_debts:
   status: "open"
   note: "Yangi partiya bo'yicha to'lov kutilmoqda"
   is_active: true
+supplier_debts:
+debt_payments:
 currencies:
 - id: "32111111-1111-1111-1111-111111111111"
   organization_id: "11111111-1111-1111-1111-111111111111"

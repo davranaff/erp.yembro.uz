@@ -5,7 +5,7 @@ from decimal import Decimal
 from uuid import UUID
 
 from sqlalchemy import CheckConstraint, Date, ForeignKey, Numeric, String, Text
-from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy.orm import Mapped, mapped_column
 
 from ..base import Base, IDMixin, TimestampMixin
 
@@ -49,17 +49,6 @@ class MedicineConsumption(Base, IDMixin, TimestampMixin):
     purpose: Mapped[str | None] = mapped_column(String(140), nullable=True)
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
 
-    organization: Mapped["Organization"] = relationship("Organization", back_populates="medicine_consumptions")
-    department: Mapped["Department"] = relationship("Department", back_populates="medicine_consumptions")
-    batch: Mapped["MedicineBatch"] = relationship("MedicineBatch", back_populates="consumptions")
-    poultry_type: Mapped["PoultryType | None"] = relationship("PoultryType", back_populates="medicine_consumptions")
-    client: Mapped["Client | None"] = relationship("Client", back_populates="medicine_consumptions")
-    created_by_employee: Mapped["Employee | None"] = relationship("Employee", lazy="selectin")
-
     __table_args__ = (
         CheckConstraint("quantity > 0", name="ck_medicine_consumption_quantity_positive"),
     )
-
-    @property
-    def effective_unit_cost(self) -> Decimal:
-        return self.batch.unit_cost if self.batch.unit_cost is not None else Decimal(0)

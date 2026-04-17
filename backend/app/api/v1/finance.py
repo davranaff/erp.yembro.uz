@@ -7,14 +7,18 @@ from app.api.module_stats import ModuleStatsTable, register_module_stats_route
 from app.repositories.finance import (
     CashAccountRepository,
     CashTransactionRepository,
+    DebtPaymentRepository,
     ExpenseCategoryRepository,
     ExpenseRepository,
+    SupplierDebtRepository,
 )
 from app.services.finance import (
     CashAccountService,
     CashTransactionService,
+    DebtPaymentService,
     ExpenseCategoryService,
     ExpenseService,
+    SupplierDebtService,
 )
 
 
@@ -56,6 +60,24 @@ router.include_router(
     )
 )
 
+router.include_router(
+    build_crud_router(
+        prefix="supplier-debts",
+        service_factory=lambda db: SupplierDebtService(SupplierDebtRepository(db)),
+        permission_prefix="supplier_debt",
+        tags=["supplier-debt"],
+    )
+)
+
+router.include_router(
+    build_crud_router(
+        prefix="debt-payments",
+        service_factory=lambda db: DebtPaymentService(DebtPaymentRepository(db)),
+        permission_prefix="debt_payment",
+        tags=["debt-payment"],
+    )
+)
+
 register_module_stats_route(
     router,
     module="finance",
@@ -65,6 +87,8 @@ register_module_stats_route(
         ModuleStatsTable(key="expenses", label="Expenses", table="expenses"),
         ModuleStatsTable(key="cash_accounts", label="Cash Accounts", table="cash_accounts"),
         ModuleStatsTable(key="cash_transactions", label="Cash Transactions", table="cash_transactions"),
+        ModuleStatsTable(key="supplier_debts", label="Supplier Debts", table="supplier_debts"),
+        ModuleStatsTable(key="debt_payments", label="Debt Payments", table="debt_payments"),
     ),
 )
 

@@ -29,11 +29,6 @@ class FeedType(Base, IDMixin, TimestampMixin):
 
     organization: Mapped["Organization"] = relationship("Organization", back_populates="feed_types")
     poultry_type: Mapped["PoultryType | None"] = relationship("PoultryType", back_populates="feed_types")
-    feed_arrivals: Mapped[list["FeedArrival"]] = relationship(
-        "FeedArrival",
-        back_populates="feed_type",
-        lazy="selectin",
-    )
     formulas: Mapped[list["FeedFormula"]] = relationship(
         "FeedFormula",
         back_populates="feed_type",

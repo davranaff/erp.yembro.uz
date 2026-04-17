@@ -11,14 +11,6 @@ class FeedIngredientRepository(BaseRepository[dict[str, object]]):
     table = "feed_ingredients"
 
 
-class FeedArrivalRepository(BaseRepository[dict[str, object]]):
-    table = "feed_arrivals"
-
-
-class FeedConsumptionRepository(BaseRepository[dict[str, object]]):
-    table = "feed_consumptions"
-
-
 class FeedFormulaRepository(BaseRepository[dict[str, object]]):
     table = "feed_formulas"
 
@@ -27,31 +19,39 @@ class FeedFormulaIngredientRepository(BaseRepository[dict[str, object]]):
     table = "feed_formula_ingredients"
 
 
-class FeedRawArrivalRepository(BaseRepository[dict[str, object]]):
-    table = "feed_raw_arrivals"
-
-
 class FeedProductionBatchRepository(BaseRepository[dict[str, object]]):
     table = "feed_production_batches"
-
-
-class FeedRawConsumptionRepository(BaseRepository[dict[str, object]]):
-    table = "feed_raw_consumptions"
 
 
 class FeedProductShipmentRepository(BaseRepository[dict[str, object]]):
     table = "feed_product_shipments"
 
 
+class FeedRawArrivalRepository(BaseRepository[dict[str, object]]):
+    table = "feed_raw_arrivals"
+
+
+class FeedRawConsumptionRepository(BaseRepository[dict[str, object]]):
+    table = "feed_raw_consumptions"
+
+
+class FeedProductionQualityCheckRepository(BaseRepository[dict[str, object]]):
+    table = "feed_production_quality_checks"
+
+
+class FeedMonthlyAnalyticsRepository(BaseRepository[dict[str, object]]):
+    table = "feed_monthly_analytics"
+
+
 __all__ = [
     "FeedTypeRepository",
     "FeedIngredientRepository",
-    "FeedArrivalRepository",
-    "FeedConsumptionRepository",
     "FeedFormulaRepository",
     "FeedFormulaIngredientRepository",
-    "FeedRawArrivalRepository",
     "FeedProductionBatchRepository",
-    "FeedRawConsumptionRepository",
     "FeedProductShipmentRepository",
+    "FeedRawArrivalRepository",
+    "FeedRawConsumptionRepository",
+    "FeedProductionQualityCheckRepository",
+    "FeedMonthlyAnalyticsRepository",
 ]

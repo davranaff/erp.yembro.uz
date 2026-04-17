@@ -4,9 +4,18 @@ from datetime import date
 from decimal import Decimal
 from uuid import UUID
 
-from sqlalchemy import Boolean, CheckConstraint, Date, ForeignKey, Integer, Numeric, String, Text, UniqueConstraint
-from sqlalchemy.ext.hybrid import hybrid_property
-from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy import (
+    Boolean,
+    CheckConstraint,
+    Date,
+    ForeignKey,
+    Integer,
+    Numeric,
+    String,
+    Text,
+    UniqueConstraint,
+)
+from sqlalchemy.orm import Mapped, mapped_column
 
 from ..base import Base, IDMixin, TimestampMixin
 
@@ -48,17 +57,6 @@ class SlaughterArrival(Base, IDMixin, TimestampMixin):
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default="true")
     note: Mapped[str | None] = mapped_column(Text, nullable=True)
 
-    organization: Mapped["Organization"] = relationship("Organization", back_populates="slaughter_arrivals")
-    department: Mapped["Department"] = relationship("Department", back_populates="slaughter_arrivals")
-    poultry_type: Mapped["PoultryType | None"] = relationship("PoultryType", back_populates="slaughter_arrivals")
-    supplier_client: Mapped["Client | None"] = relationship("Client", back_populates="slaughter_arrivals")
-    chick_arrival: Mapped["ChickArrival | None"] = relationship("ChickArrival")
-    processings: Mapped[list["SlaughterProcessing"]] = relationship(
-        "SlaughterProcessing",
-        back_populates="arrival",
-        lazy="selectin",
-    )
-
     __table_args__ = (
         UniqueConstraint(
             "organization_id",
@@ -68,12 +66,12 @@ class SlaughterArrival(Base, IDMixin, TimestampMixin):
             name="uq_slaughter_arrival_invoice",
         ),
         CheckConstraint("birds_count >= 0", name="ck_slaughter_arrival_birds_count_non_negative"),
-        CheckConstraint("average_weight_kg IS NULL OR average_weight_kg >= 0", name="ck_slaughter_arrival_avg_weight_non_negative"),
-        CheckConstraint("unit_price IS NULL OR unit_price >= 0", name="ck_slaughter_arrival_unit_price_non_negative"),
+        CheckConstraint(
+            "average_weight_kg IS NULL OR average_weight_kg >= 0",
+            name="ck_slaughter_arrival_avg_weight_non_negative",
+        ),
+        CheckConstraint(
+            "unit_price IS NULL OR unit_price >= 0",
+            name="ck_slaughter_arrival_unit_price_non_negative",
+        ),
     )
-
-    @hybrid_property
-    def estimated_total_weight(self) -> Decimal:
-        if self.average_weight_kg is None:
-            return Decimal(0)
-        return self.average_weight_kg * self.birds_count

@@ -1,26 +1,47 @@
 from __future__ import annotations
 
+from datetime import date, datetime
+from decimal import Decimal
 from typing import TYPE_CHECKING, Any
 from uuid import UUID, uuid4
 
 from app.core.exceptions import ValidationError
+from app.repositories.core import ClientDebtRepository, ClientRepository
 from app.repositories.finance import (
     CashAccountRepository,
     CashTransactionRepository,
+    DebtPaymentRepository,
     ExpenseCategoryRepository,
     ExpenseRepository,
+    SupplierDebtRepository,
 )
 from app.schemas.finance import (
     CashAccountReadSchema,
     CashTransactionReadSchema,
+    DebtPaymentReadSchema,
     ExpenseCategoryReadSchema,
     ExpenseReadSchema,
+    SupplierDebtReadSchema,
 )
 from app.services.base import BaseService, CreatedByActorMixin
+from app.services.inventory import (
+    ITEM_KEY_REFERENCE_TABLE,
+    ITEM_TYPES,
+    _fetch_inventory_item_key_options,
+    _inventory_item_key_exists,
+    normalize_stock_movement_unit,
+)
 from app.utils.result import Result
 
 if TYPE_CHECKING:
     from app.api.deps import CurrentActor
+
+
+DEBT_STATUSES = ("open", "partially_paid", "closed", "cancelled")
+DEBT_PAYMENT_METHODS = ("cash", "bank", "card", "transfer", "offset", "other")
+DEBT_PAYMENT_DIRECTIONS = ("incoming", "outgoing")
+DEBT_PAYMENT_MARKER_PREFIX = "[auto-linked-debt-payment:"
+AUTO_DEBT_CASH_TITLE_MAX_LEN = 255
 
 
 ALLOWED_CASH_TRANSACTION_TYPES = (
@@ -920,9 +941,759 @@ class CashTransactionService(CreatedByActorMixin, BaseService):
         return Result.ok_result(deleted)
 
 
+def _normalize_decimal(raw_value: Any, *, field_name: str) -> Decimal:
+    try:
+        return Decimal(str(raw_value))
+    except Exception as exc:
+        raise ValidationError(f"{field_name} has an invalid value") from exc
+
+
+def _normalize_debt_date(raw_value: Any, *, field_name: str) -> date | None:
+    if raw_value is None:
+        return None
+    if isinstance(raw_value, datetime):
+        return raw_value.date()
+    if isinstance(raw_value, date):
+        return raw_value
+    if not isinstance(raw_value, str):
+        raise ValidationError(f"{field_name} has an invalid value")
+    text = raw_value.strip()
+    if not text:
+        return None
+    try:
+        return date.fromisoformat(text)
+    except ValueError:
+        try:
+            return datetime.fromisoformat(text.replace("Z", "+00:00")).date()
+        except ValueError as exc:
+            raise ValidationError(f"{field_name} has an invalid value") from exc
+
+
+def _resolve_debt_status(
+    amount_total: Decimal,
+    amount_paid: Decimal,
+    requested_status: Any,
+) -> str:
+    normalized = str(requested_status or "").strip().lower()
+    if normalized == "cancelled":
+        return "cancelled"
+    if amount_paid <= Decimal("0"):
+        return "open"
+    if amount_paid >= amount_total:
+        return "closed"
+    return "partially_paid"
+
+
+class SupplierDebtService(BaseService):
+    read_schema = SupplierDebtReadSchema
+
+    def __init__(self, repository: SupplierDebtRepository) -> None:
+        super().__init__(repository=repository)
+
+    async def get_additional_meta_fields(self, db) -> list[dict[str, Any]]:
+        fields = await super().get_additional_meta_fields(db)
+        fields.extend(
+            [
+                {
+                    "name": "item_type",
+                    "reference": {
+                        "table": "__static__",
+                        "column": "value",
+                        "label_column": "label",
+                        "multiple": False,
+                        "options": self._build_static_reference_options(sorted(ITEM_TYPES)),
+                    },
+                },
+                {
+                    "name": "status",
+                    "reference": {
+                        "table": "__static__",
+                        "column": "value",
+                        "label_column": "label",
+                        "multiple": False,
+                        "options": self._build_static_reference_options(list(DEBT_STATUSES)),
+                    },
+                },
+                {
+                    "name": "item_key",
+                    "reference": {
+                        "table": ITEM_KEY_REFERENCE_TABLE,
+                        "column": "value",
+                        "label_column": "label",
+                        "multiple": False,
+                        "options": [],
+                    },
+                },
+            ]
+        )
+        return fields
+
+    async def get_reference_options(
+        self,
+        field_name: str,
+        *,
+        db,
+        actor: CurrentActor | None = None,
+        search: str | None = None,
+        values=None,
+        limit: int = 25,
+        extra_params=None,
+    ) -> list[dict[str, str]] | None:
+        if field_name != "item_key":
+            return None
+
+        normalized_item_type = str((extra_params or {}).get("item_type") or "").strip().lower()
+        if normalized_item_type not in ITEM_TYPES:
+            return []
+
+        normalized_department_id = str((extra_params or {}).get("department_id") or "").strip() or None
+        organization_id = str(
+            (actor.organization_id if actor is not None else None)
+            or (extra_params or {}).get("organization_id")
+            or ""
+        ).strip()
+        if not organization_id:
+            return []
+
+        normalized_values = [str(value).strip() for value in (values or []) if str(value).strip()]
+        return await _fetch_inventory_item_key_options(
+            db=db,
+            organization_id=organization_id,
+            item_type=normalized_item_type,
+            department_id=normalized_department_id,
+            search=search,
+            values=normalized_values,
+            limit=limit,
+        )
+
+    async def _prepare_payload(
+        self,
+        payload: dict[str, Any],
+        *,
+        actor: CurrentActor | None,
+        existing: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        next_payload = dict(payload)
+        existing_item_type = existing.get("item_type") if existing is not None else None
+        existing_item_key = existing.get("item_key") if existing is not None else None
+        existing_unit = existing.get("unit") if existing is not None else None
+        item_type = str(next_payload.get("item_type") or existing_item_type or "").strip().lower()
+        item_key = str(next_payload.get("item_key") or existing_item_key or "").strip()
+        unit = normalize_stock_movement_unit(next_payload.get("unit") or existing_unit)
+        department_id = str(
+            next_payload.get("department_id")
+            or (existing.get("department_id") if existing else None)
+            or ""
+        ).strip()
+        organization_id = str(
+            next_payload.get("organization_id")
+            or (existing.get("organization_id") if existing else None)
+            or (actor.organization_id if actor is not None else "")
+            or ""
+        ).strip()
+        amount_total = _normalize_decimal(
+            next_payload.get("amount_total")
+            if "amount_total" in next_payload
+            else existing.get("amount_total") if existing else None,
+            field_name="amount_total",
+        )
+        amount_paid = _normalize_decimal(
+            next_payload.get("amount_paid")
+            if "amount_paid" in next_payload
+            else existing.get("amount_paid") if existing else Decimal("0"),
+            field_name="amount_paid",
+        )
+        quantity = _normalize_decimal(
+            next_payload.get("quantity")
+            if "quantity" in next_payload
+            else existing.get("quantity") if existing else None,
+            field_name="quantity",
+        )
+
+        if item_type not in ITEM_TYPES:
+            raise ValidationError("item_type is invalid")
+        if not item_key:
+            raise ValidationError("item_key is required")
+        if not department_id:
+            raise ValidationError("department_id is required")
+        if not organization_id:
+            raise ValidationError("organization_id is required")
+        if amount_total < Decimal("0"):
+            raise ValidationError("amount_total must be non-negative")
+        if amount_paid < Decimal("0"):
+            raise ValidationError("amount_paid must be non-negative")
+        if amount_paid > amount_total:
+            raise ValidationError("amount_paid cannot exceed amount_total")
+        if quantity <= Decimal("0"):
+            raise ValidationError("quantity must be positive")
+
+        issued_on = _normalize_debt_date(
+            next_payload.get("issued_on")
+            if "issued_on" in next_payload
+            else existing.get("issued_on") if existing else None,
+            field_name="issued_on",
+        )
+        due_on = _normalize_debt_date(
+            next_payload.get("due_on")
+            if "due_on" in next_payload
+            else existing.get("due_on") if existing else None,
+            field_name="due_on",
+        )
+        if issued_on is not None and due_on is not None and due_on < issued_on:
+            raise ValidationError("due_on cannot be before issued_on")
+
+        client_id = _normalize_optional_uuid(
+            next_payload.get("client_id")
+            if "client_id" in next_payload
+            else existing.get("client_id") if existing else None,
+            field_name="client_id",
+        )
+        if client_id is None:
+            raise ValidationError("client_id is required")
+
+        supplier_row = await ClientRepository(self.repository.db).get_by_id_optional(client_id)
+        if supplier_row is None or str(supplier_row.get("organization_id") or "").strip() != organization_id:
+            raise ValidationError("client_id is invalid")
+
+        if not await _inventory_item_key_exists(
+            db=self.repository.db,
+            organization_id=organization_id,
+            item_type=item_type,
+            item_key=item_key,
+            department_id=department_id,
+        ):
+            raise ValidationError("item_key is invalid for selected item_type")
+
+        next_payload["item_type"] = item_type
+        next_payload["item_key"] = item_key
+        next_payload["unit"] = unit
+        next_payload["department_id"] = department_id
+        next_payload["organization_id"] = organization_id
+        next_payload["client_id"] = client_id
+        next_payload["amount_total"] = str(amount_total)
+        next_payload["amount_paid"] = str(amount_paid)
+        next_payload["quantity"] = str(quantity)
+        next_payload["status"] = _resolve_debt_status(
+            amount_total=amount_total,
+            amount_paid=amount_paid,
+            requested_status=next_payload.get("status")
+            if "status" in next_payload
+            else existing.get("status") if existing else None,
+        )
+        return next_payload
+
+    async def _before_create(
+        self,
+        data: dict[str, Any],
+        *,
+        actor: CurrentActor | None = None,
+    ) -> dict[str, Any]:
+        return await self._prepare_payload(data, actor=actor, existing=None)
+
+    async def _before_update(
+        self,
+        entity_id: Any,
+        data: dict[str, Any],
+        *,
+        existing: dict[str, Any],
+        actor: CurrentActor | None = None,
+    ) -> dict[str, Any]:
+        next_payload = dict(data)
+        if "organization_id" in next_payload and str(next_payload["organization_id"]) != str(existing["organization_id"]):
+            raise ValidationError("organization_id is immutable")
+        if "department_id" in next_payload and str(next_payload["department_id"]) != str(existing["department_id"]):
+            raise ValidationError("department_id is immutable")
+        if "client_id" in next_payload and str(next_payload["client_id"]) != str(existing["client_id"]):
+            raise ValidationError("client_id is immutable")
+        return await self._prepare_payload(next_payload, actor=actor, existing=existing)
+
+
+class DebtPaymentService(CreatedByActorMixin, BaseService):
+    """Payment record against a client or supplier debt.
+
+    Maintains four invariants on every create/update/delete:
+      1. Exactly one of ``client_debt_id`` / ``supplier_debt_id`` is set.
+      2. ``direction`` matches parent (incoming → client, outgoing → supplier).
+      3. The parent debt's ``amount_paid`` equals SUM(active payments) and
+         ``status`` is recomputed accordingly.
+      4. If ``cash_account_id`` is set, a matching ``CashTransaction`` is
+         created (and kept in sync on update/delete) so the ledger balances.
+    """
+
+    read_schema = DebtPaymentReadSchema
+
+    def __init__(self, repository: DebtPaymentRepository) -> None:
+        super().__init__(repository=repository)
+
+    async def get_additional_meta_fields(self, db) -> list[dict[str, Any]]:
+        fields = await super().get_additional_meta_fields(db)
+        fields.extend(
+            [
+                {
+                    "name": "direction",
+                    "reference": {
+                        "table": "__static__",
+                        "column": "value",
+                        "label_column": "label",
+                        "multiple": False,
+                        "options": self._build_static_reference_options(list(DEBT_PAYMENT_DIRECTIONS)),
+                    },
+                },
+                {
+                    "name": "method",
+                    "reference": {
+                        "table": "__static__",
+                        "column": "value",
+                        "label_column": "label",
+                        "multiple": False,
+                        "options": self._build_static_reference_options(list(DEBT_PAYMENT_METHODS)),
+                    },
+                },
+            ]
+        )
+        return fields
+
+    @staticmethod
+    def _build_marker(payment_id: str) -> str:
+        return f"{DEBT_PAYMENT_MARKER_PREFIX}{payment_id}]"
+
+    @classmethod
+    def _compose_note(cls, *, payment_id: str, source_note: Any) -> str:
+        marker = cls._build_marker(payment_id)
+        note_text = str(source_note).strip() if source_note is not None else ""
+        if not note_text:
+            return marker
+        if marker in note_text:
+            return note_text
+        return f"{note_text}\n{marker}"
+
+    @staticmethod
+    def _compose_title(
+        *,
+        direction: str,
+        debt_row: dict[str, Any],
+        supplier_name: str | None = None,
+        client_name: str | None = None,
+    ) -> str:
+        item_key = str(debt_row.get("item_key") or "").strip()
+        item_type = str(debt_row.get("item_type") or "").strip()
+        counterparty = supplier_name or client_name or ""
+        if direction == "incoming":
+            base = f"Debt payment from {counterparty}".strip()
+        else:
+            base = f"Debt payment to {counterparty}".strip()
+        tag = " · ".join([part for part in (item_type, item_key) if part])
+        full = f"{base} ({tag})" if tag else base
+        if len(full) > AUTO_DEBT_CASH_TITLE_MAX_LEN:
+            full = full[:AUTO_DEBT_CASH_TITLE_MAX_LEN]
+        return full or "Debt payment"
+
+    async def _load_parent(
+        self,
+        *,
+        client_debt_id: str | None,
+        supplier_debt_id: str | None,
+    ) -> tuple[str, dict[str, Any]]:
+        if bool(client_debt_id) == bool(supplier_debt_id):
+            raise ValidationError(
+                "Exactly one of client_debt_id or supplier_debt_id must be set"
+            )
+        if client_debt_id:
+            row = await ClientDebtRepository(self.repository.db).get_by_id_optional(client_debt_id)
+            if row is None:
+                raise ValidationError("client_debt_id is invalid")
+            return "incoming", row
+        row = await SupplierDebtRepository(self.repository.db).get_by_id_optional(supplier_debt_id)
+        if row is None:
+            raise ValidationError("supplier_debt_id is invalid")
+        return "outgoing", row
+
+    async def _recalculate_parent(
+        self,
+        *,
+        direction: str,
+        debt_row: dict[str, Any],
+    ) -> None:
+        debt_id = str(debt_row["id"])
+        column = "client_debt_id" if direction == "incoming" else "supplier_debt_id"
+        row = await self.repository.db.fetchrow(
+            f"""
+            SELECT COALESCE(SUM(amount), 0) AS total
+            FROM debt_payments
+            WHERE {column} = $1 AND is_active = TRUE
+            """,
+            debt_id,
+        )
+        total_paid = Decimal(str(row["total"])) if row is not None else Decimal("0")
+        amount_total = Decimal(str(debt_row.get("amount_total") or 0))
+        if total_paid > amount_total:
+            raise ValidationError("Total payments exceed the debt amount_total")
+
+        new_status = _resolve_debt_status(
+            amount_total=amount_total,
+            amount_paid=total_paid,
+            requested_status=debt_row.get("status"),
+        )
+        table = "client_debts" if direction == "incoming" else "supplier_debts"
+        await self.repository.db.execute(
+            f"UPDATE {table} SET amount_paid = $1, status = $2, updated_at = NOW() WHERE id = $3",
+            str(total_paid),
+            new_status,
+            debt_id,
+        )
+
+    async def _sync_cash_transaction(
+        self,
+        *,
+        payment_row: dict[str, Any],
+        debt_row: dict[str, Any],
+        direction: str,
+        actor: CurrentActor | None,
+    ) -> str | None:
+        cash_account_id = str(payment_row.get("cash_account_id") or "").strip()
+        if not cash_account_id:
+            return None
+
+        organization_id = str(debt_row.get("organization_id") or "").strip()
+        if not organization_id:
+            raise ValidationError("organization_id is required")
+
+        account_repo = CashAccountRepository(self.repository.db)
+        account = await account_repo.get_by_id_optional(cash_account_id)
+        if account is None:
+            raise ValidationError("cash_account_id is invalid")
+        if str(account.get("organization_id") or "").strip() != organization_id:
+            raise ValidationError("cash_account_id is invalid")
+
+        payment_id = str(payment_row["id"])
+        transaction_type = "income" if direction == "incoming" else "expense"
+        counterparty_client_id = str(debt_row.get("client_id") or "")
+
+        tx_payload: dict[str, Any] = {
+            "organization_id": organization_id,
+            "cash_account_id": cash_account_id,
+            "expense_id": None,
+            "counterparty_client_id": counterparty_client_id or None,
+            "created_by": actor.employee_id if actor is not None else None,
+            "title": self._compose_title(
+                direction=direction,
+                debt_row=debt_row,
+            ),
+            "transaction_type": transaction_type,
+            "amount": str(payment_row.get("amount")),
+            "currency": str(payment_row.get("currency") or debt_row.get("currency") or ""),
+            "transaction_date": payment_row.get("paid_on"),
+            "reference_no": payment_row.get("reference_no"),
+            "note": self._compose_note(
+                payment_id=payment_id,
+                source_note=payment_row.get("note"),
+            ),
+            "is_active": True,
+        }
+
+        tx_repo = CashTransactionRepository(self.repository.db)
+        existing_tx_id = str(payment_row.get("cash_transaction_id") or "").strip()
+        if existing_tx_id:
+            existing_tx = await tx_repo.get_by_id_optional(existing_tx_id)
+            if existing_tx is not None:
+                await tx_repo.update_by_id(existing_tx_id, tx_payload)
+                return existing_tx_id
+
+        created = await tx_repo.create({"id": str(uuid4()), **tx_payload})
+        return str(created["id"])
+
+    async def _delete_linked_cash_transaction(
+        self,
+        *,
+        cash_transaction_id: str | None,
+        payment_id: str,
+    ) -> None:
+        if not cash_transaction_id:
+            return
+        tx_repo = CashTransactionRepository(self.repository.db)
+        tx_row = await tx_repo.get_by_id_optional(cash_transaction_id)
+        if tx_row is None:
+            return
+        marker = self._build_marker(payment_id)
+        if marker not in str(tx_row.get("note") or ""):
+            return
+        await tx_repo.delete_by_id(cash_transaction_id)
+
+    async def _prepare_payload(
+        self,
+        payload: dict[str, Any],
+        *,
+        actor: CurrentActor | None,
+        existing: dict[str, Any] | None,
+    ) -> tuple[dict[str, Any], str, dict[str, Any]]:
+        next_payload = dict(payload)
+
+        client_debt_id = _normalize_optional_uuid(
+            next_payload.get("client_debt_id")
+            if "client_debt_id" in next_payload
+            else (existing.get("client_debt_id") if existing else None),
+            field_name="client_debt_id",
+        )
+        supplier_debt_id = _normalize_optional_uuid(
+            next_payload.get("supplier_debt_id")
+            if "supplier_debt_id" in next_payload
+            else (existing.get("supplier_debt_id") if existing else None),
+            field_name="supplier_debt_id",
+        )
+        direction, debt_row = await self._load_parent(
+            client_debt_id=client_debt_id,
+            supplier_debt_id=supplier_debt_id,
+        )
+
+        if existing is not None:
+            existing_direction = "incoming" if existing.get("client_debt_id") else "outgoing"
+            if existing_direction != direction:
+                raise ValidationError("direction is immutable")
+
+        requested_direction = str(next_payload.get("direction") or direction).strip().lower()
+        if requested_direction not in DEBT_PAYMENT_DIRECTIONS:
+            raise ValidationError("direction is invalid")
+        if requested_direction != direction:
+            raise ValidationError("direction must match the parent debt")
+
+        method = str(next_payload.get("method") or (existing.get("method") if existing else "cash")).strip().lower()
+        if method not in DEBT_PAYMENT_METHODS:
+            raise ValidationError("method is invalid")
+
+        amount = _normalize_decimal(
+            next_payload.get("amount")
+            if "amount" in next_payload
+            else (existing.get("amount") if existing else None),
+            field_name="amount",
+        )
+        if amount <= Decimal("0"):
+            raise ValidationError("amount must be positive")
+
+        paid_on = _normalize_debt_date(
+            next_payload.get("paid_on")
+            if "paid_on" in next_payload
+            else (existing.get("paid_on") if existing else None),
+            field_name="paid_on",
+        )
+        if paid_on is None:
+            raise ValidationError("paid_on is required")
+
+        currency = str(
+            next_payload.get("currency")
+            or (existing.get("currency") if existing else None)
+            or debt_row.get("currency")
+            or ""
+        ).strip()
+        if not currency:
+            raise ValidationError("currency is required")
+        if currency != str(debt_row.get("currency") or "").strip():
+            raise ValidationError("currency must match the parent debt currency")
+
+        cash_account_id = _normalize_optional_uuid(
+            next_payload.get("cash_account_id")
+            if "cash_account_id" in next_payload
+            else (existing.get("cash_account_id") if existing else None),
+            field_name="cash_account_id",
+        )
+
+        organization_id = str(debt_row.get("organization_id") or "").strip()
+        department_id = str(debt_row.get("department_id") or "").strip()
+
+        # cap amount at remaining balance taking into account this payment's
+        # own prior amount if updating (so editing upward to the new cap works)
+        total_active = await self.repository.db.fetchrow(
+            f"""
+            SELECT COALESCE(SUM(amount), 0) AS total
+            FROM debt_payments
+            WHERE {'client_debt_id' if direction == 'incoming' else 'supplier_debt_id'} = $1
+              AND is_active = TRUE
+              AND ($2::uuid IS NULL OR id <> $2::uuid)
+            """,
+            str(debt_row["id"]),
+            str(existing["id"]) if existing is not None else None,
+        )
+        other_total = Decimal(str(total_active["total"])) if total_active is not None else Decimal("0")
+        debt_total = Decimal(str(debt_row.get("amount_total") or 0))
+        if other_total + amount > debt_total:
+            raise ValidationError("Payment would exceed debt amount_total")
+
+        next_payload["organization_id"] = organization_id
+        next_payload["department_id"] = department_id
+        next_payload["client_debt_id"] = client_debt_id
+        next_payload["supplier_debt_id"] = supplier_debt_id
+        next_payload["direction"] = direction
+        next_payload["method"] = method
+        next_payload["amount"] = str(amount)
+        next_payload["currency"] = currency
+        next_payload["paid_on"] = paid_on
+        next_payload["cash_account_id"] = cash_account_id
+        next_payload["is_active"] = next_payload.get("is_active", existing.get("is_active") if existing else True)
+
+        return next_payload, direction, debt_row
+
+    async def _before_create(
+        self,
+        data: dict[str, Any],
+        *,
+        actor: CurrentActor | None = None,
+    ) -> dict[str, Any]:
+        prepared, _direction, _debt_row = await self._prepare_payload(
+            data, actor=actor, existing=None,
+        )
+        return prepared
+
+    async def _before_update(
+        self,
+        entity_id: Any,
+        data: dict[str, Any],
+        *,
+        existing: dict[str, Any],
+        actor: CurrentActor | None = None,
+    ) -> dict[str, Any]:
+        next_data = dict(data)
+        if "client_debt_id" in next_data and str(next_data["client_debt_id"] or "") != str(existing.get("client_debt_id") or ""):
+            raise ValidationError("client_debt_id is immutable")
+        if "supplier_debt_id" in next_data and str(next_data["supplier_debt_id"] or "") != str(existing.get("supplier_debt_id") or ""):
+            raise ValidationError("supplier_debt_id is immutable")
+        prepared, _direction, _debt_row = await self._prepare_payload(
+            next_data, actor=actor, existing=existing,
+        )
+        return prepared
+
+    async def create(self, payload: Any, *, actor: CurrentActor | None = None) -> Result[Any]:
+        data = self._payload_to_dict(payload)
+        data = self._prepare_create_payload(data, actor=actor)
+        data = self._apply_actor_organization_on_create(data, actor=actor)
+
+        async with self.repository.db.transaction():
+            prepared, direction, debt_row = await self._prepare_payload(
+                data, actor=actor, existing=None,
+            )
+            payment_id = str(uuid4())
+            prepared["id"] = payment_id
+            # reserve the cash_transaction_id column; may be filled below
+            prepared.setdefault("cash_transaction_id", None)
+
+            entity = await self.repository.create(prepared)
+
+            tx_id = await self._sync_cash_transaction(
+                payment_row=entity,
+                debt_row=debt_row,
+                direction=direction,
+                actor=actor,
+            )
+            if tx_id:
+                entity = await self.repository.update_by_id(
+                    entity["id"], {"cash_transaction_id": tx_id},
+                )
+
+            await self._recalculate_parent(direction=direction, debt_row=debt_row)
+
+            after_snapshot = await self._capture_audit_snapshot(
+                entity.get(self.repository.id_column),
+                entity=entity,
+                actor=actor,
+            )
+            await self._record_audit_event(
+                action="create",
+                entity_id=entity.get(self.repository.id_column),
+                before_data=None,
+                after_data=after_snapshot,
+                actor=actor,
+            )
+        return Result.ok_result(self._map_read(entity))
+
+    async def update(
+        self,
+        entity_id: Any,
+        payload: Any,
+        *,
+        actor: CurrentActor | None = None,
+    ) -> Result[Any]:
+        data = self._payload_to_dict(payload)
+        data = self._prepare_update_payload(data, actor=actor)
+
+        async with self.repository.db.transaction():
+            existing = await self.repository.get_by_id(entity_id)
+            self._ensure_actor_can_access_entity(existing, actor=actor)
+            before_snapshot = await self._capture_audit_snapshot(
+                entity_id, entity=existing, actor=actor,
+            )
+
+            data = self._apply_actor_organization_on_update(data, actor=actor)
+            prepared, direction, debt_row = await self._prepare_payload(
+                data, actor=actor, existing=existing,
+            )
+            entity = await self.repository.update_by_id(entity_id, prepared)
+
+            tx_id = await self._sync_cash_transaction(
+                payment_row=entity,
+                debt_row=debt_row,
+                direction=direction,
+                actor=actor,
+            )
+            if tx_id and tx_id != str(entity.get("cash_transaction_id") or ""):
+                entity = await self.repository.update_by_id(
+                    entity_id, {"cash_transaction_id": tx_id},
+                )
+
+            await self._recalculate_parent(direction=direction, debt_row=debt_row)
+
+            after_snapshot = await self._capture_audit_snapshot(
+                entity_id, entity=entity, actor=actor,
+            )
+            await self._record_audit_event(
+                action="update",
+                entity_id=entity_id,
+                before_data=before_snapshot,
+                after_data=after_snapshot,
+                actor=actor,
+            )
+        return Result.ok_result(self._map_read(entity))
+
+    async def delete(self, entity_id: Any, *, actor: CurrentActor | None = None) -> Result[bool]:
+        async with self.repository.db.transaction():
+            existing = await self.repository.get_by_id(entity_id)
+            self._ensure_actor_can_access_entity(existing, actor=actor)
+            before_snapshot = await self._capture_audit_snapshot(
+                entity_id, entity=existing, actor=actor,
+            )
+
+            direction = "incoming" if existing.get("client_debt_id") else "outgoing"
+            if direction == "incoming":
+                debt_row = await ClientDebtRepository(self.repository.db).get_by_id_optional(
+                    existing["client_debt_id"],
+                )
+            else:
+                debt_row = await SupplierDebtRepository(self.repository.db).get_by_id_optional(
+                    existing["supplier_debt_id"],
+                )
+
+            await self._delete_linked_cash_transaction(
+                cash_transaction_id=str(existing.get("cash_transaction_id") or "") or None,
+                payment_id=str(existing["id"]),
+            )
+
+            deleted = await self.repository.delete_by_id(entity_id)
+            if deleted and debt_row is not None:
+                await self._recalculate_parent(direction=direction, debt_row=debt_row)
+
+            if deleted:
+                await self._record_audit_event(
+                    action="delete",
+                    entity_id=entity_id,
+                    before_data=before_snapshot,
+                    after_data=None,
+                    actor=actor,
+                )
+        return Result.ok_result(deleted)
+
+
 __all__ = [
     "ExpenseCategoryService",
     "ExpenseService",
     "CashAccountService",
     "CashTransactionService",
+    "SupplierDebtService",
+    "DebtPaymentService",
 ]

@@ -142,11 +142,13 @@ function SheetContent({
         {showCloseButton && (
           <SheetPrimitive.Close
             data-slot="sheet-close"
+            aria-label={t('common.close')}
             render={
               <Button
                 variant="outline"
                 className="border-primary/18 bg-background/98 absolute right-3 top-3 shadow-[0_14px_32px_-26px_rgba(15,23,42,0.14)]"
                 size="icon-sm"
+                aria-label={t('common.close')}
               />
             }
           >

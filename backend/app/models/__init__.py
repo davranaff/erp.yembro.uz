@@ -1,21 +1,29 @@
 from app.models.base import Base
 from app.models.core import (
     Client,
+    ClientCategory,
     ClientDebt,
     Currency,
     Department,
     DepartmentModule,
+    MeasurementUnit,
     Organization,
     PoultryType,
     Warehouse,
     WorkspaceResource,
 )
 from app.models.egg import EggMonthlyAnalytics, EggProduction, EggShipment
-from app.models.finance import CashAccount, CashTransaction, Expense, ExpenseCategory
+from app.models.finance import (
+    CashAccount,
+    CashTransaction,
+    DebtPayment,
+    Expense,
+    ExpenseCategory,
+    SupplierDebt,
+)
 from app.models.hr import Employee, Permission, Position, Role, employee_roles, role_permissions
 from app.models.inventory import StockMovement
 from app.models.incubation import (
-    ChickArrival,
     ChickShipment,
     FactoryMonthlyAnalytics,
     IncubationBatch,
@@ -23,21 +31,29 @@ from app.models.incubation import (
     IncubationRun,
 )
 from app.models.feed import (
-    FeedArrival,
-    FeedConsumption,
     FeedIngredient,
     FeedFormula,
     FeedFormulaIngredient,
+    FeedMonthlyAnalytics,
     FeedProductionBatch,
+    FeedProductionQualityCheck,
+    FeedProductShipment,
     FeedRawArrival,
     FeedRawConsumption,
-    FeedProductShipment,
     FeedType,
 )
-from app.models.medicine import MedicineArrival, MedicineBatch, MedicineConsumption, MedicineType
+from app.models.factory import (
+    FactoryDailyLog,
+    FactoryFlock,
+    FactoryMedicineUsage,
+    FactoryShipment,
+    FactoryVaccinationPlan,
+)
+from app.models.medicine import MedicineBatch, MedicineType
 from app.models.slaughter import (
-    SlaughterArrival,
+    SlaughterMonthlyAnalytics,
     SlaughterProcessing,
+    SlaughterQualityCheck,
     SlaughterSemiProduct,
     SlaughterSemiProductShipment,
 )
@@ -61,6 +77,8 @@ __all__ = [
     "Expense",
     "CashAccount",
     "CashTransaction",
+    "SupplierDebt",
+    "DebtPayment",
     "StockMovement",
     "Role",
     "Position",
@@ -69,29 +87,32 @@ __all__ = [
     "role_permissions",
     "IncubationBatch",
     "IncubationRun",
-    "ChickArrival",
     "ChickShipment",
     "IncubationMonthlyAnalytics",
     "FactoryMonthlyAnalytics",
     "PoultryType",
     "FeedType",
     "FeedIngredient",
-    "FeedRawArrival",
     "FeedFormula",
     "FeedFormulaIngredient",
+    "FeedMonthlyAnalytics",
     "FeedProductionBatch",
-    "FeedRawConsumption",
+    "FeedProductionQualityCheck",
     "FeedProductShipment",
-    "FeedArrival",
-    "FeedConsumption",
-    "SlaughterArrival",
+    "FeedRawArrival",
+    "FeedRawConsumption",
+    "SlaughterMonthlyAnalytics",
     "SlaughterProcessing",
+    "SlaughterQualityCheck",
     "SlaughterSemiProduct",
     "SlaughterSemiProductShipment",
     "MedicineType",
-    "MedicineArrival",
     "MedicineBatch",
-    "MedicineConsumption",
+    "FactoryFlock",
+    "FactoryDailyLog",
+    "FactoryShipment",
+    "FactoryMedicineUsage",
+    "FactoryVaccinationPlan",
     "AuditLog",
     "TelegramRecipient",
 ]

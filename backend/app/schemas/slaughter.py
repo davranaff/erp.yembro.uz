@@ -10,26 +10,6 @@ from app.schemas.base import (
 )
 
 
-class SlaughterArrivalCreateSchema(OpenSchema, BaseCreateSchema):
-    """Input payload to create slaughter arrival."""
-
-
-class SlaughterArrivalUpdateSchema(OpenSchema, BaseUpdateSchema):
-    """Input payload to update slaughter arrival."""
-
-
-class SlaughterArrivalReadSchema(OpenSchema, BaseReadSchema):
-    """Readable slaughter arrival response."""
-
-
-class SlaughterArrivalListParams(CRUDBaseParams):
-    """Pagination + query params for slaughter arrival list."""
-
-
-class SlaughterArrivalListResponse(CRUDListResponse[SlaughterArrivalReadSchema]):
-    """Paginated slaughter arrival response."""
-
-
 class SlaughterProcessingCreateSchema(OpenSchema, BaseCreateSchema):
     """Input payload to create slaughter processing."""
 
@@ -90,12 +70,49 @@ class SlaughterSemiProductShipmentListResponse(CRUDListResponse[SlaughterSemiPro
     """Paginated slaughter semi-product shipment response."""
 
 
+class SlaughterQualityCheckCreateSchema(OpenSchema, BaseCreateSchema):
+    """Input payload to create slaughter quality check."""
+
+
+class SlaughterQualityCheckUpdateSchema(OpenSchema, BaseUpdateSchema):
+    """Input payload to update slaughter quality check."""
+
+
+class SlaughterQualityCheckReadSchema(OpenSchema, BaseReadSchema):
+    """Readable slaughter quality check response."""
+
+
+class SlaughterQualityCheckListParams(CRUDBaseParams):
+    """Pagination + query params for slaughter quality check list."""
+
+
+class SlaughterQualityCheckListResponse(CRUDListResponse[SlaughterQualityCheckReadSchema]):
+    """Paginated slaughter quality check response."""
+
+
+class SlaughterMonthlyAnalyticsCreateSchema(OpenSchema, BaseCreateSchema):
+    """Input payload to create slaughter monthly analytics."""
+
+
+class SlaughterMonthlyAnalyticsUpdateSchema(OpenSchema, BaseUpdateSchema):
+    """Input payload to update slaughter monthly analytics."""
+
+
+class SlaughterMonthlyAnalyticsReadSchema(OpenSchema, BaseReadSchema):
+    """Readable slaughter monthly analytics response."""
+
+
+class SlaughterMonthlyAnalyticsListParams(CRUDBaseParams):
+    """Pagination + query params for slaughter monthly analytics list."""
+
+
+class SlaughterMonthlyAnalyticsListResponse(
+    CRUDListResponse[SlaughterMonthlyAnalyticsReadSchema]
+):
+    """Paginated slaughter monthly analytics response."""
+
+
 __all__ = [
-    "SlaughterArrivalCreateSchema",
-    "SlaughterArrivalUpdateSchema",
-    "SlaughterArrivalReadSchema",
-    "SlaughterArrivalListParams",
-    "SlaughterArrivalListResponse",
     "SlaughterProcessingCreateSchema",
     "SlaughterProcessingUpdateSchema",
     "SlaughterProcessingReadSchema",
@@ -111,4 +128,14 @@ __all__ = [
     "SlaughterSemiProductShipmentReadSchema",
     "SlaughterSemiProductShipmentListParams",
     "SlaughterSemiProductShipmentListResponse",
+    "SlaughterQualityCheckCreateSchema",
+    "SlaughterQualityCheckUpdateSchema",
+    "SlaughterQualityCheckReadSchema",
+    "SlaughterQualityCheckListParams",
+    "SlaughterQualityCheckListResponse",
+    "SlaughterMonthlyAnalyticsCreateSchema",
+    "SlaughterMonthlyAnalyticsUpdateSchema",
+    "SlaughterMonthlyAnalyticsReadSchema",
+    "SlaughterMonthlyAnalyticsListParams",
+    "SlaughterMonthlyAnalyticsListResponse",
 ]

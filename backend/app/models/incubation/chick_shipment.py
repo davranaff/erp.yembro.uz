@@ -29,6 +29,11 @@ class ChickShipment(Base, IDMixin, TimestampMixin):
         nullable=False,
         index=True,
     )
+    warehouse_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("warehouses.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
     client_id: Mapped[UUID] = mapped_column(
         ForeignKey("clients.id", ondelete="RESTRICT"),
         nullable=False,
@@ -44,6 +49,7 @@ class ChickShipment(Base, IDMixin, TimestampMixin):
     organization: Mapped["Organization"] = relationship("Organization", back_populates="chick_shipments")
     run: Mapped["IncubationRun | None"] = relationship("IncubationRun", back_populates="chick_shipments")
     department: Mapped["Department"] = relationship("Department", back_populates="chick_shipments")
+    warehouse: Mapped["Warehouse | None"] = relationship("Warehouse")
     client: Mapped["Client"] = relationship("Client", back_populates="chick_shipments")
 
     __table_args__ = (
