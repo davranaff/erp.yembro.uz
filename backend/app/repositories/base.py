@@ -171,18 +171,36 @@ class BaseRepository(ABC, Generic[RowT]):
     def _order(self, order_by: str | Sequence[str] | None) -> str:
         if not order_by:
             return ""
-        if isinstance(order_by, str):
-            return f" ORDER BY {self._column(order_by)}"
+
+        items: Sequence[str] = (order_by,) if isinstance(order_by, str) else order_by
 
         columns: list[str] = []
-        for item in order_by:
+        for item in items:
             if not item:
                 continue
-            parts = item.strip().rsplit(" ", 1)
-            if len(parts) == 2 and parts[1].lower() in {"asc", "desc"}:
-                columns.append(f"{self._column(parts[0])} {parts[1].upper()}")
+            normalized = item.strip()
+            if not normalized:
+                continue
+
+            direction: str | None = None
+            if normalized.startswith("-"):
+                direction = "DESC"
+                normalized = normalized[1:].strip()
+            elif normalized.startswith("+"):
+                direction = "ASC"
+                normalized = normalized[1:].strip()
             else:
-                columns.append(self._column(item))
+                parts = normalized.rsplit(" ", 1)
+                if len(parts) == 2 and parts[1].lower() in {"asc", "desc"}:
+                    direction = parts[1].upper()
+                    normalized = parts[0].strip()
+
+            if not normalized:
+                continue
+
+            column = self._column(normalized)
+            columns.append(f"{column} {direction}" if direction else column)
+
         return " ORDER BY " + ", ".join(columns) if columns else ""
 
     def _limit_offset(
