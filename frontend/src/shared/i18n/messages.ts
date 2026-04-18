@@ -52,6 +52,10 @@ const baseMessages: Record<Language, Record<string, unknown>> = {
       neutral: 'Без оценки',
     },
     language: { label: 'Язык', uz: 'Oʻz', ru: 'Рус', en: 'Eng' },
+    crudShell: {
+      switchToDrawer: 'Перевести в боковую панель',
+      switchToModal: 'Перевести в окно по центру',
+    },
     nav: {
       dashboard: 'Дашборд',
       heading: 'Навигация',
@@ -1150,6 +1154,10 @@ const baseMessages: Record<Language, Record<string, unknown>> = {
       neutral: 'Baholanmagan',
     },
     language: { label: 'Til', uz: 'Oʻz', ru: 'Рус', en: 'Eng' },
+    crudShell: {
+      switchToDrawer: 'Yon panelga oʻtkazish',
+      switchToModal: 'Markazdagi oynaga oʻtkazish',
+    },
     nav: {
       dashboard: 'Dashboard',
       heading: 'Navigatsiya',
@@ -2275,6 +2283,10 @@ const baseMessages: Record<Language, Record<string, unknown>> = {
       neutral: 'No rating',
     },
     language: { label: 'Language', uz: 'Oʻz', ru: 'Рус', en: 'Eng' },
+    crudShell: {
+      switchToDrawer: 'Switch to side panel',
+      switchToModal: 'Switch to centered modal',
+    },
     nav: {
       dashboard: 'Dashboard',
       heading: 'Navigation',
