@@ -982,6 +982,30 @@ async def _main() -> None:
     rows_by_table = _load_fixture_rows(FIXTURES_DIR)
     inserted_counts = await _truncate_and_load(rows_by_table)
     _print_summary(rows_by_table, inserted_counts)
+    await _sync_module_manager_roles()
+
+
+async def _sync_module_manager_roles() -> None:
+    from app.scripts.sync_role_templates import sync_role_templates_for_organizations
+
+    settings = get_settings()
+    db = Database(
+        settings.database_url,
+        min_size=settings.postgres_pool_min_size,
+        max_size=settings.postgres_pool_max_size,
+        command_timeout=settings.request_timeout_seconds,
+    )
+    await db.connect()
+    try:
+        stats = await sync_role_templates_for_organizations(db, dry_run=False, verbose=False)
+    finally:
+        await db.disconnect()
+
+    print(
+        "Module-manager role templates synced: "
+        f"created={stats.roles_created}, updated={stats.roles_updated}, "
+        f"permission_links={stats.role_permission_links_written}"
+    )
 
 
 def main() -> None:

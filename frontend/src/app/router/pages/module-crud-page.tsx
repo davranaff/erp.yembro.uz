@@ -903,7 +903,7 @@ export function ModuleCrudPage() {
         resources: buckets.warehouse,
       },
     ].filter((group) => group.resources.length > 0);
-  }, [availableResources, t]);
+  }, [availableResources, moduleKey, t]);
   const hasAnyResourceAccess = availableResources.length > 0;
   const hasAnyPageAccess = hasAnyResourceAccess || (supportsStatistics && canOpenModuleAnalytics);
   const activeResource = useMemo(() => {
@@ -2761,24 +2761,14 @@ export function ModuleCrudPage() {
   };
 
   const printMedicineBatchQrImage = (imageDataUrl: string, batchLabel: string) => {
-    const printWindow = window.open('', '_blank', 'noopener,noreferrer,width=640,height=820');
-    if (!printWindow) {
-      throw new Error(
-        t(
-          'crud.popupBlocked',
-          undefined,
-          'Браузер заблокировал окно печати. Разрешите pop-up для этого сайта.',
-        ),
-      );
-    }
-
     const safeBatchLabel = batchLabel.replace(/</g, '&lt;').replace(/>/g, '&gt;');
-    printWindow.document.write(`<!doctype html>
+    const printDocument = `<!doctype html>
 <html lang="en">
   <head>
     <meta charset="utf-8" />
     <title>QR ${safeBatchLabel}</title>
     <style>
+      @page { margin: 12mm; }
       body { margin: 0; display: grid; place-items: center; min-height: 100vh; font-family: sans-serif; }
       .wrapper { text-align: center; }
       img { width: 320px; height: 320px; object-fit: contain; border: 1px solid #d1d5db; border-radius: 16px; padding: 16px; }
@@ -2787,12 +2777,78 @@ export function ModuleCrudPage() {
   </head>
   <body>
     <div class="wrapper">
-      <img src="${imageDataUrl}" alt="QR code" onload="window.print();setTimeout(() => window.close(), 120);" />
+      <img src="${imageDataUrl}" alt="QR code" />
       <div class="label">${safeBatchLabel}</div>
     </div>
   </body>
-</html>`);
-    printWindow.document.close();
+</html>`;
+
+    const iframe = document.createElement('iframe');
+    iframe.setAttribute('aria-hidden', 'true');
+    iframe.setAttribute('title', `QR ${safeBatchLabel}`);
+    iframe.style.position = 'fixed';
+    iframe.style.right = '0';
+    iframe.style.bottom = '0';
+    iframe.style.width = '0';
+    iframe.style.height = '0';
+    iframe.style.border = '0';
+    iframe.style.opacity = '0';
+    document.body.append(iframe);
+
+    const cleanup = () => {
+      if (iframe.parentNode) {
+        iframe.parentNode.removeChild(iframe);
+      }
+    };
+
+    const triggerPrint = () => {
+      const printWindow = iframe.contentWindow;
+      if (!printWindow) {
+        cleanup();
+        return;
+      }
+
+      const finishOnce = (() => {
+        let done = false;
+        return () => {
+          if (done) {
+            return;
+          }
+          done = true;
+          window.setTimeout(cleanup, 500);
+        };
+      })();
+
+      printWindow.addEventListener('afterprint', finishOnce);
+      try {
+        printWindow.focus();
+        printWindow.print();
+      } catch {
+        cleanup();
+        return;
+      }
+      window.setTimeout(finishOnce, 60_000);
+    };
+
+    iframe.addEventListener('load', () => {
+      const doc = iframe.contentDocument;
+      const img = doc?.querySelector('img');
+      if (img && !img.complete) {
+        img.addEventListener('load', triggerPrint, { once: true });
+        img.addEventListener('error', triggerPrint, { once: true });
+        return;
+      }
+      triggerPrint();
+    });
+
+    const doc = iframe.contentDocument;
+    if (!doc) {
+      cleanup();
+      throw new Error(t('crud.saveError'));
+    }
+    doc.open();
+    doc.write(printDocument);
+    doc.close();
   };
 
   const downloadMedicineBatchQrImage = (imageDataUrl: string, batchLabel: string) => {
