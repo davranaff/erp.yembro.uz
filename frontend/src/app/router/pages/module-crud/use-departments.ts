@@ -7,10 +7,7 @@ import { buildDepartmentTree, flattenDepartmentTree } from '@/shared/lib/departm
 import { isValidUuid } from '@/shared/lib/uuid';
 import type { BackendModuleConfig } from '@/shared/workspace';
 
-import {
-  getDepartmentLabel,
-  type DepartmentRecord,
-} from '../module-crud-page.helpers';
+import { getDepartmentLabel, type DepartmentRecord } from '../module-crud-page.helpers';
 
 export interface UseDepartmentsOptions {
   moduleConfig: BackendModuleConfig | null;

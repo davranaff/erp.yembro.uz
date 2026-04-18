@@ -10,8 +10,6 @@ import { useApiQuery } from '@/shared/api/react-query';
 import type { TranslateFn } from '@/shared/i18n/types';
 import { isValidUuid } from '@/shared/lib/uuid';
 
-import type { FormValues } from '../module-crud-page.helpers';
-
 import {
   compareWarehouses,
   getDefaultWarehouseId,
@@ -22,6 +20,8 @@ import {
   isWarehouseActive,
   type WarehouseRecord,
 } from './warehouse-utils';
+
+import type { FormValues } from '../module-crud-page.helpers';
 
 export interface UseWarehouseMovementOptions {
   t: TranslateFn;
