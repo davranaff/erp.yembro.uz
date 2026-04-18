@@ -4557,6 +4557,1116 @@ async def _build_slaughterhouse_dashboard_module(
     )
 
 
+async def _build_finance_section(
+    db: Database,
+    start_date: date | None,
+    end_date: date | None,
+    department_ids: list[UUID] | None,
+    organization_id: str,
+) -> DashboardSectionSchema:
+    daily_cashflow_rows = await db.fetch(
+        f"""
+        SELECT
+            ct.transaction_date AS event_date,
+            TO_CHAR(ct.transaction_date, 'YYYY-MM-DD') AS label,
+            COALESCE(SUM(CASE WHEN ct.transaction_type IN ('income', 'transfer_in', 'adjustment') THEN ct.amount ELSE 0 END), 0) AS income,
+            COALESCE(SUM(CASE WHEN ct.transaction_type IN ('expense', 'transfer_out') THEN ct.amount ELSE 0 END), 0) AS expense
+        FROM cash_transactions ct
+        INNER JOIN cash_accounts ca ON ca.id = ct.cash_account_id
+        WHERE {_date_condition('ct.transaction_date')}
+          AND {_department_condition('ca.department_id')}
+          AND ct.is_active = true
+          AND ca.organization_id = $4::uuid
+        GROUP BY ct.transaction_date
+        ORDER BY ct.transaction_date
+        """,
+        start_date,
+        end_date,
+        department_ids,
+        organization_id,
+    )
+
+    expense_category_rows = await db.fetch(
+        f"""
+        SELECT
+            COALESCE(c.id::text, 'uncategorized') AS key,
+            COALESCE(NULLIF(c.name, ''), NULLIF(c.code, ''), 'Без категории') AS label,
+            COALESCE(SUM(e.amount), 0) AS value,
+            'UZS' AS unit
+        FROM expenses e
+        LEFT JOIN expense_categories c ON c.id = e.category_id
+        WHERE {_date_condition('e.expense_date')}
+          AND {_department_condition('e.department_id')}
+          AND e.is_active = true
+          AND e.organization_id = $4::uuid
+        GROUP BY c.id, c.name, c.code
+        ORDER BY value DESC
+        LIMIT 8
+        """,
+        start_date,
+        end_date,
+        department_ids,
+        organization_id,
+    )
+
+    ar_aging_row = await db.fetchrow(
+        """
+        SELECT
+            COALESCE(SUM(CASE WHEN cd.due_on IS NOT NULL AND cd.due_on < CURRENT_DATE THEN cd.amount_total - cd.amount_paid ELSE 0 END), 0) AS overdue,
+            COALESCE(SUM(CASE WHEN cd.due_on IS NULL OR (cd.due_on >= CURRENT_DATE AND cd.due_on <= CURRENT_DATE + INTERVAL '30 days') THEN cd.amount_total - cd.amount_paid ELSE 0 END), 0) AS bucket_30,
+            COALESCE(SUM(CASE WHEN cd.due_on > CURRENT_DATE + INTERVAL '30 days' AND cd.due_on <= CURRENT_DATE + INTERVAL '60 days' THEN cd.amount_total - cd.amount_paid ELSE 0 END), 0) AS bucket_60,
+            COALESCE(SUM(CASE WHEN cd.due_on > CURRENT_DATE + INTERVAL '60 days' THEN cd.amount_total - cd.amount_paid ELSE 0 END), 0) AS bucket_90
+        FROM client_debts cd
+        WHERE ($1::uuid[] IS NULL OR cd.department_id = ANY($1::uuid[]))
+          AND cd.organization_id = $2::uuid
+          AND cd.status IN ('open', 'partially_paid')
+          AND cd.is_active = true
+          AND cd.amount_total > cd.amount_paid
+        """,
+        department_ids,
+        organization_id,
+    )
+
+    ap_aging_row = await db.fetchrow(
+        """
+        SELECT
+            COALESCE(SUM(CASE WHEN sd.due_on IS NOT NULL AND sd.due_on < CURRENT_DATE THEN sd.amount_total - sd.amount_paid ELSE 0 END), 0) AS overdue,
+            COALESCE(SUM(CASE WHEN sd.due_on IS NULL OR (sd.due_on >= CURRENT_DATE AND sd.due_on <= CURRENT_DATE + INTERVAL '30 days') THEN sd.amount_total - sd.amount_paid ELSE 0 END), 0) AS bucket_30,
+            COALESCE(SUM(CASE WHEN sd.due_on > CURRENT_DATE + INTERVAL '30 days' AND sd.due_on <= CURRENT_DATE + INTERVAL '60 days' THEN sd.amount_total - sd.amount_paid ELSE 0 END), 0) AS bucket_60,
+            COALESCE(SUM(CASE WHEN sd.due_on > CURRENT_DATE + INTERVAL '60 days' THEN sd.amount_total - sd.amount_paid ELSE 0 END), 0) AS bucket_90
+        FROM supplier_debts sd
+        WHERE ($1::uuid[] IS NULL OR sd.department_id = ANY($1::uuid[]))
+          AND sd.organization_id = $2::uuid
+          AND sd.status IN ('open', 'partially_paid')
+          AND sd.is_active = true
+          AND sd.amount_total > sd.amount_paid
+        """,
+        department_ids,
+        organization_id,
+    )
+
+    cash_account_rows = await db.fetch(
+        """
+        WITH balances AS (
+            SELECT
+                ca.id::text AS key,
+                COALESCE(NULLIF(ca.name, ''), NULLIF(ca.code, ''), 'Касса') AS label,
+                (
+                    COALESCE(ca.opening_balance, 0)
+                    + COALESCE(SUM(CASE WHEN ct.transaction_type IN ('income', 'transfer_in', 'adjustment') THEN ct.amount ELSE -ct.amount END), 0)
+                ) AS balance,
+                COUNT(ct.id) FILTER (WHERE ct.id IS NOT NULL) AS operations_count
+            FROM cash_accounts ca
+            LEFT JOIN cash_transactions ct
+                ON ct.cash_account_id = ca.id AND ct.is_active = true
+            WHERE ca.is_active = true
+              AND ($1::uuid[] IS NULL OR ca.department_id = ANY($1::uuid[]))
+              AND ca.organization_id = $2::uuid
+            GROUP BY ca.id, ca.name, ca.code, ca.opening_balance
+        )
+        SELECT
+            key, label, balance AS value, 'UZS' AS unit,
+            CONCAT('Операций: ', operations_count::text) AS caption
+        FROM balances
+        WHERE ABS(balance) > 0 OR operations_count > 0
+        ORDER BY balance DESC, label
+        LIMIT 8
+        """,
+        department_ids,
+        organization_id,
+    )
+
+    top_debtors_rows = await db.fetch(
+        f"""
+        SELECT
+            c.id::text AS key,
+            {_client_label_sql('c')} AS label,
+            COALESCE(SUM(cd.amount_total - cd.amount_paid), 0) AS value,
+            'UZS' AS unit,
+            CONCAT(
+                'Долгов: ', COUNT(*)::text,
+                ' • просрочено: ', COUNT(*) FILTER (WHERE cd.due_on IS NOT NULL AND cd.due_on < CURRENT_DATE)::text
+            ) AS caption
+        FROM client_debts cd
+        INNER JOIN clients c ON c.id = cd.client_id
+        WHERE ($1::uuid[] IS NULL OR cd.department_id = ANY($1::uuid[]))
+          AND cd.organization_id = $2::uuid
+          AND cd.status IN ('open', 'partially_paid')
+          AND cd.is_active = true
+          AND cd.amount_total > cd.amount_paid
+        GROUP BY c.id, c.company_name, c.first_name, c.last_name, c.client_code
+        ORDER BY value DESC
+        LIMIT 8
+        """,
+        department_ids,
+        organization_id,
+    )
+
+    top_creditors_rows = await db.fetch(
+        f"""
+        SELECT
+            c.id::text AS key,
+            {_client_label_sql('c')} AS label,
+            COALESCE(SUM(sd.amount_total - sd.amount_paid), 0) AS value,
+            'UZS' AS unit,
+            CONCAT(
+                'Долгов: ', COUNT(*)::text,
+                ' • просрочено: ', COUNT(*) FILTER (WHERE sd.due_on IS NOT NULL AND sd.due_on < CURRENT_DATE)::text
+            ) AS caption
+        FROM supplier_debts sd
+        INNER JOIN clients c ON c.id = sd.client_id
+        WHERE ($1::uuid[] IS NULL OR sd.department_id = ANY($1::uuid[]))
+          AND sd.organization_id = $2::uuid
+          AND sd.status IN ('open', 'partially_paid')
+          AND sd.is_active = true
+          AND sd.amount_total > sd.amount_paid
+        GROUP BY c.id, c.company_name, c.first_name, c.last_name, c.client_code
+        ORDER BY value DESC
+        LIMIT 8
+        """,
+        department_ids,
+        organization_id,
+    )
+
+    recent_payments_rows = await db.fetch(
+        f"""
+        SELECT
+            dp.id::text AS key,
+            CONCAT(
+                TO_CHAR(dp.paid_on, 'YYYY-MM-DD'),
+                ' • ',
+                CASE WHEN dp.direction = 'incoming' THEN 'Приём оплаты' ELSE 'Выплата' END,
+                ' • ',
+                {_client_label_sql('c')}
+            ) AS label,
+            dp.amount AS value,
+            'UZS' AS unit,
+            CONCAT(
+                'Метод: ', dp.method,
+                CASE WHEN dp.reference_no IS NOT NULL AND dp.reference_no <> '' THEN CONCAT(' • ', dp.reference_no) ELSE '' END
+            ) AS caption
+        FROM debt_payments dp
+        LEFT JOIN client_debts cd ON cd.id = dp.client_debt_id
+        LEFT JOIN supplier_debts sd ON sd.id = dp.supplier_debt_id
+        LEFT JOIN clients c ON c.id = COALESCE(cd.client_id, sd.client_id)
+        WHERE {_date_condition('dp.paid_on')}
+          AND {_department_condition('dp.department_id')}
+          AND dp.is_active = true
+          AND dp.organization_id = $4::uuid
+        ORDER BY dp.paid_on DESC, dp.created_at DESC
+        LIMIT 8
+        """,
+        start_date,
+        end_date,
+        department_ids,
+        organization_id,
+    )
+
+    cash_inflow = sum(_to_float(row["income"]) for row in daily_cashflow_rows)
+    cash_outflow = sum(_to_float(row["expense"]) for row in daily_cashflow_rows)
+    total_expenses = sum(_to_float(row["value"]) for row in expense_category_rows)
+    cash_balance = sum(_to_float(row["value"]) for row in cash_account_rows)
+
+    ar = ar_aging_row or {}
+    ap = ap_aging_row or {}
+    ar_total = (
+        _to_float(ar.get("overdue")) + _to_float(ar.get("bucket_30"))
+        + _to_float(ar.get("bucket_60")) + _to_float(ar.get("bucket_90"))
+    )
+    ap_total = (
+        _to_float(ap.get("overdue")) + _to_float(ap.get("bucket_30"))
+        + _to_float(ap.get("bucket_60")) + _to_float(ap.get("bucket_90"))
+    )
+
+    cashflow_chart = DashboardChartSchema(
+        key="finance_cashflow_daily",
+        title="Денежный поток по дням",
+        description="Поступления и списания по кассам организации.",
+        type="line",
+        unit="UZS",
+        series=_wide_series(
+            daily_cashflow_rows,
+            ("income", "Поступления", "income"),
+            ("expense", "Списания", "expense"),
+        ),
+    )
+
+    expense_categories_chart = DashboardChartSchema(
+        key="finance_expense_categories",
+        title="Расходы по категориям",
+        description="Куда уходят деньги по статьям расходов.",
+        type="bar",
+        unit="UZS",
+        series=[
+            DashboardChartSeriesSchema(
+                key="amount",
+                label="Сумма",
+                points=[
+                    DashboardSeriesPointSchema(label=_to_label(row["label"]), value=_to_float(row["value"]))
+                    for row in expense_category_rows
+                ],
+            )
+        ],
+    )
+
+    aging_buckets = [
+        ("Просрочено", "overdue"),
+        ("0–30 дней", "bucket_30"),
+        ("31–60 дней", "bucket_60"),
+        ("60+ дней", "bucket_90"),
+    ]
+    debts_aging_chart = DashboardChartSchema(
+        key="finance_debts_aging",
+        title="Долги по срокам",
+        description="Дебиторская и кредиторская задолженность по корзинам срока оплаты.",
+        type="stacked-bar",
+        unit="UZS",
+        series=[
+            DashboardChartSeriesSchema(
+                key="receivable",
+                label="Дебиторская",
+                points=[
+                    DashboardSeriesPointSchema(label=label, value=_to_float(ar.get(field)))
+                    for label, field in aging_buckets
+                ],
+            ),
+            DashboardChartSeriesSchema(
+                key="payable",
+                label="Кредиторская",
+                points=[
+                    DashboardSeriesPointSchema(label=label, value=_to_float(ap.get(field)))
+                    for label, field in aging_buckets
+                ],
+            ),
+        ],
+    )
+
+    cash_balance_chart = DashboardChartSchema(
+        key="finance_cash_balance_by_account",
+        title="Балансы касс",
+        description="Текущий остаток средств по каждой кассе организации.",
+        type="bar",
+        unit="UZS",
+        series=[
+            DashboardChartSeriesSchema(
+                key="balance",
+                label="Остаток",
+                points=[
+                    DashboardSeriesPointSchema(label=_to_label(row["label"]), value=_to_float(row["value"]))
+                    for row in cash_account_rows
+                ],
+            )
+        ],
+    )
+
+    return DashboardSectionSchema(
+        key="finance",
+        title="Финансы",
+        description="Денежный поток, расходы и взаиморасчёты по организации.",
+        metrics=[
+            _metric(key="cash_inflow", label="Поступления", value=cash_inflow, unit="UZS"),
+            _metric(key="cash_outflow", label="Списания", value=cash_outflow, unit="UZS"),
+            _signed_metric(key="net_cashflow", label="Денежный поток", value=cash_inflow - cash_outflow, unit="UZS"),
+            _metric(key="total_expenses", label="Расходы", value=total_expenses, unit="UZS"),
+            _signed_metric(key="cash_balance", label="Касса сейчас", value=cash_balance, unit="UZS"),
+            _metric(key="accounts_receivable", label="Дебиторская задолженность", value=ar_total, unit="UZS"),
+            _metric(key="accounts_payable", label="Кредиторская задолженность", value=ap_total, unit="UZS"),
+            _signed_metric(key="financial_result", label="Финрезультат (АР − АП)", value=ar_total - ap_total, unit="UZS"),
+        ],
+        charts=[cashflow_chart, expense_categories_chart, debts_aging_chart, cash_balance_chart],
+        breakdowns=[
+            DashboardBreakdownSchema(
+                key="finance_top_debtors",
+                title="Крупнейшие должники",
+                description="Клиенты с наибольшей суммой непогашенной задолженности.",
+                items=_breakdown_items(top_debtors_rows, unit="UZS"),
+            ),
+            DashboardBreakdownSchema(
+                key="finance_top_creditors",
+                title="Крупнейшие кредиторы",
+                description="Поставщики, которым организация должна больше всего.",
+                items=_breakdown_items(top_creditors_rows, unit="UZS"),
+            ),
+            DashboardBreakdownSchema(
+                key="finance_cash_accounts",
+                title="Кассы и счета",
+                description="Текущие остатки по кассам и счетам с количеством операций.",
+                items=_breakdown_items(cash_account_rows, unit="UZS"),
+            ),
+            DashboardBreakdownSchema(
+                key="finance_recent_payments",
+                title="Последние платежи",
+                description="Последние операции по приёму или выплате задолженности.",
+                items=_breakdown_items(recent_payments_rows, unit="UZS"),
+            ),
+        ],
+    )
+
+
+async def _build_finance_dashboard_module(
+    db: Database,
+    start_date: date | None,
+    end_date: date | None,
+    department_ids: list[UUID] | None,
+    organization_id: str,
+) -> DashboardModuleSchema:
+    base = await _build_finance_section(db, start_date, end_date, department_ids, organization_id)
+    breakdowns = _breakdown_map(base)
+    ar = _metric_map(base).get("accounts_receivable")
+    ap = _metric_map(base).get("accounts_payable")
+    cash_balance_metric = _metric_map(base).get("cash_balance")
+
+    alerts: list[DashboardAlertSchema] = []
+    overdue_ar = next(
+        (point.value for chart in base.charts if chart.key == "finance_debts_aging"
+         for series in chart.series if series.key == "receivable"
+         for point in series.points if point.label == "Просрочено"),
+        0.0,
+    )
+    overdue_ap = next(
+        (point.value for chart in base.charts if chart.key == "finance_debts_aging"
+         for series in chart.series if series.key == "payable"
+         for point in series.points if point.label == "Просрочено"),
+        0.0,
+    )
+    if overdue_ar > 0:
+        alerts.append(
+            DashboardAlertSchema(
+                key="finance_overdue_receivables",
+                level="warning",
+                title="Просроченная дебиторская задолженность",
+                message="Часть долгов клиентов просрочена — стоит инициировать сбор.",
+                value=round(overdue_ar, 2),
+                unit="UZS",
+            )
+        )
+    if overdue_ap > 0:
+        alerts.append(
+            DashboardAlertSchema(
+                key="finance_overdue_payables",
+                level="critical",
+                title="Просроченная кредиторская задолженность",
+                message="Есть просроченные обязательства перед поставщиками.",
+                value=round(overdue_ap, 2),
+                unit="UZS",
+            )
+        )
+    if cash_balance_metric is not None and cash_balance_metric.value < 0:
+        alerts.append(
+            DashboardAlertSchema(
+                key="finance_negative_cash_balance",
+                level="critical",
+                title="Касса в минусе",
+                message="Совокупный баланс касс ушёл в минус.",
+                value=round(abs(cash_balance_metric.value), 2),
+                unit="UZS",
+            )
+        )
+
+    return DashboardModuleSchema(
+        key="finance",
+        title="Финансы",
+        description="Денежный поток, расходы, дебиторская и кредиторская задолженность по организации.",
+        kpis=base.metrics,
+        charts=base.charts,
+        tables=[
+            _table_from_breakdown(breakdowns.get("finance_top_debtors"), key="finance_top_debtors", title="Крупнейшие должники"),
+            _table_from_breakdown(breakdowns.get("finance_top_creditors"), key="finance_top_creditors", title="Крупнейшие кредиторы"),
+            _table_from_breakdown(breakdowns.get("finance_cash_accounts"), key="finance_cash_accounts", title="Кассы и счета"),
+            _table_from_breakdown(breakdowns.get("finance_recent_payments"), key="finance_recent_payments", title="Последние платежи"),
+        ],
+        alerts=alerts,
+    )
+
+
+async def _build_hr_section(
+    db: Database,
+    start_date: date | None,
+    end_date: date | None,
+    department_ids: list[UUID] | None,
+    organization_id: str,
+) -> DashboardSectionSchema:
+    headcount_row = await db.fetchrow(
+        """
+        SELECT
+            COUNT(*) FILTER (WHERE e.is_active = true) AS active_count,
+            COUNT(*) AS total_count,
+            COALESCE(SUM(CASE WHEN e.is_active = true THEN e.salary ELSE 0 END), 0) AS total_payroll,
+            COALESCE(AVG(CASE WHEN e.is_active = true AND e.salary IS NOT NULL AND e.salary > 0 THEN e.salary ELSE NULL END), 0) AS average_salary,
+            COUNT(*) FILTER (WHERE e.is_active = true AND e.position_id IS NULL) AS without_position,
+            COUNT(*) FILTER (WHERE e.is_active = true AND e.department_id IS NULL) AS without_department
+        FROM employees e
+        WHERE e.organization_id = $1::uuid
+          AND ($2::uuid[] IS NULL OR e.department_id = ANY($2::uuid[]) OR e.department_id IS NULL)
+        """,
+        organization_id,
+        department_ids,
+    )
+
+    new_hires_row = await db.fetchrow(
+        """
+        SELECT COUNT(*) AS hires_count
+        FROM employees e
+        WHERE e.organization_id = $1::uuid
+          AND ($2::uuid[] IS NULL OR e.department_id = ANY($2::uuid[]) OR e.department_id IS NULL)
+          AND ($3::date IS NULL OR e.created_at::date >= $3::date)
+          AND ($4::date IS NULL OR e.created_at::date <= $4::date)
+        """,
+        organization_id,
+        department_ids,
+        start_date,
+        end_date,
+    )
+
+    hires_monthly_rows = await db.fetch(
+        """
+        SELECT
+            TO_CHAR(DATE_TRUNC('month', e.created_at), 'YYYY-MM') AS label,
+            COUNT(*) AS value
+        FROM employees e
+        WHERE e.organization_id = $1::uuid
+          AND ($2::uuid[] IS NULL OR e.department_id = ANY($2::uuid[]) OR e.department_id IS NULL)
+          AND e.created_at >= COALESCE($3::date, CURRENT_DATE - INTERVAL '12 months')::timestamptz
+          AND ($4::date IS NULL OR e.created_at::date <= $4::date)
+        GROUP BY DATE_TRUNC('month', e.created_at)
+        ORDER BY DATE_TRUNC('month', e.created_at)
+        """,
+        organization_id,
+        department_ids,
+        start_date,
+        end_date,
+    )
+
+    employees_by_department_rows = await db.fetch(
+        """
+        SELECT
+            d.id::text AS key,
+            COALESCE(NULLIF(d.name, ''), NULLIF(d.code, ''), 'Без отдела') AS label,
+            COUNT(e.id) AS value,
+            'чел' AS unit,
+            CONCAT('Активных: ', COUNT(*) FILTER (WHERE e.is_active = true)::text) AS caption
+        FROM employees e
+        INNER JOIN departments d ON d.id = e.department_id
+        WHERE e.organization_id = $1::uuid
+          AND ($2::uuid[] IS NULL OR e.department_id = ANY($2::uuid[]))
+        GROUP BY d.id, d.name, d.code
+        ORDER BY value DESC
+        LIMIT 8
+        """,
+        organization_id,
+        department_ids,
+    )
+
+    employees_by_position_rows = await db.fetch(
+        """
+        SELECT
+            p.id::text AS key,
+            COALESCE(NULLIF(p.title, ''), NULLIF(p.slug, ''), 'Без должности') AS label,
+            COUNT(e.id) AS value,
+            'чел' AS unit,
+            CONCAT(
+                'Зарплатная вилка: ',
+                COALESCE(p.min_salary::text, '—'),
+                ' / ',
+                COALESCE(p.max_salary::text, '—')
+            ) AS caption
+        FROM employees e
+        INNER JOIN positions p ON p.id = e.position_id
+        WHERE e.organization_id = $1::uuid
+          AND e.is_active = true
+          AND ($2::uuid[] IS NULL OR e.department_id = ANY($2::uuid[]) OR e.department_id IS NULL)
+        GROUP BY p.id, p.title, p.slug, p.min_salary, p.max_salary
+        ORDER BY value DESC
+        LIMIT 8
+        """,
+        organization_id,
+        department_ids,
+    )
+
+    salary_distribution_rows = await db.fetch(
+        """
+        WITH buckets AS (
+            SELECT
+                CASE
+                    WHEN e.salary IS NULL OR e.salary <= 0 THEN 'Не указана'
+                    WHEN e.salary < 2000000 THEN '< 2 млн'
+                    WHEN e.salary < 5000000 THEN '2–5 млн'
+                    WHEN e.salary < 10000000 THEN '5–10 млн'
+                    WHEN e.salary < 20000000 THEN '10–20 млн'
+                    ELSE '20+ млн'
+                END AS bucket,
+                CASE
+                    WHEN e.salary IS NULL OR e.salary <= 0 THEN 0
+                    WHEN e.salary < 2000000 THEN 1
+                    WHEN e.salary < 5000000 THEN 2
+                    WHEN e.salary < 10000000 THEN 3
+                    WHEN e.salary < 20000000 THEN 4
+                    ELSE 5
+                END AS bucket_order
+            FROM employees e
+            WHERE e.organization_id = $1::uuid
+              AND e.is_active = true
+              AND ($2::uuid[] IS NULL OR e.department_id = ANY($2::uuid[]) OR e.department_id IS NULL)
+        )
+        SELECT bucket AS label, COUNT(*) AS value, bucket_order
+        FROM buckets
+        GROUP BY bucket, bucket_order
+        ORDER BY bucket_order
+        """,
+        organization_id,
+        department_ids,
+    )
+
+    role_distribution_rows = await db.fetch(
+        """
+        SELECT
+            r.id::text AS key,
+            COALESCE(NULLIF(r.name, ''), NULLIF(r.slug, ''), 'Роль') AS label,
+            COUNT(DISTINCT e.id) AS value,
+            'чел' AS unit
+        FROM employee_roles er
+        INNER JOIN employees e ON e.id = er.employee_id
+        INNER JOIN roles r ON r.id = er.role_id
+        WHERE e.organization_id = $1::uuid
+          AND e.is_active = true
+          AND r.is_active = true
+          AND ($2::uuid[] IS NULL OR e.department_id = ANY($2::uuid[]) OR e.department_id IS NULL)
+        GROUP BY r.id, r.name, r.slug
+        ORDER BY value DESC
+        LIMIT 8
+        """,
+        organization_id,
+        department_ids,
+    )
+
+    recent_hires_rows = await db.fetch(
+        """
+        SELECT
+            e.id::text AS key,
+            CONCAT(
+                TO_CHAR(e.created_at::date, 'YYYY-MM-DD'),
+                ' • ',
+                COALESCE(NULLIF(BTRIM(CONCAT_WS(' ', e.first_name, e.last_name)), ''), e.email)
+            ) AS label,
+            1::int AS value,
+            'найм' AS unit,
+            CONCAT(
+                COALESCE(NULLIF(p.title, ''), 'без должности'),
+                ' • ',
+                COALESCE(NULLIF(d.name, ''), 'без отдела')
+            ) AS caption
+        FROM employees e
+        LEFT JOIN positions p ON p.id = e.position_id
+        LEFT JOIN departments d ON d.id = e.department_id
+        WHERE e.organization_id = $1::uuid
+          AND ($2::uuid[] IS NULL OR e.department_id = ANY($2::uuid[]) OR e.department_id IS NULL)
+        ORDER BY e.created_at DESC
+        LIMIT 8
+        """,
+        organization_id,
+        department_ids,
+    )
+
+    headcount = headcount_row or {}
+    hires_count = _to_float((new_hires_row or {}).get("hires_count"))
+    active_count = _to_float(headcount.get("active_count"))
+    total_count = _to_float(headcount.get("total_count"))
+    total_payroll = _to_float(headcount.get("total_payroll"))
+    average_salary = _to_float(headcount.get("average_salary"))
+    without_position = _to_float(headcount.get("without_position"))
+    without_department = _to_float(headcount.get("without_department"))
+
+    hires_chart = DashboardChartSchema(
+        key="hr_hires_monthly",
+        title="Найм по месяцам",
+        description="Число новых сотрудников по месяцам.",
+        type="bar",
+        unit="чел",
+        series=[
+            DashboardChartSeriesSchema(
+                key="hires",
+                label="Новые сотрудники",
+                points=[
+                    DashboardSeriesPointSchema(label=_to_label(row["label"]), value=_to_float(row["value"]))
+                    for row in hires_monthly_rows
+                ],
+            )
+        ],
+    )
+
+    employees_by_department_chart = DashboardChartSchema(
+        key="hr_employees_by_department",
+        title="Сотрудники по отделам",
+        description="Топ отделов по численности персонала.",
+        type="bar",
+        unit="чел",
+        series=[
+            DashboardChartSeriesSchema(
+                key="headcount",
+                label="Сотрудников",
+                points=[
+                    DashboardSeriesPointSchema(label=_to_label(row["label"]), value=_to_float(row["value"]))
+                    for row in employees_by_department_rows
+                ],
+            )
+        ],
+    )
+
+    employees_by_position_chart = DashboardChartSchema(
+        key="hr_employees_by_position",
+        title="Сотрудники по должностям",
+        description="Какие должности занимают активные сотрудники.",
+        type="bar",
+        unit="чел",
+        series=[
+            DashboardChartSeriesSchema(
+                key="headcount",
+                label="Сотрудников",
+                points=[
+                    DashboardSeriesPointSchema(label=_to_label(row["label"]), value=_to_float(row["value"]))
+                    for row in employees_by_position_rows
+                ],
+            )
+        ],
+    )
+
+    salary_distribution_chart = DashboardChartSchema(
+        key="hr_salary_distribution",
+        title="Распределение зарплат",
+        description="Сколько сотрудников попадает в каждый диапазон.",
+        type="bar",
+        unit="чел",
+        series=[
+            DashboardChartSeriesSchema(
+                key="employees",
+                label="Сотрудников",
+                points=[
+                    DashboardSeriesPointSchema(label=_to_label(row["label"]), value=_to_float(row["value"]))
+                    for row in salary_distribution_rows
+                ],
+            )
+        ],
+    )
+
+    return DashboardSectionSchema(
+        key="hr",
+        title="Сотрудники",
+        description="Численность персонала, найм, зарплатный фонд и распределение по отделам.",
+        metrics=[
+            _metric(key="active_employees", label="Активные сотрудники", value=active_count, unit="чел"),
+            _metric(key="total_employees", label="Всего сотрудников", value=total_count, unit="чел"),
+            _metric(key="new_hires", label="Найм за период", value=hires_count, unit="чел"),
+            _metric(key="total_payroll", label="ФОТ (активные)", value=total_payroll, unit="UZS"),
+            _metric(key="average_salary", label="Средняя зарплата", value=round(average_salary, 2), unit="UZS"),
+            _metric(key="without_position", label="Без должности", value=without_position, unit="чел"),
+            _metric(key="without_department", label="Без отдела", value=without_department, unit="чел"),
+        ],
+        charts=[
+            hires_chart,
+            employees_by_department_chart,
+            employees_by_position_chart,
+            salary_distribution_chart,
+        ],
+        breakdowns=[
+            DashboardBreakdownSchema(
+                key="hr_top_departments",
+                title="Топ отделов по численности",
+                description="Какие отделы концентрируют больше всего сотрудников.",
+                items=_breakdown_items(employees_by_department_rows, unit="чел"),
+            ),
+            DashboardBreakdownSchema(
+                key="hr_top_positions",
+                title="Топ должностей",
+                description="Самые многочисленные должности в организации.",
+                items=_breakdown_items(employees_by_position_rows, unit="чел"),
+            ),
+            DashboardBreakdownSchema(
+                key="hr_role_distribution",
+                title="Распределение по ролям",
+                description="Сколько сотрудников имеют каждую активную роль.",
+                items=_breakdown_items(role_distribution_rows, unit="чел"),
+            ),
+            DashboardBreakdownSchema(
+                key="hr_recent_hires",
+                title="Последние найм",
+                description="Свежедобавленные сотрудники с должностью и отделом.",
+                items=_breakdown_items(recent_hires_rows, unit="найм"),
+            ),
+        ],
+    )
+
+
+async def _build_hr_dashboard_module(
+    db: Database,
+    start_date: date | None,
+    end_date: date | None,
+    department_ids: list[UUID] | None,
+    organization_id: str,
+) -> DashboardModuleSchema:
+    base = await _build_hr_section(db, start_date, end_date, department_ids, organization_id)
+    breakdowns = _breakdown_map(base)
+    metrics = _metric_map(base)
+
+    alerts: list[DashboardAlertSchema] = []
+    without_position = metrics.get("without_position")
+    without_department = metrics.get("without_department")
+    if without_position is not None and without_position.value > 0:
+        alerts.append(
+            DashboardAlertSchema(
+                key="hr_employees_without_position",
+                level="warning",
+                title="Сотрудники без должности",
+                message="Есть активные сотрудники без указанной должности.",
+                value=without_position.value,
+                unit="чел",
+            )
+        )
+    if without_department is not None and without_department.value > 0:
+        alerts.append(
+            DashboardAlertSchema(
+                key="hr_employees_without_department",
+                level="info",
+                title="Сотрудники без отдела",
+                message="Есть активные сотрудники без привязки к отделу.",
+                value=without_department.value,
+                unit="чел",
+            )
+        )
+
+    return DashboardModuleSchema(
+        key="hr",
+        title="Сотрудники",
+        description="Численность, найм и распределение персонала по отделам, должностям и ролям.",
+        kpis=base.metrics,
+        charts=base.charts,
+        tables=[
+            _table_from_breakdown(breakdowns.get("hr_top_departments"), key="hr_top_departments", title="Топ отделов по численности"),
+            _table_from_breakdown(breakdowns.get("hr_top_positions"), key="hr_top_positions", title="Топ должностей"),
+            _table_from_breakdown(breakdowns.get("hr_role_distribution"), key="hr_role_distribution", title="Распределение по ролям"),
+            _table_from_breakdown(breakdowns.get("hr_recent_hires"), key="hr_recent_hires", title="Последние найм"),
+        ],
+        alerts=alerts,
+    )
+
+
+async def _build_core_section(
+    db: Database,
+    start_date: date | None,
+    end_date: date | None,
+    department_ids: list[UUID] | None,
+    organization_id: str,
+) -> DashboardSectionSchema:
+    overview_row = await db.fetchrow(
+        """
+        SELECT
+            (SELECT COUNT(*) FROM clients c WHERE c.organization_id = $1::uuid AND c.is_active = true) AS clients_total,
+            (SELECT COUNT(*) FROM departments d WHERE d.organization_id = $1::uuid AND d.is_active = true) AS departments_total,
+            (SELECT COUNT(*) FROM warehouses w INNER JOIN departments d2 ON d2.id = w.department_id WHERE d2.organization_id = $1::uuid AND w.is_active = true) AS warehouses_total
+        """,
+        organization_id,
+    )
+
+    new_clients_row = await db.fetchrow(
+        """
+        SELECT COUNT(*) AS new_count
+        FROM clients c
+        WHERE c.organization_id = $1::uuid
+          AND ($2::date IS NULL OR c.created_at::date >= $2::date)
+          AND ($3::date IS NULL OR c.created_at::date <= $3::date)
+        """,
+        organization_id,
+        start_date,
+        end_date,
+    )
+
+    audit_overview_row = await db.fetchrow(
+        """
+        SELECT
+            COUNT(*) AS events_total,
+            COUNT(*) FILTER (WHERE al.action = 'create') AS create_count,
+            COUNT(*) FILTER (WHERE al.action = 'update') AS update_count,
+            COUNT(*) FILTER (WHERE al.action = 'delete') AS delete_count,
+            COUNT(DISTINCT al.actor_username) FILTER (WHERE al.actor_username IS NOT NULL) AS unique_actors
+        FROM audit_logs al
+        WHERE al.organization_id = $1::uuid
+          AND ($2::date IS NULL OR al.changed_at::date >= $2::date)
+          AND ($3::date IS NULL OR al.changed_at::date <= $3::date)
+        """,
+        organization_id,
+        start_date,
+        end_date,
+    )
+
+    audit_daily_rows = await db.fetch(
+        """
+        SELECT
+            TO_CHAR(al.changed_at::date, 'YYYY-MM-DD') AS label,
+            COUNT(*) FILTER (WHERE al.action = 'create') AS create_count,
+            COUNT(*) FILTER (WHERE al.action = 'update') AS update_count,
+            COUNT(*) FILTER (WHERE al.action = 'delete') AS delete_count
+        FROM audit_logs al
+        WHERE al.organization_id = $1::uuid
+          AND ($2::date IS NULL OR al.changed_at::date >= $2::date)
+          AND ($3::date IS NULL OR al.changed_at::date <= $3::date)
+        GROUP BY al.changed_at::date
+        ORDER BY al.changed_at::date
+        """,
+        organization_id,
+        start_date,
+        end_date,
+    )
+
+    clients_growth_rows = await db.fetch(
+        """
+        SELECT
+            TO_CHAR(DATE_TRUNC('month', c.created_at), 'YYYY-MM') AS label,
+            COUNT(*) AS value
+        FROM clients c
+        WHERE c.organization_id = $1::uuid
+          AND c.created_at >= COALESCE($2::date, CURRENT_DATE - INTERVAL '12 months')::timestamptz
+          AND ($3::date IS NULL OR c.created_at::date <= $3::date)
+        GROUP BY DATE_TRUNC('month', c.created_at)
+        ORDER BY DATE_TRUNC('month', c.created_at)
+        """,
+        organization_id,
+        start_date,
+        end_date,
+    )
+
+    departments_by_module_rows = await db.fetch(
+        """
+        SELECT
+            COALESCE(NULLIF(dm.name, ''), NULLIF(d.module_key, ''), 'Без модуля') AS label,
+            COUNT(d.id) AS value
+        FROM departments d
+        LEFT JOIN department_modules dm ON dm.key = d.module_key
+        WHERE d.organization_id = $1::uuid
+          AND d.is_active = true
+        GROUP BY dm.name, d.module_key, dm.sort_order
+        ORDER BY COALESCE(dm.sort_order, 999), value DESC
+        """,
+        organization_id,
+    )
+
+    top_actors_rows = await db.fetch(
+        """
+        SELECT
+            COALESCE(al.actor_username, 'system') AS key,
+            COALESCE(al.actor_username, 'Система') AS label,
+            COUNT(*) AS value,
+            'операций' AS unit,
+            CONCAT(
+                'Создано: ', COUNT(*) FILTER (WHERE al.action = 'create')::text,
+                ' • изменено: ', COUNT(*) FILTER (WHERE al.action = 'update')::text,
+                ' • удалено: ', COUNT(*) FILTER (WHERE al.action = 'delete')::text
+            ) AS caption
+        FROM audit_logs al
+        WHERE al.organization_id = $1::uuid
+          AND ($2::date IS NULL OR al.changed_at::date >= $2::date)
+          AND ($3::date IS NULL OR al.changed_at::date <= $3::date)
+        GROUP BY al.actor_username
+        ORDER BY value DESC
+        LIMIT 8
+        """,
+        organization_id,
+        start_date,
+        end_date,
+    )
+
+    top_entities_rows = await db.fetch(
+        """
+        SELECT
+            al.entity_table AS key,
+            al.entity_table AS label,
+            COUNT(*) AS value,
+            'операций' AS unit,
+            CONCAT(
+                'Создано: ', COUNT(*) FILTER (WHERE al.action = 'create')::text,
+                ' • изменено: ', COUNT(*) FILTER (WHERE al.action = 'update')::text,
+                ' • удалено: ', COUNT(*) FILTER (WHERE al.action = 'delete')::text
+            ) AS caption
+        FROM audit_logs al
+        WHERE al.organization_id = $1::uuid
+          AND ($2::date IS NULL OR al.changed_at::date >= $2::date)
+          AND ($3::date IS NULL OR al.changed_at::date <= $3::date)
+        GROUP BY al.entity_table
+        ORDER BY value DESC
+        LIMIT 8
+        """,
+        organization_id,
+        start_date,
+        end_date,
+    )
+
+    recent_clients_rows = await db.fetch(
+        """
+        SELECT
+            c.id::text AS key,
+            CONCAT(
+                TO_CHAR(c.created_at::date, 'YYYY-MM-DD'),
+                ' • ',
+                COALESCE(
+                    NULLIF(c.company_name, ''),
+                    NULLIF(BTRIM(CONCAT_WS(' ', c.first_name, c.last_name)), ''),
+                    NULLIF(c.client_code, ''),
+                    'Клиент'
+                )
+            ) AS label,
+            1::int AS value,
+            'клиент' AS unit,
+            CONCAT(
+                COALESCE(NULLIF(c.phone, ''), 'без телефона'),
+                ' • ',
+                COALESCE(NULLIF(c.category, ''), 'без категории')
+            ) AS caption
+        FROM clients c
+        WHERE c.organization_id = $1::uuid
+          AND c.is_active = true
+        ORDER BY c.created_at DESC
+        LIMIT 8
+        """,
+        organization_id,
+    )
+
+    overview = overview_row or {}
+    audit_overview = audit_overview_row or {}
+    new_clients = _to_float((new_clients_row or {}).get("new_count"))
+
+    audit_daily_chart = DashboardChartSchema(
+        key="core_audit_activity_daily",
+        title="Активность аудита по дням",
+        description="События аудита по типу действий за выбранный период.",
+        type="line",
+        unit="событий",
+        series=_wide_series(
+            audit_daily_rows,
+            ("create", "Создание", "create_count"),
+            ("update", "Изменение", "update_count"),
+            ("delete", "Удаление", "delete_count"),
+        ),
+    )
+
+    audit_action_chart = DashboardChartSchema(
+        key="core_audit_by_action",
+        title="События по типу действий",
+        description="Распределение операций аудита по типам.",
+        type="bar",
+        unit="событий",
+        series=[
+            DashboardChartSeriesSchema(
+                key="actions",
+                label="Событий",
+                points=[
+                    DashboardSeriesPointSchema(label="Создание", value=_to_float(audit_overview.get("create_count"))),
+                    DashboardSeriesPointSchema(label="Изменение", value=_to_float(audit_overview.get("update_count"))),
+                    DashboardSeriesPointSchema(label="Удаление", value=_to_float(audit_overview.get("delete_count"))),
+                ],
+            )
+        ],
+    )
+
+    clients_growth_chart = DashboardChartSchema(
+        key="core_clients_growth",
+        title="Прирост клиентской базы",
+        description="Сколько новых клиентов появлялось каждый месяц.",
+        type="line",
+        unit="клиентов",
+        series=[
+            DashboardChartSeriesSchema(
+                key="clients",
+                label="Новые клиенты",
+                points=[
+                    DashboardSeriesPointSchema(label=_to_label(row["label"]), value=_to_float(row["value"]))
+                    for row in clients_growth_rows
+                ],
+            )
+        ],
+    )
+
+    departments_by_module_chart = DashboardChartSchema(
+        key="core_departments_by_module",
+        title="Отделы по модулям",
+        description="Сколько отделов настроено в каждом модуле.",
+        type="bar",
+        unit="отделов",
+        series=[
+            DashboardChartSeriesSchema(
+                key="departments",
+                label="Отделов",
+                points=[
+                    DashboardSeriesPointSchema(label=_to_label(row["label"]), value=_to_float(row["value"]))
+                    for row in departments_by_module_rows
+                ],
+            )
+        ],
+    )
+
+    return DashboardSectionSchema(
+        key="core",
+        title="Справочники и аудит",
+        description="Состояние ключевых справочников и активность пользователей в организации.",
+        metrics=[
+            _metric(key="clients_total", label="Активных клиентов", value=_to_float(overview.get("clients_total")), unit="клиентов"),
+            _metric(key="new_clients", label="Новых клиентов за период", value=new_clients, unit="клиентов"),
+            _metric(key="departments_total", label="Активных отделов", value=_to_float(overview.get("departments_total")), unit="отделов"),
+            _metric(key="warehouses_total", label="Активных складов", value=_to_float(overview.get("warehouses_total")), unit="складов"),
+            _metric(key="audit_events", label="Событий аудита", value=_to_float(audit_overview.get("events_total")), unit="событий"),
+            _metric(key="unique_actors", label="Активных пользователей", value=_to_float(audit_overview.get("unique_actors")), unit="чел"),
+        ],
+        charts=[
+            audit_daily_chart,
+            audit_action_chart,
+            clients_growth_chart,
+            departments_by_module_chart,
+        ],
+        breakdowns=[
+            DashboardBreakdownSchema(
+                key="core_top_actors",
+                title="Самые активные пользователи",
+                description="Кто чаще всего меняет данные в системе за период.",
+                items=_breakdown_items(top_actors_rows, unit="операций"),
+            ),
+            DashboardBreakdownSchema(
+                key="core_top_entities",
+                title="Самые изменяемые сущности",
+                description="Какие таблицы чаще всего обновляются.",
+                items=_breakdown_items(top_entities_rows, unit="операций"),
+            ),
+            DashboardBreakdownSchema(
+                key="core_recent_clients",
+                title="Последние клиенты",
+                description="Свежедобавленные карточки клиентов.",
+                items=_breakdown_items(recent_clients_rows, unit="клиент"),
+            ),
+        ],
+    )
+
+
+async def _build_core_dashboard_module(
+    db: Database,
+    start_date: date | None,
+    end_date: date | None,
+    department_ids: list[UUID] | None,
+    organization_id: str,
+) -> DashboardModuleSchema:
+    base = await _build_core_section(db, start_date, end_date, department_ids, organization_id)
+    breakdowns = _breakdown_map(base)
+
+    return DashboardModuleSchema(
+        key="core",
+        title="Справочники",
+        description="Аудит активности, рост клиентской базы и состояние ключевых справочников.",
+        kpis=base.metrics,
+        charts=base.charts,
+        tables=[
+            _table_from_breakdown(breakdowns.get("core_top_actors"), key="core_top_actors", title="Самые активные пользователи"),
+            _table_from_breakdown(breakdowns.get("core_top_entities"), key="core_top_entities", title="Самые изменяемые сущности"),
+            _table_from_breakdown(breakdowns.get("core_recent_clients"), key="core_recent_clients", title="Последние клиенты"),
+        ],
+        alerts=[],
+    )
+
+
 @router.get(
     "/analytics",
     response_model=DashboardAnalyticsResponseSchema,
@@ -4590,6 +5700,9 @@ async def get_dashboard_analytics(
         await _build_feed_mill_dashboard_module(db, start_date, end_date, department_ids),
         await _build_vet_pharmacy_dashboard_module(db, start_date, end_date, department_ids),
         await _build_slaughterhouse_dashboard_module(db, start_date, end_date, department_ids),
+        await _build_finance_dashboard_module(db, start_date, end_date, department_ids, current_actor.organization_id),
+        await _build_hr_dashboard_module(db, start_date, end_date, department_ids, current_actor.organization_id),
+        await _build_core_dashboard_module(db, start_date, end_date, department_ids, current_actor.organization_id),
     ]
     modules = [_apply_currency_code(module, currency_code) for module in modules]
     previous_modules_by_key: dict[str, DashboardModuleSchema] = {}
@@ -4637,6 +5750,27 @@ async def get_dashboard_analytics(
                 previous_start_date,
                 previous_end_date,
                 previous_department_ids,
+            ),
+            await _build_finance_dashboard_module(
+                db,
+                previous_start_date,
+                previous_end_date,
+                previous_department_ids,
+                current_actor.organization_id,
+            ),
+            await _build_hr_dashboard_module(
+                db,
+                previous_start_date,
+                previous_end_date,
+                previous_department_ids,
+                current_actor.organization_id,
+            ),
+            await _build_core_dashboard_module(
+                db,
+                previous_start_date,
+                previous_end_date,
+                previous_department_ids,
+                current_actor.organization_id,
             ),
         ]
         previous_modules = [_apply_currency_code(module, currency_code) for module in previous_modules]

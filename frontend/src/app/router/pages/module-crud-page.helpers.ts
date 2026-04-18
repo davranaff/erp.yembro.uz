@@ -1171,6 +1171,8 @@ const RESOURCE_ICON_KEY_MAP: Record<string, string> = {
   'product-shipments': 'Truck',
   'semi-product-shipments': 'Truck',
   'stock-movements': 'ArrowRightLeft',
+  'stock-takes': 'ClipboardCheck',
+  'reorder-levels': 'AlertTriangle',
   warehouses: 'Warehouse',
   clients: 'Users',
   'factory-clients': 'Users',

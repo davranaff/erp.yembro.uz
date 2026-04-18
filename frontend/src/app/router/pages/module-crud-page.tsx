@@ -1,134 +1,44 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { format, subDays } from 'date-fns';
+import { BarChart3, Check, ChevronDown, Loader2, Pencil, Plus, Send, Trash2 } from 'lucide-react';
 import {
-  ArrowLeftRight,
-  ArrowRightLeft,
-  Barcode,
-  BarChart3,
-  Bird,
-  Briefcase,
-  Building2,
-  CalendarDays,
-  Check,
-  ChevronDown,
-  CircleDollarSign,
-  Copy,
-  CreditCard,
-  Download,
-  ExternalLink,
-  Factory,
-  FileText,
-  FlaskConical,
-  FlaskRound,
-  FolderOpen,
-  History,
-  IterationCcw,
-  KeyRound,
-  Landmark,
-  LayoutGrid,
-  Leaf,
-  Loader2,
-  Network,
-  Package,
-  PackageMinus,
-  PackagePlus,
-  Paperclip,
-  Pencil,
-  Plus,
-  Printer,
-  QrCode,
-  Receipt,
-  Ruler,
-  Scissors,
-  Send,
-  ShieldCheck,
-  Tag,
-  Tags,
-  Trash2,
-  Truck,
-  UserCog,
-  Users,
-  Wallet,
-  Warehouse,
-} from 'lucide-react';
-import {
-  type ChangeEvent as ReactChangeEvent,
   type MouseEvent as ReactMouseEvent,
   useCallback,
   useEffect,
   useMemo,
-  useRef,
   useState,
 } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 
-import {
-  AnalyticsDashboardView,
-  buildAnalyticsQuickRangePresets,
-  formatAnalyticsPeriodLabel,
-  type AnalyticsQuickRangePreset,
-} from '@/app/router/ui/analytics-dashboard-view';
-import { getDashboardHealthLevel } from '@/app/router/ui/dashboard-analytics';
-import { buildModuleAnalyticsPresentation } from '@/app/router/ui/module-analytics-presentation';
+import type { AnalyticsQuickRangePreset } from '@/app/router/ui/analytics-dashboard-view';
 import { RouteStatusScreen } from '@/app/router/ui/route-status-screen';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { CrudDrawer, CrudDrawerFooter } from '@/components/ui/crud-drawer';
-import { CustomSelect } from '@/components/ui/custom-select';
-import { EmptyState } from '@/components/ui/empty-state';
 import { ErrorNotice } from '@/components/ui/error-notice';
-import { InlineLoader } from '@/components/ui/inline-loader';
-import { Input } from '@/components/ui/input';
-import {
-  Pagination,
-  PaginationContent,
-  PaginationEllipsis,
-  PaginationItem,
-  PaginationLink,
-  PaginationNext,
-  PaginationPrevious,
-} from '@/components/ui/pagination';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { SearchableReferenceSelect } from '@/components/ui/searchable-reference-select';
-import { Sheet, SheetContent, SheetFooter, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+import { Sheet } from '@/components/ui/sheet';
 import { getMyProfile } from '@/shared/api/auth';
 import {
   createCrudRecord,
   deleteCrudRecord,
-  getClientNotificationContext,
   getCrudRecordAuditHistory,
   getCrudResourceMeta,
-  listVisibleDepartments,
   listCrudRecords,
-  sendBulkClientNotifications,
-  sendClientNotification,
-  type CrudAuditEntry,
   type CrudAuditResponse,
   type CrudFieldMeta,
   type CrudListResponse,
-  type ClientNotificationBulkResult,
-  type ClientNotificationContext,
-  type ClientNotificationSendResult,
   type CrudRecord,
-  type CrudReferenceOption,
   type CrudResourceMeta,
   updateCrudRecord,
 } from '@/shared/api/backend-crud';
-import { getDashboardAnalytics } from '@/shared/api/dashboard';
-import { ApiError } from '@/shared/api/error-handler';
 import {
   createInventoryStockTransfer,
   type InventoryItemType,
   type InventoryTransferRequest,
   type InventoryUnit,
 } from '@/shared/api/inventory';
-import {
-  generateMedicineBatchQr,
-  getMedicineBatchQr,
-  uploadMedicineBatchAttachment,
-  type MedicineBatchQr,
-} from '@/shared/api/medicine';
 import { baseQueryKeys, toQueryKey } from '@/shared/api/query-keys';
 import { useApiMutation, useApiQuery } from '@/shared/api/react-query';
 import {
@@ -140,22 +50,45 @@ import {
   canReadCrudResource,
   useAuthStore,
 } from '@/shared/auth';
-import { translateDashboardAnalytics, useI18n } from '@/shared/i18n';
+import { useI18n } from '@/shared/i18n';
 import { cn } from '@/shared/lib/cn';
-import {
-  buildDepartmentChildrenMap,
-  buildDepartmentTree,
-  flattenDepartmentTree,
-} from '@/shared/lib/departments';
+import { buildDepartmentChildrenMap } from '@/shared/lib/departments';
 import { getReadableReferenceLabel } from '@/shared/lib/reference-label';
 import { isValidUuid } from '@/shared/lib/uuid';
-import {
-  useWorkspaceStore,
-  type BackendModuleConfig,
-  type BackendResourceConfig,
-} from '@/shared/workspace';
+import { useWorkspaceStore } from '@/shared/workspace';
 
 import { DebtPaymentsPanel } from './debt-payments-panel';
+import { AnalyticsStatsView } from './module-crud/analytics-stats-view';
+import { AuditHistorySheet } from './module-crud/audit-history-sheet';
+import { ClientNotificationSheet } from './module-crud/client-notification-sheet';
+import {
+  EMPTY_AUTH_LIST,
+  EMPTY_FIELD_LIST,
+  EMPTY_RECORD_LIST,
+  EMPTY_RESOURCE_LIST,
+  getWorkspaceModuleConfig,
+} from './module-crud/constants';
+import { CrudFormFieldRow } from './module-crud/crud-form-field-row';
+import { getResourceIcon, GROUP_ICON_MAP } from './module-crud/icons';
+import { InventoryTools } from './module-crud/inventory-tools';
+import { MedicineBatchQrSheet } from './module-crud/medicine-batch-qr-sheet';
+import { renderRecordActionButtons as renderRecordActionButtonsView } from './module-crud/record-action-buttons';
+import { RecordsPaginationBar } from './module-crud/records-pagination-bar';
+import { RecordsTableView } from './module-crud/records-table';
+import { StockMovementCards } from './module-crud/stock-movement-cards';
+import { useAuditFormatters } from './module-crud/use-audit-formatters';
+import { useClientNotifications } from './module-crud/use-client-notifications';
+import { useDepartments } from './module-crud/use-departments';
+import { useMedicineBatchQr } from './module-crud/use-medicine-batch-qr';
+import { useModuleStats } from './module-crud/use-module-stats';
+import { useWarehouseMovement } from './module-crud/use-warehouse-movement';
+import {
+  getSuggestedInventoryUnit,
+  getWarehouseDepartmentId,
+  parseDecimalValue,
+  TRANSFER_MOVEMENT_KINDS,
+  type InventoryCreateMode,
+} from './module-crud/warehouse-utils';
 import {
   applyAutoGeneratedCodeFields,
   areFormValuesEqual,
@@ -165,35 +98,23 @@ import {
   canExecuteModuleCrudAction,
   cloneFormValues,
   compactPillClassName,
-  EMPTY_TEXT,
   formatDateTimeDisplayValue,
-  formatDateValue,
   FORM_HIDDEN_FIELDS,
   frostedPanelClassName,
   getDefaultInventoryItemTypeForModule,
   getDepartmentLabel,
   getDisplayValue,
-  getFieldInputKind,
-  getInputProps,
-  getInputType,
   getRecordId,
   getReferenceOptionLabel,
   getResourceUiConfig,
   getTableFields,
   heroCardClassName,
   humanizeKey,
-  inputBaseClassName,
-  isAuditSnapshot,
-  isPasswordFieldName,
-  isMultiReferenceField,
-  isStructuredAuditValue,
   resolveResourceCategoryGroupId,
-  resolveResourceIconKey,
   resolveDefaultDepartmentSelection,
   resolveDefaultFormDepartmentId,
   shouldExposeResourceInModule,
   sortFieldsByPreferredOrder,
-  type AuditSnapshot,
   type DepartmentRecord,
   type FormErrors,
   type FormValues,
@@ -201,217 +122,6 @@ import {
   type ResourceCategoryGroupId,
   type SubmitMode,
 } from './module-crud-page.helpers';
-
-const parseDecimalValue = (value: string): number => {
-  const normalized = value.trim().replace(',', '.');
-  const parsed = Number.parseFloat(normalized);
-  return Number.isFinite(parsed) ? parsed : Number.NaN;
-};
-
-const LUCIDE_ICON_MAP: Record<string, React.ComponentType<{ className?: string }>> = {
-  PackagePlus,
-  PackageMinus,
-  Barcode,
-  Tag,
-  Factory,
-  Truck,
-  ArrowRightLeft,
-  Warehouse,
-  Users,
-  Receipt,
-  UserCog,
-  Briefcase,
-  FolderOpen,
-  CreditCard,
-  Landmark,
-  ArrowLeftRight,
-  CircleDollarSign,
-  Building2,
-  Network,
-  LayoutGrid,
-  Bird,
-  Ruler,
-  Tags,
-  ShieldCheck,
-  KeyRound,
-  CalendarDays,
-  IterationCcw,
-  FlaskConical,
-  Leaf,
-  FlaskRound,
-  Scissors,
-  Package,
-  FileText,
-};
-
-const getResourceIcon = (resourceKey: string): React.ComponentType<{ className?: string }> => {
-  const iconKey = resolveResourceIconKey(resourceKey);
-  return LUCIDE_ICON_MAP[iconKey] ?? FileText;
-};
-
-const GROUP_ICON_MAP: Record<
-  ResourceCategoryGroupId,
-  React.ComponentType<{ className?: string }>
-> = {
-  finance: Wallet,
-  people_clients: Users,
-  warehouse: Warehouse,
-  operations: LayoutGrid,
-  catalogs: Tags,
-  analytics: BarChart3,
-};
-
-type WarehouseRecord = CrudRecord & {
-  id?: string;
-  name?: string;
-  code?: string;
-  department_id?: string;
-  organization_id?: string;
-  is_default?: boolean | string;
-  is_active?: boolean | string;
-};
-
-const EMPTY_AUTH_LIST: string[] = [];
-const EMPTY_RESOURCE_LIST: BackendResourceConfig[] = [];
-const EMPTY_FIELD_LIST: CrudFieldMeta[] = [];
-const EMPTY_RECORD_LIST: CrudRecord[] = [];
-
-const getWorkspaceModuleConfig = (
-  moduleMap: Record<string, BackendModuleConfig>,
-  moduleKey: string,
-): BackendModuleConfig | null =>
-  moduleKey && Object.prototype.hasOwnProperty.call(moduleMap, moduleKey)
-    ? moduleMap[moduleKey]
-    : null;
-
-const getRecordBoolean = (value: unknown, fallback: boolean): boolean => {
-  if (typeof value === 'boolean') {
-    return value;
-  }
-
-  if (typeof value === 'string') {
-    const normalized = value.trim().toLowerCase();
-    if (normalized === 'true') {
-      return true;
-    }
-    if (normalized === 'false') {
-      return false;
-    }
-  }
-
-  return fallback;
-};
-
-const isWarehouseActive = (warehouse: WarehouseRecord): boolean =>
-  getRecordBoolean(warehouse.is_active, true);
-
-const isDefaultWarehouse = (warehouse: WarehouseRecord): boolean =>
-  getRecordBoolean(warehouse.is_default, false);
-
-const getWarehouseId = (warehouse: WarehouseRecord): string => getRecordId(warehouse, 'id');
-
-const getWarehouseDepartmentId = (warehouse: WarehouseRecord): string =>
-  typeof warehouse.department_id === 'string' ? warehouse.department_id.trim() : '';
-
-const getWarehouseRecordLabel = (warehouse: WarehouseRecord): string => {
-  const warehouseName =
-    typeof warehouse.name === 'string' && warehouse.name.trim().length > 0
-      ? warehouse.name.trim()
-      : typeof warehouse.code === 'string' && warehouse.code.trim().length > 0
-        ? warehouse.code.trim()
-        : getWarehouseId(warehouse);
-  const warehouseCode =
-    typeof warehouse.code === 'string' && warehouse.code.trim().length > 0
-      ? warehouse.code.trim()
-      : '';
-
-  return warehouseCode && warehouseCode !== warehouseName
-    ? `${warehouseName} (${warehouseCode})`
-    : warehouseName;
-};
-
-const compareWarehouses = (left: WarehouseRecord, right: WarehouseRecord): number => {
-  if (isDefaultWarehouse(left) !== isDefaultWarehouse(right)) {
-    return Number(isDefaultWarehouse(right)) - Number(isDefaultWarehouse(left));
-  }
-
-  if (isWarehouseActive(left) !== isWarehouseActive(right)) {
-    return Number(isWarehouseActive(right)) - Number(isWarehouseActive(left));
-  }
-
-  const leftDepartmentId =
-    typeof left.department_id === 'string' && left.department_id.trim().length > 0
-      ? left.department_id.trim()
-      : '';
-  const rightDepartmentId =
-    typeof right.department_id === 'string' && right.department_id.trim().length > 0
-      ? right.department_id.trim()
-      : '';
-  if (leftDepartmentId !== rightDepartmentId) {
-    return leftDepartmentId.localeCompare(rightDepartmentId);
-  }
-
-  return getWarehouseRecordLabel(left).localeCompare(getWarehouseRecordLabel(right));
-};
-
-const getDefaultWarehouseId = (warehouses: WarehouseRecord[]): string => {
-  if (warehouses.length === 0) {
-    return '';
-  }
-
-  const defaultWarehouse =
-    warehouses.find((warehouse) => isWarehouseActive(warehouse) && isDefaultWarehouse(warehouse)) ??
-    warehouses.find((warehouse) => isWarehouseActive(warehouse)) ??
-    warehouses[0];
-
-  return getWarehouseId(defaultWarehouse);
-};
-
-const getSuggestedInventoryUnit = (itemType: InventoryItemType): InventoryUnit => {
-  switch (itemType) {
-    case 'feed':
-    case 'semi_product':
-      return 'kg';
-    case 'medicine':
-      return 'pcs';
-    case 'egg':
-    case 'chick':
-    default:
-      return 'pcs';
-  }
-};
-
-const TRANSFER_MOVEMENT_KINDS = new Set(['transfer_in', 'transfer_out']);
-type InventoryCreateMode = 'incoming' | 'outgoing' | 'transfer';
-type ClientNotificationTemplateKey = 'debt_reminder' | 'product_alert' | 'general_notice';
-
-const CLIENT_NOTIFICATION_FALLBACK_TEMPLATES: Array<{
-  key: ClientNotificationTemplateKey;
-  title: string;
-  description: string;
-  message: string;
-}> = [
-  {
-    key: 'debt_reminder',
-    title: 'Qarz eslatmasi',
-    description: 'Qarz bo‘yicha eslatma yuborish.',
-    message:
-      "Assalomu alaykum. Sizda ochiq qarzdorlik mavjud. To'lov muddatini aniqlashtirish uchun biz bilan bog'laning.",
-  },
-  {
-    key: 'product_alert',
-    title: "Tovar bo'yicha ogohlantirish",
-    description: 'So‘nggi xarid asosida taklif yuborish.',
-    message:
-      "Assalomu alaykum. Siz uchun bo'limda yangi takliflar mavjud. Zarur hajm bo'lsa, javob yozing.",
-  },
-  {
-    key: 'general_notice',
-    title: 'Umumiy xabar',
-    description: 'Ixtiyoriy shaxsiy xabar yuborish.',
-    message: 'Assalomu alaykum. Siz uchun shaxsiy xabar.',
-  },
-];
 
 export function ModuleCrudPage() {
   const { t, locale } = useI18n();
@@ -479,17 +189,6 @@ export function ModuleCrudPage() {
   const [isAuditSheetOpen, setIsAuditSheetOpen] = useState(false);
   const [auditRecordId, setAuditRecordId] = useState('');
   const [auditRecordLabel, setAuditRecordLabel] = useState('');
-  const [isClientNotificationSheetOpen, setIsClientNotificationSheetOpen] = useState(false);
-  const [isClientNotificationBulkMode, setIsClientNotificationBulkMode] = useState(false);
-  const [clientNotificationTargetId, setClientNotificationTargetId] = useState('');
-  const [clientNotificationTargetLabel, setClientNotificationTargetLabel] = useState('');
-  const [clientNotificationTemplateKey, setClientNotificationTemplateKey] =
-    useState<ClientNotificationTemplateKey>('debt_reminder');
-  const [clientNotificationMessage, setClientNotificationMessage] = useState('');
-  const [clientNotificationMessageTouched, setClientNotificationMessageTouched] = useState(false);
-  const [clientNotificationFeedback, setClientNotificationFeedback] = useState('');
-  const [clientNotificationBulkResult, setClientNotificationBulkResult] =
-    useState<ClientNotificationBulkResult | null>(null);
   const [selectedResourceGroupId, setSelectedResourceGroupId] = useState<
     ResourceCategoryGroupId | ''
   >('');
@@ -498,16 +197,6 @@ export function ModuleCrudPage() {
   const [operationMessage, setOperationMessage] = useState('');
   const [systemFormError, setSystemFormError] = useState('');
   const [inventoryCreateMode, setInventoryCreateMode] = useState<InventoryCreateMode>('incoming');
-  const [medicineBatchQrCache, setMedicineBatchQrCache] = useState<Record<string, MedicineBatchQr>>(
-    {},
-  );
-  const [medicineBatchBusyKey, setMedicineBatchBusyKey] = useState('');
-  const [medicineBatchQrSheetBatch, setMedicineBatchQrSheetBatch] = useState<{
-    id: string;
-    code: string;
-  } | null>(null);
-  const [attachmentTargetBatchId, setAttachmentTargetBatchId] = useState('');
-  const medicineBatchAttachmentInputRef = useRef<HTMLInputElement | null>(null);
   const emptyLabel = t('common.empty');
   const yesLabel = t('common.yes');
   const noLabel = t('common.no');
@@ -587,132 +276,48 @@ export function ModuleCrudPage() {
       (!sessionOrganizationId || sessionDepartmentId === null || sessionDepartmentId === undefined),
   });
 
-  const departmentQuery = useApiQuery<CrudListResponse>({
-    queryKey: baseQueryKeys.crud.resource('core', 'visible-departments-filter'),
-    queryFn: () => listVisibleDepartments(),
-    enabled: Boolean(moduleConfig?.isDepartmentAssignable && sessionEmployeeId),
+  const {
+    availableDepartments,
+    departmentFilterOptions,
+    selectableDepartmentOptions,
+    departmentNodeMap,
+    selectableDepartmentIds,
+    availableDepartmentIds,
+    supportsDepartmentFilter,
+    selectedDepartmentId,
+  } = useDepartments({
+    moduleConfig: moduleConfig ?? null,
+    sessionEmployeeId,
+    requestedDepartmentId,
   });
-
-  const allDepartments = useMemo(
-    () => (departmentQuery.data?.items ?? []) as DepartmentRecord[],
-    [departmentQuery.data?.items],
-  );
-  const departmentModuleKey =
-    moduleConfig && moduleConfig.isDepartmentAssignable ? moduleConfig.key : null;
-  const availableDepartments = useMemo(() => {
-    if (!moduleConfig || !moduleConfig.isDepartmentAssignable) {
-      return [] as DepartmentRecord[];
-    }
-
-    if (departmentModuleKey === null) {
-      return allDepartments.filter(
-        (department) => typeof department.id === 'string' && isValidUuid(department.id),
-      );
-    }
-
-    return allDepartments.filter(
-      (department) =>
-        department.module_key === departmentModuleKey &&
-        typeof department.id === 'string' &&
-        isValidUuid(department.id),
-    );
-  }, [allDepartments, departmentModuleKey, moduleConfig]);
-  const departmentTree = useMemo(
-    () => buildDepartmentTree(availableDepartments, getDepartmentLabel),
-    [availableDepartments],
-  );
-  const departmentOptions = useMemo(() => flattenDepartmentTree(departmentTree), [departmentTree]);
-  const departmentFilterOptions = departmentOptions;
-  const selectableDepartmentOptions = useMemo(
-    () => departmentOptions.filter((department) => department.children.length === 0),
-    [departmentOptions],
-  );
-  const departmentNodeMap = useMemo(
-    () => new Map(departmentOptions.map((department) => [department.id, department] as const)),
-    [departmentOptions],
-  );
-  const selectableDepartmentIds = useMemo(
-    () => new Set(selectableDepartmentOptions.map((department) => department.id)),
-    [selectableDepartmentOptions],
-  );
-  const availableDepartmentIds = useMemo(
-    () => new Set(departmentFilterOptions.map((department) => department.id)),
-    [departmentFilterOptions],
-  );
-  const supportsDepartmentFilter = departmentFilterOptions.length > 0;
-  const selectedDepartmentId =
-    supportsDepartmentFilter &&
-    isValidUuid(requestedDepartmentId) &&
-    availableDepartmentIds.has(requestedDepartmentId)
-      ? requestedDepartmentId
-      : '';
-  const moduleStatsQuery = useApiQuery({
-    queryKey: [
-      ...baseQueryKeys.dashboard.stats,
-      effectiveStartDate,
-      effectiveEndDate,
-      selectedDepartmentId,
-    ],
-    queryFn: () =>
-      getDashboardAnalytics({
-        startDate: effectiveStartDate,
-        endDate: effectiveEndDate,
-        departmentId: selectedDepartmentId || undefined,
-      }),
-    enabled: supportsStatistics && activeView === 'stats' && canOpenModuleAnalytics,
+  const moduleLabel = moduleConfig
+    ? t(`modules.${moduleConfig.key}.label`, undefined, moduleConfig.label)
+    : '';
+  const {
+    moduleStatsQuery,
+    moduleStatsSection,
+    moduleStatsBadgeTone,
+    moduleStatsBadgeLabel,
+    selectedStatsPeriodLabel,
+    statsUpdatedAtLabel,
+    quickRangePresets,
+    activeQuickRangeKey,
+    moduleAnalyticsPresentation,
+  } = useModuleStats({
+    t,
+    locale,
+    today,
+    effectiveStartDate,
+    effectiveEndDate,
+    requestedPeriodKey,
+    selectedDepartmentId,
+    supportsStatistics,
+    activeView,
+    canOpenModuleAnalytics,
+    moduleStatsSectionKey,
+    moduleLabel,
+    setSearchParams,
   });
-  const translatedModuleStats = useMemo(
-    () => (moduleStatsQuery.data ? translateDashboardAnalytics(moduleStatsQuery.data, t) : null),
-    [moduleStatsQuery.data, t],
-  );
-  const moduleStatsModule = useMemo(
-    () =>
-      moduleStatsSectionKey
-        ? (translatedModuleStats?.department_dashboard?.modules.find(
-            (module) => module.key === moduleStatsSectionKey,
-          ) ?? null)
-        : null,
-    [moduleStatsSectionKey, translatedModuleStats],
-  );
-  const moduleStatsSection = useMemo(
-    () =>
-      moduleStatsModule
-        ? {
-            key: moduleStatsModule.key,
-            title: moduleStatsModule.title,
-            description: moduleStatsModule.description ?? null,
-            metrics: moduleStatsModule.kpis,
-            charts: moduleStatsModule.charts,
-            breakdowns:
-              (moduleStatsModule.alerts ?? []).length > 0
-                ? [
-                    ...moduleStatsModule.tables,
-                    {
-                      key: 'module_alerts',
-                      title: t(
-                        'dashboardData.sections.module_alerts.breakdowns.module_alerts.title',
-                        undefined,
-                        'Операционные alerts',
-                      ),
-                      description: t(
-                        'dashboardData.sections.module_alerts.breakdowns.module_alerts.description',
-                        undefined,
-                        'Ключевые сигналы по выбранному модулю.',
-                      ),
-                      items: (moduleStatsModule.alerts ?? []).map((alert, index) => ({
-                        key: `${alert.key}-${index}`,
-                        label: alert.title,
-                        value: alert.value ?? 0,
-                        unit: alert.unit ?? null,
-                        caption: alert.message,
-                      })),
-                    },
-                  ]
-                : moduleStatsModule.tables,
-          }
-        : null,
-    [moduleStatsModule, t],
-  );
   const departmentChildrenMap = useMemo(
     () => buildDepartmentChildrenMap(availableDepartments),
     [availableDepartments],
@@ -730,71 +335,6 @@ export function ModuleCrudPage() {
   const selectedStatsScopeLabel = selectedDepartmentId
     ? currentDepartmentLabel
     : t('common.allDepartments');
-  const quickRangePresets = useMemo(() => buildAnalyticsQuickRangePresets(t, today), [t, today]);
-  const validQuickRangeKeys = useMemo(
-    () => new Set(quickRangePresets.map((preset) => preset.key)),
-    [quickRangePresets],
-  );
-  const activeQuickRangeKey = (() => {
-    const matchingPresetKeys = quickRangePresets
-      .filter(
-        (preset) => preset.startDate === effectiveStartDate && preset.endDate === effectiveEndDate,
-      )
-      .map((preset) => preset.key);
-
-    if (
-      validQuickRangeKeys.has(requestedPeriodKey) &&
-      matchingPresetKeys.includes(requestedPeriodKey)
-    ) {
-      return requestedPeriodKey;
-    }
-
-    return matchingPresetKeys.length === 1 ? matchingPresetKeys[0] : '';
-  })();
-  useEffect(() => {
-    if (!requestedPeriodKey) {
-      return;
-    }
-
-    if (requestedPeriodKey === activeQuickRangeKey) {
-      return;
-    }
-
-    setSearchParams((current) => {
-      const next = new URLSearchParams(current);
-      next.delete('period');
-      return next;
-    });
-  }, [activeQuickRangeKey, requestedPeriodKey, setSearchParams]);
-  const selectedStatsPeriodLabel = useMemo(
-    () => formatAnalyticsPeriodLabel(t, effectiveStartDate, effectiveEndDate),
-    [effectiveEndDate, effectiveStartDate, t],
-  );
-  const moduleStatsHasData = Boolean(
-    moduleStatsSection &&
-    (moduleStatsSection.metrics.some((metric) => metric.value > 0) ||
-      moduleStatsSection.charts.some((chart) =>
-        chart.series.some((series) => series.points.length > 0),
-      ) ||
-      moduleStatsSection.breakdowns.some((breakdown) => breakdown.items.length > 0)),
-  );
-  const moduleStatsHealth = getDashboardHealthLevel(moduleStatsSection?.metrics ?? []);
-  const moduleStatsHealthLabel =
-    moduleStatsHealth === 'good'
-      ? t('common.good')
-      : moduleStatsHealth === 'warning'
-        ? t('common.warning')
-        : moduleStatsHealth === 'bad'
-          ? t('common.bad')
-          : t('common.neutral');
-  const moduleStatsBadgeTone = moduleStatsHasData ? moduleStatsHealth : 'neutral';
-  const moduleStatsBadgeLabel = moduleStatsHasData ? moduleStatsHealthLabel : t('common.neutral');
-  const statsUpdatedAtLabel = moduleStatsQuery.data
-    ? new Intl.DateTimeFormat(locale, {
-        dateStyle: 'short',
-        timeStyle: 'short',
-      }).format(new Date(moduleStatsQuery.data.generatedAt))
-    : '';
   const actorOrganizationId =
     authSession?.organizationId ?? actorProfileQuery.data?.organizationId ?? '';
   const actorDepartmentId = authSession?.departmentId ?? actorProfileQuery.data?.departmentId ?? '';
@@ -809,17 +349,7 @@ export function ModuleCrudPage() {
     scopedDepartmentIds,
   );
   const fallbackOrganizationId = currentDepartmentOrganizationId || actorOrganizationId;
-  const moduleLabel = moduleConfig
-    ? t(`modules.${moduleConfig.key}.label`, undefined, moduleConfig.label)
-    : '';
   const recordsScopeLabel = currentDepartmentLabel || t('common.allDepartments');
-  const moduleAnalyticsPresentation = useMemo(
-    () =>
-      moduleStatsModule
-        ? buildModuleAnalyticsPresentation(moduleStatsModule, moduleLabel, t)
-        : { summaryMetrics: [], sections: [] },
-    [moduleLabel, moduleStatsModule, t],
-  );
   const childDepartments = useMemo(() => {
     if (!currentDepartmentNode) {
       return [] as DepartmentRecord[];
@@ -1006,247 +536,30 @@ export function ModuleCrudPage() {
     ],
   );
   const canManageMedicineBatchOps = isMedicineBatchesResource && canEditRecordEntries;
-  const activeMedicineBatchQrSheetPayload = medicineBatchQrSheetBatch?.id
-    ? medicineBatchQrCache[medicineBatchQrSheetBatch.id]
-    : undefined;
-  const isMedicineBatchQrSheetBusy =
-    medicineBatchQrSheetBatch?.id &&
-    medicineBatchBusyKey.startsWith(`${medicineBatchQrSheetBatch.id}:`)
-      ? true
-      : false;
-
-  useEffect(() => {
-    if (!isMedicineBatchesResource && medicineBatchQrSheetBatch) {
-      setMedicineBatchQrSheetBatch(null);
-    }
-  }, [isMedicineBatchesResource, medicineBatchQrSheetBatch]);
   const inventoryMovementKind =
     typeof formValues.movement_kind === 'string'
       ? formValues.movement_kind.trim().toLowerCase()
       : '';
   const isTransferMovementForm =
     isInventoryMovementsResource && TRANSFER_MOVEMENT_KINDS.has(inventoryMovementKind);
-  const warehouseQuery = useApiQuery<CrudListResponse>({
-    queryKey: baseQueryKeys.crud.resource('core', 'warehouses-filter'),
-    queryFn: () => listCrudRecords('core', 'warehouses', { orderBy: 'department_id' }),
-    enabled: isInventoryMovementsResource,
-  });
-  const availableWarehouses = useMemo(() => {
-    const warehouseItems = (warehouseQuery.data?.items ?? []) as WarehouseRecord[];
-
-    return warehouseItems
-      .filter((warehouse) => {
-        const warehouseId = getWarehouseId(warehouse);
-        const departmentId = getWarehouseDepartmentId(warehouse);
-
-        return (
-          isValidUuid(warehouseId) &&
-          departmentId.length > 0 &&
-          availableDepartmentIds.has(departmentId)
-        );
-      })
-      .sort(compareWarehouses);
-  }, [availableDepartmentIds, warehouseQuery.data]);
-  const warehouseById = useMemo(
-    () =>
-      new Map(
-        availableWarehouses.map((warehouse) => [getWarehouseId(warehouse), warehouse] as const),
-      ),
-    [availableWarehouses],
-  );
-  const warehousesByDepartmentId = useMemo(() => {
-    const nextMap = new Map<string, WarehouseRecord[]>();
-
-    availableWarehouses.forEach((warehouse) => {
-      const departmentId = getWarehouseDepartmentId(warehouse);
-      if (!departmentId) {
-        return;
-      }
-
-      const currentWarehouses = nextMap.get(departmentId) ?? [];
-      currentWarehouses.push(warehouse);
-      nextMap.set(departmentId, currentWarehouses);
-    });
-
-    return nextMap;
-  }, [availableWarehouses]);
-  const movementDepartmentId = useMemo(() => {
-    if (!isInventoryMovementsResource) {
-      return '';
-    }
-
-    const formDepartmentId =
-      typeof formValues.department_id === 'string' ? formValues.department_id.trim() : '';
-    if (formDepartmentId && availableDepartmentIds.has(formDepartmentId)) {
-      return formDepartmentId;
-    }
-    if (selectedDepartmentId && availableDepartmentIds.has(selectedDepartmentId)) {
-      return selectedDepartmentId;
-    }
-    if (fallbackDepartmentId && availableDepartmentIds.has(fallbackDepartmentId)) {
-      return fallbackDepartmentId;
-    }
-    return '';
-  }, [
-    availableDepartmentIds,
-    fallbackDepartmentId,
-    formValues.department_id,
-    isInventoryMovementsResource,
-    selectedDepartmentId,
-  ]);
-  const movementWarehouseRecords = useMemo(() => {
-    if (!isInventoryMovementsResource || !movementDepartmentId) {
-      return [] as WarehouseRecord[];
-    }
-
-    return (warehousesByDepartmentId.get(movementDepartmentId) ?? []).filter((warehouse) =>
-      isWarehouseActive(warehouse),
-    );
-  }, [isInventoryMovementsResource, movementDepartmentId, warehousesByDepartmentId]);
-  const movementCounterpartyWarehouseRecords = useMemo(() => {
-    if (!isInventoryMovementsResource || !isTransferMovementForm) {
-      return [] as WarehouseRecord[];
-    }
-
-    const selectedWarehouseId =
-      typeof formValues.warehouse_id === 'string' ? formValues.warehouse_id.trim() : '';
-
-    return availableWarehouses.filter((warehouse) => {
-      const warehouseId = getWarehouseId(warehouse);
-      return (
-        isWarehouseActive(warehouse) &&
-        warehouseId.length > 0 &&
-        warehouseId !== selectedWarehouseId
-      );
-    });
-  }, [
-    availableWarehouses,
-    formValues.warehouse_id,
+  const {
+    warehouseById,
+    movementDepartmentId,
+    movementWarehouseReferenceOptions,
+    movementCounterpartyWarehouseReferenceOptions,
+  } = useWarehouseMovement({
+    t,
     isInventoryMovementsResource,
     isTransferMovementForm,
-  ]);
-  const movementWarehouseIds = useMemo(
-    () =>
-      new Set(
-        movementWarehouseRecords.map((warehouse) => getWarehouseId(warehouse)).filter(Boolean),
-      ),
-    [movementWarehouseRecords],
-  );
-  const movementCounterpartyWarehouseIds = useMemo(
-    () =>
-      new Set(
-        movementCounterpartyWarehouseRecords
-          .map((warehouse) => getWarehouseId(warehouse))
-          .filter(Boolean),
-      ),
-    [movementCounterpartyWarehouseRecords],
-  );
-  const movementWarehouseReferenceOptions = useMemo<CrudReferenceOption[]>(
-    () =>
-      movementWarehouseRecords.map((warehouse) => {
-        const departmentId = getWarehouseDepartmentId(warehouse);
-        const departmentLabel =
-          departmentNodeMap.get(departmentId)?.label ??
-          t('common.notSpecified', undefined, 'Не определён');
-        const warehouseLabel = getWarehouseRecordLabel(warehouse);
-        const defaultSuffix = isDefaultWarehouse(warehouse)
-          ? ` · ${t('fields.is_default', undefined, 'По умолчанию')}`
-          : '';
-        const labelPrefix = movementDepartmentId ? '' : `${departmentLabel} · `;
-
-        return {
-          value: getWarehouseId(warehouse),
-          label: `${labelPrefix}${warehouseLabel}${defaultSuffix}`,
-        };
-      }),
-    [departmentNodeMap, movementDepartmentId, movementWarehouseRecords, t],
-  );
-  const movementCounterpartyWarehouseReferenceOptions = useMemo<CrudReferenceOption[]>(
-    () =>
-      movementCounterpartyWarehouseRecords.map((warehouse) => {
-        const departmentId = getWarehouseDepartmentId(warehouse);
-        const departmentLabel =
-          departmentNodeMap.get(departmentId)?.label ??
-          t('common.notSpecified', undefined, 'Не определён');
-        const warehouseLabel = getWarehouseRecordLabel(warehouse);
-        const defaultSuffix = isDefaultWarehouse(warehouse)
-          ? ` · ${t('fields.is_default', undefined, 'По умолчанию')}`
-          : '';
-
-        return {
-          value: getWarehouseId(warehouse),
-          label: `${departmentLabel} · ${warehouseLabel}${defaultSuffix}`,
-        };
-      }),
-    [departmentNodeMap, movementCounterpartyWarehouseRecords, t],
-  );
-
-  useEffect(() => {
-    if (!isInventoryMovementsResource || !isFormSheetOpen) {
-      return;
-    }
-
-    setFormValues((current) => {
-      const currentWarehouseId =
-        typeof current.warehouse_id === 'string' ? current.warehouse_id.trim() : '';
-      const currentCounterpartyWarehouseId =
-        typeof current.counterparty_warehouse_id === 'string'
-          ? current.counterparty_warehouse_id.trim()
-          : '';
-      let hasChanges = false;
-      const nextValues = { ...current };
-
-      if (currentWarehouseId && !movementWarehouseIds.has(currentWarehouseId)) {
-        nextValues.warehouse_id = '';
-        hasChanges = true;
-      }
-      if (
-        currentCounterpartyWarehouseId &&
-        !movementCounterpartyWarehouseIds.has(currentCounterpartyWarehouseId)
-      ) {
-        nextValues.counterparty_warehouse_id = '';
-        nextValues.counterparty_department_id = '';
-        hasChanges = true;
-      }
-
-      return hasChanges ? nextValues : current;
-    });
-  }, [
     isFormSheetOpen,
-    isInventoryMovementsResource,
-    movementCounterpartyWarehouseIds,
-    movementWarehouseIds,
-  ]);
-
-  useEffect(() => {
-    if (!isInventoryMovementsResource || !isFormSheetOpen || selectedRecordId) {
-      return;
-    }
-
-    const defaultWarehouseId = getDefaultWarehouseId(movementWarehouseRecords);
-    if (!defaultWarehouseId) {
-      return;
-    }
-
-    setFormValues((current) => {
-      const currentWarehouseId =
-        typeof current.warehouse_id === 'string' ? current.warehouse_id.trim() : '';
-      if (currentWarehouseId && movementWarehouseIds.has(currentWarehouseId)) {
-        return current;
-      }
-
-      return {
-        ...current,
-        warehouse_id: defaultWarehouseId,
-      };
-    });
-  }, [
-    isFormSheetOpen,
-    isInventoryMovementsResource,
-    movementWarehouseIds,
-    movementWarehouseRecords,
     selectedRecordId,
-  ]);
+    formValues,
+    availableDepartmentIds,
+    selectedDepartmentId,
+    fallbackDepartmentId,
+    departmentNodeMap,
+    setFormValues,
+  });
 
   const metaQuery = useApiQuery<CrudResourceMeta>({
     queryKey: baseQueryKeys.crud.meta(moduleKey || 'unknown', activeResource?.key ?? 'unknown'),
@@ -1358,41 +671,6 @@ export function ModuleCrudPage() {
     [idColumn, isClientResource, visibleRecords],
   );
   const clientNotificationDepartmentId = selectedDepartmentId || fallbackDepartmentId || '';
-  const clientNotificationContextQuery = useApiQuery<ClientNotificationContext>({
-    queryKey: [
-      ...baseQueryKeys.crud.resource('core', 'client-notification-context'),
-      clientNotificationTargetId || 'none',
-      clientNotificationDepartmentId || 'all',
-    ],
-    queryFn: () =>
-      getClientNotificationContext(clientNotificationTargetId, {
-        departmentId: clientNotificationDepartmentId || undefined,
-      }),
-    enabled:
-      canSendClientNotifications &&
-      isClientNotificationSheetOpen &&
-      !isClientNotificationBulkMode &&
-      clientNotificationTargetId.length > 0,
-  });
-  const clientNotificationTemplates = useMemo(
-    () =>
-      isClientNotificationBulkMode
-        ? CLIENT_NOTIFICATION_FALLBACK_TEMPLATES
-        : (clientNotificationContextQuery.data?.templates ??
-          CLIENT_NOTIFICATION_FALLBACK_TEMPLATES),
-    [clientNotificationContextQuery.data?.templates, isClientNotificationBulkMode],
-  );
-  const activeClientNotificationTemplate = useMemo(() => {
-    if (clientNotificationTemplates.length === 0) {
-      return null;
-    }
-
-    return (
-      clientNotificationTemplates.find(
-        (template) => template.key === clientNotificationTemplateKey,
-      ) ?? clientNotificationTemplates[0]
-    );
-  }, [clientNotificationTemplateKey, clientNotificationTemplates]);
   const totalCount = visibleRecords.length;
   const totalPages = Math.max(Math.ceil(totalCount / pageSize), 1);
   const paginationItems = useMemo<Array<number | string>>(() => {
@@ -1424,6 +702,35 @@ export function ModuleCrudPage() {
     const startIndex = (currentPage - 1) * pageSize;
     return visibleRecords.slice(startIndex, startIndex + pageSize);
   }, [currentPage, pageSize, visibleRecords]);
+  const invalidateResource = useCallback(async () => {
+    if (!activeResource) {
+      return;
+    }
+
+    await queryClient.invalidateQueries({
+      queryKey: baseQueryKeys.crud.resource(moduleKey, activeResource.key),
+    });
+    await queryClient.invalidateQueries({
+      queryKey: baseQueryKeys.crud.auditResource(moduleKey, activeResource.key),
+    });
+
+    if (resourceModuleKey === 'hr') {
+      await queryClient.invalidateQueries({
+        queryKey: baseQueryKeys.auth.me,
+      });
+    }
+  }, [activeResource, moduleKey, queryClient, resourceModuleKey]);
+  const medicineBatchQr = useMedicineBatchQr({
+    t,
+    emptyLabel,
+    idColumn,
+    isMedicineBatchesResource,
+    canManageMedicineBatchOps,
+    paginatedRecords,
+    invalidateResource,
+    setSystemFormError,
+    setOperationMessage,
+  });
   const hiddenFieldNames = useMemo(() => {
     const nextHiddenFields = new Set(resourceUiConfig?.hiddenFields ?? []);
 
@@ -1564,124 +871,22 @@ export function ModuleCrudPage() {
     () => getTableFields(tableSourceFields, idColumn),
     [idColumn, tableSourceFields],
   );
-  const auditDateTimeFormatter = useMemo(
-    () =>
-      new Intl.DateTimeFormat(locale, {
-        dateStyle: 'medium',
-        timeStyle: 'short',
-      }),
-    [locale],
-  );
-  const getAuditActionLabel = (action: CrudAuditEntry['action']): string => {
-    switch (action) {
-      case 'create':
-        return t('crud.auditActionCreate');
-      case 'delete':
-        return t('crud.auditActionDelete');
-      case 'update':
-      default:
-        return t('crud.auditActionUpdate');
-    }
-  };
-  const getAuditActionBadgeClassName = (action: CrudAuditEntry['action']): string => {
-    switch (action) {
-      case 'create':
-        return 'border-emerald-200 bg-emerald-50 text-emerald-700';
-      case 'delete':
-        return 'border-destructive/20 bg-destructive/10 text-destructive';
-      case 'update':
-      default:
-        return 'border-primary/20 bg-primary/10 text-primary';
-    }
-  };
-  const formatAuditTimestamp = (value: string): string => {
-    const changedAt = new Date(value);
-    if (Number.isNaN(changedAt.getTime())) {
-      return value;
-    }
-    return auditDateTimeFormatter.format(changedAt);
-  };
-  const getAuditFieldLabel = (fieldName: string): string => {
-    const field = fieldMetaByName.get(fieldName);
-    return t(`fields.${fieldName}`, undefined, field?.label || humanizeKey(fieldName));
-  };
-  const formatFallbackAuditValue = (value: unknown): string => {
-    if (value === null || value === undefined || value === '') {
-      return emptyLabel;
-    }
-
-    if (typeof value === 'boolean') {
-      return value ? yesLabel : noLabel;
-    }
-
-    if (typeof value === 'string') {
-      if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
-        return formatDateValue(value);
-      }
-      if (/^\d{4}-\d{2}-\d{2}[tT ]/.test(value)) {
-        return formatDateTimeDisplayValue(value);
-      }
-      return value;
-    }
-
-    if (typeof value === 'number' || typeof value === 'bigint') {
-      return String(value);
-    }
-
-    if (Array.isArray(value)) {
-      if (value.length === 0) {
-        return emptyLabel;
-      }
-      if (value.some((item) => typeof item === 'object' && item !== null)) {
-        return JSON.stringify(value, null, 2);
-      }
-      return value.map((item) => formatFallbackAuditValue(item)).join(', ');
-    }
-
-    return JSON.stringify(value, null, 2);
-  };
-  const getAuditFieldDisplayValue = (fieldName: string, value: unknown): string => {
-    if (isPasswordFieldName(fieldName)) {
-      return emptyLabel;
-    }
-
-    if (Array.isArray(value) || isAuditSnapshot(value)) {
-      return formatFallbackAuditValue(value);
-    }
-
-    const field = fieldMetaByName.get(fieldName);
-    if (field) {
-      return getDisplayValue(field, value, yesLabel, noLabel, emptyLabel, translateReferenceLabel);
-    }
-
-    return formatFallbackAuditValue(value);
-  };
-  const getAuditFieldNames = (entry: CrudAuditEntry): string[] => {
-    const explicitFieldNames = (entry.changed_fields ?? [])
-      .map((fieldName) => String(fieldName).trim())
-      .filter((fieldName) => fieldName.length > 0 && !isPasswordFieldName(fieldName));
-    if (explicitFieldNames.length > 0) {
-      return explicitFieldNames;
-    }
-
-    const fieldNames = new Set<string>();
-    if (isAuditSnapshot(entry.before_data)) {
-      Object.keys(entry.before_data).forEach((fieldName) => {
-        if (!isPasswordFieldName(fieldName)) {
-          fieldNames.add(fieldName);
-        }
-      });
-    }
-    if (isAuditSnapshot(entry.after_data)) {
-      Object.keys(entry.after_data).forEach((fieldName) => {
-        if (!isPasswordFieldName(fieldName)) {
-          fieldNames.add(fieldName);
-        }
-      });
-    }
-
-    return Array.from(fieldNames).sort();
-  };
+  const {
+    getAuditActionLabel,
+    getAuditActionBadgeClassName,
+    formatAuditTimestamp,
+    getAuditFieldLabel,
+    getAuditFieldDisplayValue,
+    getAuditFieldNames,
+  } = useAuditFormatters({
+    locale,
+    t,
+    fieldMetaByName,
+    emptyLabel,
+    yesLabel,
+    noLabel,
+    translateReferenceLabel,
+  });
   const getRecordSummaryLabel = useCallback(
     (record: CrudRecord): string => {
       for (const field of tableFields) {
@@ -1702,6 +907,22 @@ export function ModuleCrudPage() {
     },
     [emptyLabel, idColumn, noLabel, tableFields, translateReferenceLabel, yesLabel],
   );
+  const canExecuteClientNotification = useCallback(
+    () => canExecuteModuleCrudAction('client_notification', moduleCrudActionAccess),
+    [moduleCrudActionAccess],
+  );
+  const clientNotifications = useClientNotifications({
+    t,
+    moduleKey,
+    idColumn,
+    isClientResource,
+    canSendClientNotifications,
+    canExecuteClientNotification,
+    departmentId: clientNotificationDepartmentId,
+    visibleClientIds,
+    getRecordSummaryLabel,
+    setOperationMessage,
+  });
 
   useEffect(() => {
     if (!supportsStatistics) {
@@ -1771,6 +992,8 @@ export function ModuleCrudPage() {
     );
   }, [visibleRecords, idColumn, selectedRecordId]);
 
+  const resetMedicineBatchQr = medicineBatchQr.resetState;
+  const resetClientNotificationSheetState = clientNotifications.resetSheetState;
   useEffect(() => {
     setSelectedRecordId('');
     setDeleteConfirmRecordId('');
@@ -1783,19 +1006,9 @@ export function ModuleCrudPage() {
     setInitialFormValuesSnapshot(null);
     setIsAuditSheetOpen(false);
     setInventoryCreateMode('incoming');
-    setMedicineBatchQrCache({});
-    setMedicineBatchBusyKey('');
-    setAttachmentTargetBatchId('');
-    setIsClientNotificationSheetOpen(false);
-    setIsClientNotificationBulkMode(false);
-    setClientNotificationTargetId('');
-    setClientNotificationTargetLabel('');
-    setClientNotificationTemplateKey('debt_reminder');
-    setClientNotificationMessage('');
-    setClientNotificationMessageTouched(false);
-    setClientNotificationFeedback('');
-    setClientNotificationBulkResult(null);
-  }, [activeResource?.key, moduleKey]);
+    resetMedicineBatchQr();
+    resetClientNotificationSheetState();
+  }, [activeResource?.key, moduleKey, resetClientNotificationSheetState, resetMedicineBatchQr]);
 
   useEffect(() => {
     if (!activeResourceGroupId) {
@@ -1812,6 +1025,7 @@ export function ModuleCrudPage() {
     setCurrentPage(1);
   }, [activeView, moduleKey, activeResource?.key, selectedDepartmentId]);
 
+  const setIsClientNotificationSheetOpen = clientNotifications.setIsSheetOpen;
   useEffect(() => {
     setIsFormSheetOpen(false);
     setInitialFormValuesSnapshot(null);
@@ -1819,7 +1033,7 @@ export function ModuleCrudPage() {
     setAuditRecordId('');
     setAuditRecordLabel('');
     setIsClientNotificationSheetOpen(false);
-  }, [moduleKey, activeResource?.key, activeView]);
+  }, [moduleKey, activeResource?.key, activeView, setIsClientNotificationSheetOpen]);
 
   useEffect(() => {
     if (currentPage <= totalPages) {
@@ -2011,25 +1225,6 @@ export function ModuleCrudPage() {
     setIsAuditSheetOpen(false);
   }, [auditRecordId, getRecordSummaryLabel, idColumn, visibleRecords]);
 
-  const invalidateResource = async () => {
-    if (!activeResource) {
-      return;
-    }
-
-    await queryClient.invalidateQueries({
-      queryKey: baseQueryKeys.crud.resource(moduleKey, activeResource.key),
-    });
-    await queryClient.invalidateQueries({
-      queryKey: baseQueryKeys.crud.auditResource(moduleKey, activeResource.key),
-    });
-
-    if (resourceModuleKey === 'hr') {
-      await queryClient.invalidateQueries({
-        queryKey: baseQueryKeys.auth.me,
-      });
-    }
-  };
-
   const createMutation = useApiMutation<CrudRecord, Error, CrudRecord>({
     mutationKey: toQueryKey(
       'crud',
@@ -2211,95 +1406,18 @@ export function ModuleCrudPage() {
     },
   });
 
-  const sendClientNotificationMutation = useApiMutation<
-    ClientNotificationSendResult,
-    Error,
-    { templateKey: ClientNotificationTemplateKey; message: string }
-  >({
-    mutationKey: toQueryKey('core', 'client-notify', moduleKey || 'unknown'),
-    mutationFn: (payload) => {
-      if (!canExecuteModuleCrudAction('client_notification', moduleCrudActionAccess)) {
-        throw new Error('Недостаточно прав для отправки уведомлений.');
-      }
-      if (!clientNotificationTargetId) {
-        throw new Error('Client is not selected');
-      }
-      return sendClientNotification(clientNotificationTargetId, {
-        templateKey: payload.templateKey,
-        message: payload.message,
-        channel: 'telegram',
-        departmentId: clientNotificationDepartmentId || undefined,
-      });
-    },
-    onSuccess: (result) => {
-      if (result.sent) {
-        setClientNotificationFeedback(
-          t('crud.clientNotificationSent', undefined, 'Уведомление отправлено в Telegram.'),
-        );
-        return;
-      }
-      setClientNotificationFeedback(
-        result.error ||
-          t('crud.clientNotificationSendFailed', undefined, 'Не удалось отправить уведомление.'),
-      );
-    },
-  });
-
-  const sendBulkClientNotificationMutation = useApiMutation<
-    ClientNotificationBulkResult,
-    Error,
-    { templateKey: ClientNotificationTemplateKey; message: string; clientIds: string[] }
-  >({
-    mutationKey: toQueryKey('core', 'client-notify-bulk', moduleKey || 'unknown'),
-    mutationFn: (payload) => {
-      if (!canExecuteModuleCrudAction('client_notification', moduleCrudActionAccess)) {
-        throw new Error('Недостаточно прав для отправки уведомлений.');
-      }
-
-      return sendBulkClientNotifications({
-        clientIds: payload.clientIds,
-        templateKey: payload.templateKey,
-        message: payload.message,
-        channel: 'telegram',
-        departmentId: clientNotificationDepartmentId || undefined,
-      });
-    },
-    onSuccess: (result) => {
-      setClientNotificationBulkResult(result);
-      setClientNotificationFeedback(
-        t(
-          'crud.clientNotificationBulkSent',
-          { sent: result.sent, failed: result.failed },
-          `Отправлено: ${result.sent}, ошибок: ${result.failed}.`,
-        ),
-      );
-    },
-  });
-
   const pendingAction =
     createMutation.isPending ||
     updateMutation.isPending ||
     deleteMutation.isPending ||
     stockTransferMutation.isPending ||
-    medicineBatchBusyKey.length > 0;
+    medicineBatchQr.isMedicineBatchPending;
   const actionError =
     createMutation.error ??
     updateMutation.error ??
     deleteMutation.error ??
     stockTransferMutation.error ??
     null;
-  const notificationPendingAction =
-    sendClientNotificationMutation.isPending || sendBulkClientNotificationMutation.isPending;
-  const notificationError =
-    sendClientNotificationMutation.error ?? sendBulkClientNotificationMutation.error ?? null;
-  const isClientNotificationSendDisabled =
-    notificationPendingAction ||
-    clientNotificationMessage.trim().length === 0 ||
-    (isClientNotificationBulkMode
-      ? visibleClientIds.length === 0
-      : !clientNotificationTargetId ||
-        clientNotificationContextQuery.isLoading ||
-        Boolean(clientNotificationContextQuery.error));
   const isFormDirty = useMemo(
     () =>
       isFormSheetOpen &&
@@ -2330,111 +1448,6 @@ export function ModuleCrudPage() {
 
     closeFormSheet();
   };
-  const resetClientNotificationState = useCallback(() => {
-    setClientNotificationTargetId('');
-    setClientNotificationTargetLabel('');
-    setClientNotificationTemplateKey('debt_reminder');
-    setClientNotificationMessage('');
-    setClientNotificationMessageTouched(false);
-    setClientNotificationFeedback('');
-    setClientNotificationBulkResult(null);
-    sendClientNotificationMutation.reset();
-    sendBulkClientNotificationMutation.reset();
-  }, [sendBulkClientNotificationMutation, sendClientNotificationMutation]);
-  const handleOpenClientNotification = (record: CrudRecord) => {
-    if (!canExecuteModuleCrudAction('client_notification', moduleCrudActionAccess)) {
-      return;
-    }
-
-    const recordId = getRecordId(record, idColumn);
-    if (!recordId) {
-      return;
-    }
-    setIsClientNotificationBulkMode(false);
-    setClientNotificationTargetId(recordId);
-    setClientNotificationTargetLabel(getRecordSummaryLabel(record));
-    setClientNotificationTemplateKey('debt_reminder');
-    setClientNotificationMessage('');
-    setClientNotificationMessageTouched(false);
-    setClientNotificationFeedback('');
-    setClientNotificationBulkResult(null);
-    setIsClientNotificationSheetOpen(true);
-  };
-  const handleOpenBulkClientNotification = () => {
-    if (!canExecuteModuleCrudAction('client_notification', moduleCrudActionAccess)) {
-      return;
-    }
-
-    if (visibleClientIds.length === 0) {
-      setOperationMessage(
-        t('crud.clientNotificationNoClients', undefined, 'Нет клиентов для массовой рассылки.'),
-      );
-      return;
-    }
-    setIsClientNotificationBulkMode(true);
-    setClientNotificationTargetId('');
-    setClientNotificationTargetLabel('');
-    setClientNotificationTemplateKey('debt_reminder');
-    setClientNotificationMessage('');
-    setClientNotificationMessageTouched(false);
-    setClientNotificationFeedback('');
-    setClientNotificationBulkResult(null);
-    setIsClientNotificationSheetOpen(true);
-  };
-  const handleSendClientNotification = () => {
-    if (!canExecuteModuleCrudAction('client_notification', moduleCrudActionAccess)) {
-      return;
-    }
-
-    if (notificationPendingAction) {
-      return;
-    }
-
-    if (isClientNotificationBulkMode) {
-      void sendBulkClientNotificationMutation.mutateAsync({
-        templateKey: clientNotificationTemplateKey,
-        message: clientNotificationMessage.trim(),
-        clientIds: visibleClientIds,
-      });
-      return;
-    }
-
-    if (!clientNotificationTargetId) {
-      setClientNotificationFeedback(
-        t('crud.clientNotificationNoTarget', undefined, 'Клиент не выбран.'),
-      );
-      return;
-    }
-    void sendClientNotificationMutation.mutateAsync({
-      templateKey: clientNotificationTemplateKey,
-      message: clientNotificationMessage.trim(),
-    });
-  };
-  useEffect(() => {
-    if (!isClientNotificationSheetOpen || clientNotificationMessageTouched) {
-      return;
-    }
-
-    const templateMessage = activeClientNotificationTemplate
-      ? activeClientNotificationTemplate.message
-      : '';
-    if (!templateMessage) {
-      return;
-    }
-
-    setClientNotificationMessage(templateMessage);
-  }, [
-    activeClientNotificationTemplate,
-    clientNotificationMessageTouched,
-    isClientNotificationSheetOpen,
-  ]);
-
-  useEffect(() => {
-    if (isClientNotificationSheetOpen || !isClientResource) {
-      return;
-    }
-    resetClientNotificationState();
-  }, [isClientNotificationSheetOpen, isClientResource, resetClientNotificationState]);
 
   const canSubmitCurrentForm = selectedRecordId ? canEditRecordEntries : canCreateActiveResource;
   const isFormReadOnly = !canSubmitCurrentForm;
@@ -2742,362 +1755,6 @@ export function ModuleCrudPage() {
     commitDeleteRecord(recordId);
   };
 
-  const isMedicineBatchActionBusy = (batchId: string, action?: string): boolean => {
-    if (!medicineBatchBusyKey) {
-      return false;
-    }
-    if (action) {
-      return medicineBatchBusyKey === `${batchId}:${action}`;
-    }
-    return medicineBatchBusyKey.startsWith(`${batchId}:`);
-  };
-
-  const getMedicineBatchCode = (record: CrudRecord): string => {
-    const recordBatchCode =
-      typeof record.batch_code === 'string' && record.batch_code.trim().length > 0
-        ? record.batch_code.trim()
-        : '';
-    return recordBatchCode || getRecordId(record, idColumn) || emptyLabel;
-  };
-
-  const printMedicineBatchQrImage = (imageDataUrl: string, batchLabel: string) => {
-    const safeBatchLabel = batchLabel.replace(/</g, '&lt;').replace(/>/g, '&gt;');
-    const printDocument = `<!doctype html>
-<html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <title>QR ${safeBatchLabel}</title>
-    <style>
-      @page { margin: 12mm; }
-      body { margin: 0; display: grid; place-items: center; min-height: 100vh; font-family: sans-serif; }
-      .wrapper { text-align: center; }
-      img { width: 320px; height: 320px; object-fit: contain; border: 1px solid #d1d5db; border-radius: 16px; padding: 16px; }
-      .label { margin-top: 12px; color: #374151; font-size: 14px; font-weight: 600; }
-    </style>
-  </head>
-  <body>
-    <div class="wrapper">
-      <img src="${imageDataUrl}" alt="QR code" />
-      <div class="label">${safeBatchLabel}</div>
-    </div>
-  </body>
-</html>`;
-
-    const iframe = document.createElement('iframe');
-    iframe.setAttribute('aria-hidden', 'true');
-    iframe.setAttribute('title', `QR ${safeBatchLabel}`);
-    iframe.style.position = 'fixed';
-    iframe.style.right = '0';
-    iframe.style.bottom = '0';
-    iframe.style.width = '0';
-    iframe.style.height = '0';
-    iframe.style.border = '0';
-    iframe.style.opacity = '0';
-    document.body.append(iframe);
-
-    const cleanup = () => {
-      if (iframe.parentNode) {
-        iframe.parentNode.removeChild(iframe);
-      }
-    };
-
-    const triggerPrint = () => {
-      const printWindow = iframe.contentWindow;
-      if (!printWindow) {
-        cleanup();
-        return;
-      }
-
-      const finishOnce = (() => {
-        let done = false;
-        return () => {
-          if (done) {
-            return;
-          }
-          done = true;
-          window.setTimeout(cleanup, 500);
-        };
-      })();
-
-      printWindow.addEventListener('afterprint', finishOnce);
-      try {
-        printWindow.focus();
-        printWindow.print();
-      } catch {
-        cleanup();
-        return;
-      }
-      window.setTimeout(finishOnce, 60_000);
-    };
-
-    iframe.addEventListener('load', () => {
-      const doc = iframe.contentDocument;
-      const img = doc?.querySelector('img');
-      if (img && !img.complete) {
-        img.addEventListener('load', triggerPrint, { once: true });
-        img.addEventListener('error', triggerPrint, { once: true });
-        return;
-      }
-      triggerPrint();
-    });
-
-    const doc = iframe.contentDocument;
-    if (!doc) {
-      cleanup();
-      throw new Error(t('crud.saveError'));
-    }
-    doc.open();
-    doc.write(printDocument);
-    doc.close();
-  };
-
-  const downloadMedicineBatchQrImage = (imageDataUrl: string, batchLabel: string) => {
-    const safeLabel = batchLabel
-      .trim()
-      .toLowerCase()
-      .replace(/[^a-z0-9_-]+/g, '-')
-      .replace(/-{2,}/g, '-')
-      .replace(/^-+|-+$/g, '');
-    const fileName = `qr-${safeLabel || 'medicine-batch'}.png`;
-    const anchor = document.createElement('a');
-    anchor.href = imageDataUrl;
-    anchor.download = fileName;
-    document.body.append(anchor);
-    anchor.click();
-    anchor.remove();
-  };
-
-  const copyTextToClipboard = async (value: string): Promise<void> => {
-    const clipboard =
-      'clipboard' in navigator && typeof navigator.clipboard.writeText === 'function'
-        ? navigator.clipboard
-        : null;
-
-    if (clipboard) {
-      await clipboard.writeText(value);
-      return;
-    }
-
-    const fallbackInput = document.createElement('textarea');
-    fallbackInput.value = value;
-    fallbackInput.setAttribute('readonly', 'true');
-    fallbackInput.style.position = 'fixed';
-    fallbackInput.style.opacity = '0';
-    document.body.append(fallbackInput);
-    fallbackInput.select();
-    const copied = document.execCommand('copy');
-    fallbackInput.remove();
-
-    if (!copied) {
-      throw new Error(t('crud.saveError'));
-    }
-  };
-
-  const resolveMedicineBatchQr = async (
-    batchId: string,
-    options: { forceGenerate?: boolean; allowGenerateOnMissing?: boolean } = {},
-  ): Promise<MedicineBatchQr> => {
-    const { forceGenerate = false, allowGenerateOnMissing = true } = options;
-    if (!forceGenerate) {
-      if (Object.prototype.hasOwnProperty.call(medicineBatchQrCache, batchId)) {
-        return medicineBatchQrCache[batchId];
-      }
-    }
-
-    try {
-      const payload = forceGenerate
-        ? await generateMedicineBatchQr(batchId)
-        : await getMedicineBatchQr(batchId);
-      setMedicineBatchQrCache((current) => ({ ...current, [batchId]: payload }));
-      return payload;
-    } catch (error) {
-      if (
-        !forceGenerate &&
-        allowGenerateOnMissing &&
-        error instanceof ApiError &&
-        error.status === 404
-      ) {
-        const generated = await generateMedicineBatchQr(batchId);
-        setMedicineBatchQrCache((current) => ({ ...current, [batchId]: generated }));
-        return generated;
-      }
-      throw error;
-    }
-  };
-
-  const handleOpenMedicineBatchQrCenter = async (record: CrudRecord) => {
-    if (!isMedicineBatchesResource) {
-      return;
-    }
-
-    const batchId = getRecordId(record, idColumn);
-    if (!batchId) {
-      return;
-    }
-
-    setMedicineBatchBusyKey(`${batchId}:center`);
-    setSystemFormError('');
-    try {
-      await resolveMedicineBatchQr(batchId, { allowGenerateOnMissing: canManageMedicineBatchOps });
-      setMedicineBatchQrSheetBatch({
-        id: batchId,
-        code: getMedicineBatchCode(record),
-      });
-    } catch (error) {
-      setSystemFormError(error instanceof Error ? error.message : t('crud.saveError'));
-    } finally {
-      setMedicineBatchBusyKey('');
-    }
-  };
-
-  const handlePrintMedicineBatchQrFromCenter = async () => {
-    if (!medicineBatchQrSheetBatch) {
-      return;
-    }
-
-    const batchId = medicineBatchQrSheetBatch.id;
-    const batchCode = medicineBatchQrSheetBatch.code;
-    setMedicineBatchBusyKey(`${batchId}:print`);
-    setSystemFormError('');
-    try {
-      const qrPayload =
-        activeMedicineBatchQrSheetPayload ?? (await resolveMedicineBatchQr(batchId));
-      printMedicineBatchQrImage(qrPayload.image_data_url, batchCode);
-    } catch (error) {
-      setSystemFormError(error instanceof Error ? error.message : t('crud.saveError'));
-    } finally {
-      setMedicineBatchBusyKey('');
-    }
-  };
-
-  const handleDownloadMedicineBatchQrFromCenter = async () => {
-    if (!medicineBatchQrSheetBatch) {
-      return;
-    }
-
-    const batchId = medicineBatchQrSheetBatch.id;
-    const batchCode = medicineBatchQrSheetBatch.code;
-    setMedicineBatchBusyKey(`${batchId}:download`);
-    setSystemFormError('');
-    try {
-      const qrPayload =
-        activeMedicineBatchQrSheetPayload ?? (await resolveMedicineBatchQr(batchId));
-      downloadMedicineBatchQrImage(qrPayload.image_data_url, batchCode);
-    } catch (error) {
-      setSystemFormError(error instanceof Error ? error.message : t('crud.saveError'));
-    } finally {
-      setMedicineBatchBusyKey('');
-    }
-  };
-
-  const handleOpenMedicineBatchPublicPageFromCenter = async () => {
-    if (!medicineBatchQrSheetBatch) {
-      return;
-    }
-
-    const batchId = medicineBatchQrSheetBatch.id;
-    setMedicineBatchBusyKey(`${batchId}:public`);
-    setSystemFormError('');
-    try {
-      const qrPayload =
-        activeMedicineBatchQrSheetPayload ?? (await resolveMedicineBatchQr(batchId));
-      const openedWindow = window.open(qrPayload.public_url, '_blank', 'noopener,noreferrer');
-      if (!openedWindow) {
-        throw new Error(
-          t(
-            'crud.popupBlocked',
-            undefined,
-            'Браузер заблокировал новое окно. Разрешите pop-up для этого сайта.',
-          ),
-        );
-      }
-    } catch (error) {
-      setSystemFormError(error instanceof Error ? error.message : t('crud.saveError'));
-    } finally {
-      setMedicineBatchBusyKey('');
-    }
-  };
-
-  const handleCopyMedicineBatchPublicLinkFromCenter = async () => {
-    if (!medicineBatchQrSheetBatch) {
-      return;
-    }
-
-    const batchId = medicineBatchQrSheetBatch.id;
-    const batchCode = medicineBatchQrSheetBatch.code;
-    setMedicineBatchBusyKey(`${batchId}:copy`);
-    setSystemFormError('');
-    try {
-      const qrPayload =
-        activeMedicineBatchQrSheetPayload ?? (await resolveMedicineBatchQr(batchId));
-      await copyTextToClipboard(qrPayload.public_url);
-      setOperationMessage(
-        t(
-          'crud.medicineBatchPublicLinkCopied',
-          { code: batchCode },
-          `Публичная ссылка для партии ${batchCode} скопирована.`,
-        ),
-      );
-    } catch (error) {
-      setSystemFormError(error instanceof Error ? error.message : t('crud.saveError'));
-    } finally {
-      setMedicineBatchBusyKey('');
-    }
-  };
-
-  const handleOpenMedicineBatchAttachmentPicker = (record: CrudRecord) => {
-    const batchId = getRecordId(record, idColumn);
-    if (!batchId || !canManageMedicineBatchOps) {
-      return;
-    }
-
-    setAttachmentTargetBatchId(batchId);
-    medicineBatchAttachmentInputRef.current?.click();
-  };
-
-  const handleMedicineBatchAttachmentInputChange = async (
-    event: ReactChangeEvent<HTMLInputElement>,
-  ) => {
-    if (!canManageMedicineBatchOps) {
-      event.target.value = '';
-      setAttachmentTargetBatchId('');
-      return;
-    }
-
-    const selectedFile = event.target.files?.[0] ?? null;
-    event.target.value = '';
-
-    if (!selectedFile || !attachmentTargetBatchId) {
-      if (!selectedFile) {
-        setAttachmentTargetBatchId('');
-      }
-      return;
-    }
-
-    setMedicineBatchBusyKey(`${attachmentTargetBatchId}:attach`);
-    setSystemFormError('');
-    try {
-      await uploadMedicineBatchAttachment(attachmentTargetBatchId, selectedFile);
-      const targetRecord = paginatedRecords.find(
-        (record) => getRecordId(record, idColumn) === attachmentTargetBatchId,
-      );
-      const batchCode = targetRecord ? getMedicineBatchCode(targetRecord) : attachmentTargetBatchId;
-      setOperationMessage(
-        t(
-          'crud.medicineBatchAttachmentUploaded',
-          { code: batchCode },
-          `Файл прикреплён к партии ${batchCode}.`,
-        ),
-      );
-      await invalidateResource();
-    } catch (error) {
-      setSystemFormError(error instanceof Error ? error.message : t('crud.saveError'));
-    } finally {
-      setAttachmentTargetBatchId('');
-      setMedicineBatchBusyKey('');
-    }
-  };
-
   const handleInputChange = (field: CrudFieldMeta, value: string | boolean | string[]) => {
     setFormValues((current) => {
       const nextValues: FormValues = { ...current, [field.name]: value };
@@ -3314,459 +1971,72 @@ export function ModuleCrudPage() {
     updateMutation.mutate(payload);
   };
 
-  const renderPaginationBar = () => {
-    if (totalCount === 0) {
-      return null;
-    }
+  const renderPaginationBar = () => (
+    <RecordsPaginationBar
+      totalCount={totalCount}
+      totalPages={totalPages}
+      currentPage={currentPage}
+      paginationItems={paginationItems}
+      pageStatusLabel={t('common.pageStatus', { current: currentPage, total: totalPages })}
+      currentPageRangeLabel={currentPageRangeLabel}
+      previousLabel={t('common.previous')}
+      nextLabel={t('common.next')}
+      onChangePage={setCurrentPage}
+      onSelectPage={setCurrentPage}
+    />
+  );
 
-    return (
-      <div
-        className={`${frostedPanelClassName} flex flex-col gap-3 px-4 py-4 lg:flex-row lg:items-center lg:justify-between`}
-      >
-        <div className="space-y-1 text-sm text-muted-foreground">
-          <p>{t('common.pageStatus', { current: currentPage, total: totalPages })}</p>
-          <p>{currentPageRangeLabel}</p>
-        </div>
-        <Pagination className="mx-0 w-full justify-start sm:w-auto sm:justify-end">
-          <PaginationContent>
-            <PaginationItem>
-              <PaginationPrevious
-                href="#"
-                text={t('common.previous')}
-                className={cn(currentPage === 1 && 'pointer-events-none opacity-50')}
-                onClick={(event) => {
-                  event.preventDefault();
-                  if (currentPage > 1) {
-                    setCurrentPage((page) => Math.max(page - 1, 1));
-                  }
-                }}
-              />
-            </PaginationItem>
-            {paginationItems.map((item, index) => (
-              <PaginationItem key={`${item}-${index}`}>
-                {typeof item === 'number' ? (
-                  <PaginationLink
-                    href="#"
-                    isActive={item === currentPage}
-                    onClick={(event) => {
-                      event.preventDefault();
-                      setCurrentPage(item);
-                    }}
-                  >
-                    {item}
-                  </PaginationLink>
-                ) : (
-                  <PaginationEllipsis />
-                )}
-              </PaginationItem>
-            ))}
-            <PaginationItem>
-              <PaginationNext
-                href="#"
-                text={t('common.next')}
-                className={cn(currentPage === totalPages && 'pointer-events-none opacity-50')}
-                onClick={(event) => {
-                  event.preventDefault();
-                  if (currentPage < totalPages) {
-                    setCurrentPage((page) => Math.min(page + 1, totalPages));
-                  }
-                }}
-              />
-            </PaginationItem>
-          </PaginationContent>
-        </Pagination>
-      </div>
-    );
-  };
-
-  const renderAuditSnapshot = (
-    snapshot: AuditSnapshot | null | undefined,
-    fieldNames: string[],
-  ) => {
-    if (!isAuditSnapshot(snapshot)) {
-      return (
-        <div className={`${frostedPanelClassName} px-4 py-6 text-sm text-muted-foreground`}>
-          {t('crud.auditNoSnapshot')}
-        </div>
-      );
-    }
-
-    const orderedFieldNames =
-      fieldNames.length > 0
-        ? fieldNames.filter((fieldName) => fieldName in snapshot)
-        : Object.keys(snapshot).sort();
-
-    if (orderedFieldNames.length === 0) {
-      return (
-        <div className={`${frostedPanelClassName} px-4 py-6 text-sm text-muted-foreground`}>
-          {t('crud.auditNoSnapshot')}
-        </div>
-      );
-    }
-
-    return (
-      <div className="space-y-2">
-        {orderedFieldNames.map((fieldName) => {
-          const rawValue = snapshot[fieldName];
-          const displayValue = getAuditFieldDisplayValue(fieldName, rawValue);
-
-          return (
-            <div
-              key={fieldName}
-              className={`${frostedPanelClassName} border-border/60 px-4 py-3 shadow-none`}
-            >
-              <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-                {getAuditFieldLabel(fieldName)}
-              </p>
-              {isStructuredAuditValue(rawValue) ? (
-                <pre className="mt-2 whitespace-pre-wrap break-all text-xs leading-5 text-foreground">
-                  {displayValue}
-                </pre>
-              ) : (
-                <p className="mt-1 break-words text-sm text-foreground">{displayValue}</p>
-              )}
-            </div>
-          );
-        })}
-      </div>
-    );
-  };
-
-  const renderRecordActionButtons = (record: CrudRecord) => {
-    const recordId = getRecordId(record, idColumn);
-    const actionKeyPrefix = recordId || 'record';
-    const isDeleteConfirming = recordId !== EMPTY_TEXT && deleteConfirmRecordId === recordId;
-    const isMedicineBatchBusy =
-      isMedicineBatchesResource && recordId !== EMPTY_TEXT
-        ? isMedicineBatchActionBusy(recordId)
-        : false;
-    const buttons = [];
-
-    if (isMedicineBatchesResource) {
-      buttons.push(
-        <Button
-          key={`${actionKeyPrefix}-qr`}
-          type="button"
-          size="sm"
-          variant="outline"
-          className="border-border/75 bg-card"
-          onClick={(event) => {
-            event.preventDefault();
-            event.stopPropagation();
-            void handleOpenMedicineBatchQrCenter(record);
-          }}
-          disabled={pendingAction || isMedicineBatchBusy}
-        >
-          <QrCode className="h-3.5 w-3.5" />
-          {t('crud.generateQr', undefined, 'QR')}
-        </Button>,
-      );
-
-      if (canManageMedicineBatchOps) {
-        buttons.push(
-          <Button
-            key={`${actionKeyPrefix}-file`}
-            type="button"
-            size="sm"
-            variant="outline"
-            className="border-border/75 bg-card"
-            onClick={(event) => {
-              event.preventDefault();
-              event.stopPropagation();
-              handleOpenMedicineBatchAttachmentPicker(record);
-            }}
-            disabled={pendingAction || isMedicineBatchBusy}
-          >
-            <Paperclip className="h-3.5 w-3.5" />
-            {t('crud.attachFile', undefined, 'Файл')}
-          </Button>,
-        );
-      }
-    }
-
-    if (canSendClientNotifications) {
-      buttons.push(
-        <Button
-          key={`${actionKeyPrefix}-notify`}
-          type="button"
-          size="sm"
-          variant="outline"
-          className="border-border/75 bg-card"
-          onClick={(event) => {
-            event.preventDefault();
-            event.stopPropagation();
-            handleOpenClientNotification(record);
-          }}
-          disabled={notificationPendingAction}
-          data-tour="client-row-notify-action"
-        >
-          <Send className="h-3.5 w-3.5" />
-          {t('crud.clientNotification', undefined, 'Уведомить')}
-        </Button>,
-      );
-    }
-
-    if (canEditActiveResource) {
-      buttons.push(
-        <Button
-          key={`${actionKeyPrefix}-edit`}
-          type="button"
-          size="sm"
-          variant="outline"
-          className="border-border/75 bg-card"
-          onClick={(event) => {
-            event.preventDefault();
-            event.stopPropagation();
-            handleEditRecord(record);
-          }}
-          disabled={pendingAction}
-        >
-          <Pencil className="h-3.5 w-3.5" />
-          {t('common.edit')}
-        </Button>,
-      );
-    }
-
-    if (canReadAuditActiveResource) {
-      buttons.push(
-        <Button
-          key={`${actionKeyPrefix}-history`}
-          type="button"
-          size="sm"
-          variant="outline"
-          className="border-border/75 bg-card"
-          onClick={(event) => {
-            event.preventDefault();
-            event.stopPropagation();
-            handleOpenAudit(record);
-          }}
-          disabled={pendingAction}
-          data-tour="module-open-audit-drawer"
-        >
-          <History className="h-3.5 w-3.5" />
-          {t('common.history')}
-        </Button>,
-      );
-    }
-
-    if (canDeleteActiveResource) {
-      buttons.push(
-        <Button
-          key={`${actionKeyPrefix}-delete`}
-          type="button"
-          size="sm"
-          variant={isDeleteConfirming ? 'destructive' : 'outline'}
-          className={cn(
-            isDeleteConfirming
-              ? deleteConfirmClassName
-              : 'border-destructive/25 bg-destructive/5 text-destructive hover:bg-destructive/10 hover:text-destructive',
-          )}
-          onClick={(event) => handleDeleteRecord(event, record)}
-          disabled={pendingAction}
-        >
-          <Trash2 className="h-3.5 w-3.5" />
-          {isDeleteConfirming ? deleteConfirmLabel : t('common.delete')}
-        </Button>,
-      );
-    }
-
-    return buttons;
-  };
+  const renderRecordActionButtons = (record: CrudRecord) =>
+    renderRecordActionButtonsView({
+      record,
+      idColumn,
+      deleteConfirmRecordId,
+      pendingAction,
+      notificationPendingAction: clientNotifications.pendingAction,
+      deleteConfirmLabel,
+      deleteConfirmClassName,
+      labels: {
+        qr: t('crud.generateQr', undefined, 'QR'),
+        attachFile: t('crud.attachFile', undefined, 'Файл'),
+        notify: t('crud.clientNotification', undefined, 'Уведомить'),
+        edit: t('common.edit'),
+        history: t('common.history'),
+        delete: t('common.delete'),
+      },
+      isMedicineBatchesResource,
+      canManageMedicineBatchOps,
+      canSendClientNotifications,
+      canEditActiveResource,
+      canReadAuditActiveResource,
+      canDeleteActiveResource,
+      isMedicineBatchActionBusy: medicineBatchQr.isMedicineBatchActionBusy,
+      onOpenMedicineBatchQrCenter: medicineBatchQr.handleOpenCenter,
+      onOpenMedicineBatchAttachmentPicker: medicineBatchQr.handleOpenAttachmentPicker,
+      onOpenClientNotification: clientNotifications.handleOpen,
+      onEditRecord: handleEditRecord,
+      onOpenAudit: handleOpenAudit,
+      onDeleteRecord: handleDeleteRecord,
+    });
 
   const renderRecordsTable = () => (
-    <div className={`${frostedPanelClassName} overflow-hidden`}>
-      <div className="max-h-[680px] overflow-y-auto p-3 sm:hidden">
-        {listQuery.isLoading ? (
-          <InlineLoader label={t('crud.loadingRecords', undefined, 'Загружаем данные…')} />
-        ) : totalCount === 0 ? (
-          <EmptyState
-            title={t('crud.emptyResource', { resource: activeResourceLabel })}
-            description={t(
-              'crud.emptyHint',
-              undefined,
-              'Создайте первую запись или измените фильтры, чтобы увидеть данные.',
-            )}
-          />
-        ) : (
-          <div className="space-y-3">
-            {paginatedRecords.map((record) => {
-              const recordId = getRecordId(record, idColumn);
-              const isActive = recordId !== EMPTY_TEXT && recordId === selectedRecordId;
-              const recordFieldEntries = tableFields.map((field) => {
-                const displayValue = getDisplayValue(
-                  field,
-                  record[field.name],
-                  yesLabel,
-                  noLabel,
-                  emptyLabel,
-                  translateReferenceLabel,
-                );
-
-                return {
-                  fieldName: field.name,
-                  label: t(
-                    `fields.${field.name}`,
-                    undefined,
-                    field.label || humanizeKey(field.name),
-                  ),
-                  displayValue,
-                };
-              });
-              const primaryEntry =
-                recordFieldEntries.find((entry) => entry.displayValue !== emptyLabel) ?? null;
-              const detailEntries = recordFieldEntries.filter(
-                (entry) => entry.fieldName !== primaryEntry?.fieldName,
-              );
-
-              return (
-                <div
-                  key={recordId || JSON.stringify(record)}
-                  className={cn(
-                    'rounded-[22px] border p-4 shadow-[0_18px_42px_-34px_rgba(15,23,42,0.14)]',
-                    isActive ? 'border-primary/30 bg-primary/5' : 'border-border/65 bg-card',
-                  )}
-                >
-                  {hasRecordActions ? (
-                    <button
-                      type="button"
-                      onClick={() => handleRecordFocus(record)}
-                      className="w-full text-left"
-                    >
-                      <div className="space-y-1">
-                        <p className="text-sm font-semibold text-foreground">
-                          {primaryEntry?.displayValue ?? getRecordSummaryLabel(record)}
-                        </p>
-                        <p className="truncate text-xs text-muted-foreground">
-                          {recordId || emptyLabel}
-                        </p>
-                      </div>
-                    </button>
-                  ) : (
-                    <div className="space-y-1">
-                      <p className="text-sm font-semibold text-foreground">
-                        {primaryEntry?.displayValue ?? getRecordSummaryLabel(record)}
-                      </p>
-                      <p className="truncate text-xs text-muted-foreground">
-                        {recordId || emptyLabel}
-                      </p>
-                    </div>
-                  )}
-
-                  <div className="mt-4 space-y-2">
-                    {detailEntries.map((entry) => (
-                      <div
-                        key={entry.fieldName}
-                        className="rounded-2xl border border-border/60 bg-background/80 px-3.5 py-3"
-                      >
-                        <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
-                          {entry.label}
-                        </p>
-                        <p className="mt-1 break-words text-sm text-foreground">
-                          {entry.displayValue}
-                        </p>
-                      </div>
-                    ))}
-                  </div>
-
-                  {hasRecordActions ? (
-                    <div className="mt-4 grid gap-2 [&>[data-slot=button]]:w-full">
-                      {renderRecordActionButtons(record)}
-                    </div>
-                  ) : null}
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </div>
-
-      <div className="hidden max-h-[680px] overflow-auto overscroll-x-contain sm:block">
-        <table className="w-full min-w-[960px] border-collapse text-left text-sm">
-          <thead className="sticky top-0 z-10 bg-card">
-            <tr className="border-primary/16 border-b">
-              {tableFields.map((field) => (
-                <th
-                  key={field.name}
-                  className="whitespace-nowrap px-5 py-4 text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground"
-                >
-                  {t(`fields.${field.name}`, undefined, field.label || humanizeKey(field.name))}
-                </th>
-              ))}
-              {hasRecordActions ? (
-                <th className="sticky right-0 whitespace-nowrap bg-card px-5 py-4 text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">
-                  {t('crud.actions')}
-                </th>
-              ) : null}
-            </tr>
-          </thead>
-          <tbody>
-            {paginatedRecords.map((record, rowIndex) => {
-              const recordId = getRecordId(record, idColumn);
-              const isActive = recordId !== EMPTY_TEXT && recordId === selectedRecordId;
-
-              return (
-                <tr
-                  key={recordId || JSON.stringify(record)}
-                  onClick={hasRecordActions ? () => handleRecordFocus(record) : undefined}
-                  aria-selected={hasRecordActions ? isActive : undefined}
-                  className={cn(
-                    'border-b border-border/50 transition-colors last:border-b-0',
-                    isActive
-                      ? 'bg-card shadow-[inset_4px_0_0_hsl(var(--primary))]'
-                      : rowIndex % 2 === 0
-                        ? 'bg-card'
-                        : 'bg-card hover:bg-card',
-                  )}
-                >
-                  {tableFields.map((field) => {
-                    const displayValue = getDisplayValue(
-                      field,
-                      record[field.name],
-                      yesLabel,
-                      noLabel,
-                      emptyLabel,
-                      translateReferenceLabel,
-                    );
-
-                    return (
-                      <td key={field.name} className="px-5 py-4 align-top">
-                        <span
-                          className="block max-w-[240px] rounded-xl border border-border/75 bg-card px-3 py-2 text-foreground shadow-[0_12px_32px_-28px_rgba(15,23,42,0.1)]"
-                          title={displayValue}
-                        >
-                          {displayValue}
-                        </span>
-                      </td>
-                    );
-                  })}
-                  {hasRecordActions ? (
-                    <td className="sticky right-0 whitespace-nowrap bg-inherit px-5 py-4">
-                      <div className="flex flex-wrap justify-end gap-2">
-                        {renderRecordActionButtons(record)}
-                      </div>
-                    </td>
-                  ) : null}
-                </tr>
-              );
-            })}
-            {totalCount === 0 && !listQuery.isLoading ? (
-              <tr>
-                <td colSpan={tableFields.length + (hasRecordActions ? 1 : 0)} className="px-5 py-2">
-                  <EmptyState
-                    title={t('crud.emptyResource', { resource: activeResourceLabel })}
-                    description={t(
-                      'crud.emptyHint',
-                      undefined,
-                      'Создайте первую запись или измените фильтры, чтобы увидеть данные.',
-                    )}
-                  />
-                </td>
-              </tr>
-            ) : null}
-          </tbody>
-        </table>
-      </div>
-    </div>
+    <RecordsTableView
+      tableFields={tableFields}
+      records={paginatedRecords}
+      idColumn={idColumn}
+      selectedRecordId={selectedRecordId}
+      totalCount={totalCount}
+      isLoading={listQuery.isLoading}
+      hasRecordActions={hasRecordActions}
+      activeResourceLabel={activeResourceLabel}
+      emptyLabel={emptyLabel}
+      yesLabel={yesLabel}
+      noLabel={noLabel}
+      t={t}
+      translateReferenceLabel={translateReferenceLabel}
+      getRecordSummaryLabel={getRecordSummaryLabel}
+      onRecordFocus={handleRecordFocus}
+      renderRecordActionButtons={renderRecordActionButtons}
+    />
   );
 
   const renderInventoryTools = () => {
@@ -3775,38 +2045,16 @@ export function ModuleCrudPage() {
     }
 
     return (
-      <div className="flex flex-wrap gap-2" data-tour="module-inventory-tools">
-        <Button
-          type="button"
-          className="rounded-full shadow-[0_18px_42px_-28px_rgba(234,88,12,0.42)]"
-          onClick={() => handleCreateInventoryMovement('incoming')}
-          disabled={pendingAction || !canCreateActiveResource}
-          data-tour="module-new-record"
-        >
-          <Plus className="h-4 w-4" />
-          {t('inventory.movementKinds.incoming', undefined, 'Приход')}
-        </Button>
-        <Button
-          type="button"
-          variant="outline"
-          className="rounded-full border-border/75 bg-card px-5 shadow-[0_16px_38px_-28px_rgba(15,23,42,0.1)]"
-          onClick={() => handleCreateInventoryMovement('outgoing')}
-          disabled={pendingAction || !canCreateActiveResource}
-        >
-          <Plus className="h-4 w-4" />
-          {t('inventory.movementKinds.outgoing', undefined, 'Расход')}
-        </Button>
-        <Button
-          type="button"
-          variant="outline"
-          className="rounded-full border-border/75 bg-card px-5 shadow-[0_16px_38px_-28px_rgba(15,23,42,0.1)]"
-          onClick={() => handleCreateInventoryMovement('transfer')}
-          disabled={pendingAction || !canCreateActiveResource}
-        >
-          <Plus className="h-4 w-4" />
-          {t('inventory.movementKinds.transfer_out', undefined, 'Перемещение')}
-        </Button>
-      </div>
+      <InventoryTools
+        canCreate={canCreateActiveResource}
+        pendingAction={pendingAction}
+        labels={{
+          incoming: t('inventory.movementKinds.incoming', undefined, 'Приход'),
+          outgoing: t('inventory.movementKinds.outgoing', undefined, 'Расход'),
+          transfer: t('inventory.movementKinds.transfer_out', undefined, 'Перемещение'),
+        }}
+        onCreate={handleCreateInventoryMovement}
+      />
     );
   };
 
@@ -3822,333 +2070,32 @@ export function ModuleCrudPage() {
       return null;
     }
 
-    const movementKindField = fieldMetaByName.get('movement_kind') ?? null;
-    const itemTypeField = fieldMetaByName.get('item_type') ?? null;
-    const unitField = fieldMetaByName.get('unit') ?? null;
-    const renderMovementActionButtons = (record: CrudRecord) => {
-      const recordId = getRecordId(record, idColumn);
-      const actionKeyPrefix = recordId || 'movement';
-      const isDeleteConfirming = recordId !== EMPTY_TEXT && deleteConfirmRecordId === recordId;
-      const buttons = [];
-
-      if (canReadAuditActiveResource) {
-        buttons.push(
-          <Button
-            key={`${actionKeyPrefix}-history`}
-            type="button"
-            size="sm"
-            variant="outline"
-            className="border-border/75 bg-card"
-            onClick={(event) => {
-              event.preventDefault();
-              event.stopPropagation();
-              handleOpenAudit(record);
-            }}
-            disabled={pendingAction}
-          >
-            <History className="h-3.5 w-3.5" />
-            {t('common.history')}
-          </Button>,
-        );
-      }
-
-      if (canDeleteActiveResource) {
-        buttons.push(
-          <Button
-            key={`${actionKeyPrefix}-delete`}
-            type="button"
-            size="sm"
-            variant={isDeleteConfirming ? 'destructive' : 'outline'}
-            className={cn(
-              isDeleteConfirming
-                ? deleteConfirmClassName
-                : 'border-destructive/25 bg-destructive/5 text-destructive hover:bg-destructive/10 hover:text-destructive',
-            )}
-            onClick={(event) => handleDeleteRecord(event, record)}
-            disabled={pendingAction}
-          >
-            <Trash2 className="h-3.5 w-3.5" />
-            {isDeleteConfirming ? deleteConfirmLabel : t('common.delete')}
-          </Button>,
-        );
-      }
-
-      return buttons;
-    };
-
     return (
-      <div
-        className={`${frostedPanelClassName} overflow-hidden`}
-        data-tour="inventory-movements-list"
-      >
-        <div className="max-h-[680px] overflow-y-auto p-3 sm:hidden">
-          {listQuery.isLoading ? (
-            <InlineLoader label={t('crud.loadingRecords', undefined, 'Загружаем данные…')} />
-          ) : paginatedRecords.length === 0 ? (
-            <EmptyState
-              title={t('crud.emptyResource', { resource: activeResourceLabel })}
-              description={t(
-                'crud.emptyHint',
-                undefined,
-                'Создайте первую запись или измените фильтры, чтобы увидеть данные.',
-              )}
-            />
-          ) : (
-            <div className="space-y-3">
-              {paginatedRecords.map((record) => {
-                const recordId = getRecordId(record, idColumn);
-                const movementKind =
-                  typeof record.movement_kind === 'string' ? record.movement_kind.trim() : '';
-                const itemType =
-                  typeof record.item_type === 'string' ? record.item_type.trim() : '';
-                const itemKey = typeof record.item_key === 'string' ? record.item_key.trim() : '';
-                const quantity = typeof record.quantity === 'string' ? record.quantity.trim() : '';
-                const unit = typeof record.unit === 'string' ? record.unit.trim() : '';
-                const warehouseId =
-                  typeof record.warehouse_id === 'string' ? record.warehouse_id.trim() : '';
-                const counterpartyWarehouseId =
-                  typeof record.counterparty_warehouse_id === 'string'
-                    ? record.counterparty_warehouse_id.trim()
-                    : '';
-                const note = typeof record.note === 'string' ? record.note.trim() : '';
-                const movementKindLabel =
-                  movementKindField && movementKind
-                    ? translateReferenceLabel(movementKindField, movementKind, movementKind)
-                    : humanizeKey(movementKind);
-                const itemTypeLabel =
-                  itemTypeField && itemType
-                    ? translateReferenceLabel(itemTypeField, itemType, itemType)
-                    : humanizeKey(itemType);
-                const itemKeyLabel = getInventoryPositionLabel(itemType, itemKey);
-                const unitLabel =
-                  unitField && unit
-                    ? translateReferenceLabel(unitField, unit, unit)
-                    : unit || emptyLabel;
-                const warehouseLabel = warehouseId
-                  ? warehouseById.get(warehouseId)
-                    ? getWarehouseRecordLabel(warehouseById.get(warehouseId)!)
-                    : warehouseId
-                  : emptyLabel;
-                const counterpartyWarehouseLabel = counterpartyWarehouseId
-                  ? warehouseById.get(counterpartyWarehouseId)
-                    ? getWarehouseRecordLabel(warehouseById.get(counterpartyWarehouseId)!)
-                    : counterpartyWarehouseId
-                  : '';
-                const isActive = recordId !== EMPTY_TEXT && recordId === selectedRecordId;
-
-                return (
-                  <div
-                    key={recordId || JSON.stringify(record)}
-                    className={cn(
-                      'rounded-[22px] border p-4 shadow-[0_18px_42px_-34px_rgba(15,23,42,0.14)]',
-                      isActive ? 'border-primary/30 bg-primary/5' : 'border-border/65 bg-card',
-                    )}
-                  >
-                    {hasRecordActions ? (
-                      <button
-                        type="button"
-                        onClick={() => handleRecordFocus(record)}
-                        className="w-full text-left"
-                      >
-                        <div className="space-y-1">
-                          <p className="text-sm font-semibold text-foreground">
-                            {movementKindLabel}
-                          </p>
-                          <p className="text-xs text-muted-foreground">
-                            {formatDateValue(record.occurred_on)}
-                          </p>
-                        </div>
-                      </button>
-                    ) : (
-                      <div className="space-y-1">
-                        <p className="text-sm font-semibold text-foreground">{movementKindLabel}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {formatDateValue(record.occurred_on)}
-                        </p>
-                      </div>
-                    )}
-
-                    <div className="mt-4 space-y-2">
-                      <div className="rounded-2xl border border-border/60 bg-background/80 px-3.5 py-3">
-                        <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
-                          {t('fields.item_key', undefined, 'Позиция')}
-                        </p>
-                        <p className="mt-1 text-sm text-foreground">{itemKeyLabel}</p>
-                        <p className="mt-1 text-xs text-muted-foreground">{itemTypeLabel}</p>
-                      </div>
-
-                      <div className="rounded-2xl border border-border/60 bg-background/80 px-3.5 py-3">
-                        <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
-                          {t('fields.warehouse_id', undefined, 'Склад')}
-                        </p>
-                        <p className="mt-1 text-sm text-foreground">{warehouseLabel}</p>
-                        {counterpartyWarehouseLabel ? (
-                          <p className="mt-1 break-words text-xs text-muted-foreground">
-                            {`${t('fields.counterparty_warehouse_id', undefined, 'Куда')}: ${counterpartyWarehouseLabel}`}
-                          </p>
-                        ) : null}
-                      </div>
-
-                      <div className="rounded-2xl border border-border/60 bg-background/80 px-3.5 py-3">
-                        <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
-                          {t('fields.quantity', undefined, 'Количество')}
-                        </p>
-                        <p className="mt-1 text-sm text-foreground">
-                          {quantity ? `${quantity} ${unitLabel}` : emptyLabel}
-                        </p>
-                      </div>
-
-                      <div className="rounded-2xl border border-border/60 bg-background/80 px-3.5 py-3">
-                        <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
-                          {t('fields.note', undefined, 'Комментарий')}
-                        </p>
-                        <p className="mt-1 break-words text-sm text-foreground">
-                          {note || emptyLabel}
-                        </p>
-                      </div>
-                    </div>
-
-                    {hasRecordActions ? (
-                      <div className="mt-4 grid gap-2 [&>[data-slot=button]]:w-full">
-                        {renderMovementActionButtons(record)}
-                      </div>
-                    ) : null}
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
-
-        <div className="hidden max-h-[680px] overflow-auto overscroll-x-contain sm:block">
-          <table className="w-full min-w-[980px] border-collapse text-left text-sm">
-            <thead className="sticky top-0 z-10 bg-card">
-              <tr className="border-primary/16 border-b">
-                <th className="whitespace-nowrap px-5 py-4 text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">
-                  {t('fields.occurred_on', undefined, 'Дата')}
-                </th>
-                <th className="whitespace-nowrap px-5 py-4 text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">
-                  {t('fields.movement_kind', undefined, 'Операция')}
-                </th>
-                <th className="whitespace-nowrap px-5 py-4 text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">
-                  {t('fields.warehouse_id', undefined, 'Склад')}
-                </th>
-                <th className="whitespace-nowrap px-5 py-4 text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">
-                  {t('fields.item_key', undefined, 'Позиция')}
-                </th>
-                <th className="whitespace-nowrap px-5 py-4 text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">
-                  {t('fields.quantity', undefined, 'Количество')}
-                </th>
-                <th className="whitespace-nowrap px-5 py-4 text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">
-                  {t('fields.note', undefined, 'Комментарий')}
-                </th>
-                {hasRecordActions ? (
-                  <th className="whitespace-nowrap px-5 py-4 text-right text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">
-                    {t('common.actions', undefined, 'Действия')}
-                  </th>
-                ) : null}
-              </tr>
-            </thead>
-            <tbody>
-              {paginatedRecords.map((record) => {
-                const recordId = getRecordId(record, idColumn);
-                const movementKind =
-                  typeof record.movement_kind === 'string' ? record.movement_kind.trim() : '';
-                const itemType =
-                  typeof record.item_type === 'string' ? record.item_type.trim() : '';
-                const itemKey = typeof record.item_key === 'string' ? record.item_key.trim() : '';
-                const quantity = typeof record.quantity === 'string' ? record.quantity.trim() : '';
-                const unit = typeof record.unit === 'string' ? record.unit.trim() : '';
-                const warehouseId =
-                  typeof record.warehouse_id === 'string' ? record.warehouse_id.trim() : '';
-                const counterpartyWarehouseId =
-                  typeof record.counterparty_warehouse_id === 'string'
-                    ? record.counterparty_warehouse_id.trim()
-                    : '';
-                const note = typeof record.note === 'string' ? record.note.trim() : '';
-                const movementKindLabel =
-                  movementKindField && movementKind
-                    ? translateReferenceLabel(movementKindField, movementKind, movementKind)
-                    : humanizeKey(movementKind);
-                const itemTypeLabel =
-                  itemTypeField && itemType
-                    ? translateReferenceLabel(itemTypeField, itemType, itemType)
-                    : humanizeKey(itemType);
-                const itemKeyLabel = getInventoryPositionLabel(itemType, itemKey);
-                const unitLabel =
-                  unitField && unit
-                    ? translateReferenceLabel(unitField, unit, unit)
-                    : unit || emptyLabel;
-                const warehouseLabel = warehouseId
-                  ? warehouseById.get(warehouseId)
-                    ? getWarehouseRecordLabel(warehouseById.get(warehouseId)!)
-                    : warehouseId
-                  : emptyLabel;
-                const counterpartyWarehouseLabel = counterpartyWarehouseId
-                  ? warehouseById.get(counterpartyWarehouseId)
-                    ? getWarehouseRecordLabel(warehouseById.get(counterpartyWarehouseId)!)
-                    : counterpartyWarehouseId
-                  : '';
-
-                return (
-                  <tr
-                    key={recordId || JSON.stringify(record)}
-                    className="border-b border-primary/10 last:border-b-0"
-                  >
-                    <td className="whitespace-nowrap px-5 py-4 align-top text-foreground">
-                      {formatDateValue(record.occurred_on)}
-                    </td>
-                    <td className="px-5 py-4 align-top">
-                      <div className="space-y-1">
-                        <p className="font-medium text-foreground">{movementKindLabel}</p>
-                        <p className="text-xs text-muted-foreground">{itemTypeLabel}</p>
-                      </div>
-                    </td>
-                    <td className="px-5 py-4 align-top">
-                      <div className="space-y-1">
-                        <p className="text-foreground">{warehouseLabel}</p>
-                        {counterpartyWarehouseLabel ? (
-                          <p className="text-xs text-muted-foreground">
-                            {`${t('fields.counterparty_warehouse_id', undefined, 'Куда')}: ${counterpartyWarehouseLabel}`}
-                          </p>
-                        ) : null}
-                      </div>
-                    </td>
-                    <td className="px-5 py-4 align-top text-foreground">{itemKeyLabel}</td>
-                    <td className="whitespace-nowrap px-5 py-4 align-top text-foreground">
-                      {quantity ? `${quantity} ${unitLabel}` : emptyLabel}
-                    </td>
-                    <td className="max-w-[280px] px-5 py-4 align-top text-muted-foreground">
-                      {note || emptyLabel}
-                    </td>
-                    {hasRecordActions ? (
-                      <td className="px-5 py-4 align-top">
-                        <div className="flex justify-end gap-2">
-                          {renderMovementActionButtons(record)}
-                        </div>
-                      </td>
-                    ) : null}
-                  </tr>
-                );
-              })}
-              {paginatedRecords.length === 0 && !listQuery.isLoading ? (
-                <tr>
-                  <td colSpan={hasRecordActions ? 7 : 6} className="px-5 py-2">
-                    <EmptyState
-                      title={t('crud.emptyResource', { resource: activeResourceLabel })}
-                      description={t(
-                        'crud.emptyHint',
-                        undefined,
-                        'Создайте первую запись или измените фильтры, чтобы увидеть данные.',
-                      )}
-                    />
-                  </td>
-                </tr>
-              ) : null}
-            </tbody>
-          </table>
-        </div>
-      </div>
+      <StockMovementCards
+        records={paginatedRecords}
+        isLoading={listQuery.isLoading}
+        idColumn={idColumn}
+        selectedRecordId={selectedRecordId}
+        deleteConfirmRecordId={deleteConfirmRecordId}
+        pendingAction={pendingAction}
+        hasRecordActions={hasRecordActions}
+        canReadAuditActiveResource={canReadAuditActiveResource}
+        canDeleteActiveResource={canDeleteActiveResource}
+        activeResourceLabel={activeResourceLabel}
+        emptyLabel={emptyLabel}
+        deleteConfirmLabel={deleteConfirmLabel}
+        deleteConfirmClassName={deleteConfirmClassName}
+        movementKindField={fieldMetaByName.get('movement_kind') ?? null}
+        itemTypeField={fieldMetaByName.get('item_type') ?? null}
+        unitField={fieldMetaByName.get('unit') ?? null}
+        warehouseById={warehouseById}
+        t={t}
+        translateReferenceLabel={translateReferenceLabel}
+        getInventoryPositionLabel={getInventoryPositionLabel}
+        onRecordFocus={handleRecordFocus}
+        onOpenAudit={handleOpenAudit}
+        onDeleteRecord={handleDeleteRecord}
+      />
     );
   };
 
@@ -4245,11 +2192,11 @@ export function ModuleCrudPage() {
   return (
     <div className="space-y-6" data-tour="module-page">
       <input
-        ref={medicineBatchAttachmentInputRef}
+        ref={medicineBatchQr.medicineBatchAttachmentInputRef}
         type="file"
         className="hidden"
         onChange={(event) => {
-          void handleMedicineBatchAttachmentInputChange(event);
+          void medicineBatchQr.handleAttachmentInputChange(event);
         }}
       />
       {(supportsStatistics && canOpenModuleAnalytics) || activeView === 'records' ? (
@@ -4291,8 +2238,8 @@ export function ModuleCrudPage() {
                 type="button"
                 variant="outline"
                 className="rounded-full border-border/75 bg-card px-5 shadow-[0_16px_38px_-28px_rgba(15,23,42,0.1)]"
-                onClick={handleOpenBulkClientNotification}
-                disabled={notificationPendingAction || visibleClientIds.length === 0}
+                onClick={clientNotifications.handleOpenBulk}
+                disabled={clientNotifications.pendingAction || visibleClientIds.length === 0}
                 data-tour="module-bulk-client-notification"
               >
                 <Send className="h-4 w-4" />
@@ -4434,46 +2381,29 @@ export function ModuleCrudPage() {
       )}
 
       {activeView === 'stats' ? (
-        <div className="space-y-6">
-          {moduleStatsQuery.isLoading ? (
-            <div className="rounded-[28px] border border-border/75 bg-card shadow-[0_24px_72px_-48px_rgba(15,23,42,0.14)]">
-              <InlineLoader
-                label={t('dashboard.loadingAnalytics', undefined, 'Готовим аналитику…')}
-              />
-            </div>
-          ) : null}
-          {moduleStatsQuery.error ? (
-            <ErrorNotice
-              error={moduleStatsQuery.error}
-              className="rounded-[28px] shadow-[0_18px_48px_-34px_rgba(244,63,94,0.16)]"
-            />
-          ) : null}
-          {!moduleStatsQuery.isLoading && !moduleStatsQuery.error && !moduleStatsSection ? (
-            <div className="rounded-[28px] border border-border/75 bg-card px-6 py-12 text-center text-sm text-muted-foreground shadow-[0_24px_72px_-48px_rgba(15,23,42,0.14)]">
-              {t('dashboard.moduleUnavailable')}
-            </div>
-          ) : null}
-          {!moduleStatsQuery.isLoading && !moduleStatsQuery.error && moduleStatsSection ? (
-            <AnalyticsDashboardView
-              title={moduleLabel}
-              badgeLabel={moduleStatsBadgeLabel}
-              badgeTone={moduleStatsBadgeTone}
-              scopeLabel={selectedStatsScopeLabel}
-              periodLabel={selectedStatsPeriodLabel}
-              updatedAtLabel={statsUpdatedAtLabel}
-              quickRangePresets={quickRangePresets}
-              activeQuickRangeKey={activeQuickRangeKey}
-              onQuickRangeApply={handleStatsQuickRangeApply}
-              startDate={effectiveStartDate}
-              endDate={effectiveEndDate}
-              onDateRangeApply={handleStatsDateRangeApply}
-              onResetFilters={handleStatsResetFilters}
-              summaryMetrics={moduleAnalyticsPresentation.summaryMetrics}
-              sections={moduleAnalyticsPresentation.sections}
-              minimalMode
-            />
-          ) : null}
-        </div>
+        <AnalyticsStatsView
+          t={t}
+          isLoading={moduleStatsQuery.isLoading}
+          error={moduleStatsQuery.error}
+          hasSection={Boolean(moduleStatsSection)}
+          dashboardProps={{
+            title: moduleLabel,
+            badgeLabel: moduleStatsBadgeLabel,
+            badgeTone: moduleStatsBadgeTone,
+            scopeLabel: selectedStatsScopeLabel,
+            periodLabel: selectedStatsPeriodLabel,
+            updatedAtLabel: statsUpdatedAtLabel,
+            quickRangePresets,
+            activeQuickRangeKey,
+            onQuickRangeApply: handleStatsQuickRangeApply,
+            startDate: effectiveStartDate,
+            endDate: effectiveEndDate,
+            onDateRangeApply: handleStatsDateRangeApply,
+            onResetFilters: handleStatsResetFilters,
+            summaryMetrics: moduleAnalyticsPresentation.summaryMetrics,
+            sections: moduleAnalyticsPresentation.sections,
+          }}
+        />
       ) : (
         <>
           {isHeadDepartmentView ? (
@@ -4598,341 +2528,56 @@ export function ModuleCrudPage() {
                 </CardContent>
               </Card>
 
-              <Sheet
-                open={Boolean(medicineBatchQrSheetBatch)}
+              <MedicineBatchQrSheet
+                batch={medicineBatchQr.medicineBatchQrSheetBatch}
+                payload={medicineBatchQr.activeMedicineBatchQrSheetPayload}
+                emptyLabel={emptyLabel}
+                t={t}
+                formatDateTime={formatDateTimeDisplayValue}
+                pendingAction={pendingAction}
+                isBusy={medicineBatchQr.isMedicineBatchQrSheetBusy}
+                onClose={() => medicineBatchQr.setMedicineBatchQrSheetBatch(null)}
+                onCopyLink={() => void medicineBatchQr.handleCopyPublicLink()}
+                onDownload={() => void medicineBatchQr.handleDownload()}
+                onPrint={() => void medicineBatchQr.handlePrint()}
+                onOpenPublic={() => void medicineBatchQr.handleOpenPublicPage()}
+              />
+
+              <ClientNotificationSheet
+                open={clientNotifications.isSheetOpen}
                 onOpenChange={(open) => {
+                  clientNotifications.setIsSheetOpen(open);
                   if (!open) {
-                    setMedicineBatchQrSheetBatch(null);
+                    clientNotifications.resetState();
                   }
                 }}
-              >
-                <SheetContent
-                  side="right"
-                  className="data-[side=right]:w-[92vw] data-[side=right]:sm:max-w-md"
-                >
-                  <SheetHeader>
-                    <SheetTitle>
-                      {t(
-                        'crud.medicineBatchQrCenterTitle',
-                        { code: medicineBatchQrSheetBatch?.code ?? emptyLabel },
-                        `QR-код партии ${medicineBatchQrSheetBatch?.code ?? emptyLabel}`,
-                      )}
-                    </SheetTitle>
-                  </SheetHeader>
-
-                  <div className="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain p-4">
-                    {activeMedicineBatchQrSheetPayload ? (
-                      <>
-                        <div className="rounded-2xl border border-border/75 bg-card px-4 py-4 text-center shadow-[0_18px_46px_-34px_rgba(15,23,42,0.16)]">
-                          <img
-                            src={activeMedicineBatchQrSheetPayload.image_data_url}
-                            alt="QR code"
-                            className="mx-auto h-[min(16rem,70vw)] w-[min(16rem,70vw)] rounded-2xl border border-border/70 bg-white object-contain p-3"
-                          />
-                        </div>
-
-                        <div className={`${frostedPanelClassName} space-y-3 px-4 py-4`}>
-                          <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
-                            {t('crud.openPublicCard', undefined, 'Public')}
-                          </p>
-                          <Input
-                            value={activeMedicineBatchQrSheetPayload.public_url}
-                            readOnly
-                            className={inputBaseClassName}
-                          />
-                        </div>
-
-                        <div className="grid gap-2 sm:grid-cols-2">
-                          <Button
-                            type="button"
-                            variant="outline"
-                            className="border-border/75 bg-card"
-                            onClick={() => void handleCopyMedicineBatchPublicLinkFromCenter()}
-                            disabled={pendingAction || isMedicineBatchQrSheetBusy}
-                          >
-                            <Copy className="h-3.5 w-3.5" />
-                            {t('crud.copyPublicLink', undefined, 'Копировать ссылку')}
-                          </Button>
-                          <Button
-                            type="button"
-                            variant="outline"
-                            className="border-border/75 bg-card"
-                            onClick={() => void handleDownloadMedicineBatchQrFromCenter()}
-                            disabled={pendingAction || isMedicineBatchQrSheetBusy}
-                          >
-                            <Download className="h-3.5 w-3.5" />
-                            {t('crud.downloadQr', undefined, 'Скачать PNG')}
-                          </Button>
-                        </div>
-
-                        <div className={`${frostedPanelClassName} space-y-2 px-4 py-4 text-xs`}>
-                          <div className="flex items-start justify-between gap-3">
-                            <span className="text-muted-foreground">
-                              {t('crud.qrGeneratedAt', undefined, 'Сгенерирован')}
-                            </span>
-                            <span className="text-right text-foreground">
-                              {formatDateTimeDisplayValue(
-                                activeMedicineBatchQrSheetPayload.generated_at,
-                              )}
-                            </span>
-                          </div>
-                          <div className="flex items-start justify-between gap-3">
-                            <span className="text-muted-foreground">
-                              {t('crud.qrExpiresAt', undefined, 'Действует до')}
-                            </span>
-                            <span className="text-right text-foreground">
-                              {formatDateTimeDisplayValue(
-                                activeMedicineBatchQrSheetPayload.token_expires_at,
-                              )}
-                            </span>
-                          </div>
-                        </div>
-                      </>
-                    ) : (
-                      <div
-                        className={`${frostedPanelClassName} px-4 py-8 text-sm text-muted-foreground`}
-                      >
-                        {t('common.loadingLabel')}
-                      </div>
-                    )}
-                  </div>
-
-                  <SheetFooter>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      className="border-border/75 bg-card"
-                      onClick={() => void handlePrintMedicineBatchQrFromCenter()}
-                      disabled={pendingAction || isMedicineBatchQrSheetBusy}
-                    >
-                      <Printer className="h-3.5 w-3.5" />
-                      {t('crud.printQr', undefined, 'Печать')}
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      className="border-border/75 bg-card"
-                      onClick={() => void handleOpenMedicineBatchPublicPageFromCenter()}
-                      disabled={pendingAction || isMedicineBatchQrSheetBusy}
-                    >
-                      <ExternalLink className="h-3.5 w-3.5" />
-                      {t('crud.openPublicCard', undefined, 'Public')}
-                    </Button>
-                  </SheetFooter>
-                </SheetContent>
-              </Sheet>
-
-              <Sheet
-                open={isClientNotificationSheetOpen}
-                onOpenChange={(open) => {
-                  setIsClientNotificationSheetOpen(open);
-                  if (!open) {
-                    resetClientNotificationState();
-                  }
+                isBulkMode={clientNotifications.isBulkMode}
+                targetLabel={clientNotifications.targetLabel}
+                emptyLabel={emptyLabel}
+                visibleClientCount={visibleClientIds.length}
+                t={t}
+                notificationError={clientNotifications.error}
+                feedback={clientNotifications.feedback}
+                context={{
+                  isLoading: clientNotifications.contextQuery.isLoading,
+                  error: clientNotifications.contextQuery.error,
+                  data: clientNotifications.contextQuery.data,
                 }}
-              >
-                <SheetContent
-                  side="right"
-                  className="data-[side=right]:w-[96vw] data-[side=right]:sm:max-w-xl"
-                  data-tour="client-notification-drawer"
-                >
-                  <SheetHeader>
-                    <SheetTitle>
-                      {isClientNotificationBulkMode
-                        ? t('crud.bulkClientNotification', undefined, 'Массовое уведомление')
-                        : t(
-                            'crud.clientNotificationTitle',
-                            { client: clientNotificationTargetLabel || emptyLabel },
-                            `Уведомление: ${clientNotificationTargetLabel || emptyLabel}`,
-                          )}
-                    </SheetTitle>
-                  </SheetHeader>
-
-                  <div className="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain p-4">
-                    {notificationError ? <ErrorNotice error={notificationError} /> : null}
-                    {clientNotificationFeedback ? (
-                      <div className={`${frostedPanelClassName} px-4 py-3 text-sm text-foreground`}>
-                        {clientNotificationFeedback}
-                      </div>
-                    ) : null}
-
-                    {isClientNotificationBulkMode ? (
-                      <div
-                        className={`${frostedPanelClassName} space-y-2 px-4 py-4 text-sm`}
-                        data-tour="client-notification-context"
-                      >
-                        <div className="flex items-center justify-between gap-3">
-                          <span className="text-muted-foreground">
-                            {t('common.totalRecords', { count: visibleClientIds.length })}
-                          </span>
-                          <span className={compactPillClassName}>
-                            {t('crud.clientNotificationChannel', undefined, 'Канал')}: Telegram
-                          </span>
-                        </div>
-                      </div>
-                    ) : (
-                      <>
-                        {clientNotificationContextQuery.isLoading ? (
-                          <div
-                            className={`${frostedPanelClassName} px-4 py-8 text-sm text-muted-foreground`}
-                          >
-                            {t('common.loadingLabel')}
-                          </div>
-                        ) : null}
-                        {clientNotificationContextQuery.error ? (
-                          <ErrorNotice error={clientNotificationContextQuery.error} />
-                        ) : null}
-                        {clientNotificationContextQuery.data ? (
-                          <div
-                            className={`${frostedPanelClassName} space-y-3 px-4 py-4 text-sm`}
-                            data-tour="client-notification-context"
-                          >
-                            <div className="grid gap-2 sm:grid-cols-2">
-                              <div className="rounded-2xl border border-border/70 bg-card px-3 py-2">
-                                <p className="text-xs text-muted-foreground">
-                                  {t('crud.debtOpenCount', undefined, 'Открытых долгов')}
-                                </p>
-                                <p className="text-base font-semibold text-foreground">
-                                  {clientNotificationContextQuery.data.debt_summary.open_count}
-                                </p>
-                              </div>
-                              <div className="rounded-2xl border border-border/70 bg-card px-3 py-2">
-                                <p className="text-xs text-muted-foreground">
-                                  {t('crud.debtOutstanding', undefined, 'Остаток долга')}
-                                </p>
-                                <p className="text-base font-semibold text-foreground">
-                                  {`${clientNotificationContextQuery.data.debt_summary.outstanding_amount} ${clientNotificationContextQuery.data.debt_summary.currency}`}
-                                </p>
-                              </div>
-                            </div>
-                            <div className="space-y-2">
-                              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
-                                {t('crud.recentPurchases', undefined, 'Последние покупки')}
-                              </p>
-                              {clientNotificationContextQuery.data.recent_purchases
-                                .slice(0, 3)
-                                .map((purchase, index) => (
-                                  <div
-                                    key={`${purchase.purchased_on ?? 'purchase'}:${index}`}
-                                    className="rounded-2xl border border-border/70 bg-card px-3 py-2"
-                                  >
-                                    <p className="text-sm text-foreground">
-                                      {`${String(purchase.purchased_on ?? emptyLabel)} · ${String(
-                                        purchase.item_name ?? emptyLabel,
-                                      )}`}
-                                    </p>
-                                    <p className="text-xs text-muted-foreground">
-                                      {`${String(purchase.quantity ?? 0)} ${String(
-                                        purchase.unit ?? '',
-                                      )} · ${String(purchase.amount ?? 0)} ${String(
-                                        purchase.currency ?? '',
-                                      )}`}
-                                    </p>
-                                  </div>
-                                ))}
-                            </div>
-                          </div>
-                        ) : null}
-                      </>
-                    )}
-
-                    <div
-                      className={`${frostedPanelClassName} space-y-3 px-4 py-4`}
-                      data-tour="client-notification-template-tabs"
-                    >
-                      <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
-                        {t('crud.clientNotificationTemplate', undefined, 'Шаблон')}
-                      </p>
-                      <div className="flex flex-wrap gap-2">
-                        {clientNotificationTemplates.map((template) => (
-                          <Button
-                            key={template.key}
-                            type="button"
-                            variant={
-                              template.key === clientNotificationTemplateKey ? 'default' : 'outline'
-                            }
-                            className="rounded-full"
-                            onClick={() => {
-                              setClientNotificationTemplateKey(
-                                template.key as ClientNotificationTemplateKey,
-                              );
-                              setClientNotificationMessageTouched(false);
-                            }}
-                            disabled={notificationPendingAction}
-                          >
-                            {template.title}
-                          </Button>
-                        ))}
-                      </div>
-                    </div>
-
-                    <div
-                      className={`${frostedPanelClassName} space-y-3 px-4 py-4`}
-                      data-tour="client-notification-message-field"
-                    >
-                      <label
-                        className="text-sm font-medium text-foreground"
-                        htmlFor="client-notification-message"
-                      >
-                        {t('crud.clientNotificationMessage', undefined, 'Сообщение')}
-                      </label>
-                      <textarea
-                        id="client-notification-message"
-                        value={clientNotificationMessage}
-                        onChange={(event) => {
-                          setClientNotificationMessage(event.target.value);
-                          setClientNotificationMessageTouched(true);
-                        }}
-                        disabled={notificationPendingAction}
-                        className="min-h-[180px] w-full rounded-2xl border border-border/75 bg-card px-4 py-3 text-sm text-foreground shadow-[0_16px_38px_-30px_rgba(15,23,42,0.12)] ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                      />
-                    </div>
-
-                    {clientNotificationBulkResult ? (
-                      <div className={`${frostedPanelClassName} space-y-2 px-4 py-4`}>
-                        <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
-                          {t('crud.clientNotificationBulkResult', undefined, 'Итог рассылки')}
-                        </p>
-                        <p className="text-sm text-foreground">
-                          {t(
-                            'crud.clientNotificationBulkSent',
-                            {
-                              sent: clientNotificationBulkResult.sent,
-                              failed: clientNotificationBulkResult.failed,
-                            },
-                            `Отправлено: ${clientNotificationBulkResult.sent}, ошибок: ${clientNotificationBulkResult.failed}.`,
-                          )}
-                        </p>
-                      </div>
-                    ) : null}
-                  </div>
-
-                  <SheetFooter>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      className="border-border/75 bg-card"
-                      onClick={() => setIsClientNotificationSheetOpen(false)}
-                      disabled={notificationPendingAction}
-                      data-tour="client-notification-close-button"
-                    >
-                      {t('common.close')}
-                    </Button>
-                    <Button
-                      type="button"
-                      className="shadow-[0_18px_42px_-28px_rgba(234,88,12,0.42)]"
-                      onClick={handleSendClientNotification}
-                      disabled={isClientNotificationSendDisabled}
-                      data-tour="client-notification-send-button"
-                    >
-                      <Send className="h-4 w-4" />
-                      {notificationPendingAction
-                        ? t('common.loadingLabel')
-                        : t('crud.clientNotificationSend', undefined, 'Отправить')}
-                    </Button>
-                  </SheetFooter>
-                </SheetContent>
-              </Sheet>
+                templates={clientNotifications.templates}
+                templateKey={clientNotifications.templateKey}
+                onTemplateKeyChange={(key) => {
+                  clientNotifications.setTemplateKey(key);
+                  clientNotifications.setMessageTouched(false);
+                }}
+                message={clientNotifications.message}
+                onMessageChange={clientNotifications.setMessage}
+                onMessageTouched={() => clientNotifications.setMessageTouched(true)}
+                bulkResult={clientNotifications.bulkResult}
+                pendingAction={clientNotifications.pendingAction}
+                sendDisabled={clientNotifications.isSendDisabled}
+                onClose={() => clientNotifications.setIsSheetOpen(false)}
+                onSend={clientNotifications.handleSend}
+              />
 
               <Sheet
                 open={isFormSheetOpen}
@@ -5043,274 +2688,38 @@ export function ModuleCrudPage() {
                     />
                   ) : null}
                   <div className="grid gap-4 md:grid-cols-2" data-tour="module-form-fields">
-                    {renderedFormFields.map((field) => {
-                      const value = formValues[field.name];
-                      const fieldError = formErrors[field.name];
-                      const fieldInputKind = getFieldInputKind(field);
-                      const isDepartmentReferenceField =
-                        supportsDepartmentFilter && field.name === 'department_id';
-                      const isMovementWarehouseField =
-                        isInventoryMovementsResource &&
-                        (field.name === 'warehouse_id' ||
-                          field.name === 'counterparty_warehouse_id');
-                      const isMovementItemKeyField =
-                        isInventoryMovementsResource && field.name === 'item_key';
-                      const isClientDebtItemKeyField =
-                        isClientDebtsResource && field.name === 'item_key';
-                      const isFinanceDepartmentScopedReferenceField =
-                        field.name === 'category_id' ||
-                        field.name === 'expense_category_id' ||
-                        field.name === 'cash_account_id';
-                      const clientDebtDepartmentId =
-                        typeof formValues.department_id === 'string'
-                          ? formValues.department_id.trim()
-                          : selectedDepartmentId || fallbackDepartmentId || '';
-                      const financeDepartmentId =
-                        typeof formValues.department_id === 'string'
-                          ? formValues.department_id.trim()
-                          : selectedDepartmentId || fallbackDepartmentId || '';
-                      const currentDepartmentReferenceValue =
-                        isDepartmentReferenceField && typeof value === 'string' ? value.trim() : '';
-                      const currentDepartmentNode = currentDepartmentReferenceValue
-                        ? departmentNodeMap.get(currentDepartmentReferenceValue)
-                        : null;
-                      const currentDepartmentReferenceOption =
-                        currentDepartmentNode &&
-                        !departmentReferenceOptions.some(
-                          (option) => option.value === currentDepartmentReferenceValue,
-                        )
-                          ? {
-                              value: currentDepartmentReferenceValue,
-                              label: `${' '.repeat(currentDepartmentNode.depth * 2)}${currentDepartmentNode.label}`,
-                            }
-                          : null;
-                      const isMovementWarehouseScopeSelected =
-                        !isMovementWarehouseField ||
-                        (field.name === 'warehouse_id'
-                          ? movementDepartmentId.length > 0
-                          : typeof formValues.warehouse_id === 'string' &&
-                            formValues.warehouse_id.trim().length > 0);
-                      const referenceOptions = isDepartmentReferenceField
-                        ? currentDepartmentReferenceOption
-                          ? [...departmentReferenceOptions, currentDepartmentReferenceOption]
-                          : departmentReferenceOptions
-                        : field.name === 'warehouse_id'
-                          ? movementWarehouseReferenceOptions
-                          : field.name === 'counterparty_warehouse_id'
-                            ? movementCounterpartyWarehouseReferenceOptions
-                            : field.name === 'item_key'
-                              ? inventoryMovementItemKeyField.reference?.options
-                              : field.reference?.options;
-                      const referenceQueryParams =
-                        field.name === 'warehouse_id'
-                          ? { department_id: movementDepartmentId || undefined }
-                          : field.name === 'item_key'
-                            ? {
-                                department_id: isInventoryMovementsResource
-                                  ? movementDepartmentId || undefined
-                                  : isClientDebtsResource
-                                    ? clientDebtDepartmentId || undefined
-                                    : undefined,
-                                item_type:
-                                  typeof formValues.item_type === 'string'
-                                    ? formValues.item_type.trim() || undefined
-                                    : undefined,
-                              }
-                            : isFinanceDepartmentScopedReferenceField
-                              ? { department_id: financeDepartmentId || undefined }
-                              : undefined;
-                      const hasReferenceOptions =
-                        isDepartmentReferenceField ||
-                        isMovementWarehouseField ||
-                        isMovementItemKeyField ||
-                        isClientDebtItemKeyField ||
-                        Boolean(field.reference);
-                      const isMultiReference = isMultiReferenceField(field);
-                      const useCompactReferenceSelect =
-                        hasReferenceOptions &&
-                        !isMultiReference &&
-                        !isMovementItemKeyField &&
-                        !isClientDebtItemKeyField &&
-                        (field.name === 'movement_kind' ||
-                          field.name === 'item_type' ||
-                          field.name === 'unit');
-                      const compactReferenceOptions = (referenceOptions ?? []).map((option) => ({
-                        value: option.value,
-                        label: translateReferenceLabel(field, option.value, option.label),
-                        searchText: option.label,
-                      }));
-                      const isWideField =
-                        fieldInputKind === 'json' ||
-                        (isInventoryMovementsResource && field.name === 'note');
-                      const isItemTypeSelected =
-                        (!isMovementItemKeyField && !isClientDebtItemKeyField) ||
-                        (typeof formValues.item_type === 'string' &&
-                          formValues.item_type.trim().length > 0);
-                      const isItemScopeSelected =
-                        !isMovementItemKeyField && !isClientDebtItemKeyField
-                          ? true
-                          : isInventoryMovementsResource
-                            ? movementDepartmentId.length > 0
-                            : clientDebtDepartmentId.length > 0;
-                      const fieldLabel =
-                        isInventoryMovementsResource && field.name === 'warehouse_id'
-                          ? isTransferMovementForm
-                            ? t('fields.from_warehouse_id', undefined, 'Откуда')
-                            : t('fields.warehouse_id', undefined, 'Склад')
-                          : isInventoryMovementsResource &&
-                              field.name === 'counterparty_warehouse_id'
-                            ? t('fields.to_warehouse_id', undefined, 'Куда')
-                            : t(
-                                `fields.${field.name}`,
-                                undefined,
-                                field.label || humanizeKey(field.name),
-                              );
-
-                      return (
-                        <div
-                          key={field.name}
-                          className={cn(
-                            `${frostedPanelClassName} space-y-3 p-4`,
-                            isWideField ? 'md:col-span-2' : '',
-                          )}
-                          data-tour={
-                            isClientDebtsResource && field.name === 'item_key'
-                              ? 'client-debt-item-key-field'
-                              : isClientDebtsResource && field.name === 'due_on'
-                                ? 'client-debt-due-on-field'
-                                : undefined
-                          }
-                        >
-                          <label
-                            className="text-sm font-medium text-foreground"
-                            htmlFor={field.name}
-                          >
-                            {fieldLabel}
-                            {field.required ? (
-                              <span className="ml-1 text-destructive">*</span>
-                            ) : null}
-                          </label>
-
-                          {fieldInputKind === 'boolean' ? (
-                            <label className="flex items-center gap-3 rounded-2xl border border-border/75 bg-card px-4 py-3 shadow-[0_16px_36px_-30px_rgba(15,23,42,0.1)]">
-                              <input
-                                id={field.name}
-                                type="checkbox"
-                                checked={Boolean(value)}
-                                disabled={isFormReadOnly || pendingAction}
-                                onChange={(event) => handleInputChange(field, event.target.checked)}
-                                className="h-4 w-4 rounded border-border text-primary focus:ring-primary"
-                              />
-                              <span className="text-sm text-foreground">{`${yesLabel} / ${noLabel}`}</span>
-                            </label>
-                          ) : useCompactReferenceSelect ? (
-                            <CustomSelect
-                              value={typeof value === 'string' ? value : EMPTY_TEXT}
-                              onChange={(nextValue) => handleInputChange(field, nextValue)}
-                              options={compactReferenceOptions}
-                              disabled={
-                                isFormReadOnly ||
-                                pendingAction ||
-                                !isItemTypeSelected ||
-                                !isItemScopeSelected ||
-                                !isMovementWarehouseScopeSelected
-                              }
-                              className={inputBaseClassName}
-                              placeholder={t('common.chooseValue')}
-                              searchPlaceholder={t('common.search', undefined, 'Поиск')}
-                              emptySearchLabel={t(
-                                'crud.referenceNoOptions',
-                                undefined,
-                                'Подходящие варианты не найдены.',
-                              )}
-                              searchable={
-                                isDepartmentReferenceField ||
-                                isMovementWarehouseField ||
-                                compactReferenceOptions.length > 6
-                              }
-                            />
-                          ) : hasReferenceOptions ? (
-                            <SearchableReferenceSelect
-                              moduleKey={resourceModuleKey}
-                              resourcePath={activeResource!.path}
-                              field={{
-                                ...field,
-                                reference:
-                                  isDepartmentReferenceField ||
-                                  isMovementWarehouseField ||
-                                  isMovementItemKeyField
-                                    ? {
-                                        ...((isMovementItemKeyField
-                                          ? inventoryMovementItemKeyField.reference
-                                          : field.reference) ?? {
-                                          table: isMovementWarehouseField
-                                            ? 'warehouses'
-                                            : isMovementItemKeyField
-                                              ? '__inventory_item_key__'
-                                              : 'departments',
-                                          column: isMovementItemKeyField ? 'value' : 'id',
-                                          label_column: isMovementItemKeyField ? 'label' : 'name',
-                                          options: [],
-                                        }),
-                                        options: referenceOptions ?? [],
-                                      }
-                                    : field.reference,
-                              }}
-                              value={
-                                isMultiReference
-                                  ? Array.isArray(value)
-                                    ? value
-                                    : []
-                                  : typeof value === 'string'
-                                    ? value
-                                    : EMPTY_TEXT
-                              }
-                              onChange={(nextValue) => handleInputChange(field, nextValue)}
-                              disabled={
-                                isFormReadOnly ||
-                                pendingAction ||
-                                !isItemTypeSelected ||
-                                !isItemScopeSelected ||
-                                !isMovementWarehouseScopeSelected
-                              }
-                              className={inputBaseClassName}
-                              placeholder={t('common.chooseValue')}
-                              searchPlaceholder={t('common.search', undefined, 'Поиск')}
-                              emptySearchLabel={t(
-                                'crud.referenceNoOptions',
-                                undefined,
-                                'Подходящие варианты не найдены.',
-                              )}
-                              translateOptionLabel={translateReferenceLabel}
-                              referenceQueryParams={referenceQueryParams}
-                            />
-                          ) : fieldInputKind === 'json' ? (
-                            <textarea
-                              id={field.name}
-                              value={typeof value === 'string' ? value : EMPTY_TEXT}
-                              disabled={isFormReadOnly || pendingAction}
-                              onChange={(event) => handleInputChange(field, event.target.value)}
-                              spellCheck={false}
-                              className="min-h-[140px] w-full rounded-2xl border border-border/75 bg-card px-4 py-3 text-sm text-foreground shadow-[0_16px_38px_-30px_rgba(15,23,42,0.12)] ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                            />
-                          ) : (
-                            <Input
-                              id={field.name}
-                              type={getInputType(field)}
-                              {...getInputProps(field)}
-                              value={typeof value === 'string' ? value : EMPTY_TEXT}
-                              disabled={isFormReadOnly || pendingAction}
-                              onChange={(event) => handleInputChange(field, event.target.value)}
-                              className={inputBaseClassName}
-                            />
-                          )}
-
-                          {fieldError ? (
-                            <p className="text-xs text-destructive">{fieldError}</p>
-                          ) : null}
-                        </div>
-                      );
-                    })}
+                    {renderedFormFields.map((field) => (
+                      <CrudFormFieldRow
+                        key={field.name}
+                        field={field}
+                        value={formValues[field.name]}
+                        fieldError={formErrors[field.name]}
+                        context={{
+                          t,
+                          translateReferenceLabel,
+                          yesLabel,
+                          noLabel,
+                          isFormReadOnly,
+                          pendingAction,
+                          supportsDepartmentFilter,
+                          isInventoryMovementsResource,
+                          isClientDebtsResource,
+                          isTransferMovementForm,
+                          formValues,
+                          selectedDepartmentId,
+                          fallbackDepartmentId,
+                          movementDepartmentId,
+                          departmentNodeMap,
+                          departmentReferenceOptions,
+                          movementWarehouseReferenceOptions,
+                          movementCounterpartyWarehouseReferenceOptions,
+                          inventoryMovementItemKeyField,
+                          resourceModuleKey,
+                          resourcePath: activeResource!.path,
+                          onInputChange: handleInputChange,
+                        }}
+                      />
+                    ))}
                   </div>
                 </CrudDrawer>
               </Sheet>
@@ -5325,7 +2734,7 @@ export function ModuleCrudPage() {
                 onConfirm={closeFormSheet}
               />
 
-              <Sheet
+              <AuditHistorySheet
                 open={isAuditSheetOpen}
                 onOpenChange={(open) => {
                   setIsAuditSheetOpen(open);
@@ -5334,125 +2743,28 @@ export function ModuleCrudPage() {
                     setAuditRecordLabel('');
                   }
                 }}
-              >
-                <CrudDrawer
-                  dataTour="module-audit-drawer"
-                  size="audit"
-                  title={t('crud.auditTitle')}
-                  description=""
-                  footer={
-                    <CrudDrawerFooter
-                      closeLabel={t('common.close')}
-                      onClose={() => {
-                        setIsAuditSheetOpen(false);
-                        setAuditRecordId('');
-                        setAuditRecordLabel('');
-                      }}
-                    />
-                  }
-                >
-                  <div className={`${frostedPanelClassName} space-y-2 px-4 py-4`}>
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-                      {activeResourceLabel}
-                    </p>
-                    <p className="text-lg font-semibold tracking-[-0.03em] text-foreground">
-                      {auditRecordLabel || auditRecordId || emptyLabel}
-                    </p>
-                  </div>
-
-                  <div className="space-y-4" data-tour="module-audit-history">
-                    {auditHistoryQuery.isLoading ? (
-                      <div className={frostedPanelClassName}>
-                        <InlineLoader
-                          label={t('crud.loadingAuditHistory', undefined, 'Загружаем историю…')}
-                        />
-                      </div>
-                    ) : null}
-
-                    {auditHistoryQuery.error ? (
-                      <ErrorNotice error={auditHistoryQuery.error} />
-                    ) : null}
-
-                    {!auditHistoryQuery.isLoading &&
-                    !auditHistoryQuery.error &&
-                    auditHistoryItems.length === 0 ? (
-                      <div className={frostedPanelClassName}>
-                        <EmptyState
-                          icon={History}
-                          title={t('crud.auditEmpty')}
-                          description={t(
-                            'crud.auditEmptyHint',
-                            undefined,
-                            'Изменения по этой записи появятся здесь автоматически.',
-                          )}
-                        />
-                      </div>
-                    ) : null}
-
-                    {!auditHistoryQuery.isLoading && !auditHistoryQuery.error ? (
-                      <div className="space-y-4">
-                        {auditHistoryItems.map((entry) => {
-                          const entryFieldNames = getAuditFieldNames(entry);
-
-                          return (
-                            <article
-                              key={entry.id}
-                              className={`${frostedPanelClassName} space-y-4 p-4`}
-                            >
-                              <div className="flex flex-wrap items-center gap-2">
-                                <span
-                                  className={cn(
-                                    'rounded-full border px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em]',
-                                    getAuditActionBadgeClassName(entry.action),
-                                  )}
-                                >
-                                  {getAuditActionLabel(entry.action)}
-                                </span>
-                                <span className={compactPillClassName}>
-                                  {`${t('crud.auditChangedBy')}: ${entry.actor_username || emptyLabel}`}
-                                </span>
-                                <span className={compactPillClassName}>
-                                  {`${t('crud.auditChangedAt')}: ${formatAuditTimestamp(entry.changed_at)}`}
-                                </span>
-                              </div>
-
-                              {entryFieldNames.length > 0 ? (
-                                <div className="space-y-2">
-                                  <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-                                    {t('crud.auditChangedFields')}
-                                  </p>
-                                  <div className="flex flex-wrap gap-2">
-                                    {entryFieldNames.map((fieldName) => (
-                                      <span key={fieldName} className={compactPillClassName}>
-                                        {getAuditFieldLabel(fieldName)}
-                                      </span>
-                                    ))}
-                                  </div>
-                                </div>
-                              ) : null}
-
-                              <div className="grid gap-4 xl:grid-cols-2">
-                                <div className="space-y-2">
-                                  <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-                                    {t('crud.auditBefore')}
-                                  </p>
-                                  {renderAuditSnapshot(entry.before_data, entryFieldNames)}
-                                </div>
-                                <div className="space-y-2">
-                                  <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-                                    {t('crud.auditAfter')}
-                                  </p>
-                                  {renderAuditSnapshot(entry.after_data, entryFieldNames)}
-                                </div>
-                              </div>
-                            </article>
-                          );
-                        })}
-                      </div>
-                    ) : null}
-                  </div>
-                </CrudDrawer>
-              </Sheet>
+                onClose={() => {
+                  setIsAuditSheetOpen(false);
+                  setAuditRecordId('');
+                  setAuditRecordLabel('');
+                }}
+                activeResourceLabel={activeResourceLabel}
+                auditRecordLabel={auditRecordLabel}
+                auditRecordId={auditRecordId}
+                emptyLabel={emptyLabel}
+                t={t}
+                query={{
+                  isLoading: auditHistoryQuery.isLoading,
+                  error: auditHistoryQuery.error,
+                }}
+                auditHistoryItems={auditHistoryItems}
+                getAuditFieldNames={getAuditFieldNames}
+                getAuditActionLabel={getAuditActionLabel}
+                getAuditActionBadgeClassName={getAuditActionBadgeClassName}
+                formatAuditTimestamp={formatAuditTimestamp}
+                getAuditFieldLabel={getAuditFieldLabel}
+                getAuditFieldDisplayValue={getAuditFieldDisplayValue}
+              />
             </>
           ) : null}
         </>

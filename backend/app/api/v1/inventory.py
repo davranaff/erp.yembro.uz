@@ -11,8 +11,21 @@ from app.api.deps import CurrentActor, db_dependency, get_current_actor, require
 from app.core.exceptions import ValidationError
 from app.db.pool import Database
 from app.repositories.core import WarehouseRepository
-from app.repositories.inventory import StockMovementRepository
-from app.services.inventory import ITEM_TYPES, StockLedgerService, StockMovementService, normalize_stock_movement_unit
+from app.repositories.inventory import (
+    StockMovementRepository,
+    StockReorderLevelRepository,
+    StockTakeLineRepository,
+    StockTakeRepository,
+)
+from app.services.inventory import (
+    ITEM_TYPES,
+    StockLedgerService,
+    StockMovementService,
+    StockReorderLevelService,
+    StockTakeLineService,
+    StockTakeService,
+    normalize_stock_movement_unit,
+)
 
 
 router = APIRouter(prefix="/inventory", tags=["inventory"])
@@ -26,6 +39,33 @@ router.include_router(
         service_factory=lambda db: StockMovementService(StockMovementRepository(db)),
         permission_prefix="stock_movement",
         tags=["stock-movement"],
+    )
+)
+
+router.include_router(
+    build_crud_router(
+        prefix="stock-takes",
+        service_factory=lambda db: StockTakeService(StockTakeRepository(db)),
+        permission_prefix="stock_take",
+        tags=["stock-take"],
+    )
+)
+
+router.include_router(
+    build_crud_router(
+        prefix="stock-take-lines",
+        service_factory=lambda db: StockTakeLineService(StockTakeLineRepository(db)),
+        permission_prefix="stock_take",
+        tags=["stock-take-line"],
+    )
+)
+
+router.include_router(
+    build_crud_router(
+        prefix="reorder-levels",
+        service_factory=lambda db: StockReorderLevelService(StockReorderLevelRepository(db)),
+        permission_prefix="stock_reorder_level",
+        tags=["stock-reorder-level"],
     )
 )
 
@@ -70,7 +110,7 @@ def _resolve_optional_department_id(
     dependencies=[Depends(require_access("stock_movement.read", roles=("admin", "manager")))],
 )
 async def get_stock_balance(
-    item_type: str = Query(..., pattern="^(egg|chick|feed|medicine|semi_product)$"),
+    item_type: str = Query(..., pattern="^(egg|chick|feed|feed_raw|medicine|semi_product)$"),
     item_key: str | None = Query(default=None, min_length=2),
     as_of: date | None = Query(default=None),
     department_id: str | None = Query(default=None),
@@ -143,7 +183,7 @@ async def create_internal_transfer(
 ) -> dict[str, Any]:
     raw_item_type = str(payload.get("item_type") or "").strip().lower()
     if raw_item_type not in ITEM_TYPES:
-        raise ValidationError("item_type must be one of: egg, chick, feed, medicine, semi_product")
+        raise ValidationError("item_type must be one of: egg, chick, feed, feed_raw, medicine, semi_product")
 
     item_key = str(payload.get("item_key") or "").strip()
     if not item_key:
@@ -197,6 +237,53 @@ async def create_internal_transfer(
         )
 
     return transfer_payload
+
+
+@router.post(
+    "/stock-takes/{stock_take_id}/finalize",
+    status_code=status.HTTP_200_OK,
+    dependencies=[Depends(require_access("stock_take.write", roles=("admin", "manager")))],
+)
+async def finalize_stock_take(
+    stock_take_id: str,
+    current_actor: CurrentActor = Depends(get_current_actor),
+    db: Database = Depends(db_dependency),
+) -> dict[str, Any]:
+    service = StockTakeService(StockTakeRepository(db))
+    return await service.finalize(stock_take_id, actor=current_actor)
+
+
+@router.get(
+    "/stock/low-stock",
+    status_code=status.HTTP_200_OK,
+    dependencies=[Depends(require_access("stock_reorder_level.read", roles=("admin", "manager")))],
+)
+async def list_low_stock(
+    department_id: str | None = Query(default=None),
+    warehouse_id: str | None = Query(default=None),
+    as_of: date | None = Query(default=None),
+    current_actor: CurrentActor = Depends(get_current_actor),
+    db: Database = Depends(db_dependency),
+) -> dict[str, Any]:
+    resolved_department_id = _resolve_optional_department_id(
+        actor=current_actor,
+        requested_department_id=department_id,
+    )
+    resolved_warehouse_id = str(warehouse_id or "").strip() or None
+
+    service = StockReorderLevelService(StockReorderLevelRepository(db))
+    items = await service.list_low_stock(
+        organization_id=current_actor.organization_id,
+        department_id=resolved_department_id,
+        warehouse_id=resolved_warehouse_id,
+        as_of=as_of,
+    )
+    return {
+        "department_id": resolved_department_id,
+        "warehouse_id": resolved_warehouse_id,
+        "as_of": as_of,
+        "items": items,
+    }
 
 
 __all__ = ["router"]

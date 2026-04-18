@@ -187,4 +187,27 @@ class StockMovementRepository(BaseRepository[dict[str, object]]):
         return [dict(row) for row in rows]
 
 
-__all__ = ["StockMovementRepository"]
+class StockTakeRepository(BaseRepository[dict[str, object]]):
+    table = "stock_takes"
+
+
+class StockTakeLineRepository(BaseRepository[dict[str, object]]):
+    table = "stock_take_lines"
+
+    async def list_by_stock_take(self, stock_take_id: str) -> list[dict[str, object]]:
+        return await self.list(
+            filters={"stock_take_id": stock_take_id},
+            order_by=("item_type", "item_key"),
+        )
+
+
+class StockReorderLevelRepository(BaseRepository[dict[str, object]]):
+    table = "stock_reorder_levels"
+
+
+__all__ = [
+    "StockMovementRepository",
+    "StockTakeRepository",
+    "StockTakeLineRepository",
+    "StockReorderLevelRepository",
+]

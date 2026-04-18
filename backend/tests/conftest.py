@@ -303,6 +303,11 @@ class AioSQLiteDatabase(Database):
         sqlite_query = re.sub(r"::[a-zA-Z_][a-zA-Z0-9_\[\]]*", "", sqlite_query)
         sqlite_query = re.sub(r"([A-Za-z0-9_\.]+)\s*=\s*ANY\(\?\)", r"\1 IN (SELECT value FROM json_each(?))", sqlite_query)
         sqlite_query = re.sub(r"\(\?\s*\+\s*INTERVAL\s+'30 days'\)", "DATE(?, '+30 days')", sqlite_query)
+        sqlite_query = re.sub(
+            r"CURRENT_DATE\s*([+-])\s*INTERVAL\s+'(\d+)\s*(day|days|month|months|year|years)'",
+            lambda m: f"DATE(CURRENT_DATE, '{m.group(1)}{m.group(2)} {m.group(3).rstrip('s')}s')",
+            sqlite_query,
+        )
         return sqlite_query, _normalize_sqlite_args(tuple(expanded_args))
 
     async def connect(self) -> None:

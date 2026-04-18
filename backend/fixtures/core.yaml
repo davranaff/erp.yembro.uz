@@ -22,9 +22,9 @@ department_modules:
   icon: "building"
   sort_order: 10
   is_department_assignable: false
-  analytics_section_key: null
+  analytics_section_key: "core"
   implicit_read_permissions: '[]'
-  analytics_read_permissions: '[]'
+  analytics_read_permissions: '["client.read", "department.read", "audit_log.read"]'
   is_active: true
 - id: "31111111-1111-1111-1111-111111111111"
   key: "egg"
@@ -34,7 +34,7 @@ department_modules:
   sort_order: 20
   is_department_assignable: true
   analytics_section_key: "egg_farm"
-  implicit_read_permissions: '["egg_production.read", "egg_shipment.read", "egg_quality_check.read", "egg_monthly_analytics.read", "stock_movement.read", "warehouse.read"]'
+  implicit_read_permissions: '["egg_production.read", "egg_shipment.read", "egg_quality_check.read", "egg_monthly_analytics.read", "stock_movement.read", "stock_take.read", "stock_reorder_level.read", "warehouse.read"]'
   analytics_read_permissions: '["egg_production.read", "egg_shipment.read"]'
   is_active: true
 - id: "31222222-2222-2222-2222-222222222222"
@@ -45,7 +45,7 @@ department_modules:
   sort_order: 30
   is_department_assignable: true
   analytics_section_key: "incubation"
-  implicit_read_permissions: '["incubation_batch.read", "incubation_run.read", "chick_shipment.read", "incubation_monthly_analytics.read", "factory_monthly_analytics.read", "stock_movement.read", "warehouse.read"]'
+  implicit_read_permissions: '["incubation_batch.read", "incubation_run.read", "chick_shipment.read", "incubation_monthly_analytics.read", "factory_monthly_analytics.read", "stock_movement.read", "stock_take.read", "stock_reorder_level.read", "warehouse.read"]'
   analytics_read_permissions: '["incubation_batch.read", "incubation_run.read", "chick_shipment.read"]'
   is_active: true
 - id: "31333333-3333-3333-3333-333333333333"
@@ -56,7 +56,7 @@ department_modules:
   sort_order: 40
   is_department_assignable: true
   analytics_section_key: "factory"
-  implicit_read_permissions: '["factory_flock.read", "factory_daily_log.read", "factory_shipment.read", "factory_medicine_usage.read", "factory_vaccination_plan.read", "stock_movement.read", "warehouse.read"]'
+  implicit_read_permissions: '["factory_flock.read", "factory_daily_log.read", "factory_shipment.read", "factory_medicine_usage.read", "factory_vaccination_plan.read", "stock_movement.read", "stock_take.read", "stock_reorder_level.read", "warehouse.read"]'
   analytics_read_permissions: '["factory_flock.read", "factory_shipment.read"]'
   is_active: true
 - id: "31444444-4444-4444-4444-444444444444"
@@ -67,7 +67,7 @@ department_modules:
   sort_order: 50
   is_department_assignable: true
   analytics_section_key: "feed_mill"
-  implicit_read_permissions: '["feed_type.read", "feed_ingredient.read", "feed_formula.read", "feed_formula_ingredient.read", "feed_raw_arrival.read", "feed_raw_consumption.read", "feed_production_batch.read", "feed_production_quality_check.read", "feed_product_shipment.read", "feed_monthly_analytics.read", "stock_movement.read", "warehouse.read"]'
+  implicit_read_permissions: '["feed_type.read", "feed_ingredient.read", "feed_formula.read", "feed_formula_ingredient.read", "feed_raw_arrival.read", "feed_raw_consumption.read", "feed_production_batch.read", "feed_production_quality_check.read", "feed_product_shipment.read", "feed_monthly_analytics.read", "stock_movement.read", "stock_take.read", "stock_reorder_level.read", "warehouse.read"]'
   analytics_read_permissions: '["feed_ingredient.read", "feed_formula.read", "feed_formula_ingredient.read", "feed_raw_arrival.read", "feed_raw_consumption.read", "feed_production_batch.read", "feed_production_quality_check.read", "feed_product_shipment.read", "feed_monthly_analytics.read"]'
   is_active: true
 - id: "31555555-5555-5555-5555-555555555555"
@@ -78,7 +78,7 @@ department_modules:
   sort_order: 60
   is_department_assignable: true
   analytics_section_key: "vet_pharmacy"
-  implicit_read_permissions: '["medicine_batch.read", "medicine_type.read", "stock_movement.read", "warehouse.read"]'
+  implicit_read_permissions: '["medicine_batch.read", "medicine_type.read", "stock_movement.read", "stock_take.read", "stock_reorder_level.read", "warehouse.read"]'
   analytics_read_permissions: '["medicine_batch.read", "medicine_type.read"]'
   is_active: true
 - id: "31666666-6666-6666-6666-666666666666"
@@ -89,7 +89,7 @@ department_modules:
   sort_order: 70
   is_department_assignable: true
   analytics_section_key: "slaughterhouse"
-  implicit_read_permissions: '["slaughter_processing.read", "slaughter_semi_product.read", "slaughter_semi_product_shipment.read", "stock_movement.read", "warehouse.read"]'
+  implicit_read_permissions: '["slaughter_processing.read", "slaughter_semi_product.read", "slaughter_semi_product_shipment.read", "stock_movement.read", "stock_take.read", "stock_reorder_level.read", "warehouse.read"]'
   analytics_read_permissions: '["slaughter_processing.read", "slaughter_semi_product.read", "slaughter_semi_product_shipment.read"]'
   is_active: true
 - id: "31000000-0000-0000-0000-000000000002"
@@ -99,9 +99,9 @@ department_modules:
   icon: "coins"
   sort_order: 80
   is_department_assignable: false
-  analytics_section_key: null
+  analytics_section_key: "finance"
   implicit_read_permissions: '[]'
-  analytics_read_permissions: '[]'
+  analytics_read_permissions: '["expense.read", "cash_account.read", "cash_transaction.read", "client_debt.read", "supplier_debt.read", "debt_payment.read"]'
   is_active: true
 - id: "31000000-0000-0000-0000-000000000003"
   key: "hr"
@@ -110,9 +110,9 @@ department_modules:
   icon: "users"
   sort_order: 90
   is_department_assignable: false
-  analytics_section_key: null
+  analytics_section_key: "hr"
   implicit_read_permissions: '[]'
-  analytics_read_permissions: '[]'
+  analytics_read_permissions: '["employee.read", "position.read", "role.read"]'
   is_active: true
 workspace_resources:
 - id: "32000000-0000-0000-0000-000000000001"
@@ -287,6 +287,28 @@ workspace_resources:
   sort_order: 55
   is_head_visible: true
   is_active: true
+- id: "320000c1-0000-0000-0000-000000000001"
+  module_key: "egg"
+  key: "stock-takes"
+  name: "Инвентаризация"
+  path: "stock-takes"
+  description: "Инвентаризация и сверка остатков"
+  permission_prefix: "stock_take"
+  api_module_key: "inventory"
+  sort_order: 56
+  is_head_visible: true
+  is_active: true
+- id: "320000d1-0000-0000-0000-000000000001"
+  module_key: "egg"
+  key: "reorder-levels"
+  name: "Точки заказа"
+  path: "reorder-levels"
+  description: "Минимальные запасы и точки заказа"
+  permission_prefix: "stock_reorder_level"
+  api_module_key: "inventory"
+  sort_order: 57
+  is_head_visible: true
+  is_active: true
 - id: "32000000-0000-0000-0000-000000000012"
   module_key: "egg"
   key: "clients"
@@ -436,6 +458,28 @@ workspace_resources:
   sort_order: 37
   is_head_visible: true
   is_active: true
+- id: "320000c1-0000-0000-0000-000000000002"
+  module_key: "incubation"
+  key: "stock-takes"
+  name: "Инвентаризация"
+  path: "stock-takes"
+  description: "Инвентаризация и сверка остатков"
+  permission_prefix: "stock_take"
+  api_module_key: "inventory"
+  sort_order: 38
+  is_head_visible: true
+  is_active: true
+- id: "320000d1-0000-0000-0000-000000000002"
+  module_key: "incubation"
+  key: "reorder-levels"
+  name: "Точки заказа"
+  path: "reorder-levels"
+  description: "Минимальные запасы и точки заказа"
+  permission_prefix: "stock_reorder_level"
+  api_module_key: "inventory"
+  sort_order: 39
+  is_head_visible: true
+  is_active: true
 - id: "32000000-0000-0000-0000-000000000020"
   module_key: "incubation"
   key: "clients"
@@ -577,6 +621,28 @@ workspace_resources:
   permission_prefix: "stock_movement"
   api_module_key: "inventory"
   sort_order: 35
+  is_head_visible: true
+  is_active: true
+- id: "320000c1-0000-0000-0000-000000000003"
+  module_key: "factory"
+  key: "stock-takes"
+  name: "Инвентаризация"
+  path: "stock-takes"
+  description: "Инвентаризация и сверка остатков"
+  permission_prefix: "stock_take"
+  api_module_key: "inventory"
+  sort_order: 36
+  is_head_visible: true
+  is_active: true
+- id: "320000d1-0000-0000-0000-000000000003"
+  module_key: "factory"
+  key: "reorder-levels"
+  name: "Точки заказа"
+  path: "reorder-levels"
+  description: "Минимальные запасы и точки заказа"
+  permission_prefix: "stock_reorder_level"
+  api_module_key: "inventory"
+  sort_order: 37
   is_head_visible: true
   is_active: true
 - id: "32000000-0000-0000-0000-000000000183"
@@ -778,6 +844,28 @@ workspace_resources:
   sort_order: 75
   is_head_visible: true
   is_active: true
+- id: "320000c1-0000-0000-0000-000000000004"
+  module_key: "feed"
+  key: "stock-takes"
+  name: "Инвентаризация"
+  path: "stock-takes"
+  description: "Инвентаризация и сверка остатков"
+  permission_prefix: "stock_take"
+  api_module_key: "inventory"
+  sort_order: 76
+  is_head_visible: true
+  is_active: true
+- id: "320000d1-0000-0000-0000-000000000004"
+  module_key: "feed"
+  key: "reorder-levels"
+  name: "Точки заказа"
+  path: "reorder-levels"
+  description: "Минимальные запасы и точки заказа"
+  permission_prefix: "stock_reorder_level"
+  api_module_key: "inventory"
+  sort_order: 77
+  is_head_visible: true
+  is_active: true
 - id: "32000000-0000-0000-0000-000000000184"
   module_key: "feed"
   key: "warehouses"
@@ -919,6 +1007,28 @@ workspace_resources:
   sort_order: 55
   is_head_visible: true
   is_active: true
+- id: "320000c1-0000-0000-0000-000000000005"
+  module_key: "medicine"
+  key: "stock-takes"
+  name: "Инвентаризация"
+  path: "stock-takes"
+  description: "Инвентаризация и сверка остатков"
+  permission_prefix: "stock_take"
+  api_module_key: "inventory"
+  sort_order: 56
+  is_head_visible: true
+  is_active: true
+- id: "320000d1-0000-0000-0000-000000000005"
+  module_key: "medicine"
+  key: "reorder-levels"
+  name: "Точки заказа"
+  path: "reorder-levels"
+  description: "Минимальные запасы и точки заказа"
+  permission_prefix: "stock_reorder_level"
+  api_module_key: "inventory"
+  sort_order: 57
+  is_head_visible: true
+  is_active: true
 - id: "32000000-0000-0000-0000-000000000185"
   module_key: "medicine"
   key: "warehouses"
@@ -1044,6 +1154,28 @@ workspace_resources:
   permission_prefix: "stock_movement"
   api_module_key: "inventory"
   sort_order: 45
+  is_head_visible: true
+  is_active: true
+- id: "320000c1-0000-0000-0000-000000000006"
+  module_key: "slaughter"
+  key: "stock-takes"
+  name: "Инвентаризация"
+  path: "stock-takes"
+  description: "Инвентаризация и сверка остатков"
+  permission_prefix: "stock_take"
+  api_module_key: "inventory"
+  sort_order: 46
+  is_head_visible: true
+  is_active: true
+- id: "320000d1-0000-0000-0000-000000000006"
+  module_key: "slaughter"
+  key: "reorder-levels"
+  name: "Точки заказа"
+  path: "reorder-levels"
+  description: "Минимальные запасы и точки заказа"
+  permission_prefix: "stock_reorder_level"
+  api_module_key: "inventory"
+  sort_order: 47
   is_head_visible: true
   is_active: true
 - id: "32000000-0000-0000-0000-000000000186"

@@ -22,7 +22,7 @@ from app.models.finance import (
     SupplierDebt,
 )
 from app.models.hr import Employee, Permission, Position, Role, employee_roles, role_permissions
-from app.models.inventory import StockMovement
+from app.models.inventory import StockMovement, StockReorderLevel, StockTake, StockTakeLine
 from app.models.incubation import (
     ChickShipment,
     FactoryMonthlyAnalytics,
@@ -80,6 +80,9 @@ __all__ = [
     "SupplierDebt",
     "DebtPayment",
     "StockMovement",
+    "StockReorderLevel",
+    "StockTake",
+    "StockTakeLine",
     "Role",
     "Position",
     "Permission",

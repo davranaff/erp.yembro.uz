@@ -1,21 +1,31 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, datetime, timezone
 from decimal import Decimal, InvalidOperation
 from typing import Any
 from uuid import uuid4
 
-from app.core.exceptions import ValidationError
+from app.core.exceptions import NotFoundError, ValidationError
 from app.repositories.core import WarehouseRepository
-from app.repositories.inventory import StockMovementRepository
-from app.schemas.inventory import StockMovementReadSchema
+from app.repositories.inventory import (
+    StockMovementRepository,
+    StockReorderLevelRepository,
+    StockTakeLineRepository,
+    StockTakeRepository,
+)
+from app.schemas.inventory import (
+    StockMovementReadSchema,
+    StockReorderLevelReadSchema,
+    StockTakeLineReadSchema,
+    StockTakeReadSchema,
+)
 from app.services.base import BaseService
 
 
 PLUS_MOVEMENTS = {"incoming", "transfer_in", "adjustment_in"}
 MINUS_MOVEMENTS = {"outgoing", "transfer_out", "adjustment_out"}
-ITEM_TYPES = {"egg", "chick", "feed", "medicine", "semi_product"}
+ITEM_TYPES = {"egg", "chick", "feed", "feed_raw", "medicine", "semi_product"}
 ITEM_KEY_REFERENCE_TABLE = "__inventory_item_key__"
 
 
@@ -181,6 +191,23 @@ async def _resolve_inventory_item_key_option(
                     "value": normalized_item_key,
                     "label": _compose_option_label("Feed ingredient", f"{row['name']} ({row['code']})"),
                 }
+
+    if normalized_item_type == "feed_raw" and normalized_item_key.startswith("feed_raw:"):
+        entity_id = normalized_item_key.split(":", 1)[1]
+        row = await db.fetchrow(
+            """
+            SELECT id, name, code
+            FROM feed_ingredients
+            WHERE id::text = $1
+            LIMIT 1
+            """,
+            entity_id,
+        )
+        if row is not None:
+            return {
+                "value": normalized_item_key,
+                "label": _compose_option_label("Feed ingredient", f"{row['name']} ({row['code']})"),
+            }
 
     if normalized_item_type == "medicine" and normalized_item_key.startswith("medicine_batch:"):
         entity_id = normalized_item_key.split(":", 1)[1]
@@ -397,6 +424,24 @@ async def _fetch_inventory_item_key_options(
             }
             for row in product_rows
         ] + [
+            {
+                "value": f"feed_raw:{row['id']}",
+                "label": _compose_option_label("Feed ingredient", f"{row['name']} ({row['code']})"),
+            }
+            for row in ingredient_rows
+        ]
+
+    if normalized_item_type == "feed_raw":
+        ingredient_rows = await db.fetch(
+            """
+            SELECT id, name, code
+            FROM feed_ingredients
+            WHERE organization_id = $1
+            ORDER BY name ASC, code ASC, id ASC
+            """,
+            organization_id,
+        )
+        options = [
             {
                 "value": f"feed_raw:{row['id']}",
                 "label": _compose_option_label("Feed ingredient", f"{row['name']} ({row['code']})"),
@@ -999,7 +1044,7 @@ class StockMovementService(BaseService):
                         "label_column": "label",
                         "multiple": False,
                         "options": _build_static_reference_options(
-                            ["egg", "chick", "feed", "medicine", "semi_product"]
+                            ["egg", "chick", "feed", "feed_raw", "medicine", "semi_product"]
                         ),
                     },
                 },
@@ -1177,12 +1222,591 @@ class StockMovementService(BaseService):
         return data
 
 
+STOCK_TAKE_STATUSES = ("draft", "finalized", "cancelled")
+
+
+def _item_type_reference_field() -> dict[str, Any]:
+    return {
+        "name": "item_type",
+        "reference": {
+            "table": "__static__",
+            "column": "value",
+            "label_column": "label",
+            "multiple": False,
+            "options": _build_static_reference_options(sorted(ITEM_TYPES)),
+        },
+    }
+
+
+class StockTakeService(BaseService):
+    read_schema = StockTakeReadSchema
+
+    def __init__(self, repository: StockTakeRepository) -> None:
+        super().__init__(repository=repository)
+
+    async def get_additional_meta_fields(self, db) -> list[dict[str, Any]]:
+        fields = await super().get_additional_meta_fields(db)
+        fields.append(
+            {
+                "name": "status",
+                "reference": {
+                    "table": "__static__",
+                    "column": "value",
+                    "label_column": "label",
+                    "multiple": False,
+                    "options": _build_static_reference_options(list(STOCK_TAKE_STATUSES)),
+                },
+            }
+        )
+        return fields
+
+    async def _before_create(
+        self,
+        data: dict[str, Any],
+        *,
+        actor=None,
+    ) -> dict[str, Any]:
+        next_data = dict(data)
+        reference_no = str(next_data.get("reference_no") or "").strip()
+        if not reference_no:
+            raise ValidationError("reference_no is required")
+        next_data["reference_no"] = reference_no
+
+        raw_counted_on = next_data.get("counted_on")
+        if raw_counted_on is None:
+            next_data["counted_on"] = date.today()
+        elif isinstance(raw_counted_on, str):
+            next_data["counted_on"] = date.fromisoformat(raw_counted_on)
+
+        status_value = str(next_data.get("status") or "draft").strip().lower() or "draft"
+        if status_value not in STOCK_TAKE_STATUSES:
+            raise ValidationError("status is invalid")
+        next_data["status"] = status_value
+        next_data.pop("finalized_at", None)
+        next_data.pop("finalized_by_employee_id", None)
+
+        organization_id = str(
+            next_data.get("organization_id")
+            or (actor.organization_id if actor is not None else "")
+        ).strip()
+        if not organization_id:
+            raise ValidationError("organization_id is required")
+
+        ledger = StockLedgerService(
+            StockMovementRepository(self.repository.db),
+            WarehouseRepository(self.repository.db),
+        )
+        scope = await ledger._resolve_scope(
+            organization_id=organization_id,
+            department_id=str(next_data.get("department_id") or "").strip() or None,
+            warehouse_id=str(next_data.get("warehouse_id") or "").strip() or None,
+            require_warehouse=True,
+            require_active_warehouse=True,
+        )
+        next_data["organization_id"] = organization_id
+        next_data["department_id"] = scope["department_id"]
+        next_data["warehouse_id"] = scope["warehouse_id"]
+        return next_data
+
+    async def _before_update(
+        self,
+        entity_id,
+        data: dict[str, Any],
+        *,
+        existing,
+        actor=None,
+    ) -> dict[str, Any]:
+        if str(existing.get("status")) == "finalized":
+            raise ValidationError("Finalized stock takes cannot be edited")
+
+        next_data = dict(data)
+        if "status" in next_data:
+            requested_status = str(next_data.get("status") or "").strip().lower()
+            if requested_status not in STOCK_TAKE_STATUSES:
+                raise ValidationError("status is invalid")
+            if requested_status == "finalized":
+                raise ValidationError("Use POST /stock-takes/{id}/finalize to finalize")
+            next_data["status"] = requested_status
+        return next_data
+
+    async def finalize(
+        self,
+        stock_take_id: str,
+        *,
+        actor=None,
+    ) -> dict[str, Any]:
+        db = self.repository.db
+        async with db.transaction():
+            stock_take = await self.repository.get_by_id(stock_take_id)
+            self._ensure_actor_can_access_entity(stock_take, actor=actor)
+            status_value = str(stock_take.get("status") or "").strip().lower()
+            if status_value == "finalized":
+                raise ValidationError("Stock take is already finalized")
+            if status_value == "cancelled":
+                raise ValidationError("Cancelled stock takes cannot be finalized")
+
+            line_repo = StockTakeLineRepository(db)
+            lines = await line_repo.list_by_stock_take(str(stock_take["id"]))
+
+            ledger = StockLedgerService(
+                StockMovementRepository(db),
+                WarehouseRepository(db),
+            )
+
+            counted_on = stock_take["counted_on"]
+            if isinstance(counted_on, str):
+                counted_on = date.fromisoformat(counted_on)
+
+            for line in lines:
+                item_type = str(line["item_type"]).strip().lower()
+                item_key = str(line["item_key"]).strip()
+                if item_type not in ITEM_TYPES or not item_key:
+                    continue
+
+                current_balance = await StockMovementRepository(db).get_balance(
+                    organization_id=str(stock_take["organization_id"]),
+                    warehouse_id=str(stock_take["warehouse_id"]),
+                    department_id=str(stock_take["department_id"]),
+                    item_type=item_type,
+                    item_key=item_key,
+                    as_of=counted_on,
+                )
+
+                counted_raw = line.get("counted_quantity") or 0
+                counted_quantity = (
+                    counted_raw if isinstance(counted_raw, Decimal) else Decimal(str(counted_raw))
+                ).quantize(Decimal("0.001"))
+
+                diff = counted_quantity - current_balance
+                if diff == 0:
+                    continue
+
+                movement_kind = "adjustment_in" if diff > 0 else "adjustment_out"
+                draft = StockMovementDraft(
+                    organization_id=str(stock_take["organization_id"]),
+                    department_id=str(stock_take["department_id"]),
+                    warehouse_id=str(stock_take["warehouse_id"]),
+                    item_type=item_type,
+                    item_key=item_key,
+                    movement_kind=movement_kind,
+                    quantity=abs(diff),
+                    unit=normalize_stock_movement_unit(line.get("unit")),
+                    occurred_on=counted_on,
+                    reference_table="stock_take",
+                    reference_id=str(stock_take["id"]),
+                    note=f"Stock take {stock_take.get('reference_no')}",
+                )
+                await ledger.record_movement(draft)
+
+            finalize_payload: dict[str, Any] = {
+                "status": "finalized",
+                "finalized_at": datetime.now(timezone.utc),
+                "finalized_by_employee_id": (
+                    actor.employee_id if actor is not None else None
+                ),
+            }
+            updated = await self.repository.update_by_id(stock_take_id, finalize_payload)
+            await self._record_audit_event(
+                action="update",
+                entity_id=stock_take_id,
+                before_data=stock_take,
+                after_data=updated,
+                actor=actor,
+                context_data={"operation": "finalize_stock_take"},
+            )
+        return updated
+
+
+class StockTakeLineService(BaseService):
+    read_schema = StockTakeLineReadSchema
+
+    def __init__(self, repository: StockTakeLineRepository) -> None:
+        super().__init__(repository=repository)
+
+    async def get_additional_meta_fields(self, db) -> list[dict[str, Any]]:
+        fields = await super().get_additional_meta_fields(db)
+        fields.extend(
+            [
+                _item_type_reference_field(),
+                {
+                    "name": "item_key",
+                    "reference": {
+                        "table": ITEM_KEY_REFERENCE_TABLE,
+                        "column": "value",
+                        "label_column": "label",
+                        "multiple": False,
+                        "options": [],
+                    },
+                },
+            ]
+        )
+        return fields
+
+    async def get_reference_options(
+        self,
+        field_name: str,
+        *,
+        db,
+        actor=None,
+        search: str | None = None,
+        values=None,
+        limit: int = 25,
+        extra_params=None,
+    ) -> list[dict[str, str]] | None:
+        if field_name != "item_key":
+            return None
+        normalized_item_type = str((extra_params or {}).get("item_type") or "").strip().lower()
+        if normalized_item_type not in ITEM_TYPES:
+            return []
+        organization_id = str(
+            (actor.organization_id if actor is not None else None)
+            or (extra_params or {}).get("organization_id")
+            or ""
+        ).strip()
+        if not organization_id:
+            return []
+        normalized_department_id = str((extra_params or {}).get("department_id") or "").strip() or None
+        normalized_values = [str(value).strip() for value in (values or []) if str(value).strip()]
+        return await _fetch_inventory_item_key_options(
+            db=db,
+            organization_id=organization_id,
+            item_type=normalized_item_type,
+            department_id=normalized_department_id,
+            search=search,
+            values=normalized_values,
+            limit=limit,
+        )
+
+    async def _before_create(
+        self,
+        data: dict[str, Any],
+        *,
+        actor=None,
+    ) -> dict[str, Any]:
+        next_data = dict(data)
+        stock_take_id = str(next_data.get("stock_take_id") or "").strip()
+        if not stock_take_id:
+            raise ValidationError("stock_take_id is required")
+
+        take_repo = StockTakeRepository(self.repository.db)
+        try:
+            stock_take = await take_repo.get_by_id(stock_take_id)
+        except NotFoundError as exc:
+            raise ValidationError("stock_take_id is invalid") from exc
+        if actor is not None and not self._actor_bypasses_organization_scope(actor):
+            if str(stock_take["organization_id"]) != actor.organization_id:
+                raise ValidationError("stock_take belongs to a different organization")
+        if str(stock_take.get("status")) == "finalized":
+            raise ValidationError("Finalized stock takes cannot be edited")
+
+        item_type = str(next_data.get("item_type") or "").strip().lower()
+        if item_type not in ITEM_TYPES:
+            raise ValidationError("item_type is invalid")
+        next_data["item_type"] = item_type
+
+        item_key = str(next_data.get("item_key") or "").strip()
+        if not item_key:
+            raise ValidationError("item_key is required")
+        next_data["item_key"] = item_key
+
+        next_data["unit"] = normalize_stock_movement_unit(next_data.get("unit"))
+        for field in ("expected_quantity", "counted_quantity"):
+            raw_value = next_data.get(field)
+            if raw_value is None or str(raw_value).strip() == "":
+                next_data[field] = Decimal("0")
+                continue
+            try:
+                value = Decimal(str(raw_value))
+            except (InvalidOperation, ValueError) as exc:
+                raise ValidationError(f"{field} has an invalid value") from exc
+            if value < 0:
+                raise ValidationError(f"{field} must be non-negative")
+            next_data[field] = value.quantize(Decimal("0.001"))
+        return next_data
+
+    async def _before_update(
+        self,
+        entity_id,
+        data: dict[str, Any],
+        *,
+        existing,
+        actor=None,
+    ) -> dict[str, Any]:
+        take_repo = StockTakeRepository(self.repository.db)
+        stock_take = await take_repo.get_by_id(str(existing["stock_take_id"]))
+        if str(stock_take.get("status")) == "finalized":
+            raise ValidationError("Finalized stock takes cannot be edited")
+
+        next_data = dict(data)
+        if "stock_take_id" in next_data and str(next_data["stock_take_id"]) != str(existing["stock_take_id"]):
+            raise ValidationError("stock_take_id cannot be changed")
+        if "item_type" in next_data:
+            item_type = str(next_data.get("item_type") or "").strip().lower()
+            if item_type not in ITEM_TYPES:
+                raise ValidationError("item_type is invalid")
+            next_data["item_type"] = item_type
+        if "item_key" in next_data:
+            item_key = str(next_data.get("item_key") or "").strip()
+            if not item_key:
+                raise ValidationError("item_key is required")
+            next_data["item_key"] = item_key
+        if "unit" in next_data:
+            next_data["unit"] = normalize_stock_movement_unit(next_data.get("unit"))
+        for field in ("expected_quantity", "counted_quantity"):
+            if field not in next_data:
+                continue
+            raw_value = next_data[field]
+            if raw_value is None:
+                continue
+            try:
+                value = Decimal(str(raw_value))
+            except (InvalidOperation, ValueError) as exc:
+                raise ValidationError(f"{field} has an invalid value") from exc
+            if value < 0:
+                raise ValidationError(f"{field} must be non-negative")
+            next_data[field] = value.quantize(Decimal("0.001"))
+        return next_data
+
+
+class StockReorderLevelService(BaseService):
+    read_schema = StockReorderLevelReadSchema
+
+    def __init__(self, repository: StockReorderLevelRepository) -> None:
+        super().__init__(repository=repository)
+
+    async def get_additional_meta_fields(self, db) -> list[dict[str, Any]]:
+        fields = await super().get_additional_meta_fields(db)
+        fields.extend(
+            [
+                _item_type_reference_field(),
+                {
+                    "name": "item_key",
+                    "reference": {
+                        "table": ITEM_KEY_REFERENCE_TABLE,
+                        "column": "value",
+                        "label_column": "label",
+                        "multiple": False,
+                        "options": [],
+                    },
+                },
+            ]
+        )
+        return fields
+
+    async def get_reference_options(
+        self,
+        field_name: str,
+        *,
+        db,
+        actor=None,
+        search: str | None = None,
+        values=None,
+        limit: int = 25,
+        extra_params=None,
+    ) -> list[dict[str, str]] | None:
+        if field_name != "item_key":
+            return None
+        normalized_item_type = str((extra_params or {}).get("item_type") or "").strip().lower()
+        if normalized_item_type not in ITEM_TYPES:
+            return []
+        organization_id = str(
+            (actor.organization_id if actor is not None else None)
+            or (extra_params or {}).get("organization_id")
+            or ""
+        ).strip()
+        if not organization_id:
+            return []
+        normalized_department_id = str((extra_params or {}).get("department_id") or "").strip() or None
+        normalized_values = [str(value).strip() for value in (values or []) if str(value).strip()]
+        return await _fetch_inventory_item_key_options(
+            db=db,
+            organization_id=organization_id,
+            item_type=normalized_item_type,
+            department_id=normalized_department_id,
+            search=search,
+            values=normalized_values,
+            limit=limit,
+        )
+
+    async def _before_create(
+        self,
+        data: dict[str, Any],
+        *,
+        actor=None,
+    ) -> dict[str, Any]:
+        next_data = dict(data)
+        organization_id = str(
+            next_data.get("organization_id")
+            or (actor.organization_id if actor is not None else "")
+        ).strip()
+        if not organization_id:
+            raise ValidationError("organization_id is required")
+
+        ledger = StockLedgerService(
+            StockMovementRepository(self.repository.db),
+            WarehouseRepository(self.repository.db),
+        )
+        scope = await ledger._resolve_scope(
+            organization_id=organization_id,
+            department_id=str(next_data.get("department_id") or "").strip() or None,
+            warehouse_id=str(next_data.get("warehouse_id") or "").strip() or None,
+            require_warehouse=True,
+            require_active_warehouse=True,
+        )
+        next_data["organization_id"] = organization_id
+        next_data["department_id"] = scope["department_id"]
+        next_data["warehouse_id"] = scope["warehouse_id"]
+
+        item_type = str(next_data.get("item_type") or "").strip().lower()
+        if item_type not in ITEM_TYPES:
+            raise ValidationError("item_type is invalid")
+        next_data["item_type"] = item_type
+
+        item_key = str(next_data.get("item_key") or "").strip()
+        if not item_key:
+            raise ValidationError("item_key is required")
+        next_data["item_key"] = item_key
+
+        next_data["unit"] = normalize_stock_movement_unit(next_data.get("unit"))
+
+        min_quantity = self._normalize_non_negative(next_data.get("min_quantity") or 0, "min_quantity")
+        next_data["min_quantity"] = min_quantity
+
+        max_raw = next_data.get("max_quantity")
+        if max_raw is None or str(max_raw).strip() == "":
+            next_data["max_quantity"] = None
+        else:
+            max_quantity = self._normalize_non_negative(max_raw, "max_quantity")
+            if max_quantity < min_quantity:
+                raise ValidationError("max_quantity must be >= min_quantity")
+            next_data["max_quantity"] = max_quantity
+
+        reorder_raw = next_data.get("reorder_quantity")
+        if reorder_raw is None or str(reorder_raw).strip() == "":
+            next_data["reorder_quantity"] = None
+        else:
+            next_data["reorder_quantity"] = self._normalize_non_negative(reorder_raw, "reorder_quantity")
+
+        return next_data
+
+    async def _before_update(
+        self,
+        entity_id,
+        data: dict[str, Any],
+        *,
+        existing,
+        actor=None,
+    ) -> dict[str, Any]:
+        next_data = dict(data)
+        if "item_type" in next_data:
+            item_type = str(next_data.get("item_type") or "").strip().lower()
+            if item_type not in ITEM_TYPES:
+                raise ValidationError("item_type is invalid")
+            next_data["item_type"] = item_type
+        if "item_key" in next_data:
+            item_key = str(next_data.get("item_key") or "").strip()
+            if not item_key:
+                raise ValidationError("item_key is required")
+            next_data["item_key"] = item_key
+        if "unit" in next_data:
+            next_data["unit"] = normalize_stock_movement_unit(next_data.get("unit"))
+        for field in ("min_quantity", "max_quantity", "reorder_quantity"):
+            if field not in next_data:
+                continue
+            raw = next_data[field]
+            if raw is None or str(raw).strip() == "":
+                if field == "min_quantity":
+                    raise ValidationError("min_quantity is required")
+                next_data[field] = None
+                continue
+            next_data[field] = self._normalize_non_negative(raw, field)
+
+        resolved_min = (
+            next_data["min_quantity"] if "min_quantity" in next_data else existing.get("min_quantity")
+        )
+        resolved_max = next_data.get("max_quantity", existing.get("max_quantity"))
+        if resolved_min is not None and resolved_max is not None:
+            if Decimal(str(resolved_max)) < Decimal(str(resolved_min)):
+                raise ValidationError("max_quantity must be >= min_quantity")
+        return next_data
+
+    @staticmethod
+    def _normalize_non_negative(raw_value: Any, field: str) -> Decimal:
+        try:
+            value = Decimal(str(raw_value))
+        except (InvalidOperation, ValueError) as exc:
+            raise ValidationError(f"{field} has an invalid value") from exc
+        if value < 0:
+            raise ValidationError(f"{field} must be non-negative")
+        return value.quantize(Decimal("0.001"))
+
+    async def list_low_stock(
+        self,
+        *,
+        organization_id: str,
+        department_id: str | None = None,
+        warehouse_id: str | None = None,
+        as_of: date | None = None,
+    ) -> list[dict[str, Any]]:
+        filters: dict[str, Any] = {
+            "organization_id": organization_id,
+            "is_active": True,
+        }
+        if warehouse_id:
+            filters["warehouse_id"] = warehouse_id
+        elif department_id:
+            filters["department_id"] = department_id
+
+        levels = await self.repository.list(filters=filters, order_by=("item_type", "item_key"))
+        movements_repo = StockMovementRepository(self.repository.db)
+        results: list[dict[str, Any]] = []
+        for level in levels:
+            balance = await movements_repo.get_balance(
+                organization_id=str(level["organization_id"]),
+                warehouse_id=str(level["warehouse_id"]),
+                department_id=str(level["department_id"]),
+                item_type=str(level["item_type"]),
+                item_key=str(level["item_key"]),
+                as_of=as_of,
+            )
+            min_quantity = Decimal(str(level.get("min_quantity") or 0))
+            if balance >= min_quantity:
+                continue
+            results.append(
+                {
+                    "id": str(level["id"]),
+                    "organization_id": str(level["organization_id"]),
+                    "department_id": str(level["department_id"]),
+                    "warehouse_id": str(level["warehouse_id"]),
+                    "item_type": level["item_type"],
+                    "item_key": level["item_key"],
+                    "unit": level.get("unit"),
+                    "min_quantity": str(min_quantity),
+                    "max_quantity": (
+                        str(level["max_quantity"]) if level.get("max_quantity") is not None else None
+                    ),
+                    "reorder_quantity": (
+                        str(level["reorder_quantity"])
+                        if level.get("reorder_quantity") is not None
+                        else None
+                    ),
+                    "current_balance": str(balance.quantize(Decimal("0.001"))),
+                    "shortage": str((min_quantity - balance).quantize(Decimal("0.001"))),
+                }
+            )
+        return results
+
+
 __all__ = [
     "StockLedgerService",
     "StockMovementDraft",
     "StockMovementService",
+    "StockTakeService",
+    "StockTakeLineService",
+    "StockReorderLevelService",
     "PLUS_MOVEMENTS",
     "MINUS_MOVEMENTS",
     "ITEM_TYPES",
+    "STOCK_TAKE_STATUSES",
     "normalize_stock_movement_unit",
 ]
