@@ -53,6 +53,20 @@ class FactoryFlockService(BaseService):
     def __init__(self, repository: FactoryFlockRepository) -> None:
         super().__init__(repository=repository)
 
+    async def _validate_chick_arrival(
+        self,
+        chick_arrival_id: Any,
+        organization_id: Any,
+    ) -> None:
+        row = await self.repository.db.fetchrow(
+            "SELECT organization_id FROM chick_arrivals WHERE id = $1",
+            str(chick_arrival_id),
+        )
+        if row is None:
+            raise ValidationError("chick_arrival_id is invalid")
+        if str(row["organization_id"]) != str(organization_id):
+            raise ValidationError("chick_arrival belongs to a different organization")
+
     async def _before_create(
         self,
         data: dict[str, Any],
@@ -65,6 +79,9 @@ class FactoryFlockService(BaseService):
             raise ValidationError("initial_count must be positive")
         if next_data.get("current_count") is None:
             next_data["current_count"] = initial_count
+        chick_arrival_id = next_data.get("chick_arrival_id")
+        if chick_arrival_id:
+            await self._validate_chick_arrival(chick_arrival_id, next_data.get("organization_id"))
         return next_data
 
     async def _before_update(
@@ -80,6 +97,11 @@ class FactoryFlockService(BaseService):
         new_current = _as_int(next_data.get("current_count", existing.get("current_count")))
         if new_current > new_initial:
             raise ValidationError("current_count cannot exceed initial_count")
+        if "chick_arrival_id" in next_data and next_data["chick_arrival_id"]:
+            await self._validate_chick_arrival(
+                next_data["chick_arrival_id"],
+                next_data.get("organization_id", existing.get("organization_id")),
+            )
         return next_data
 
     async def _sync_stock(self, entity: Mapping[str, Any]) -> None:
@@ -164,6 +186,67 @@ class FactoryDailyLogService(BaseService):
                 next_data["healthy_count"] = 0
         return next_data
 
+    async def _sync_feed_consumption_row(self, entity: Mapping[str, Any]) -> None:
+        """Mirror daily log's feed entry into a feed_consumptions row.
+
+        Why: ``factory_daily_logs.feed_consumed_kg`` and ``feed_consumptions``
+        used to be independent inputs — analytics that read feed_consumptions
+        missed daily-log consumption (and vice versa), or double-counted when
+        both existed. We keep a single derived row per daily log, keyed by
+        ``daily_log_id`` (unique).
+        """
+        db = self.repository.db
+        daily_log_id = str(entity["id"])
+        feed_consumed = _as_decimal(entity.get("feed_consumed_kg"))
+        feed_type_id = entity.get("feed_type_id")
+
+        if feed_consumed <= 0 or not feed_type_id:
+            await db.execute(
+                "DELETE FROM feed_consumptions WHERE daily_log_id = $1",
+                daily_log_id,
+            )
+            return
+
+        flock_row = await db.fetchrow(
+            "SELECT poultry_type_id FROM factory_flocks WHERE id = $1",
+            str(entity["flock_id"]),
+        )
+        poultry_type_id = (
+            str(flock_row["poultry_type_id"])
+            if flock_row is not None and flock_row["poultry_type_id"] is not None
+            else None
+        )
+
+        note = entity.get("note")
+        await db.execute(
+            """
+            INSERT INTO feed_consumptions (
+                id, organization_id, department_id, poultry_type_id,
+                feed_type_id, daily_log_id, consumed_on, quantity, unit, note,
+                created_at, updated_at
+            )
+            VALUES (gen_random_uuid(), $1, $2, $3, $4, $5, $6, $7, 'kg', $8, now(), now())
+            ON CONFLICT (daily_log_id) DO UPDATE SET
+                organization_id = EXCLUDED.organization_id,
+                department_id = EXCLUDED.department_id,
+                poultry_type_id = EXCLUDED.poultry_type_id,
+                feed_type_id = EXCLUDED.feed_type_id,
+                consumed_on = EXCLUDED.consumed_on,
+                quantity = EXCLUDED.quantity,
+                unit = EXCLUDED.unit,
+                note = EXCLUDED.note,
+                updated_at = now()
+            """,
+            str(entity["organization_id"]),
+            str(entity["department_id"]),
+            poultry_type_id,
+            str(feed_type_id),
+            daily_log_id,
+            _as_date(entity["log_date"]),
+            feed_consumed,
+            note,
+        )
+
     async def _sync_feed_stock(self, entity: Mapping[str, Any]) -> None:
         """Sync outgoing feed stock movement when feed is consumed."""
         feed_consumed = _as_decimal(entity.get("feed_consumed_kg"))
@@ -195,15 +278,16 @@ class FactoryDailyLogService(BaseService):
         )
 
     async def _after_create(self, entity: Mapping[str, Any], *, actor=None) -> None:
-        await self._apply_mortality(entity)
+        await self._recalculate_flock_count(str(entity["flock_id"]))
         await self._sync_feed_stock(entity)
+        await self._sync_feed_consumption_row(entity)
 
     async def _after_update(self, *, before: Mapping[str, Any], after: Mapping[str, Any], actor=None) -> None:
-        old_mortality = _as_int(before.get("mortality_count"))
-        new_mortality = _as_int(after.get("mortality_count"))
-        if old_mortality != new_mortality:
-            await self._recalculate_flock_count(str(after["flock_id"]))
+        await self._recalculate_flock_count(str(after["flock_id"]))
+        if str(before.get("flock_id")) != str(after.get("flock_id")):
+            await self._recalculate_flock_count(str(before["flock_id"]))
         await self._sync_feed_stock(after)
+        await self._sync_feed_consumption_row(after)
 
     async def _after_delete(self, *, deleted_entity: Mapping[str, Any], actor=None) -> None:
         await self._recalculate_flock_count(str(deleted_entity["flock_id"]))
@@ -211,22 +295,6 @@ class FactoryDailyLogService(BaseService):
         await ledger.clear_reference_movements(
             reference_table="factory_daily_logs",
             reference_id=str(deleted_entity["id"]),
-        )
-
-    async def _apply_mortality(self, entity: Mapping[str, Any]) -> None:
-        mortality = _as_int(entity.get("mortality_count"))
-        if mortality <= 0:
-            return
-        flock_id = str(entity["flock_id"])
-        await self.repository.db.execute(
-            """
-            UPDATE factory_flocks
-            SET current_count = GREATEST(current_count - $1, 0),
-                updated_at = now()
-            WHERE id = $2
-            """,
-            mortality,
-            flock_id,
         )
 
     async def _recalculate_flock_count(self, flock_id: str) -> None:

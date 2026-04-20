@@ -1,178 +1,303 @@
+# Factory (broyler sex) fixtures: flocks, daily logs, shipments,
+# medicine usages, vaccination plans.
+#
+# Depts: 55555555 (Broyler sexi parent) — warehouse e77c27ea... (FACT-WH)
+#        55551111 (Broyler maydoni 1 child) — warehouse 8f6c4a2b... (FACT-L1-WH)
+# Chick arrivals from incubation:
+#   87111111...01 → dept 55555555, 3900 chicks, now-13d
+#   87111111...02 → dept 55551111, 3400 chicks, now-6d
+# Poultry type: b0000000-0000-0000-0000-000000000001 (broyler)
+# Clients: CL-001 Alimov Trade (e1111111...01) — broiler wholesaler
+
 factory_flocks:
-- id: "fa000000-0000-0000-0000-000000000001"
-  organization_id: "11111111-1111-1111-1111-111111111111"
-  department_id: "55555555-5555-5555-5555-555555555555"
-  flock_code: "FLOCK-2026-01"
-  arrived_on: "2026-01-05"
-  initial_count: 5000
-  current_count: 4720
-  status: "completed"
-  is_active: true
-  note: "Первая партия января"
-- id: "fa000000-0000-0000-0000-000000000002"
-  organization_id: "11111111-1111-1111-1111-111111111111"
-  department_id: "55555555-5555-5555-5555-555555555555"
-  flock_code: "FLOCK-2026-02"
-  arrived_on: "2026-02-10"
-  initial_count: 5200
-  current_count: 5050
-  status: "active"
-  is_active: true
-  note: "Февральская партия"
+  - id: a0111111-1111-1111-1111-111111111101
+    organization_id: 11111111-1111-1111-1111-111111111111
+    department_id: 55555555-5555-5555-5555-555555555555
+    poultry_type_id: b0000000-0000-0000-0000-000000000001
+    source_client_id: null
+    chick_arrival_id: 87111111-1111-1111-1111-111111111101
+    flock_code: FLK-2026-0301
+    arrived_on: now-13d
+    initial_count: 3900
+    current_count: 3820
+    status: active
+    is_active: true
+    note: Inkubatsiyadan kelgan birinchi partiya (broyler)
+    warehouse_id: e77c27ea-dcea-5d11-bc1d-75ba1418ad65
+
+  - id: a0111111-1111-1111-1111-111111111102
+    organization_id: 11111111-1111-1111-1111-111111111111
+    department_id: 55551111-1111-1111-1111-111111111111
+    poultry_type_id: b0000000-0000-0000-0000-000000000001
+    source_client_id: null
+    chick_arrival_id: 87111111-1111-1111-1111-111111111102
+    flock_code: FLK-2026-0302
+    arrived_on: now-6d
+    initial_count: 3400
+    current_count: 3380
+    status: active
+    is_active: true
+    note: Broyler maydoni 1 — ikkinchi partiya
+    warehouse_id: 8f6c4a2b-72d8-52ff-9f74-7490cb096e5c
+
+  - id: a0111111-1111-1111-1111-111111111103
+    organization_id: 11111111-1111-1111-1111-111111111111
+    department_id: 55555555-5555-5555-5555-555555555555
+    poultry_type_id: b0000000-0000-0000-0000-000000000001
+    source_client_id: null
+    chick_arrival_id: null
+    flock_code: FLK-2026-0201
+    arrived_on: now-55d
+    initial_count: 4200
+    current_count: 0
+    status: completed
+    is_active: false
+    note: Yakunlangan partiya — to'liq jo'natildi
+    warehouse_id: e77c27ea-dcea-5d11-bc1d-75ba1418ad65
+
 
 factory_daily_logs:
-- id: "fd000000-0000-0000-0000-000000000001"
-  organization_id: "11111111-1111-1111-1111-111111111111"
-  department_id: "55555555-5555-5555-5555-555555555555"
-  flock_id: "fa000000-0000-0000-0000-000000000001"
-  log_date: "2026-01-06"
-  mortality_count: 12
-  sick_count: 35
-  healthy_count: 4953
-  feed_type_id: "01010101-0101-0101-0101-010101010101"
-  feed_consumed_kg: 320.5
-  feed_cost: 1602500.00
-  water_consumed_liters: 480.0
-  avg_weight_kg: 0.045
-  temperature: 32.0
-  note: "Первый день учёта"
-- id: "fd000000-0000-0000-0000-000000000002"
-  organization_id: "11111111-1111-1111-1111-111111111111"
-  department_id: "55555555-5555-5555-5555-555555555555"
-  flock_id: "fa000000-0000-0000-0000-000000000001"
-  log_date: "2026-01-07"
-  mortality_count: 8
-  sick_count: 20
-  healthy_count: 4960
-  feed_type_id: "01010101-0101-0101-0101-010101010101"
-  feed_consumed_kg: 345.0
-  feed_cost: 1725000.00
-  water_consumed_liters: 510.0
-  avg_weight_kg: 0.055
-  temperature: 31.5
-- id: "fd000000-0000-0000-0000-000000000003"
-  organization_id: "11111111-1111-1111-1111-111111111111"
-  department_id: "55555555-5555-5555-5555-555555555555"
-  flock_id: "fa000000-0000-0000-0000-000000000002"
-  log_date: "2026-02-11"
-  mortality_count: 15
-  sick_count: 40
-  healthy_count: 5145
-  feed_type_id: "01010101-0101-0101-0101-010101010101"
-  feed_consumed_kg: 310.0
-  feed_cost: 1550000.00
-  water_consumed_liters: 460.0
-  avg_weight_kg: 0.042
-  temperature: 33.0
+  # Active flock 0301 — daily logs over last 13 days (sample)
+  - id: a1111111-1111-1111-1111-111111111101
+    organization_id: 11111111-1111-1111-1111-111111111111
+    department_id: 55555555-5555-5555-5555-555555555555
+    flock_id: a0111111-1111-1111-1111-111111111101
+    log_date: now-12d
+    mortality_count: 25
+    sick_count: 18
+    healthy_count: 3857
+    feed_type_id: 72111111-1111-1111-1111-111111111101
+    feed_consumed_kg: 95
+    feed_cost: 425000
+    water_consumed_liters: 380
+    avg_weight_kg: 0.085
+    temperature: 32.5
+    note: Birinchi hafta — starter yem
+
+  - id: a1111111-1111-1111-1111-111111111102
+    organization_id: 11111111-1111-1111-1111-111111111111
+    department_id: 55555555-5555-5555-5555-555555555555
+    flock_id: a0111111-1111-1111-1111-111111111101
+    log_date: now-7d
+    mortality_count: 30
+    sick_count: 12
+    healthy_count: 3833
+    feed_type_id: 72111111-1111-1111-1111-111111111102
+    feed_consumed_kg: 245
+    feed_cost: 1078000
+    water_consumed_liters: 720
+    avg_weight_kg: 0.42
+    temperature: 28.0
+    note: Grower yemga o'tildi
+
+  - id: a1111111-1111-1111-1111-111111111103
+    organization_id: 11111111-1111-1111-1111-111111111111
+    department_id: 55555555-5555-5555-5555-555555555555
+    flock_id: a0111111-1111-1111-1111-111111111101
+    log_date: now-2d
+    mortality_count: 15
+    sick_count: 8
+    healthy_count: 3812
+    feed_type_id: 72111111-1111-1111-1111-111111111102
+    feed_consumed_kg: 380
+    feed_cost: 1672000
+    water_consumed_liters: 1100
+    avg_weight_kg: 0.95
+    temperature: 26.0
+
+  # Active flock 0302 — child dept
+  - id: a1111111-1111-1111-1111-111111111104
+    organization_id: 11111111-1111-1111-1111-111111111111
+    department_id: 55551111-1111-1111-1111-111111111111
+    flock_id: a0111111-1111-1111-1111-111111111102
+    log_date: now-5d
+    mortality_count: 12
+    sick_count: 10
+    healthy_count: 3378
+    feed_type_id: 72111111-1111-1111-1111-111111111101
+    feed_consumed_kg: 75
+    feed_cost: 337500
+    water_consumed_liters: 320
+    avg_weight_kg: 0.075
+    temperature: 32.0
+    note: Boshlang'ich kuzatuv
+
+  - id: a1111111-1111-1111-1111-111111111105
+    organization_id: 11111111-1111-1111-1111-111111111111
+    department_id: 55551111-1111-1111-1111-111111111111
+    flock_id: a0111111-1111-1111-1111-111111111102
+    log_date: now-1d
+    mortality_count: 8
+    sick_count: 6
+    healthy_count: 3380
+    feed_type_id: 72111111-1111-1111-1111-111111111101
+    feed_consumed_kg: 110
+    feed_cost: 495000
+    water_consumed_liters: 420
+    avg_weight_kg: 0.18
+    temperature: 30.5
+
 
 factory_shipments:
-- id: "f5000000-0000-0000-0000-000000000001"
-  organization_id: "11111111-1111-1111-1111-111111111111"
-  department_id: "55555555-5555-5555-5555-555555555555"
-  flock_id: "fa000000-0000-0000-0000-000000000001"
-  client_id: "88888888-8888-8888-8888-888888888888"
-  shipped_on: "2026-02-15"
-  birds_count: 2400
-  total_weight_kg: 5280.0
-  unit_price: 18500.00
-  currency: "UZS"
-  invoice_no: "FS-2026-001"
-  note: "Первая отгрузка январской партии"
-- id: "f5000000-0000-0000-0000-000000000002"
-  organization_id: "11111111-1111-1111-1111-111111111111"
-  department_id: "55555555-5555-5555-5555-555555555555"
-  flock_id: "fa000000-0000-0000-0000-000000000001"
-  client_id: "12121212-1212-1212-1212-121212121212"
-  shipped_on: "2026-02-20"
-  birds_count: 2320
-  total_weight_kg: 5104.0
-  unit_price: 19000.00
-  currency: "UZS"
-  invoice_no: "FS-2026-002"
-  note: "Вторая отгрузка январской партии"
+  # Completed flock fully shipped
+  - id: a2111111-1111-1111-1111-111111111101
+    organization_id: 11111111-1111-1111-1111-111111111111
+    department_id: 55555555-5555-5555-5555-555555555555
+    flock_id: a0111111-1111-1111-1111-111111111103
+    client_id: e1111111-0000-0000-0000-000000000001
+    shipped_on: now-12d
+    birds_count: 2200
+    total_weight_kg: 5060
+    unit_price: 38000
+    currency: UZS
+    invoice_no: BRO-SHIP-0201
+    note: Alimov Trade — birinchi yetkazma
+    warehouse_id: e77c27ea-dcea-5d11-bc1d-75ba1418ad65
+
+  - id: a2111111-1111-1111-1111-111111111102
+    organization_id: 11111111-1111-1111-1111-111111111111
+    department_id: 55555555-5555-5555-5555-555555555555
+    flock_id: a0111111-1111-1111-1111-111111111103
+    client_id: e1111111-0000-0000-0000-000000000001
+    shipped_on: now-8d
+    birds_count: 2000
+    total_weight_kg: 4640
+    unit_price: 38500
+    currency: UZS
+    invoice_no: BRO-SHIP-0202
+    note: Alimov Trade — yakuniy yetkazma
+    warehouse_id: e77c27ea-dcea-5d11-bc1d-75ba1418ad65
+
 
 factory_medicine_usages:
-- id: "fe000000-0000-0000-0000-000000000001"
-  organization_id: "11111111-1111-1111-1111-111111111111"
-  department_id: "55555555-5555-5555-5555-555555555555"
-  flock_id: "fa000000-0000-0000-0000-000000000001"
-  usage_date: "2026-01-06"
-  medicine_type_id: "50515151-5151-5151-5151-515151515152"
-  quantity: 250.0
-  unit_cost: 800.00
-  total_cost: 200000.00
-  measurement_unit_id: "34000000-0000-0000-0000-000000000003"
-  note: "Вакцинация суточных птенцов"
-- id: "fe000000-0000-0000-0000-000000000002"
-  organization_id: "11111111-1111-1111-1111-111111111111"
-  department_id: "55555555-5555-5555-5555-555555555555"
-  flock_id: "fa000000-0000-0000-0000-000000000001"
-  usage_date: "2026-01-06"
-  medicine_type_id: "20202020-2020-2020-2020-202020202020"
-  quantity: 5.0
-  unit_cost: 45000.00
-  total_cost: 225000.00
-  measurement_unit_id: "34000000-0000-0000-0000-000000000002"
-  note: "Витамины в первый день"
-- id: "fe000000-0000-0000-0000-000000000003"
-  organization_id: "11111111-1111-1111-1111-111111111111"
-  department_id: "55555555-5555-5555-5555-555555555555"
-  flock_id: "fa000000-0000-0000-0000-000000000002"
-  usage_date: "2026-02-11"
-  medicine_type_id: "10101010-1010-1010-1010-101010101010"
-  quantity: 3.5
-  unit_cost: 120000.00
-  total_cost: 420000.00
-  measurement_unit_id: "34000000-0000-0000-0000-000000000003"
-  note: "Антибиотик от инфекции"
+  - id: a3111111-1111-1111-1111-111111111101
+    organization_id: 11111111-1111-1111-1111-111111111111
+    department_id: 55555555-5555-5555-5555-555555555555
+    flock_id: a0111111-1111-1111-1111-111111111101
+    usage_date: now-10d
+    medicine_type_id: 92111111-1111-1111-1111-111111111101
+    medicine_batch_id: 93111111-1111-1111-1111-111111111101
+    quantity: 800
+    unit_cost: 325
+    total_cost: 260000
+    measurement_unit_id: null
+    note: Enrofloksatsin — profilaktik kurs (5 kun)
+
+  - id: a3111111-1111-1111-1111-111111111102
+    organization_id: 11111111-1111-1111-1111-111111111111
+    department_id: 55555555-5555-5555-5555-555555555555
+    flock_id: a0111111-1111-1111-1111-111111111101
+    usage_date: now-5d
+    medicine_type_id: 92111111-1111-1111-1111-111111111105
+    medicine_batch_id: 93111111-1111-1111-1111-111111111105
+    quantity: 250
+    unit_cost: 85
+    total_cost: 21250
+    measurement_unit_id: null
+    note: Multivitamin AD3E — stress kuchayganda
+
+  - id: a3111111-1111-1111-1111-111111111103
+    organization_id: 11111111-1111-1111-1111-111111111111
+    department_id: 55551111-1111-1111-1111-111111111111
+    flock_id: a0111111-1111-1111-1111-111111111102
+    usage_date: now-4d
+    medicine_type_id: 92111111-1111-1111-1111-111111111105
+    medicine_batch_id: 93111111-1111-1111-1111-111111111105
+    quantity: 180
+    unit_cost: 85
+    total_cost: 15300
+    note: Boshlang'ich vitaminlash
+
 
 factory_vaccination_plans:
-- id: "fb000000-0000-0000-0000-000000000001"
-  organization_id: "11111111-1111-1111-1111-111111111111"
-  department_id: "55555555-5555-5555-5555-555555555555"
-  flock_id: "fa000000-0000-0000-0000-000000000001"
-  medicine_type_id: "50515151-5151-5151-5151-515151515152"
-  day_of_life: 1
-  planned_date: "2026-01-06"
-  is_completed: true
-  completed_date: "2026-01-06"
-  note: "Вакцина Марека (суточные)"
-- id: "fb000000-0000-0000-0000-000000000002"
-  organization_id: "11111111-1111-1111-1111-111111111111"
-  department_id: "55555555-5555-5555-5555-555555555555"
-  flock_id: "fa000000-0000-0000-0000-000000000001"
-  medicine_type_id: "50515151-5151-5151-5151-515151515152"
-  day_of_life: 7
-  planned_date: "2026-01-12"
-  is_completed: true
-  completed_date: "2026-01-12"
-  note: "Вакцина Ньюкасла (7 дней)"
-- id: "fb000000-0000-0000-0000-000000000003"
-  organization_id: "11111111-1111-1111-1111-111111111111"
-  department_id: "55555555-5555-5555-5555-555555555555"
-  flock_id: "fa000000-0000-0000-0000-000000000001"
-  medicine_type_id: "50515151-5151-5151-5151-515151515152"
-  day_of_life: 14
-  planned_date: "2026-01-19"
-  is_completed: true
-  completed_date: "2026-01-19"
-  note: "Вакцина Гамборо (14 дней)"
-- id: "fb000000-0000-0000-0000-000000000004"
-  organization_id: "11111111-1111-1111-1111-111111111111"
-  department_id: "55555555-5555-5555-5555-555555555555"
-  flock_id: "fa000000-0000-0000-0000-000000000002"
-  medicine_type_id: "50515151-5151-5151-5151-515151515152"
-  day_of_life: 1
-  planned_date: "2026-02-11"
-  is_completed: true
-  completed_date: "2026-02-11"
-  note: "Вакцина Марека (суточные)"
-- id: "fb000000-0000-0000-0000-000000000005"
-  organization_id: "11111111-1111-1111-1111-111111111111"
-  department_id: "55555555-5555-5555-5555-555555555555"
-  flock_id: "fa000000-0000-0000-0000-000000000002"
-  medicine_type_id: "50515151-5151-5151-5151-515151515152"
-  day_of_life: 7
-  planned_date: "2026-02-17"
-  is_completed: false
-  note: "Вакцина Ньюкасла (7 дней)"
+  # Flock 0301 vaccination calendar (broyler standard)
+  - id: a4111111-1111-1111-1111-111111111101
+    organization_id: 11111111-1111-1111-1111-111111111111
+    department_id: 55555555-5555-5555-5555-555555555555
+    flock_id: a0111111-1111-1111-1111-111111111101
+    medicine_type_id: 92111111-1111-1111-1111-111111111103
+    day_of_life: 7
+    planned_date: now-6d
+    is_completed: true
+    completed_date: now-6d
+    note: ND-IB vaksinasi — 7-kun
+
+  - id: a4111111-1111-1111-1111-111111111102
+    organization_id: 11111111-1111-1111-1111-111111111111
+    department_id: 55555555-5555-5555-5555-555555555555
+    flock_id: a0111111-1111-1111-1111-111111111101
+    medicine_type_id: 92111111-1111-1111-1111-111111111104
+    day_of_life: 14
+    planned_date: now+1d
+    is_completed: false
+    completed_date: null
+    note: Gumboro vaksinasi — 14-kun (rejada)
+
+  - id: a4111111-1111-1111-1111-111111111103
+    organization_id: 11111111-1111-1111-1111-111111111111
+    department_id: 55555555-5555-5555-5555-555555555555
+    flock_id: a0111111-1111-1111-1111-111111111101
+    medicine_type_id: 92111111-1111-1111-1111-111111111103
+    day_of_life: 21
+    planned_date: now+8d
+    is_completed: false
+    completed_date: null
+    note: ND-IB takroriy vaksinasi — 21-kun
+
+  # Flock 0302 (younger)
+  - id: a4111111-1111-1111-1111-111111111104
+    organization_id: 11111111-1111-1111-1111-111111111111
+    department_id: 55551111-1111-1111-1111-111111111111
+    flock_id: a0111111-1111-1111-1111-111111111102
+    medicine_type_id: 92111111-1111-1111-1111-111111111103
+    day_of_life: 7
+    planned_date: now+1d
+    is_completed: false
+    completed_date: null
+    note: ND-IB vaksinasi — boshlang'ich
+
+  - id: a4111111-1111-1111-1111-111111111105
+    organization_id: 11111111-1111-1111-1111-111111111111
+    department_id: 55551111-1111-1111-1111-111111111111
+    flock_id: a0111111-1111-1111-1111-111111111102
+    medicine_type_id: 92111111-1111-1111-1111-111111111104
+    day_of_life: 14
+    planned_date: now+8d
+    is_completed: false
+    completed_date: null
+    note: Gumboro vaksinasi — rejada
+
+
+factory_monthly_analytics:
+  - id: a5111111-1111-1111-1111-111111111101
+    organization_id: 11111111-1111-1111-1111-111111111111
+    department_id: 55555555-5555-5555-5555-555555555555
+    poultry_type_id: b0000000-0000-0000-0000-000000000001
+    month_start: 2026-02-01
+    chicks_arrived: 3900
+    feed_quantity: 12500.000
+    feed_quantity_unit: kg
+    medicines_arrived: 480.000
+    note: Fevral oyi — Broyler sexi asosiy
+
+  - id: a5111111-1111-1111-1111-111111111102
+    organization_id: 11111111-1111-1111-1111-111111111111
+    department_id: 55555555-5555-5555-5555-555555555555
+    poultry_type_id: b0000000-0000-0000-0000-000000000001
+    month_start: 2026-03-01
+    chicks_arrived: 4100
+    feed_quantity: 13800.000
+    feed_quantity_unit: kg
+    medicines_arrived: 510.000
+    note: Mart oyi — Broyler sexi asosiy
+
+  - id: a5111111-1111-1111-1111-111111111103
+    organization_id: 11111111-1111-1111-1111-111111111111
+    department_id: 55551111-1111-1111-1111-111111111111
+    poultry_type_id: b0000000-0000-0000-0000-000000000001
+    month_start: 2026-03-01
+    chicks_arrived: 3400
+    feed_quantity: 9800.000
+    feed_quantity_unit: kg
+    medicines_arrived: 320.000
+    note: Mart oyi — Broyler maydoni 1

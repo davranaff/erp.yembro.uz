@@ -8,7 +8,9 @@ from uuid import uuid4
 from app.core.config import get_settings
 from app.db.pool import Database
 from app.repositories.egg import EggMonthlyAnalyticsRepository
+from app.repositories.feed import FeedMonthlyAnalyticsRepository
 from app.repositories.incubation import FactoryMonthlyAnalyticsRepository, IncubationMonthlyAnalyticsRepository
+from app.repositories.slaughter import SlaughterMonthlyAnalyticsRepository
 from app.services.telegram_alerts import deliver_operational_admin_alert
 from app.taskiq_app import broker
 
@@ -313,6 +315,327 @@ async def _upsert_factory_monthly_analytics(db: Database, *, start: date, end: d
     return upserted
 
 
+async def _upsert_feed_monthly_analytics(db: Database, *, start: date, end: date) -> int:
+    repository = FeedMonthlyAnalyticsRepository(db)
+
+    arrival_rows = await db.fetch(
+        """
+        SELECT
+            organization_id,
+            department_id,
+            feed_type_id,
+            COALESCE(SUM(quantity), 0) AS raw_arrivals_kg,
+            COALESCE(SUM(COALESCE(unit_price, 0) * quantity), 0) AS purchased_amount,
+            MAX(currency) AS currency
+        FROM feed_arrivals
+        WHERE arrived_on >= $1
+          AND arrived_on < $2
+        GROUP BY organization_id, department_id, feed_type_id
+        """,
+        start,
+        end,
+    )
+    consumption_rows = await db.fetch(
+        """
+        SELECT
+            organization_id,
+            department_id,
+            feed_type_id,
+            COALESCE(SUM(quantity), 0) AS raw_consumptions_kg
+        FROM feed_consumptions
+        WHERE consumed_on >= $1
+          AND consumed_on < $2
+        GROUP BY organization_id, department_id, feed_type_id
+        """,
+        start,
+        end,
+    )
+    production_rows = await db.fetch(
+        """
+        SELECT
+            pb.organization_id,
+            pb.department_id,
+            f.feed_type_id,
+            COALESCE(SUM(pb.actual_output), 0) AS produced_kg
+        FROM feed_production_batches AS pb
+        JOIN feed_formulas AS f ON f.id = pb.formula_id
+        WHERE COALESCE(pb.finished_on, pb.started_on) >= $1
+          AND COALESCE(pb.finished_on, pb.started_on) < $2
+        GROUP BY pb.organization_id, pb.department_id, f.feed_type_id
+        """,
+        start,
+        end,
+    )
+    shipment_rows = await db.fetch(
+        """
+        SELECT
+            organization_id,
+            department_id,
+            feed_type_id,
+            COALESCE(SUM(quantity), 0) AS shipped_kg,
+            COALESCE(SUM(COALESCE(unit_price, 0) * quantity), 0) AS shipped_amount,
+            MAX(currency) AS currency
+        FROM feed_product_shipments
+        WHERE shipped_on >= $1
+          AND shipped_on < $2
+        GROUP BY organization_id, department_id, feed_type_id
+        """,
+        start,
+        end,
+    )
+    quality_rows = await db.fetch(
+        """
+        SELECT
+            qc.organization_id,
+            qc.department_id,
+            f.feed_type_id,
+            qc.status,
+            COUNT(*) AS cnt
+        FROM feed_production_quality_checks AS qc
+        JOIN feed_production_batches AS pb ON pb.id = qc.production_batch_id
+        JOIN feed_formulas AS f ON f.id = pb.formula_id
+        WHERE qc.checked_on >= $1
+          AND qc.checked_on < $2
+        GROUP BY qc.organization_id, qc.department_id, f.feed_type_id, qc.status
+        """,
+        start,
+        end,
+    )
+
+    def _empty_entry() -> dict[str, object]:
+        return {
+            "raw_arrivals_kg": Decimal("0.000"),
+            "raw_consumptions_kg": Decimal("0.000"),
+            "produced_kg": Decimal("0.000"),
+            "shipped_kg": Decimal("0.000"),
+            "shipped_amount": Decimal("0.00"),
+            "purchased_amount": Decimal("0.00"),
+            "quality_passed_count": 0,
+            "quality_failed_count": 0,
+            "quality_pending_count": 0,
+            "currency": None,
+        }
+
+    merged: dict[tuple[str, str | None, str | None], dict[str, object]] = defaultdict(_empty_entry)
+
+    def _key(row: object) -> tuple[str, str | None, str | None]:
+        return (
+            str(row["organization_id"]),
+            str(row["department_id"]) if row["department_id"] is not None else None,
+            str(row["feed_type_id"]) if row["feed_type_id"] is not None else None,
+        )
+
+    for row in arrival_rows:
+        entry = merged[_key(row)]
+        entry["raw_arrivals_kg"] = Decimal(str(row["raw_arrivals_kg"] or 0)).quantize(Decimal("0.001"))
+        entry["purchased_amount"] = Decimal(str(row["purchased_amount"] or 0)).quantize(Decimal("0.01"))
+        if row["currency"] is not None and entry["currency"] is None:
+            entry["currency"] = str(row["currency"])
+
+    for row in consumption_rows:
+        entry = merged[_key(row)]
+        entry["raw_consumptions_kg"] = Decimal(str(row["raw_consumptions_kg"] or 0)).quantize(Decimal("0.001"))
+
+    for row in production_rows:
+        entry = merged[_key(row)]
+        entry["produced_kg"] = Decimal(str(row["produced_kg"] or 0)).quantize(Decimal("0.001"))
+
+    for row in shipment_rows:
+        entry = merged[_key(row)]
+        entry["shipped_kg"] = Decimal(str(row["shipped_kg"] or 0)).quantize(Decimal("0.001"))
+        entry["shipped_amount"] = Decimal(str(row["shipped_amount"] or 0)).quantize(Decimal("0.01"))
+        if row["currency"] is not None and entry["currency"] is None:
+            entry["currency"] = str(row["currency"])
+
+    status_to_field = {
+        "passed": "quality_passed_count",
+        "failed": "quality_failed_count",
+        "pending": "quality_pending_count",
+    }
+    for row in quality_rows:
+        field = status_to_field.get(str(row["status"]))
+        if field is None:
+            continue
+        entry = merged[_key(row)]
+        entry[field] = int(row["cnt"] or 0)
+
+    upserted = 0
+    for (organization_id, department_id, feed_type_id), metrics in merged.items():
+        payload = {
+            "id": str(uuid4()),
+            "organization_id": organization_id,
+            "department_id": department_id,
+            "feed_type_id": feed_type_id,
+            "month_start": start,
+            "raw_arrivals_kg": metrics["raw_arrivals_kg"],
+            "raw_consumptions_kg": metrics["raw_consumptions_kg"],
+            "produced_kg": metrics["produced_kg"],
+            "shipped_kg": metrics["shipped_kg"],
+            "shipped_amount": metrics["shipped_amount"],
+            "purchased_amount": metrics["purchased_amount"],
+            "quality_passed_count": metrics["quality_passed_count"],
+            "quality_failed_count": metrics["quality_failed_count"],
+            "quality_pending_count": metrics["quality_pending_count"],
+            "currency": metrics["currency"] or "UZS",
+        }
+        await repository.upsert(
+            payload=payload,
+            conflict_columns=["organization_id", "department_id", "feed_type_id", "month_start"],
+            update_columns=[
+                "raw_arrivals_kg",
+                "raw_consumptions_kg",
+                "produced_kg",
+                "shipped_kg",
+                "shipped_amount",
+                "purchased_amount",
+                "quality_passed_count",
+                "quality_failed_count",
+                "quality_pending_count",
+                "currency",
+            ],
+        )
+        upserted += 1
+
+    return upserted
+
+
+async def _upsert_slaughter_monthly_analytics(db: Database, *, start: date, end: date) -> int:
+    repository = SlaughterMonthlyAnalyticsRepository(db)
+
+    processing_rows = await db.fetch(
+        """
+        SELECT
+            organization_id,
+            department_id,
+            poultry_type_id,
+            COALESCE(SUM(birds_received), 0) AS birds_received,
+            COALESCE(SUM(birds_processed), 0) AS birds_processed,
+            COALESCE(SUM(first_sort_count), 0) AS first_sort_count,
+            COALESCE(SUM(second_sort_count), 0) AS second_sort_count,
+            COALESCE(SUM(bad_count), 0) AS bad_count,
+            COALESCE(SUM(first_sort_weight_kg), 0) AS first_sort_weight_kg,
+            COALESCE(SUM(second_sort_weight_kg), 0) AS second_sort_weight_kg,
+            COALESCE(SUM(bad_weight_kg), 0) AS bad_weight_kg,
+            COALESCE(SUM(COALESCE(arrival_unit_price, 0) * COALESCE(arrival_total_weight_kg, 0)), 0) AS purchased_amount,
+            MAX(arrival_currency) AS arrival_currency
+        FROM slaughter_processings
+        WHERE processed_on >= $1
+          AND processed_on < $2
+        GROUP BY organization_id, department_id, poultry_type_id
+        """,
+        start,
+        end,
+    )
+    shipment_rows = await db.fetch(
+        """
+        SELECT
+            sp.organization_id,
+            sp.department_id,
+            COALESCE(sp.poultry_type_id, pr.poultry_type_id) AS poultry_type_id,
+            COALESCE(SUM(sh.quantity), 0) AS shipped_quantity_kg,
+            COALESCE(SUM(COALESCE(sh.unit_price, 0) * sh.quantity), 0) AS shipped_amount,
+            MAX(sh.currency) AS currency
+        FROM slaughter_semi_product_shipments AS sh
+        JOIN slaughter_semi_products AS sp ON sp.id = sh.semi_product_id
+        JOIN slaughter_processings AS pr ON pr.id = sp.processing_id
+        WHERE sh.shipped_on >= $1
+          AND sh.shipped_on < $2
+        GROUP BY sp.organization_id, sp.department_id, COALESCE(sp.poultry_type_id, pr.poultry_type_id)
+        """,
+        start,
+        end,
+    )
+
+    def _empty_entry() -> dict[str, object]:
+        return {
+            "birds_received": 0,
+            "birds_processed": 0,
+            "first_sort_count": 0,
+            "second_sort_count": 0,
+            "bad_count": 0,
+            "first_sort_weight_kg": Decimal("0.000"),
+            "second_sort_weight_kg": Decimal("0.000"),
+            "bad_weight_kg": Decimal("0.000"),
+            "shipped_quantity_kg": Decimal("0.000"),
+            "shipped_amount": Decimal("0.00"),
+            "purchased_amount": Decimal("0.00"),
+            "currency": None,
+        }
+
+    merged: dict[tuple[str, str | None, str | None], dict[str, object]] = defaultdict(_empty_entry)
+
+    def _key(row: object) -> tuple[str, str | None, str | None]:
+        return (
+            str(row["organization_id"]),
+            str(row["department_id"]) if row["department_id"] is not None else None,
+            str(row["poultry_type_id"]) if row["poultry_type_id"] is not None else None,
+        )
+
+    for row in processing_rows:
+        entry = merged[_key(row)]
+        entry["birds_received"] = int(row["birds_received"] or 0)
+        entry["birds_processed"] = int(row["birds_processed"] or 0)
+        entry["first_sort_count"] = int(row["first_sort_count"] or 0)
+        entry["second_sort_count"] = int(row["second_sort_count"] or 0)
+        entry["bad_count"] = int(row["bad_count"] or 0)
+        entry["first_sort_weight_kg"] = Decimal(str(row["first_sort_weight_kg"] or 0)).quantize(Decimal("0.001"))
+        entry["second_sort_weight_kg"] = Decimal(str(row["second_sort_weight_kg"] or 0)).quantize(Decimal("0.001"))
+        entry["bad_weight_kg"] = Decimal(str(row["bad_weight_kg"] or 0)).quantize(Decimal("0.001"))
+        entry["purchased_amount"] = Decimal(str(row["purchased_amount"] or 0)).quantize(Decimal("0.01"))
+        if row["arrival_currency"] is not None and entry["currency"] is None:
+            entry["currency"] = str(row["arrival_currency"])
+
+    for row in shipment_rows:
+        entry = merged[_key(row)]
+        entry["shipped_quantity_kg"] = Decimal(str(row["shipped_quantity_kg"] or 0)).quantize(Decimal("0.001"))
+        entry["shipped_amount"] = Decimal(str(row["shipped_amount"] or 0)).quantize(Decimal("0.01"))
+        if row["currency"] is not None and entry["currency"] is None:
+            entry["currency"] = str(row["currency"])
+
+    upserted = 0
+    for (organization_id, department_id, poultry_type_id), metrics in merged.items():
+        payload = {
+            "id": str(uuid4()),
+            "organization_id": organization_id,
+            "department_id": department_id,
+            "poultry_type_id": poultry_type_id,
+            "month_start": start,
+            "birds_received": metrics["birds_received"],
+            "birds_processed": metrics["birds_processed"],
+            "first_sort_count": metrics["first_sort_count"],
+            "second_sort_count": metrics["second_sort_count"],
+            "bad_count": metrics["bad_count"],
+            "first_sort_weight_kg": metrics["first_sort_weight_kg"],
+            "second_sort_weight_kg": metrics["second_sort_weight_kg"],
+            "bad_weight_kg": metrics["bad_weight_kg"],
+            "shipped_quantity_kg": metrics["shipped_quantity_kg"],
+            "shipped_amount": metrics["shipped_amount"],
+            "purchased_amount": metrics["purchased_amount"],
+            "currency": metrics["currency"] or "UZS",
+        }
+        await repository.upsert(
+            payload=payload,
+            conflict_columns=["organization_id", "department_id", "poultry_type_id", "month_start"],
+            update_columns=[
+                "birds_received",
+                "birds_processed",
+                "first_sort_count",
+                "second_sort_count",
+                "bad_count",
+                "first_sort_weight_kg",
+                "second_sort_weight_kg",
+                "bad_weight_kg",
+                "shipped_quantity_kg",
+                "shipped_amount",
+                "purchased_amount",
+                "currency",
+            ],
+        )
+        upserted += 1
+
+    return upserted
+
+
 async def refresh_monthly_analytics() -> dict[str, object]:
     settings = get_settings()
     db = Database(
@@ -332,6 +655,8 @@ async def refresh_monthly_analytics() -> dict[str, object]:
                 egg_count = await _upsert_egg_monthly_analytics(db, start=month_start, end=month_end)
                 incubation_count = await _upsert_incubation_monthly_analytics(db, start=month_start, end=month_end)
                 factory_count = await _upsert_factory_monthly_analytics(db, start=month_start, end=month_end)
+                feed_count = await _upsert_feed_monthly_analytics(db, start=month_start, end=month_end)
+                slaughter_count = await _upsert_slaughter_monthly_analytics(db, start=month_start, end=month_end)
 
             refreshed.append(
                 {
@@ -339,6 +664,8 @@ async def refresh_monthly_analytics() -> dict[str, object]:
                     "egg_rows": egg_count,
                     "incubation_rows": incubation_count,
                     "factory_rows": factory_count,
+                    "feed_rows": feed_count,
+                    "slaughter_rows": slaughter_count,
                 }
             )
 

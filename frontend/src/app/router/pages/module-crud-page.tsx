@@ -19,6 +19,7 @@ import { CrudDrawer, CrudDrawerFooter } from '@/components/ui/crud-drawer';
 import { ErrorNotice } from '@/components/ui/error-notice';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Sheet } from '@/components/ui/sheet';
+import { useToast } from '@/components/ui/toast';
 import { getMyProfile } from '@/shared/api/auth';
 import {
   createCrudRecord,
@@ -40,7 +41,7 @@ import {
   type InventoryUnit,
 } from '@/shared/api/inventory';
 import { baseQueryKeys, toQueryKey } from '@/shared/api/query-keys';
-import { useApiMutation, useApiQuery } from '@/shared/api/react-query';
+import { getErrorMessage, useApiMutation, useApiQuery } from '@/shared/api/react-query';
 import {
   canAccessModuleAnalytics,
   canCreateCrudResource,
@@ -50,6 +51,7 @@ import {
   canReadCrudResource,
   useAuthStore,
 } from '@/shared/auth';
+import { useDirtyRouteBlocker, useRegisterDirtyForm, useSubmitShortcut } from '@/shared/forms';
 import { useI18n } from '@/shared/i18n';
 import { cn } from '@/shared/lib/cn';
 import { buildDepartmentChildrenMap } from '@/shared/lib/departments';
@@ -58,6 +60,9 @@ import { isValidUuid } from '@/shared/lib/uuid';
 import { useWorkspaceStore } from '@/shared/workspace';
 
 import { DebtPaymentsPanel } from './debt-payments-panel';
+import { DebtsAgingPanel } from './debts-aging-panel';
+import { FlockKpiPanel } from './flock-kpi-panel';
+import { MedicineConsumeButton } from './medicine-consume-sheet';
 import { AnalyticsStatsView } from './module-crud/analytics-stats-view';
 import { AuditHistorySheet } from './module-crud/audit-history-sheet';
 import { ClientNotificationSheet } from './module-crud/client-notification-sheet';
@@ -70,7 +75,6 @@ import {
 } from './module-crud/constants';
 import { CrudFormFieldRow } from './module-crud/crud-form-field-row';
 import { getResourceIcon, GROUP_ICON_MAP } from './module-crud/icons';
-import { InventoryTools } from './module-crud/inventory-tools';
 import { MedicineBatchQrSheet } from './module-crud/medicine-batch-qr-sheet';
 import { renderRecordActionButtons as renderRecordActionButtonsView } from './module-crud/record-action-buttons';
 import { RecordsPaginationBar } from './module-crud/records-pagination-bar';
@@ -129,6 +133,7 @@ export function ModuleCrudPage() {
   const { moduleKey = '' } = useParams<{ moduleKey: string }>();
   const [searchParams, setSearchParams] = useSearchParams();
   const queryClient = useQueryClient();
+  const { show: showToast } = useToast();
   const defaultInventoryItemType = useMemo(
     () => getDefaultInventoryItemTypeForModule(moduleKey),
     [moduleKey],
@@ -494,7 +499,20 @@ export function ModuleCrudPage() {
     resourceModuleKey === 'core' &&
     activeResource.path === 'client-debts',
   );
+  const isSupplierDebtsResource = Boolean(
+    activeView === 'records' &&
+    activeResource &&
+    resourceModuleKey === 'finance' &&
+    activeResource.path === 'supplier-debts',
+  );
   const isVetAptekaModule = moduleKey.trim().toLowerCase() === 'medicine';
+  const isMedicineConsumptionsResource = Boolean(
+    activeView === 'records' &&
+    isVetAptekaModule &&
+    activeResource &&
+    resourceModuleKey === 'medicine' &&
+    activeResource.path === 'consumptions',
+  );
   const isMedicineBatchesResource = Boolean(
     activeView === 'records' &&
     isVetAptekaModule &&
@@ -561,9 +579,30 @@ export function ModuleCrudPage() {
     setFormValues,
   });
 
+  const listDepartmentIds = useMemo(
+    () =>
+      isHeadDepartmentView && scopedDepartmentIds.size > 0
+        ? Array.from(scopedDepartmentIds).sort()
+        : [],
+    [isHeadDepartmentView, scopedDepartmentIds],
+  );
+  const listDepartmentScopeKey = useMemo(() => {
+    if (listDepartmentIds.length > 0) {
+      return `scope:${listDepartmentIds.join(',')}`;
+    }
+    return selectedDepartmentId || 'all';
+  }, [listDepartmentIds, selectedDepartmentId]);
+
   const metaQuery = useApiQuery<CrudResourceMeta>({
-    queryKey: baseQueryKeys.crud.meta(moduleKey || 'unknown', activeResource?.key ?? 'unknown'),
-    queryFn: () => getCrudResourceMeta(resourceModuleKey, activeResource!.path),
+    queryKey: [
+      ...baseQueryKeys.crud.meta(moduleKey || 'unknown', activeResource?.key ?? 'unknown'),
+      listDepartmentScopeKey,
+    ],
+    queryFn: () =>
+      getCrudResourceMeta(resourceModuleKey, activeResource!.path, {
+        departmentIds: listDepartmentIds.length > 0 ? listDepartmentIds : undefined,
+        departmentId: listDepartmentIds.length > 0 ? undefined : selectedDepartmentId || undefined,
+      }),
     enabled: Boolean(
       moduleConfig && activeResource && activeView === 'records' && hasAnyResourceAccess,
     ),
@@ -572,11 +611,12 @@ export function ModuleCrudPage() {
   const listQuery = useApiQuery<CrudListResponse>({
     queryKey: [
       ...baseQueryKeys.crud.resource(moduleKey || 'unknown', activeResource?.key ?? 'unknown'),
-      selectedDepartmentId || 'all',
+      listDepartmentScopeKey,
     ],
     queryFn: () =>
       listCrudRecords(resourceModuleKey, activeResource!.path, {
-        departmentId: selectedDepartmentId || undefined,
+        departmentIds: listDepartmentIds.length > 0 ? listDepartmentIds : undefined,
+        departmentId: listDepartmentIds.length > 0 ? undefined : selectedDepartmentId || undefined,
       }),
     enabled: Boolean(
       moduleConfig && activeResource && activeView === 'records' && hasAnyResourceAccess,
@@ -649,7 +689,14 @@ export function ModuleCrudPage() {
     [fields],
   );
   const visibleRecords = useMemo(() => {
-    if (!hasDepartmentColumn || scopedDepartmentIds.size === 0) {
+    if (!hasDepartmentColumn) {
+      return records;
+    }
+
+    const effectiveScope =
+      scopedDepartmentIds.size > 0 ? scopedDepartmentIds : availableDepartmentIds;
+
+    if (effectiveScope.size === 0) {
       return records;
     }
 
@@ -657,10 +704,10 @@ export function ModuleCrudPage() {
       const departmentId = record.department_id;
       return (
         (typeof departmentId === 'string' || typeof departmentId === 'number') &&
-        scopedDepartmentIds.has(String(departmentId))
+        effectiveScope.has(String(departmentId))
       );
     });
-  }, [hasDepartmentColumn, records, scopedDepartmentIds]);
+  }, [availableDepartmentIds, hasDepartmentColumn, records, scopedDepartmentIds]);
   const visibleClientIds = useMemo(
     () =>
       isClientResource
@@ -1241,29 +1288,6 @@ export function ModuleCrudPage() {
     },
     onSuccess: async (createdRecord) => {
       const createdRecordId = getRecordId(createdRecord, idColumn);
-      const listQueryKey = baseQueryKeys.crud.resource(
-        moduleKey || 'unknown',
-        activeResource?.key ?? 'unknown',
-      );
-
-      queryClient.setQueryData<CrudListResponse>(listQueryKey, (previous) => {
-        const existingItems = previous?.items ?? [];
-        const alreadyExists = existingItems.some(
-          (item) => getRecordId(item, idColumn) === createdRecordId,
-        );
-        const nextItems = alreadyExists
-          ? existingItems.map((item) =>
-              getRecordId(item, idColumn) === createdRecordId ? createdRecord : item,
-            )
-          : [createdRecord, ...existingItems];
-        const previousTotal =
-          typeof previous?.total === 'number' ? previous.total : existingItems.length;
-
-        return {
-          items: nextItems,
-          total: alreadyExists ? previousTotal : previousTotal + 1,
-        };
-      });
 
       setOperationMessage(t('crud.created'));
       setFormErrors({});
@@ -1295,7 +1319,18 @@ export function ModuleCrudPage() {
         });
       }
 
+      showToast({
+        tone: 'success',
+        title: t('common.createdSuccess', undefined, 'Запись создана'),
+      });
       await invalidateResource();
+    },
+    onError: (error) => {
+      showToast({
+        tone: 'error',
+        title: t('common.errorTitle', undefined, 'Ошибка'),
+        description: getErrorMessage(error),
+      });
     },
   });
 
@@ -1324,7 +1359,18 @@ export function ModuleCrudPage() {
       setFormValues(buildFormValues(fields, updatedRecord));
       setIsFormSheetOpen(false);
       setInitialFormValuesSnapshot(null);
+      showToast({
+        tone: 'success',
+        title: t('common.saved', undefined, 'Сохранено'),
+      });
       await invalidateResource();
+    },
+    onError: (error) => {
+      showToast({
+        tone: 'error',
+        title: t('common.errorTitle', undefined, 'Ошибка'),
+        description: getErrorMessage(error),
+      });
     },
   });
 
@@ -1356,7 +1402,18 @@ export function ModuleCrudPage() {
         setAuditRecordLabel('');
         setIsAuditSheetOpen(false);
       }
+      showToast({
+        tone: 'success',
+        title: t('common.deleted', undefined, 'Запись удалена'),
+      });
       await invalidateResource();
+    },
+    onError: (error) => {
+      showToast({
+        tone: 'error',
+        title: t('common.errorTitle', undefined, 'Ошибка'),
+        description: getErrorMessage(error),
+      });
     },
   });
 
@@ -1646,23 +1703,6 @@ export function ModuleCrudPage() {
     setFormErrors({});
     setSystemFormError('');
     const nextFormValues = buildCreateDraftFormValues();
-    setFormValues(nextFormValues);
-    setInitialFormValuesSnapshot(cloneFormValues(nextFormValues));
-    setIsFormSheetOpen(true);
-  };
-
-  const handleCreateInventoryMovement = (mode: InventoryCreateMode) => {
-    setInventoryCreateMode(mode);
-    if (!canExecuteModuleCrudAction('create_record', moduleCrudActionAccess)) {
-      return;
-    }
-
-    setSelectedRecordId('');
-    setDeleteConfirmRecordId('');
-    setOperationMessage('');
-    setFormErrors({});
-    setSystemFormError('');
-    const nextFormValues = buildCreateDraftFormValues(mode);
     setFormValues(nextFormValues);
     setInitialFormValuesSnapshot(cloneFormValues(nextFormValues));
     setIsFormSheetOpen(true);
@@ -1971,6 +2011,13 @@ export function ModuleCrudPage() {
     updateMutation.mutate(payload);
   };
 
+  useRegisterDirtyForm(isFormDirty);
+  useDirtyRouteBlocker(isFormDirty);
+  useSubmitShortcut(
+    () => handleSubmit(selectedRecordId ? 'update' : 'create'),
+    isFormSheetOpen && canSubmitCurrentForm && !pendingAction,
+  );
+
   const renderPaginationBar = () => (
     <RecordsPaginationBar
       totalCount={totalCount}
@@ -2040,22 +2087,36 @@ export function ModuleCrudPage() {
   );
 
   const renderInventoryTools = () => {
-    if (!isInventoryMovementsResource) {
-      return null;
+    if (isClientDebtsResource) {
+      return (
+        <DebtsAgingPanel
+          variant="receivables"
+          departmentId={selectedDepartmentId || fallbackDepartmentId || null}
+          departmentIds={listDepartmentIds.length > 0 ? listDepartmentIds : null}
+        />
+      );
     }
-
-    return (
-      <InventoryTools
-        canCreate={canCreateActiveResource}
-        pendingAction={pendingAction}
-        labels={{
-          incoming: t('inventory.movementKinds.incoming', undefined, 'Приход'),
-          outgoing: t('inventory.movementKinds.outgoing', undefined, 'Расход'),
-          transfer: t('inventory.movementKinds.transfer_out', undefined, 'Перемещение'),
-        }}
-        onCreate={handleCreateInventoryMovement}
-      />
-    );
+    if (isSupplierDebtsResource) {
+      return (
+        <DebtsAgingPanel
+          variant="payables"
+          departmentId={selectedDepartmentId || fallbackDepartmentId || null}
+          departmentIds={listDepartmentIds.length > 0 ? listDepartmentIds : null}
+        />
+      );
+    }
+    if (isMedicineConsumptionsResource) {
+      return (
+        <div className="flex flex-wrap items-center justify-end">
+          <MedicineConsumeButton
+            departmentId={selectedDepartmentId || fallbackDepartmentId || undefined}
+            disabled={pendingAction || !canCreateActiveResource}
+            onSuccess={() => void invalidateResource()}
+          />
+        </div>
+      );
+    }
+    return null;
   };
 
   const renderWarehouseCards = () => {
@@ -2080,7 +2141,7 @@ export function ModuleCrudPage() {
         pendingAction={pendingAction}
         hasRecordActions={hasRecordActions}
         canReadAuditActiveResource={canReadAuditActiveResource}
-        canDeleteActiveResource={canDeleteActiveResource}
+        canDeleteActiveResource={false}
         activeResourceLabel={activeResourceLabel}
         emptyLabel={emptyLabel}
         deleteConfirmLabel={deleteConfirmLabel}
@@ -2686,6 +2747,9 @@ export function ModuleCrudPage() {
                       direction={activeResource.path === 'client-debts' ? 'incoming' : 'outgoing'}
                       onChanged={invalidateResource}
                     />
+                  ) : null}
+                  {selectedRecord && resourceUiConfig?.detailPanelKey === 'flock_kpi' ? (
+                    <FlockKpiPanel flock={selectedRecord} />
                   ) : null}
                   <div className="grid gap-4 md:grid-cols-2" data-tour="module-form-fields">
                     {renderedFormFields.map((field) => (

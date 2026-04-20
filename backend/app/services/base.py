@@ -556,6 +556,22 @@ class BaseService(ABC):
     def _uses_department_scope(self) -> bool:
         return self.repository.has_column("department_id")
 
+    def _uses_warehouse_scope(self) -> bool:
+        return self.repository.has_column("warehouse_id")
+
+    @staticmethod
+    def _actor_has_explicit_scope(actor: CurrentActor | None) -> bool:
+        """True when the row-level scope feature has produced explicit allow-lists."""
+        if actor is None:
+            return False
+        scope = getattr(actor, "scope", None)
+        if scope is None:
+            return False
+        return (
+            scope.allowed_department_ids is not None
+            or scope.allowed_warehouse_ids is not None
+        )
+
     @staticmethod
     def _is_empty_scope_value(value: Any) -> bool:
         if value is None:
@@ -606,6 +622,17 @@ class BaseService(ABC):
             scoped_filters["organization_id"] = []
             return scoped_filters
 
+        # Row-level scope (flag-gated): when explicit allow-lists are present,
+        # delegate to UserScope which intersects with any caller-supplied
+        # department/warehouse filter and returns an empty list for rows the
+        # user cannot see. See docs/adr/0001-row-level-scope.md.
+        if self._actor_has_explicit_scope(actor):
+            return actor.scope.apply_filters(
+                scoped_filters,
+                has_department_column=self._uses_department_scope(),
+                has_warehouse_column=self._uses_warehouse_scope(),
+            )
+
         if not self._uses_department_scope():
             return scoped_filters
         if self._actor_bypasses_department_scope(actor):
@@ -649,6 +676,18 @@ class BaseService(ABC):
             return
         if str(entity_organization_id) != actor.organization_id:
             raise AccessDeniedError("You can only access records inside your organization")
+
+        # Row-level scope path: check against explicit allow-lists.
+        if self._actor_has_explicit_scope(actor):
+            entity_department_id = entity.get("department_id")
+            entity_warehouse_id = entity.get("warehouse_id")
+            allowed = actor.scope.can_access(
+                department_id=str(entity_department_id) if entity_department_id is not None else None,
+                warehouse_id=str(entity_warehouse_id) if entity_warehouse_id is not None else None,
+            )
+            if not allowed:
+                raise AccessDeniedError("You can only access records inside your scope")
+            return
 
         if not self._uses_department_scope():
             return
@@ -698,6 +737,11 @@ class BaseService(ABC):
             if self._is_empty_scope_value(current_department_value):
                 if actor is not None and actor.department_id:
                     next_payload["department_id"] = actor.department_id
+            elif self._actor_has_explicit_scope(actor):
+                if not actor.scope.can_access(department_id=str(current_department_value)):
+                    raise AccessDeniedError(
+                        "You cannot create records in that department",
+                    )
             elif (
                 actor is not None
                 and not self._actor_bypasses_department_scope(actor)
@@ -705,11 +749,21 @@ class BaseService(ABC):
                 and str(current_department_value) != actor.department_id
             ):
                 next_payload["department_id"] = actor.department_id
+                if self._uses_warehouse_scope() and "warehouse_id" in next_payload:
+                    next_payload["warehouse_id"] = None
 
             if self._is_required_column("department_id") and self._is_empty_scope_value(
                 next_payload.get("department_id")
             ):
                 raise ValidationError("department_id is required")
+
+        if self._uses_warehouse_scope() and self._actor_has_explicit_scope(actor):
+            current_warehouse_value = next_payload.get("warehouse_id")
+            if not self._is_empty_scope_value(current_warehouse_value):
+                if not actor.scope.can_access(warehouse_id=str(current_warehouse_value)):
+                    raise AccessDeniedError(
+                        "You cannot create records in that warehouse",
+                    )
 
         return next_payload
 
@@ -730,12 +784,31 @@ class BaseService(ABC):
 
         if (
             actor is not None
+            and self._actor_has_explicit_scope(actor)
+            and self._uses_department_scope()
+            and "department_id" in next_payload
+        ):
+            new_dept = next_payload["department_id"]
+            if new_dept is None or not actor.scope.can_access(department_id=str(new_dept)):
+                raise AccessDeniedError("You cannot move records outside your scope")
+        elif (
+            actor is not None
             and not self._actor_bypasses_department_scope(actor)
             and self._uses_department_scope()
             and "department_id" in next_payload
         ):
             if next_payload["department_id"] is None or str(next_payload["department_id"]) != str(actor.department_id):
                 raise AccessDeniedError("You cannot move records outside your department")
+
+        if (
+            actor is not None
+            and self._actor_has_explicit_scope(actor)
+            and self._uses_warehouse_scope()
+            and "warehouse_id" in next_payload
+            and next_payload["warehouse_id"] is not None
+        ):
+            if not actor.scope.can_access(warehouse_id=str(next_payload["warehouse_id"])):
+                raise AccessDeniedError("You cannot move records outside your warehouse scope")
 
         return next_payload
 

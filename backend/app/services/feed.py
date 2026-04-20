@@ -94,7 +94,17 @@ def _normalize_currency(raw_value: object) -> str | None:
     return text or None
 
 
-def _feed_product_key(feed_type_id: str) -> str:
+def _feed_product_key(production_batch_id: str) -> str:
+    """Compose the stock-ledger item_key for a feed product tied to its production batch."""
+    return f"feed_product:{production_batch_id}"
+
+
+def _feed_product_key_by_type(feed_type_id: str) -> str:
+    """Legacy item_key for stock rows that have no production_batch_id (e.g. factory daily logs).
+
+    New code should always prefer :func:`_feed_product_key` when the batch is known,
+    so balances can be computed per-batch and support FIFO/FEFO/recall.
+    """
     return f"feed_product:{feed_type_id}"
 
 
@@ -179,31 +189,16 @@ class FeedProductionBatchService(CreatedByActorMixin, BaseService):
     def __init__(self, repository: FeedProductionBatchRepository) -> None:
         super().__init__(repository=repository)
 
-    async def _fetch_formula_feed_type_id(self, formula_id: str) -> str:
-        row = await self.repository.db.fetchrow(
-            """
-            SELECT feed_type_id
-            FROM feed_formulas
-            WHERE id = $1
-            LIMIT 1
-            """,
-            formula_id,
-        )
-        if row is None:
-            raise ValidationError("formula_id is invalid")
-        return str(row["feed_type_id"])
-
     async def _sync_stock(self, entity: Mapping[str, Any]) -> None:
         quantity = _as_decimal(entity.get("actual_output"))
         movements: list[StockMovementDraft] = []
         if quantity > 0:
-            feed_type_id = await self._fetch_formula_feed_type_id(str(entity["formula_id"]))
             movements.append(
                 StockMovementDraft(
                     organization_id=str(entity["organization_id"]),
                     department_id=str(entity["department_id"]),
                     item_type="feed",
-                    item_key=_feed_product_key(feed_type_id),
+                    item_key=_feed_product_key(str(entity["id"])),
                     movement_kind="incoming",
                     quantity=quantity,
                     unit=str(entity.get("unit") or "kg"),
@@ -486,12 +481,17 @@ class FeedProductShipmentService(CreatedByActorMixin, BaseService):
         quantity = _as_decimal(entity.get("quantity"))
         movements: list[StockMovementDraft] = []
         if quantity > 0:
+            production_batch_id = entity.get("production_batch_id")
+            if production_batch_id:
+                item_key = _feed_product_key(str(production_batch_id))
+            else:
+                item_key = _feed_product_key_by_type(str(entity["feed_type_id"]))
             movements.append(
                 StockMovementDraft(
                     organization_id=str(entity["organization_id"]),
                     department_id=str(entity["department_id"]),
                     item_type="feed",
-                    item_key=_feed_product_key(str(entity["feed_type_id"])),
+                    item_key=item_key,
                     movement_kind="outgoing",
                     quantity=quantity,
                     unit=str(entity.get("unit") or "kg"),

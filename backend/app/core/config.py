@@ -59,6 +59,10 @@ class Settings(BaseSettings):
         default=False,
         validation_alias=AliasChoices("APP_AUTH_ALLOW_HEADER_OVERRIDES", "AUTH_ALLOW_HEADER_OVERRIDES"),
     )
+    enable_row_level_scope: bool = Field(
+        default=False,
+        validation_alias=AliasChoices("APP_ENABLE_ROW_LEVEL_SCOPE", "ENABLE_ROW_LEVEL_SCOPE"),
+    )
     public_web_base_url: str = Field(
         default="http://localhost:30080",
         validation_alias=AliasChoices("APP_PUBLIC_WEB_BASE_URL", "PUBLIC_WEB_BASE_URL"),
@@ -141,7 +145,7 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
-    @field_validator("debug", "auth_allow_header_overrides", mode="before")
+    @field_validator("debug", "auth_allow_header_overrides", "enable_row_level_scope", mode="before")
     @classmethod
     def _coerce_debug(cls, value: object) -> object:
         if isinstance(value, str):

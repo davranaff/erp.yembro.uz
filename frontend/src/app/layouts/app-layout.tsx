@@ -5,16 +5,20 @@ import {
   CircleHelp,
   ChevronDown,
   History,
-  LogOut,
+  Search,
   Settings,
   type LucideIcon,
 } from 'lucide-react';
 import { type ReactNode, useEffect, useMemo, useState } from 'react';
-import { NavLink, Outlet, type To, useLocation, useNavigate } from 'react-router-dom';
+import { NavLink, Outlet, type Path, type To, useLocation, useNavigate } from 'react-router-dom';
 
+import { useCommandPalette } from '@/app/ui/command-palette';
 import { LanguageSwitcher } from '@/app/ui/language-switcher';
+import { ProfileMenu } from '@/app/ui/profile-menu';
 import { Badge } from '@/components/ui/badge';
+import { Breadcrumbs, type BreadcrumbItem } from '@/components/ui/breadcrumbs';
 import { Button } from '@/components/ui/button';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Separator } from '@/components/ui/separator';
 import { listVisibleDepartments, type CrudListResponse } from '@/shared/api/backend-crud';
@@ -27,6 +31,7 @@ import {
   hasPrivilegedAccessRole,
   canReadAuditLogs,
   useAuthStore,
+  useSessionExpiryWarning,
 } from '@/shared/auth';
 import { getDepartmentIcon } from '@/shared/config/department-icons';
 import { ROUTES } from '@/shared/config/routes';
@@ -115,7 +120,7 @@ const buildModuleTarget = ({
   currentDepartmentId: string;
   currentSearchParams: URLSearchParams;
   departmentId?: string;
-}): To => {
+}): Path => {
   const nextSearchParams = new URLSearchParams();
   const currentView = currentSearchParams.get('view') ?? '';
   const currentResourceKey = currentSearchParams.get('resource') ?? '';
@@ -141,10 +146,11 @@ const buildModuleTarget = ({
   return {
     pathname: ROUTES.dashboardModule(moduleKey),
     search: nextSearch ? `?${nextSearch}` : '',
+    hash: '',
   };
 };
 
-const buildOverviewTarget = (currentSearchParams: URLSearchParams): To => {
+const buildOverviewTarget = (currentSearchParams: URLSearchParams): Path => {
   const nextSearchParams = new URLSearchParams();
 
   copySearchParam(currentSearchParams, nextSearchParams, 'startDate');
@@ -155,6 +161,7 @@ const buildOverviewTarget = (currentSearchParams: URLSearchParams): To => {
   return {
     pathname: ROUTES.dashboard,
     search: nextSearch ? `?${nextSearch}` : '',
+    hash: '',
   };
 };
 
@@ -421,6 +428,7 @@ function WorkspaceNavigation() {
   const navigate = useNavigate();
   const location = useLocation();
   const clearSession = useAuthStore((state) => state.clearSession);
+  const sessionUsername = useAuthStore((state) => state.session?.username ?? '');
   const sessionEmployeeId = useAuthStore((state) => state.session?.employeeId ?? '');
   const storedSessionRoles = useAuthStore((state) => state.session?.roles);
   const storedSessionPermissions = useAuthStore((state) => state.session?.permissions);
@@ -431,6 +439,7 @@ function WorkspaceNavigation() {
   );
   const workspaceModuleMap = useWorkspaceStore((state) => state.moduleMap);
   const { t } = useI18n();
+  const { open: openCommandPalette } = useCommandPalette();
   const { hasContextTour, contextTourTitle, startContextTour, isActive: isTourActive } = useTour();
   const currentSearchParams = useMemo(
     () => new URLSearchParams(location.search),
@@ -617,10 +626,65 @@ function WorkspaceNavigation() {
     setOpenDropdownDepartmentId('');
   }, [location.pathname, location.search]);
 
-  const handleLogout = () => {
+  const [isLogoutConfirmOpen, setIsLogoutConfirmOpen] = useState(false);
+  const confirmLogout = () => {
+    setIsLogoutConfirmOpen(false);
     clearSession();
     navigate(ROUTES.login, { replace: true });
   };
+
+  const breadcrumbItems: BreadcrumbItem[] = useMemo(() => {
+    const items: BreadcrumbItem[] = [
+      {
+        label: t('nav.dashboard', undefined, 'Дашборд'),
+        to: buildOverviewTarget(currentSearchParams).pathname,
+      },
+    ];
+    if (isSettingsRoute) {
+      items.push({ label: t('nav.settings', undefined, 'Настройки'), isCurrent: true });
+      return items;
+    }
+    if (isRoleManagementRoute) {
+      items.push({ label: t('nav.roleManagement', undefined, 'Роли'), isCurrent: true });
+      return items;
+    }
+    if (isAuditRoute) {
+      items.push({ label: t('nav.audit', undefined, 'Аудит'), isCurrent: true });
+      return items;
+    }
+    if (currentModuleKey) {
+      const moduleLabel = t(
+        `modules.${currentModuleKey}.label`,
+        undefined,
+        currentModuleConfig?.label ?? currentModuleKey,
+      );
+      const moduleTarget = buildModuleTarget({
+        moduleKey: currentModuleKey,
+        currentModuleKey,
+        currentDepartmentId,
+        currentSearchParams,
+      });
+      items.push({
+        label: moduleLabel,
+        to: currentDepartmentNode ? `${moduleTarget.pathname}${moduleTarget.search}` : undefined,
+        isCurrent: !currentDepartmentNode,
+      });
+      if (currentDepartmentNode) {
+        items.push({ label: currentDepartmentNode.label, isCurrent: true });
+      }
+    }
+    return items;
+  }, [
+    currentDepartmentId,
+    currentDepartmentNode,
+    currentModuleConfig?.label,
+    currentModuleKey,
+    currentSearchParams,
+    isAuditRoute,
+    isRoleManagementRoute,
+    isSettingsRoute,
+    t,
+  ]);
 
   return (
     <div className="sticky top-3 z-30 sm:top-4" data-tour="workspace-nav">
@@ -628,9 +692,13 @@ function WorkspaceNavigation() {
         <div className="flex flex-col gap-3 p-3 sm:gap-4 sm:p-5">
           <div className="flex flex-col gap-3 sm:gap-4 xl:flex-row xl:items-start xl:justify-between">
             <div className="min-w-0 space-y-2">
-              <Badge variant="muted" className="w-fit border-slate-200 bg-slate-50">
-                {t('nav.heading', undefined, 'Навигация')}
-              </Badge>
+              {breadcrumbItems.length > 1 ? (
+                <Breadcrumbs items={breadcrumbItems} />
+              ) : (
+                <Badge variant="muted" className="w-fit border-slate-200 bg-slate-50">
+                  {t('nav.heading', undefined, 'Навигация')}
+                </Badge>
+              )}
               <div className="space-y-1">
                 <p className="truncate text-xl font-semibold tracking-[-0.03em] text-foreground">
                   {currentDepartmentLabel || t('nav.dashboard', undefined, 'Дашборд')}
@@ -656,16 +724,38 @@ function WorkspaceNavigation() {
                   {t('common.help', undefined, 'Помощь')}
                 </Button>
               ) : null}
-              <LanguageSwitcher />
               <Button
                 type="button"
                 variant="outline"
-                className="rounded-full border-slate-200 bg-white px-4 shadow-[0_14px_32px_-26px_rgba(15,23,42,0.1)]"
-                onClick={handleLogout}
+                onClick={openCommandPalette}
+                aria-label={t('nav.commandPalette', undefined, 'Быстрый переход')}
+                className="hidden rounded-full border-slate-200 bg-white px-3 text-xs text-muted-foreground shadow-[0_14px_32px_-26px_rgba(15,23,42,0.1)] hover:text-foreground sm:inline-flex"
               >
-                <LogOut className="h-4 w-4" />
-                {t('common.logout')}
+                <Search className="h-3.5 w-3.5" />
+                <span>{t('nav.quickJump', undefined, 'Быстрый переход')}</span>
+                <kbd className="ml-1 rounded border border-slate-200 bg-slate-50 px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground">
+                  ⌘K
+                </kbd>
               </Button>
+              <LanguageSwitcher />
+              <ProfileMenu
+                username={sessionUsername}
+                onLogout={() => setIsLogoutConfirmOpen(true)}
+              />
+              <ConfirmDialog
+                open={isLogoutConfirmOpen}
+                onOpenChange={setIsLogoutConfirmOpen}
+                title={t('common.logout')}
+                description={t(
+                  'common.logoutConfirm',
+                  undefined,
+                  'Выйти из системы? Несохранённые изменения в открытых формах будут потеряны.',
+                )}
+                confirmLabel={t('common.logout')}
+                cancelLabel={t('common.cancel', undefined, 'Отмена')}
+                confirmVariant="destructive"
+                onConfirm={confirmLogout}
+              />
             </div>
           </div>
 
@@ -770,7 +860,11 @@ function WorkspaceNavigation() {
                   </div>
                 ) : (
                   <div className="rounded-2xl border border-dashed border-slate-200 bg-white px-4 py-4 text-sm text-muted-foreground">
-                    {t('crud.currentPageRangeEmpty', undefined, 'На этой странице пока нет строк.')}
+                    {t(
+                      'nav.departmentsEmpty',
+                      undefined,
+                      'У вас нет доступных отделов. Попросите администратора назначить отдел.',
+                    )}
                   </div>
                 )}
               </section>
@@ -784,6 +878,8 @@ function WorkspaceNavigation() {
 
 export function AppLayout({ children }: AppLayoutProps) {
   const location = useLocation();
+  const { t } = useI18n();
+  useSessionExpiryWarning();
   const showWorkspaceNav =
     location.pathname === ROUTES.dashboard ||
     location.pathname.startsWith(`${ROUTES.dashboard}/`) ||
@@ -793,9 +889,17 @@ export function AppLayout({ children }: AppLayoutProps) {
 
   return (
     <div className="min-h-screen bg-[radial-gradient(circle_at_top_left,hsl(var(--primary)/0.14),transparent_24%),radial-gradient(circle_at_top_right,hsl(var(--accent)/0.12),transparent_26%),radial-gradient(circle_at_bottom,hsl(var(--secondary)/0.24),transparent_34%),linear-gradient(180deg,hsl(var(--canvas)),hsl(var(--background)))]">
+      <a
+        href="#app-main-content"
+        className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[100] focus:rounded-full focus:border focus:border-primary/30 focus:bg-background focus:px-4 focus:py-2 focus:text-sm focus:font-medium focus:text-foreground focus:shadow-[0_14px_32px_-26px_rgba(15,23,42,0.18)]"
+      >
+        {t('nav.skipToContent', undefined, 'Перейти к основному содержимому')}
+      </a>
       <div className="mx-auto flex min-h-screen w-full max-w-[1760px] flex-col gap-3 px-3 py-3 sm:gap-4 sm:px-6 sm:py-5 xl:px-8">
         {showWorkspaceNav ? <WorkspaceNavigation /> : null}
-        <main className="min-w-0 flex-1">{children ?? <Outlet />}</main>
+        <main id="app-main-content" tabIndex={-1} className="min-w-0 flex-1">
+          {children ?? <Outlet />}
+        </main>
       </div>
     </div>
   );

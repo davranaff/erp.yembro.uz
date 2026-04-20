@@ -427,6 +427,7 @@ async def _fetch_reference_options(
     reference_column: str,
     label_column: str,
     actor: CurrentActor | None = None,
+    department_id: str | list[str] | None = None,
 ) -> list[dict[str, str]]:
     return await _query_reference_options(
         db=db,
@@ -434,6 +435,7 @@ async def _fetch_reference_options(
         reference_column=reference_column,
         label_column=label_column,
         actor=actor,
+        department_id=department_id,
     )
 
 
@@ -446,11 +448,17 @@ async def _query_reference_options(
     search: str | None = None,
     values: list[str] | None = None,
     limit: int = 200,
-    department_id: str | None = None,
+    department_id: str | list[str] | None = None,
     actor: CurrentActor | None = None,
 ) -> list[dict[str, str]]:
     normalized_values = [value.strip() for value in (values or []) if value and value.strip()]
-    normalized_department_id = str(department_id or "").strip()
+    if isinstance(department_id, list):
+        normalized_department_ids = [
+            value.strip() for value in department_id if value and value.strip()
+        ]
+    else:
+        single = str(department_id or "").strip()
+        normalized_department_ids = [single] if single else []
     label_expression = _build_reference_label_expression(
         table=table,
         reference_column=reference_column,
@@ -477,9 +485,13 @@ async def _query_reference_options(
         params.append(actor.organization_id)
         cursor += 1
 
-    if normalized_department_id and model_table is not None and "department_id" in model_table.columns:
-        clauses.append(f"{_quote_identifier('department_id')} = ${cursor}")
-        params.append(normalized_department_id)
+    if normalized_department_ids and model_table is not None and "department_id" in model_table.columns:
+        if len(normalized_department_ids) == 1:
+            clauses.append(f"{_quote_identifier('department_id')} = ${cursor}")
+            params.append(normalized_department_ids[0])
+        else:
+            clauses.append(f"{_quote_identifier('department_id')} = ANY(${cursor}::uuid[])")
+            params.append(normalized_department_ids)
         cursor += 1
 
     if (
@@ -535,6 +547,7 @@ async def _build_resource_meta(
     prefix: str,
     service_factory: Callable[[Database], BaseService],
     actor: CurrentActor | None = None,
+    department_scope: str | list[str] | None = None,
 ) -> dict[str, Any]:
     service = service_factory(db)
     repository = service.repository
@@ -584,6 +597,14 @@ async def _build_resource_meta(
                     foreign_key["table"],
                     foreign_key["column"],
                 )
+                referenced_table = Base.metadata.tables.get(foreign_key["table"])
+                referenced_has_department = (
+                    referenced_table is not None
+                    and "department_id" in referenced_table.columns
+                )
+                reference_department_scope = (
+                    department_scope if referenced_has_department and name != "department_id" else None
+                )
                 reference_cache[cache_key] = {
                     "table": foreign_key["table"],
                     "column": foreign_key["column"],
@@ -594,6 +615,7 @@ async def _build_resource_meta(
                         foreign_key["column"],
                         label_column,
                         actor=actor,
+                        department_id=reference_department_scope,
                     ),
                 }
             reference_payload = reference_cache[cache_key]
@@ -623,6 +645,16 @@ async def _build_resource_meta(
                 reference_payload.get("label_column")
                 or await _detect_reference_label_column(db, table_name, reference_column)
             )
+            referenced_table = Base.metadata.tables.get(table_name)
+            referenced_has_department = (
+                referenced_table is not None and "department_id" in referenced_table.columns
+            )
+            field_name_for_meta = str(normalized_field.get("name") or "")
+            reference_department_scope = (
+                department_scope
+                if referenced_has_department and field_name_for_meta != "department_id"
+                else None
+            )
             if "options" not in reference_payload:
                 reference_payload["options"] = await _fetch_reference_options(
                     db,
@@ -630,6 +662,7 @@ async def _build_resource_meta(
                     reference_column,
                     label_column,
                     actor=actor,
+                    department_id=reference_department_scope,
                 )
             reference_payload["label_column"] = label_column
             normalized_field["reference"] = reference_payload
@@ -720,15 +753,23 @@ def build_crud_router(
         offset: int = Query(default=0, ge=0),
         order_by: str | None = Query(default=None),
         search: str | None = Query(default=None, min_length=1),
-        department_id: str | None = Query(default=None),
+        department_id: list[str] | None = Query(default=None),
         current_actor: CurrentActor = Depends(get_current_actor),
         db: Database = Depends(db_dependency),
     ) -> dict[str, Any]:
         service = service_factory(db)
         filters: dict[str, Any] | None = None
-        normalized_department_id = str(department_id or "").strip()
-        if normalized_department_id and service._uses_department_scope():
-            filters = {"department_id": normalized_department_id}
+        normalized_department_ids = [
+            value.strip() for value in (department_id or []) if value and value.strip()
+        ]
+        if normalized_department_ids and service._uses_department_scope():
+            filters = {
+                "department_id": (
+                    normalized_department_ids[0]
+                    if len(normalized_department_ids) == 1
+                    else normalized_department_ids
+                )
+            }
         result = await service.list_with_pagination(
             filters=filters,
             search=search,
@@ -759,14 +800,26 @@ def build_crud_router(
         dependencies=[Depends(read_dep)],
     )
     async def get_resource_meta(
+        department_id: list[str] | None = Query(default=None),
         current_actor: CurrentActor = Depends(get_current_actor),
         db: Database = Depends(db_dependency),
     ) -> dict[str, Any]:
+        normalized_department_ids = [
+            value.strip() for value in (department_id or []) if value and value.strip()
+        ]
+        scope_param: str | list[str] | None = (
+            normalized_department_ids
+            if len(normalized_department_ids) > 1
+            else normalized_department_ids[0]
+            if len(normalized_department_ids) == 1
+            else None
+        )
         return await _build_resource_meta(
             db=db,
             prefix=prefix,
             service_factory=service_factory,
             actor=current_actor,
+            department_scope=scope_param,
         )
 
     @router.get(
@@ -779,7 +832,7 @@ def build_crud_router(
         search: str | None = Query(default=None),
         values: list[str] = Query(default=[]),
         limit: int = Query(default=25, ge=1, le=100),
-        department_id: str | None = Query(default=None),
+        department_id: list[str] | None = Query(default=None),
         item_type: str | None = Query(default=None),
         current_actor: CurrentActor = Depends(get_current_actor),
         db: Database = Depends(db_dependency),
@@ -793,6 +846,20 @@ def build_crud_router(
         if reference_payload is None:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Reference field not found")
 
+        normalized_department_ids = [
+            value.strip() for value in (department_id or []) if value and value.strip()
+        ]
+        custom_department_id: str | None = (
+            normalized_department_ids[0] if len(normalized_department_ids) == 1 else None
+        )
+        generic_department_scope: str | list[str] | None
+        if len(normalized_department_ids) > 1:
+            generic_department_scope = normalized_department_ids
+        elif len(normalized_department_ids) == 1:
+            generic_department_scope = normalized_department_ids[0]
+        else:
+            generic_department_scope = None
+
         custom_options = await service.get_reference_options(
             field_name=field,
             db=db,
@@ -801,7 +868,7 @@ def build_crud_router(
             values=values,
             limit=limit,
             extra_params={
-                "department_id": department_id,
+                "department_id": custom_department_id,
                 "item_type": item_type,
             },
         )
@@ -819,7 +886,7 @@ def build_crud_router(
                 search=search,
                 values=values,
                 limit=limit,
-                department_id=department_id,
+                department_id=generic_department_scope,
                 actor=current_actor,
             )
 

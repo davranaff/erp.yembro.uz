@@ -38,6 +38,11 @@ class MedicineConsumption(Base, IDMixin, TimestampMixin):
         nullable=True,
         index=True,
     )
+    factory_flock_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("factory_flocks.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
     created_by: Mapped[UUID | None] = mapped_column(
         ForeignKey("employees.id", ondelete="SET NULL"),
         nullable=True,

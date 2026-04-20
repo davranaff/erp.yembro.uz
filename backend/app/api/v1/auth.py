@@ -15,6 +15,7 @@ from app.schemas.auth import (
     AuthRefreshRequestSchema,
     AuthProfileUpdateSchema,
 )
+from app.core.scope import UserScope, load_user_scope
 from app.services.auth_access import AuthProfileData, fetch_auth_profile_data
 from app.services.hr import EmployeeService
 from app.utils.auth_tokens import TokenError, create_signed_token, decode_signed_token
@@ -23,7 +24,33 @@ from app.utils.password import verify_password
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 
-def _profile_to_schema(profile: AuthProfileData) -> AuthProfileSchema:
+def _scope_to_schema_fields(scope: UserScope | None) -> dict[str, object]:
+    if scope is None:
+        return {
+            "allowedDepartmentIds": None,
+            "allowedWarehouseIds": None,
+            "isOrgAdmin": False,
+        }
+    return {
+        "allowedDepartmentIds": (
+            sorted(scope.allowed_department_ids)
+            if scope.allowed_department_ids is not None
+            else None
+        ),
+        "allowedWarehouseIds": (
+            sorted(scope.allowed_warehouse_ids)
+            if scope.allowed_warehouse_ids is not None
+            else None
+        ),
+        "isOrgAdmin": scope.is_org_admin,
+    }
+
+
+def _profile_to_schema(
+    profile: AuthProfileData,
+    *,
+    scope: UserScope | None = None,
+) -> AuthProfileSchema:
     return AuthProfileSchema(
         employeeId=profile.employee_id,
         organizationId=profile.organization_id,
@@ -37,6 +64,7 @@ def _profile_to_schema(profile: AuthProfileData) -> AuthProfileSchema:
         phone=profile.phone,
         roles=list(profile.roles),
         permissions=list(profile.permissions),
+        **_scope_to_schema_fields(scope),
     )
 
 
@@ -46,6 +74,7 @@ def _profile_to_login_response(
     access_token: str,
     refresh_token: str,
     expires_at: str,
+    scope: UserScope | None = None,
 ) -> AuthLoginResponseSchema:
     return AuthLoginResponseSchema(
         employeeId=profile.employee_id,
@@ -59,6 +88,18 @@ def _profile_to_login_response(
         accessToken=access_token,
         refreshToken=refresh_token,
         expiresAt=expires_at,
+        **_scope_to_schema_fields(scope),
+    )
+
+
+async def _load_profile_scope(db: Database, profile: AuthProfileData) -> UserScope:
+    settings = get_settings()
+    return await load_user_scope(
+        db,
+        employee_id=profile.employee_id,
+        organization_id=profile.organization_id,
+        roles=frozenset(profile.roles),
+        enabled=settings.enable_row_level_scope,
     )
 
 
@@ -107,11 +148,13 @@ async def login(payload: AuthLoginRequestSchema, db: Database = Depends(db_depen
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Employee not found")
 
     access_token, refresh_token, expires_at = _issue_token_pair(employee_id)
+    scope = await _load_profile_scope(db, profile)
     return _profile_to_login_response(
         profile,
         access_token=access_token,
         refresh_token=refresh_token,
         expires_at=expires_at,
+        scope=scope,
     )
 
 
@@ -136,11 +179,13 @@ async def refresh_session(
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required")
 
     access_token, refresh_token, expires_at = _issue_token_pair(employee_id)
+    scope = await _load_profile_scope(db, profile)
     return _profile_to_login_response(
         profile,
         access_token=access_token,
         refresh_token=refresh_token,
         expires_at=expires_at,
+        scope=scope,
     )
 
 
@@ -152,7 +197,7 @@ async def get_me(
     profile = await fetch_auth_profile_data(db, current_actor.employee_id)
     if profile is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Employee not found")
-    return _profile_to_schema(profile)
+    return _profile_to_schema(profile, scope=current_actor.scope)
 
 
 @router.patch("/me", status_code=status.HTTP_200_OK, response_model=AuthProfileSchema)
@@ -210,4 +255,4 @@ async def update_me(
     profile = await fetch_auth_profile_data(db, current_actor.employee_id)
     if profile is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Employee not found")
-    return _profile_to_schema(profile)
+    return _profile_to_schema(profile, scope=current_actor.scope)

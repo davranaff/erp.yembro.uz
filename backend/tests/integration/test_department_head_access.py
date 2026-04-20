@@ -180,3 +180,54 @@ async def test_visible_departments_returns_all_departments_for_admin_role(api_cl
     assert HOME_CHILD_DEPARTMENT_ID in visible_ids
     assert UNRELATED_DEPARTMENT_ID in visible_ids
     assert SECOND_ORGANIZATION_DEPARTMENT_ID not in visible_ids
+
+
+@pytest.mark.asyncio
+async def test_visible_departments_includes_headed_and_descendant_departments(api_client) -> None:
+    admin_headers = _headers(role="admin")
+    headed_id = str(uuid.uuid4())
+    descendant_id = str(uuid.uuid4())
+
+    response = await api_client.post(
+        DEPARTMENTS_PATH,
+        json={
+            "id": headed_id,
+            "organization_id": PRIMARY_ORGANIZATION_ID,
+            "parent_department_id": HOME_DEPARTMENT_ID,
+            "name": f"Headed by test {headed_id[:8]}",
+            "code": f"HV-{headed_id[:8]}",
+            "module_key": "egg",
+            "description": "Department headed for visibility test",
+            "head_id": TEST_EMPLOYEE_ID,
+            "is_active": True,
+        },
+        headers=admin_headers,
+    )
+    assert response.status_code == 201, response.text
+
+    response = await api_client.post(
+        DEPARTMENTS_PATH,
+        json={
+            "id": descendant_id,
+            "organization_id": PRIMARY_ORGANIZATION_ID,
+            "parent_department_id": headed_id,
+            "name": f"Headed descendant {descendant_id[:8]}",
+            "code": f"HD-{descendant_id[:8]}",
+            "module_key": "egg",
+            "description": "Child of headed department",
+            "is_active": True,
+        },
+        headers=admin_headers,
+    )
+    assert response.status_code == 201, response.text
+
+    response = await api_client.get(VISIBLE_DEPARTMENTS_PATH, headers=_headers())
+    assert response.status_code == 200, response.text
+
+    payload = extract_data(response)
+    visible_ids = {item["id"] for item in payload["items"]}
+
+    assert HOME_DEPARTMENT_ID in visible_ids
+    assert headed_id in visible_ids
+    assert descendant_id in visible_ids
+    assert UNRELATED_DEPARTMENT_ID not in visible_ids

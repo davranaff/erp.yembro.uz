@@ -1,5 +1,5 @@
 import { ArrowRight, Eye, EyeOff, Loader2, LockKeyhole, UserRound } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { type KeyboardEvent, useMemo, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { z } from 'zod';
 
@@ -28,6 +28,12 @@ export function LoginPage() {
   const setSession = useAuthStore((state) => state.setSession);
   const { t } = useI18n();
   const [isPasswordVisible, setIsPasswordVisible] = useState(false);
+  const [isCapsLockOn, setIsCapsLockOn] = useState(false);
+  const handlePasswordKey = (event: KeyboardEvent<HTMLInputElement>) => {
+    if (typeof event.getModifierState === 'function') {
+      setIsCapsLockOn(event.getModifierState('CapsLock'));
+    }
+  };
   const loginSchema = useMemo(
     () =>
       z.object({
@@ -140,12 +146,16 @@ export function LoginPage() {
                       type="text"
                       autoComplete="username"
                       autoFocus
+                      aria-invalid={errors.username ? true : undefined}
+                      aria-describedby={errors.username ? 'username-error' : undefined}
                       className="h-12 rounded-2xl border-border/75 bg-card pl-14"
                       {...register('username')}
                     />
                   </div>
                   {errors.username ? (
-                    <p className="text-xs text-destructive">{errors.username.message}</p>
+                    <p id="username-error" className="text-sm text-destructive" role="alert">
+                      {errors.username.message}
+                    </p>
                   ) : null}
                 </div>
 
@@ -161,6 +171,16 @@ export function LoginPage() {
                       id="password"
                       type={isPasswordVisible ? 'text' : 'password'}
                       autoComplete="current-password"
+                      aria-invalid={errors.password ? true : undefined}
+                      aria-describedby={
+                        errors.password
+                          ? 'password-error password-capslock'
+                          : isCapsLockOn
+                            ? 'password-capslock'
+                            : undefined
+                      }
+                      onKeyDown={handlePasswordKey}
+                      onKeyUp={handlePasswordKey}
                       className="h-12 rounded-2xl border-border/75 bg-card pl-14 pr-12"
                       {...register('password')}
                     />
@@ -168,6 +188,7 @@ export function LoginPage() {
                       type="button"
                       className="absolute right-3 top-1/2 inline-flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-md text-muted-foreground transition-colors hover:text-foreground"
                       onClick={() => setIsPasswordVisible((current) => !current)}
+                      aria-pressed={isPasswordVisible}
                       aria-label={
                         isPasswordVisible
                           ? t('login.hidePassword', undefined, 'Скрыть пароль')
@@ -181,8 +202,19 @@ export function LoginPage() {
                       )}
                     </button>
                   </div>
+                  {isCapsLockOn ? (
+                    <p
+                      id="password-capslock"
+                      className="text-sm text-amber-600 dark:text-amber-400"
+                      role="status"
+                    >
+                      {t('login.capsLockOn', undefined, 'Включён Caps Lock')}
+                    </p>
+                  ) : null}
                   {errors.password ? (
-                    <p className="text-xs text-destructive">{errors.password.message}</p>
+                    <p id="password-error" className="text-sm text-destructive" role="alert">
+                      {errors.password.message}
+                    </p>
                   ) : null}
                 </div>
               </div>

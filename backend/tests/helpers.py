@@ -126,16 +126,39 @@ async def _pick_alternative_id(
     path: str,
     current_id: str,
     organization_id: str | None = None,
+    exclude_ids: set[str] | None = None,
 ) -> str:
     items = await _list_items(api_client, path)
+    excluded = {current_id}
+    if exclude_ids:
+        excluded |= {str(value) for value in exclude_ids}
     for item in items:
         item_id = str(item.get("id", ""))
-        if not item_id or item_id == current_id:
+        if not item_id or item_id in excluded:
             continue
         if organization_id and str(item.get("organization_id", "")) != organization_id:
             continue
         return item_id
     raise AssertionError(f"Could not find alternative related record for {path}")
+
+
+async def _collect_sibling_ids(
+    api_client: AsyncClient,
+    path: str,
+    parent_field: str,
+    parent_value: Any,
+    target_field: str,
+) -> set[str]:
+    items = await _list_items(api_client, path)
+    collected: set[str] = set()
+    for item in items:
+        if str(item.get(parent_field, "")) != str(parent_value):
+            continue
+        value = item.get(target_field)
+        if value is None:
+            continue
+        collected.add(str(value))
+    return collected
 
 
 async def build_create_payload(api_client: AsyncClient, path: str) -> dict[str, Any]:
@@ -152,19 +175,35 @@ async def build_create_payload(api_client: AsyncClient, path: str) -> dict[str, 
     payload["id"] = str(uuid.uuid4())
 
     if path.endswith("/feed/formula-ingredients"):
+        used_ingredients = await _collect_sibling_ids(
+            api_client,
+            "/api/v1/feed/formula-ingredients",
+            parent_field="formula_id",
+            parent_value=template["formula_id"],
+            target_field="ingredient_id",
+        )
         payload["ingredient_id"] = await _pick_alternative_id(
             api_client,
             "/api/v1/feed/ingredients",
             str(template["ingredient_id"]),
             str(template.get("organization_id", "")) or None,
+            exclude_ids=used_ingredients,
         )
 
     if path.endswith("/feed/raw-consumptions"):
+        used_ingredients = await _collect_sibling_ids(
+            api_client,
+            "/api/v1/feed/raw-consumptions",
+            parent_field="production_batch_id",
+            parent_value=template["production_batch_id"],
+            target_field="ingredient_id",
+        )
         payload["ingredient_id"] = await _pick_alternative_id(
             api_client,
             "/api/v1/feed/ingredients",
             str(template["ingredient_id"]),
             str(template.get("organization_id", "")) or None,
+            exclude_ids=used_ingredients,
         )
 
     if path.endswith("/core/currencies"):
@@ -191,6 +230,20 @@ async def build_create_payload(api_client: AsyncClient, path: str) -> dict[str, 
     if path.endswith("/incubation/chick-arrivals"):
         # Keep generated payload safely within remaining stock limits.
         payload["chicks_count"] = 1
+
+    if path.endswith("/egg/shipments"):
+        payload["eggs_count"] = 1
+        if "eggs_broken" in payload:
+            payload["eggs_broken"] = 0
+
+    if path.endswith("/feed/raw-consumptions"):
+        payload["quantity"] = 1
+
+    if path.endswith("/feed/product-shipments"):
+        payload["quantity"] = 1
+
+    if path.endswith("/incubation/batches"):
+        payload["eggs_arrived"] = 1
 
     return payload
 
@@ -254,7 +307,7 @@ async def run_crud_flow(api_client: AsyncClient, path: str, permission_prefix: s
     entity_id = str(create_payload["id"])
 
     response = await api_client.post(path, json=create_payload, headers=headers)
-    assert response.status_code == 201
+    assert response.status_code == 201, response.text
     created_record = extract_data(response)
     assert created_record["id"] == entity_id
 

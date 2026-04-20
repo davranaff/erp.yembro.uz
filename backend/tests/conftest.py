@@ -19,15 +19,15 @@ import pytest_asyncio
 from fastapi import FastAPI
 from sqlalchemy import create_engine
 
-os.environ.setdefault("APP_ENVIRONMENT", "test")
-os.environ.setdefault("APP_AUTH_ALLOW_HEADER_OVERRIDES", "true")
+os.environ["APP_ENVIRONMENT"] = "test"
+os.environ["APP_AUTH_ALLOW_HEADER_OVERRIDES"] = "true"
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 import app.models  # noqa: F401
-from app.api.deps import db_dependency
+from app.api.deps import db_dependency, redis_dependency
 from app.api.exceptions import register_exception_handlers
 from app.api.middleware import ApiResponseMiddleware
 from app.api.router import api_router
@@ -35,6 +35,33 @@ from app.db.errors import normalize_database_error
 from app.db.pool import Database
 from app.models import Base
 from app.scripts.load_fixtures import FIXTURE_LOAD_ORDER, FIXTURES_DIR, _coerce_value, _load_fixture_rows
+
+
+class _FakeRedisInner:
+    """No-op stand-in for ``redis.asyncio.Redis`` used in tests."""
+
+    async def get(self, key):  # noqa: ARG002
+        return None
+
+    async def set(self, key, value, *, ex=None, nx=False, px=None):  # noqa: ARG002
+        return True
+
+    async def delete(self, *keys):  # noqa: ARG002
+        return 0
+
+    async def ping(self):
+        return True
+
+
+class _FakeRedis:
+    def __init__(self) -> None:
+        self.client = _FakeRedisInner()
+
+    async def connect(self) -> None:
+        return None
+
+    async def disconnect(self) -> None:
+        return None
 
 
 def _quote_identifier(value: str) -> str:
@@ -237,8 +264,68 @@ def _prepare_sqlite_database(path: str) -> None:
                 )
 
         _seed_passed_quality_checks(conn, rows_by_table)
+        _seed_test_stock_buffers(conn, rows_by_table)
 
         conn.commit()
+
+
+def _seed_test_stock_buffers(
+    conn: sqlite3.Connection,
+    rows_by_table: dict[str, list[dict[str, object]]],
+) -> None:
+    """Inject large incoming movements so every warehouse has enough stock for test CRUD.
+
+    Fixture-generated shipments can outpace incoming movements in a given warehouse
+    (e.g. shipments ship from a warehouse that never received production). Tests that
+    clone those shipments would otherwise fail the balance check in `record_movement`.
+    """
+    from uuid import uuid4
+
+    warehouses_by_org: dict[str, list[dict[str, object]]] = {}
+    for warehouse in rows_by_table.get("warehouses", []):
+        organization_id = str(warehouse.get("organization_id") or "")
+        if not organization_id:
+            continue
+        warehouses_by_org.setdefault(organization_id, []).append(warehouse)
+
+    item_sources: list[tuple[str, list[dict[str, object]], object, str]] = [
+        ("egg", rows_by_table.get("egg_production", []), lambda r: f"egg:{r['id']}", "pcs"),
+        ("chick", rows_by_table.get("incubation_runs", []), lambda r: f"chick_run:{r['id']}", "pcs"),
+        ("chick", rows_by_table.get("chick_arrivals", []), lambda r: f"chick_arrival:{r['id']}", "pcs"),
+        ("feed", rows_by_table.get("feed_production_batches", []), lambda r: f"feed_product:{r['id']}", "kg"),
+        ("feed_raw", rows_by_table.get("feed_ingredients", []), lambda r: f"feed_raw:{r['id']}", "kg"),
+        ("medicine", rows_by_table.get("medicine_batches", []), lambda r: f"medicine_batch:{r['id']}", "pcs"),
+        ("semi_product", rows_by_table.get("slaughter_semi_products", []), lambda r: f"semi_product:{r['id']}", "kg"),
+    ]
+
+    for item_type, items, key_fn, unit in item_sources:
+        for item in items:
+            organization_id = str(item.get("organization_id") or "")
+            if not organization_id:
+                continue
+            item_key = key_fn(item)
+            for warehouse in warehouses_by_org.get(organization_id, []):
+                conn.execute(
+                    'INSERT INTO "stock_movements" '
+                    "(id, organization_id, department_id, warehouse_id, item_type, item_key, "
+                    "movement_kind, quantity, unit, occurred_on, reference_table, reference_id, note) "
+                    "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                    (
+                        str(uuid4()),
+                        str(warehouse["organization_id"]),
+                        str(warehouse["department_id"]),
+                        str(warehouse["id"]),
+                        item_type,
+                        item_key,
+                        "incoming",
+                        "1000000",
+                        unit,
+                        "2000-01-01",
+                        "test_stock_buffer",
+                        str(uuid4()),
+                        "buffer for integration tests",
+                    ),
+                )
 
 
 def _seed_passed_quality_checks(
@@ -412,6 +499,16 @@ class AioSQLiteDatabase(Database):
         finally:
             await conn.close()
 
+    async def fetchval(self, query: str, *args):
+        row = await self.fetchrow(query, *args)
+        if row is None:
+            return None
+        # asyncpg.fetchval returns the first column of the first row.
+        try:
+            return next(iter(row.values()))
+        except StopIteration:
+            return None
+
     async def execute(self, query: str, *args):
         sqlite_query, sqlite_args = self._convert(query, args)
         active_connection = self._get_active_sqlite_connection()
@@ -464,6 +561,7 @@ def _build_app(db: Database) -> FastAPI:
 
     app.get("/health", include_in_schema=False)(healthcheck)
     app.dependency_overrides[db_dependency] = lambda: db
+    app.dependency_overrides[redis_dependency] = lambda: _FakeRedis()
     return app
 
 

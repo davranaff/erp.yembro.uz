@@ -161,6 +161,26 @@ async def _resolve_inventory_item_key_option(
     if normalized_item_type == "feed":
         if normalized_item_key.startswith("feed_product:"):
             entity_id = normalized_item_key.split(":", 1)[1]
+            batch_row = await db.fetchrow(
+                """
+                SELECT pb.batch_code, pb.finished_on, ft.name AS feed_type_name, ft.code AS feed_type_code
+                FROM feed_production_batches pb
+                JOIN feed_formulas ff ON ff.id = pb.formula_id
+                JOIN feed_types ft ON ft.id = ff.feed_type_id
+                WHERE pb.id::text = $1
+                LIMIT 1
+                """,
+                entity_id,
+            )
+            if batch_row is not None:
+                return {
+                    "value": normalized_item_key,
+                    "label": _compose_option_label(
+                        "Feed product",
+                        f"{batch_row['feed_type_name']} ({batch_row['feed_type_code']})",
+                        batch_row["batch_code"],
+                    ),
+                }
             row = await db.fetchrow(
                 """
                 SELECT id, name, code
@@ -868,18 +888,10 @@ class StockLedgerService:
                 exclude_reference_id=(movement.reference_id if exclude_reference_check else None),
             )
             if quantity > available_balance:
-                has_existing_movements = await self.repository.has_item_movements(
-                    organization_id=str(normalized_scope["organization_id"]),
-                    warehouse_id=str(normalized_scope["warehouse_id"]),
-                    department_id=str(normalized_scope["department_id"]),
-                    item_type=movement.item_type,
-                    item_key=movement.item_key,
+                raise ValidationError(
+                    f"Insufficient stock for {movement.item_type}:{movement.item_key}. "
+                    f"Available={available_balance}, requested={quantity}."
                 )
-                if has_existing_movements and available_balance >= 0:
-                    raise ValidationError(
-                        f"Insufficient stock for {movement.item_type}:{movement.item_key}. "
-                        f"Available={available_balance}, requested={quantity}."
-                    )
 
         payload: dict[str, object] = {
             "id": str(uuid4()),
@@ -1178,14 +1190,7 @@ class StockMovementService(BaseService):
                 item_key=item_key,
                 as_of=(as_of if isinstance(as_of, date) else None),
             )
-            has_existing = await self.repository.has_item_movements(
-                organization_id=organization_id,
-                warehouse_id=str(next_data["warehouse_id"]),
-                department_id=str(next_data["department_id"]),
-                item_type=item_type,
-                item_key=item_key,
-            )
-            if quantity > balance and has_existing and balance >= 0:
+            if quantity > balance:
                 raise ValidationError(
                     f"Insufficient stock for {item_type}:{item_key}. "
                     f"Available={balance}, requested={quantity}."
@@ -1748,46 +1753,89 @@ class StockReorderLevelService(BaseService):
         warehouse_id: str | None = None,
         as_of: date | None = None,
     ) -> list[dict[str, Any]]:
-        filters: dict[str, Any] = {
-            "organization_id": organization_id,
-            "is_active": True,
-        }
+        params: list[Any] = [organization_id]
+        cursor = 2
+        scope_where: list[str] = []
         if warehouse_id:
-            filters["warehouse_id"] = warehouse_id
+            scope_where.append(f"l.warehouse_id = ${cursor}")
+            params.append(warehouse_id)
+            cursor += 1
         elif department_id:
-            filters["department_id"] = department_id
+            scope_where.append(f"l.department_id = ${cursor}")
+            params.append(department_id)
+            cursor += 1
 
-        levels = await self.repository.list(filters=filters, order_by=("item_type", "item_key"))
-        movements_repo = StockMovementRepository(self.repository.db)
+        as_of_cursor: int | None = None
+        if as_of is not None:
+            as_of_cursor = cursor
+            params.append(as_of)
+            cursor += 1
+
+        as_of_clause = (
+            f" AND sm.occurred_on <= ${as_of_cursor}" if as_of_cursor is not None else ""
+        )
+        scope_clause = (" AND " + " AND ".join(scope_where)) if scope_where else ""
+
+        sql = f"""
+        SELECT
+            l.id,
+            l.organization_id,
+            l.department_id,
+            l.warehouse_id,
+            l.item_type,
+            l.item_key,
+            l.unit,
+            l.min_quantity,
+            l.max_quantity,
+            l.reorder_quantity,
+            COALESCE(balances.balance, 0) AS current_balance
+        FROM stock_reorder_levels AS l
+        LEFT JOIN LATERAL (
+            SELECT COALESCE(
+                SUM(
+                    CASE
+                        WHEN sm.movement_kind IN ('incoming', 'transfer_in', 'adjustment_in')
+                        THEN sm.quantity
+                        ELSE -sm.quantity
+                    END
+                ), 0
+            ) AS balance
+            FROM stock_movements AS sm
+            WHERE sm.organization_id = l.organization_id
+              AND sm.warehouse_id = l.warehouse_id
+              AND sm.department_id = l.department_id
+              AND sm.item_type = l.item_type
+              AND sm.item_key = l.item_key
+              {as_of_clause}
+        ) AS balances ON TRUE
+        WHERE l.organization_id = $1
+          AND l.is_active = TRUE
+          {scope_clause}
+          AND COALESCE(balances.balance, 0) < l.min_quantity
+        ORDER BY l.item_type, l.item_key
+        """
+
+        rows = await self.repository.db.fetch(sql, *params)
         results: list[dict[str, Any]] = []
-        for level in levels:
-            balance = await movements_repo.get_balance(
-                organization_id=str(level["organization_id"]),
-                warehouse_id=str(level["warehouse_id"]),
-                department_id=str(level["department_id"]),
-                item_type=str(level["item_type"]),
-                item_key=str(level["item_key"]),
-                as_of=as_of,
-            )
-            min_quantity = Decimal(str(level.get("min_quantity") or 0))
-            if balance >= min_quantity:
-                continue
+        for row in rows:
+            min_quantity = Decimal(str(row["min_quantity"] or 0))
+            balance = Decimal(str(row["current_balance"] or 0))
             results.append(
                 {
-                    "id": str(level["id"]),
-                    "organization_id": str(level["organization_id"]),
-                    "department_id": str(level["department_id"]),
-                    "warehouse_id": str(level["warehouse_id"]),
-                    "item_type": level["item_type"],
-                    "item_key": level["item_key"],
-                    "unit": level.get("unit"),
+                    "id": str(row["id"]),
+                    "organization_id": str(row["organization_id"]),
+                    "department_id": str(row["department_id"]),
+                    "warehouse_id": str(row["warehouse_id"]),
+                    "item_type": row["item_type"],
+                    "item_key": row["item_key"],
+                    "unit": row["unit"],
                     "min_quantity": str(min_quantity),
                     "max_quantity": (
-                        str(level["max_quantity"]) if level.get("max_quantity") is not None else None
+                        str(row["max_quantity"]) if row["max_quantity"] is not None else None
                     ),
                     "reorder_quantity": (
-                        str(level["reorder_quantity"])
-                        if level.get("reorder_quantity") is not None
+                        str(row["reorder_quantity"])
+                        if row["reorder_quantity"] is not None
                         else None
                     ),
                     "current_balance": str(balance.quantize(Decimal("0.001"))),

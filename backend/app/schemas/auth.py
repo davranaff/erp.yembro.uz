@@ -17,6 +17,9 @@ class AuthLoginResponseSchema(OpenSchema):
     username: str
     roles: list[str]
     permissions: list[str]
+    allowedDepartmentIds: list[str] | None = None
+    allowedWarehouseIds: list[str] | None = None
+    isOrgAdmin: bool = False
     accessToken: str | None = None
     refreshToken: str | None = None
     expiresAt: str | None = None
@@ -39,6 +42,9 @@ class AuthProfileSchema(OpenSchema):
     phone: str | None = None
     roles: list[str]
     permissions: list[str]
+    allowedDepartmentIds: list[str] | None = None
+    allowedWarehouseIds: list[str] | None = None
+    isOrgAdmin: bool = False
 
 
 class AuthProfileUpdateSchema(OpenSchema):

@@ -14,7 +14,7 @@ export type ResourceCategoryGroupId =
   | 'operations'
   | 'catalogs'
   | 'analytics';
-export type ResourceDetailPanelKey = 'debt_summary';
+export type ResourceDetailPanelKey = 'debt_summary' | 'flock_kpi';
 export type ResourceUiConfig = {
   formOrder?: string[];
   tableOrder?: string[];
@@ -678,6 +678,7 @@ const resourceUiConfigs: Record<string, ResourceUiConfig> = {
     ],
     hideDepartmentFieldWhenScoped: true,
     hideOrganizationFieldWhenScoped: true,
+    detailPanelKey: 'flock_kpi',
   },
   'factory:daily-logs': {
     formOrder: [

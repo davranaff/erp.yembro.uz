@@ -3,7 +3,7 @@ import {
   type AnalyticsQuickRangePreset,
 } from '@/app/router/ui/analytics-dashboard-view';
 import { ErrorNotice } from '@/components/ui/error-notice';
-import { InlineLoader } from '@/components/ui/inline-loader';
+import { MetricSkeleton } from '@/components/ui/skeleton';
 
 import type { ComponentProps } from 'react';
 
@@ -35,8 +35,8 @@ export function AnalyticsStatsView({
   return (
     <div className="space-y-6">
       {isLoading ? (
-        <div className="rounded-[28px] border border-border/75 bg-card shadow-[0_24px_72px_-48px_rgba(15,23,42,0.14)]">
-          <InlineLoader label={t('dashboard.loadingAnalytics', undefined, 'Готовим аналитику…')} />
+        <div className="rounded-[28px] border border-border/75 bg-card p-5 shadow-[0_24px_72px_-48px_rgba(15,23,42,0.14)]">
+          <MetricSkeleton count={4} />
         </div>
       ) : null}
       {error ? (

@@ -114,6 +114,26 @@ class Database:
                     raise normalized from exc
                 raise
 
+    async def fetchval(self, query: str, *args):
+        active_connection = self._get_active_connection()
+        if active_connection is not None:
+            try:
+                return await active_connection.fetchval(query, *args)
+            except Exception as exc:
+                normalized = normalize_database_error(exc)
+                if normalized is not exc:
+                    raise normalized from exc
+                raise
+
+        async with self.pool.acquire() as conn:
+            try:
+                return await conn.fetchval(query, *args)
+            except Exception as exc:
+                normalized = normalize_database_error(exc)
+                if normalized is not exc:
+                    raise normalized from exc
+                raise
+
     async def execute(self, query: str, *args):
         active_connection = self._get_active_connection()
         if active_connection is not None:

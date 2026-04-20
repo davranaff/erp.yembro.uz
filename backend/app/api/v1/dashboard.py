@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from collections import defaultdict
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta, timezone
@@ -8,8 +9,9 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 
-from app.api.deps import CurrentActor, db_dependency, get_current_actor, require_access
+from app.api.deps import CurrentActor, db_dependency, get_current_actor, redis_dependency, require_access
 from app.db.pool import Database
+from app.db.redis_client import RedisClient
 from app.schemas.stats import (
     DashboardAlertSchema,
     DashboardAnalyticsResponseSchema,
@@ -29,6 +31,24 @@ from app.schemas.stats import (
 
 
 router = APIRouter(prefix="/dashboard", tags=["dashboard"])
+
+
+DASHBOARD_ANALYTICS_CACHE_TTL = 180
+
+
+def _dashboard_cache_key(
+    *,
+    organization_id: str,
+    start_date: date | None,
+    end_date: date | None,
+    department_id: UUID | None,
+) -> str:
+    return (
+        f"dashboard:analytics:{organization_id}:"
+        f"{start_date.isoformat() if start_date else '-'}:"
+        f"{end_date.isoformat() if end_date else '-'}:"
+        f"{str(department_id) if department_id else '-'}"
+    )
 
 
 def _date_condition(column: str) -> str:
@@ -5680,9 +5700,26 @@ async def get_dashboard_analytics(
     department_id: UUID | None = Query(default=None),
     current_actor: CurrentActor = Depends(get_current_actor),
     db: Database = Depends(db_dependency),
+    redis: RedisClient = Depends(redis_dependency),
 ) -> DashboardAnalyticsResponseSchema:
     if start_date and end_date and start_date > end_date:
         raise HTTPException(status_code=422, detail="start_date must be before or equal to end_date")
+
+    cache_key = _dashboard_cache_key(
+        organization_id=current_actor.organization_id,
+        start_date=start_date,
+        end_date=end_date,
+        department_id=department_id,
+    )
+    try:
+        cached = await redis.client.get(cache_key)
+    except Exception:
+        cached = None
+    if cached is not None:
+        try:
+            return DashboardAnalyticsResponseSchema.model_validate_json(cached)
+        except Exception:
+            pass
 
     previous_start_date, previous_end_date = _resolve_previous_period(start_date, end_date)
     department_ids, scope = await _resolve_department_scope(
@@ -5693,17 +5730,17 @@ async def get_dashboard_analytics(
         end_date=end_date,
     )
     currency_code = await _resolve_currency_code(db, current_actor.organization_id)
-    modules = [
-        await _build_egg_dashboard_module(db, start_date, end_date, department_ids),
-        await _build_incubation_dashboard_module(db, start_date, end_date, department_ids),
-        await _build_factory_dashboard_module(db, start_date, end_date, department_ids),
-        await _build_feed_mill_dashboard_module(db, start_date, end_date, department_ids),
-        await _build_vet_pharmacy_dashboard_module(db, start_date, end_date, department_ids),
-        await _build_slaughterhouse_dashboard_module(db, start_date, end_date, department_ids),
-        await _build_finance_dashboard_module(db, start_date, end_date, department_ids, current_actor.organization_id),
-        await _build_hr_dashboard_module(db, start_date, end_date, department_ids, current_actor.organization_id),
-        await _build_core_dashboard_module(db, start_date, end_date, department_ids, current_actor.organization_id),
-    ]
+    modules = list(await asyncio.gather(
+        _build_egg_dashboard_module(db, start_date, end_date, department_ids),
+        _build_incubation_dashboard_module(db, start_date, end_date, department_ids),
+        _build_factory_dashboard_module(db, start_date, end_date, department_ids),
+        _build_feed_mill_dashboard_module(db, start_date, end_date, department_ids),
+        _build_vet_pharmacy_dashboard_module(db, start_date, end_date, department_ids),
+        _build_slaughterhouse_dashboard_module(db, start_date, end_date, department_ids),
+        _build_finance_dashboard_module(db, start_date, end_date, department_ids, current_actor.organization_id),
+        _build_hr_dashboard_module(db, start_date, end_date, department_ids, current_actor.organization_id),
+        _build_core_dashboard_module(db, start_date, end_date, department_ids, current_actor.organization_id),
+    ))
     modules = [_apply_currency_code(module, currency_code) for module in modules]
     previous_modules_by_key: dict[str, DashboardModuleSchema] = {}
     if previous_start_date is not None and previous_end_date is not None:
@@ -5714,65 +5751,17 @@ async def get_dashboard_analytics(
             start_date=previous_start_date,
             end_date=previous_end_date,
         )
-        previous_modules = [
-            await _build_egg_dashboard_module(
-                db,
-                previous_start_date,
-                previous_end_date,
-                previous_department_ids,
-            ),
-            await _build_incubation_dashboard_module(
-                db,
-                previous_start_date,
-                previous_end_date,
-                previous_department_ids,
-            ),
-            await _build_factory_dashboard_module(
-                db,
-                previous_start_date,
-                previous_end_date,
-                previous_department_ids,
-            ),
-            await _build_feed_mill_dashboard_module(
-                db,
-                previous_start_date,
-                previous_end_date,
-                previous_department_ids,
-            ),
-            await _build_vet_pharmacy_dashboard_module(
-                db,
-                previous_start_date,
-                previous_end_date,
-                previous_department_ids,
-            ),
-            await _build_slaughterhouse_dashboard_module(
-                db,
-                previous_start_date,
-                previous_end_date,
-                previous_department_ids,
-            ),
-            await _build_finance_dashboard_module(
-                db,
-                previous_start_date,
-                previous_end_date,
-                previous_department_ids,
-                current_actor.organization_id,
-            ),
-            await _build_hr_dashboard_module(
-                db,
-                previous_start_date,
-                previous_end_date,
-                previous_department_ids,
-                current_actor.organization_id,
-            ),
-            await _build_core_dashboard_module(
-                db,
-                previous_start_date,
-                previous_end_date,
-                previous_department_ids,
-                current_actor.organization_id,
-            ),
-        ]
+        previous_modules = list(await asyncio.gather(
+            _build_egg_dashboard_module(db, previous_start_date, previous_end_date, previous_department_ids),
+            _build_incubation_dashboard_module(db, previous_start_date, previous_end_date, previous_department_ids),
+            _build_factory_dashboard_module(db, previous_start_date, previous_end_date, previous_department_ids),
+            _build_feed_mill_dashboard_module(db, previous_start_date, previous_end_date, previous_department_ids),
+            _build_vet_pharmacy_dashboard_module(db, previous_start_date, previous_end_date, previous_department_ids),
+            _build_slaughterhouse_dashboard_module(db, previous_start_date, previous_end_date, previous_department_ids),
+            _build_finance_dashboard_module(db, previous_start_date, previous_end_date, previous_department_ids, current_actor.organization_id),
+            _build_hr_dashboard_module(db, previous_start_date, previous_end_date, previous_department_ids, current_actor.organization_id),
+            _build_core_dashboard_module(db, previous_start_date, previous_end_date, previous_department_ids, current_actor.organization_id),
+        ))
         previous_modules = [_apply_currency_code(module, currency_code) for module in previous_modules]
         previous_modules_by_key = {module.key: module for module in previous_modules}
 
@@ -5781,13 +5770,22 @@ async def get_dashboard_analytics(
         for module in modules
     ]
 
-    return DashboardAnalyticsResponseSchema(
+    response = DashboardAnalyticsResponseSchema(
         generatedAt=datetime.now(timezone.utc),
         currency=currency_code,
         scope=scope,
         department_dashboard=DashboardDepartmentDashboardSchema(modules=modules),
         executive_dashboard=None,
     )
+    try:
+        await redis.client.set(
+            cache_key,
+            response.model_dump_json(),
+            ex=DASHBOARD_ANALYTICS_CACHE_TTL,
+        )
+    except Exception:
+        pass
+    return response
 
 
 __all__ = ["router"]

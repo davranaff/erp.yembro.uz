@@ -147,8 +147,20 @@ export function CrudFormFieldRow({ field, value, fieldError, context }: CrudForm
         : field.name === 'item_key'
           ? inventoryMovementItemKeyField.reference?.options
           : field.reference?.options;
+  const DEPARTMENT_META_FIELDS = new Set([
+    'department_id',
+    'parent_department_id',
+    'head_id',
+    'organization_id',
+    'module_key',
+    'id',
+  ]);
+  const formDepartmentId =
+    typeof formValues.department_id === 'string' ? formValues.department_id.trim() : '';
+  const defaultFormScopeDepartmentId =
+    formDepartmentId || selectedDepartmentId || fallbackDepartmentId || '';
   const referenceQueryParams =
-    field.name === 'warehouse_id'
+    field.name === 'warehouse_id' && isInventoryMovementsResource
       ? { department_id: movementDepartmentId || undefined }
       : field.name === 'item_key'
         ? {
@@ -164,7 +176,11 @@ export function CrudFormFieldRow({ field, value, fieldError, context }: CrudForm
           }
         : isFinanceDepartmentScopedReferenceField
           ? { department_id: financeDepartmentId || undefined }
-          : undefined;
+          : field.reference &&
+              !DEPARTMENT_META_FIELDS.has(field.name) &&
+              defaultFormScopeDepartmentId
+            ? { department_id: defaultFormScopeDepartmentId }
+            : undefined;
   const hasReferenceOptions =
     isDepartmentReferenceField ||
     isMovementWarehouseField ||

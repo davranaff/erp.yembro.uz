@@ -520,13 +520,17 @@ class DepartmentService(BaseService):
                 }
             )
 
+        visible_ids: set[str] = set()
+        if actor is not None:
+            if actor.department_id is not None:
+                visible_ids.add(str(actor.department_id))
+            managed_ids, _ = await self._get_managed_department_scope(actor)
+            visible_ids.update(managed_ids)
+
         visible_departments = [
             department
             for department in departments
-            if actor is not None
-            and actor.department_id is not None
-            and department.get("id") is not None
-            and str(department["id"]) == str(actor.department_id)
+            if department.get("id") is not None and str(department["id"]) in visible_ids
         ]
 
         return Result.ok_result(

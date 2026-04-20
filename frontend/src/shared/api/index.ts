@@ -53,6 +53,20 @@ export type {
   InventoryTransferResponse,
   StockBalanceItem,
 } from './inventory';
+export { factoryFlockKpiSchema, getFactoryFlockKpi } from './factory';
+export type { FactoryFlockKpi } from './factory';
+export { debtsAgingResponseSchema, getDebtsAging } from './finance';
+export type { DebtsAgingBuckets, DebtsAgingResponse } from './finance';
+export {
+  consumeMedicine,
+  medicineConsumeRequestSchema,
+  medicineConsumeResponseSchema,
+} from './medicine';
+export type {
+  MedicineConsumeAllocation,
+  MedicineConsumeRequest,
+  MedicineConsumeResponse,
+} from './medicine';
 export { baseQueryKeys, toQueryKey } from './query-keys';
 export {
   getErrorMessage,

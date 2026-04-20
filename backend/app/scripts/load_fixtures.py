@@ -697,14 +697,13 @@ def _build_generated_stock_movements(
 
     for row in rows_by_table.get("feed_production_batches", []):
         formula_id = str(row.get("formula_id") or "")
-        feed_type_id = formula_feed_type_by_id.get(formula_id)
-        if not feed_type_id:
+        if not formula_feed_type_by_id.get(formula_id):
             raise ValueError(f"Unknown feed formula for production batch: {formula_id}")
         movement = _stock_movement_row(
             organization_id=row["organization_id"],
             department_id=row["department_id"],
             item_type="feed",
-            item_key=f"feed_product:{feed_type_id}",
+            item_key=f"feed_product:{row['id']}",
             movement_kind="incoming",
             quantity=_decimal_value(row.get("actual_output")),
             unit=row.get("unit") or "kg",
@@ -717,11 +716,13 @@ def _build_generated_stock_movements(
             stock_rows.append(movement)
 
     for row in rows_by_table.get("feed_product_shipments", []):
+        production_batch_id = row.get("production_batch_id")
+        item_key_target = str(production_batch_id) if production_batch_id else str(row["feed_type_id"])
         movement = _stock_movement_row(
             organization_id=row["organization_id"],
             department_id=row["department_id"],
             item_type="feed",
-            item_key=f"feed_product:{row['feed_type_id']}",
+            item_key=f"feed_product:{item_key_target}",
             movement_kind="outgoing",
             quantity=_decimal_value(row.get("quantity")),
             unit=row.get("unit") or "kg",

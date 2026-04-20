@@ -11,7 +11,12 @@ class MedicineTypeRepository(BaseRepository[dict[str, object]]):
     table = "medicine_types"
 
 
+class MedicineConsumptionRepository(BaseRepository[dict[str, object]]):
+    table = "medicine_consumptions"
+
+
 __all__ = [
     "MedicineBatchRepository",
     "MedicineTypeRepository",
+    "MedicineConsumptionRepository",
 ]

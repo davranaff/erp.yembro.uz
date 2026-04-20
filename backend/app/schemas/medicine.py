@@ -50,6 +50,26 @@ class MedicineTypeListResponse(CRUDListResponse[MedicineTypeReadSchema]):
     """Paginated medicine type response."""
 
 
+class MedicineConsumptionCreateSchema(OpenSchema, BaseCreateSchema):
+    """Input payload to create medicine consumption."""
+
+
+class MedicineConsumptionUpdateSchema(OpenSchema, BaseUpdateSchema):
+    """Input payload to update medicine consumption."""
+
+
+class MedicineConsumptionReadSchema(OpenSchema, BaseReadSchema):
+    """Readable medicine consumption response."""
+
+
+class MedicineConsumptionListParams(CRUDBaseParams):
+    """Pagination + query params for medicine consumption list."""
+
+
+class MedicineConsumptionListResponse(CRUDListResponse[MedicineConsumptionReadSchema]):
+    """Paginated medicine consumption response."""
+
+
 __all__ = [
     "MedicineBatchCreateSchema",
     "MedicineBatchUpdateSchema",
@@ -61,4 +81,9 @@ __all__ = [
     "MedicineTypeReadSchema",
     "MedicineTypeListParams",
     "MedicineTypeListResponse",
+    "MedicineConsumptionCreateSchema",
+    "MedicineConsumptionUpdateSchema",
+    "MedicineConsumptionReadSchema",
+    "MedicineConsumptionListParams",
+    "MedicineConsumptionListResponse",
 ]

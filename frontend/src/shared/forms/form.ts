@@ -11,7 +11,7 @@ import {
 import type { ZodTypeAny, input as ZodInput, output as ZodOutput } from 'zod';
 
 export const baseFormConfig = {
-  mode: 'onSubmit',
+  mode: 'onBlur',
   reValidateMode: 'onChange',
   shouldUnregister: false,
   shouldFocusError: true,

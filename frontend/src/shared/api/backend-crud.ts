@@ -44,6 +44,7 @@ export type CrudListOptions = {
   orderBy?: string;
   search?: string;
   departmentId?: string;
+  departmentIds?: string[];
 };
 
 export type CrudReferenceOption = {
@@ -213,12 +214,16 @@ export const listCrudRecords = (
   resourcePath: string,
   options: CrudListOptions = {},
 ) => {
+  const departmentParam: string | string[] | undefined =
+    options.departmentIds && options.departmentIds.length > 0
+      ? options.departmentIds
+      : options.departmentId?.trim() || undefined;
   const path = buildPath(resourcePath, {
     limit: options.limit ?? 1000,
     offset: options.offset,
     order_by: options.orderBy,
     search: options.search?.trim() || undefined,
-    department_id: options.departmentId?.trim() || undefined,
+    department_id: departmentParam,
   });
   return apiClient.get<CrudListResponse>(`/${moduleKey}/${path}`);
 };
@@ -231,8 +236,23 @@ export const listWorkspaceModules = () => {
   return apiClient.get<CrudListResponse>('/core/workspace-modules');
 };
 
-export const getCrudResourceMeta = (moduleKey: string, resourcePath: string) => {
-  return apiClient.get<CrudResourceMeta>(`/${moduleKey}/${resourcePath}/meta`);
+export const getCrudResourceMeta = (
+  moduleKey: string,
+  resourcePath: string,
+  options: { departmentId?: string; departmentIds?: string[] } = {},
+) => {
+  const ids =
+    options.departmentIds && options.departmentIds.length > 0
+      ? options.departmentIds
+      : options.departmentId
+        ? [options.departmentId]
+        : [];
+  const departmentParam: string | string[] | undefined =
+    ids.length > 1 ? ids : ids.length === 1 ? ids[0] : undefined;
+  const path = buildPath(`${resourcePath}/meta`, {
+    department_id: departmentParam,
+  });
+  return apiClient.get<CrudResourceMeta>(`/${moduleKey}/${path}`);
 };
 
 export const getCrudReferenceOptions = (

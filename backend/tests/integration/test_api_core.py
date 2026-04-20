@@ -168,22 +168,21 @@ async def test_workspace_modules_expose_org_scoped_positions_inside_core_when_pe
 
 @pytest.mark.asyncio
 async def test_client_notification_context_and_bulk_send_endpoint(api_client) -> None:
+    primary_client = "e1111111-0000-0000-0000-000000000002"
+    secondary_client = "e1111111-0000-0000-0000-000000000010"
     context_response = await api_client.get(
-        "/api/v1/core/clients/77777777-7777-7777-7777-777777777777/notification-context",
+        f"/api/v1/core/clients/{primary_client}/notification-context",
         headers=make_auth_headers("client"),
     )
     assert context_response.status_code == 200, context_response.text
     context_payload = extract_data(context_response)
-    assert context_payload["client"]["id"] == "77777777-7777-7777-7777-777777777777"
+    assert context_payload["client"]["id"] == primary_client
     assert len(context_payload["templates"]) >= 1
 
     bulk_response = await api_client.post(
         "/api/v1/core/clients/notify/bulk",
         json={
-            "client_ids": [
-                "77777777-7777-7777-7777-777777777777",
-                "88888888-8888-8888-8888-888888888888",
-            ],
+            "client_ids": [primary_client, secondary_client],
             "template_key": "debt_reminder",
             "channel": "telegram",
         },
@@ -197,7 +196,7 @@ async def test_client_notification_context_and_bulk_send_endpoint(api_client) ->
 
 @pytest.mark.asyncio
 async def test_client_debt_rejects_due_date_before_issue_date(api_client) -> None:
-    debt_id = "40404040-4040-4040-4040-404040404041"
+    debt_id = "f1000000-0000-0000-0000-000000000001"
     current_response = await api_client.get(
         f"/api/v1/core/client-debts/{debt_id}",
         headers=make_auth_headers("client_debt"),

@@ -2,7 +2,7 @@ import { History, Trash2 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/empty-state';
-import { InlineLoader } from '@/components/ui/inline-loader';
+import { CardSkeleton } from '@/components/ui/skeleton';
 import type { CrudFieldMeta, CrudRecord } from '@/shared/api/backend-crud';
 import { cn } from '@/shared/lib/cn';
 
@@ -227,7 +227,7 @@ export function StockMovementCards(props: StockMovementCardsProps) {
     >
       <div className="max-h-[680px] overflow-y-auto p-3 sm:hidden">
         {isLoading ? (
-          <InlineLoader label={t('crud.loadingRecords', undefined, 'Загружаем данные…')} />
+          <CardSkeleton lines={3} />
         ) : records.length === 0 ? (
           <EmptyState title={emptyTitle} description={emptyDescription} />
         ) : (

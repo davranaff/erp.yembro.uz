@@ -40,6 +40,11 @@ class FactoryFlock(Base, IDMixin, TimestampMixin):
         nullable=True,
         index=True,
     )
+    chick_arrival_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("chick_arrivals.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
     flock_code: Mapped[str] = mapped_column(String(120), nullable=False, index=True)
     arrived_on: Mapped[date] = mapped_column(Date, nullable=False, index=True)
     initial_count: Mapped[int] = mapped_column(Integer, nullable=False)
@@ -57,6 +62,7 @@ class FactoryFlock(Base, IDMixin, TimestampMixin):
     warehouse: Mapped["Warehouse | None"] = relationship("Warehouse")
     poultry_type: Mapped["PoultryType | None"] = relationship("PoultryType")
     source_client: Mapped["Client | None"] = relationship("Client", back_populates="factory_source_flocks")
+    chick_arrival: Mapped["ChickArrival | None"] = relationship("ChickArrival")
     daily_logs: Mapped[List["FactoryDailyLog"]] = relationship(
         "FactoryDailyLog",
         back_populates="flock",

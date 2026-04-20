@@ -77,7 +77,7 @@ async def test_viewer_with_required_permissions_has_access(api_client, path: str
     create_payload = await build_create_payload(api_client, path)
     headers = make_headers("viewer", [f"{prefix}.create"])
     response = await api_client.post(path, json=create_payload, headers=headers)
-    assert response.status_code == 201
+    assert response.status_code == 201, response.text
 
 
 @pytest.mark.asyncio

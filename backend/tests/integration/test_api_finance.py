@@ -13,8 +13,8 @@ FINANCE_RESOURCES = [
     ("/api/v1/finance/cash-accounts", "cash_account"),
     ("/api/v1/finance/cash-transactions", "cash_transaction"),
 ]
-FACTORY_CATEGORY_ID = "80222222-2222-2222-2222-222222222222"
-EGG_CASH_ACCOUNT_ID = "90411111-1111-1111-1111-111111111111"
+FACTORY_CATEGORY_ID = "60111111-1111-1111-1111-111111111104"
+EGG_CASH_ACCOUNT_ID = "62111111-1111-1111-1111-111111111101"
 
 
 @pytest.mark.asyncio

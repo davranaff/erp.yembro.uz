@@ -363,17 +363,11 @@ class SlaughterSemiProductService(BaseService):
         if str(processing.get("organization_id")) != organization_id:
             raise AccessDeniedError("processing belongs to another organization")
 
-        department_id = merged.get("department_id")
-        if not department_id:
-            department_id = processing.get("department_id")
-            if department_id is None:
-                raise ValidationError("department_id is required")
-            out["department_id"] = str(department_id)
-        else:
-            if str(department_id) != str(processing.get("department_id")):
-                raise ValidationError(
-                    "department_id must match processing department",
-                )
+        processing_dept = processing.get("department_id")
+        if processing_dept is None:
+            raise ValidationError("department_id is required")
+        out["department_id"] = str(processing_dept)
+        merged["department_id"] = str(processing_dept)
 
         out["processing_id"] = processing_id
 
@@ -607,15 +601,11 @@ class SlaughterSemiProductShipmentService(CreatedByActorMixin, BaseService):
         if str(semi_product.get("organization_id")) != organization_id:
             raise AccessDeniedError("semi product belongs to another organization")
 
-        department_id = merged.get("department_id")
-        if not department_id:
-            department_id = semi_product.get("department_id")
-            if department_id is None:
-                raise ValidationError("department_id is required")
-            out["department_id"] = str(department_id)
-        else:
-            if str(department_id) != str(semi_product.get("department_id")):
-                raise ValidationError("department_id must match semi product department")
+        sp_dept = semi_product.get("department_id")
+        if sp_dept is None:
+            raise ValidationError("department_id is required")
+        out["department_id"] = str(sp_dept)
+        merged["department_id"] = str(sp_dept)
 
         out["semi_product_id"] = semi_product_id
 
@@ -848,14 +838,11 @@ class SlaughterQualityCheckService(BaseService):
         if str(semi_product.get("organization_id")) != organization_id:
             raise AccessDeniedError("semi product belongs to another organization")
 
-        department_id = merged.get("department_id")
-        if not department_id:
-            department_id = semi_product.get("department_id")
-            if department_id is None:
-                raise ValidationError("department_id is required")
-            out["department_id"] = str(department_id)
-        elif str(department_id) != str(semi_product.get("department_id")):
-            raise ValidationError("department_id must match semi product department")
+        sp_dept = semi_product.get("department_id")
+        if sp_dept is None:
+            raise ValidationError("department_id is required")
+        out["department_id"] = str(sp_dept)
+        merged["department_id"] = str(sp_dept)
 
         out["semi_product_id"] = semi_product_id
 

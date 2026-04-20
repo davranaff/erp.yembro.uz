@@ -45,4 +45,5 @@ export {
   hasPrivilegedAccessRole,
 } from './access';
 export { useAuthStore } from './auth-store';
+export { useSessionExpiryWarning } from './use-session-expiry-warning';
 export type { AuthCredentials, AuthSession, AuthState } from './types';

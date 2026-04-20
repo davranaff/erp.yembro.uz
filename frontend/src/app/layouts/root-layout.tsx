@@ -1,8 +1,13 @@
 import { type ReactNode, useEffect } from 'react';
 import { Outlet, useLocation } from 'react-router-dom';
 
+import { ToastProvider } from '@/components/ui/toast';
+import { TopProgressBar } from '@/components/ui/top-progress-bar';
 import { useAppStore } from '@/shared/store';
+import { useThemeEffect } from '@/shared/theme';
 import { TourProvider } from '@/shared/tour';
+
+import { CommandPaletteProvider } from '../ui/command-palette';
 
 type RootLayoutProps = {
   children?: ReactNode;
@@ -11,6 +16,7 @@ type RootLayoutProps = {
 export function RootLayout({ children }: RootLayoutProps) {
   const setCurrentRoute = useAppStore((state) => state.setCurrentRoute);
   const location = useLocation();
+  useThemeEffect();
 
   useEffect(() => {
     setCurrentRoute(location.pathname);
@@ -50,7 +56,12 @@ export function RootLayout({ children }: RootLayoutProps) {
         }}
       />
       <main className="relative min-h-screen w-full">
-        <TourProvider>{children ?? <Outlet />}</TourProvider>
+        <ToastProvider>
+          <TopProgressBar />
+          <CommandPaletteProvider>
+            <TourProvider>{children ?? <Outlet />}</TourProvider>
+          </CommandPaletteProvider>
+        </ToastProvider>
       </main>
     </div>
   );

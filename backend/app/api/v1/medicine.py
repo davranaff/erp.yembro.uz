@@ -1,13 +1,15 @@
 from __future__ import annotations
 
 import base64
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
+from decimal import Decimal
 from io import BytesIO
 import re
 from typing import Any
 from uuid import UUID, uuid4
 
 from fastapi import APIRouter, Depends, File, HTTPException, Response, UploadFile, status
+from pydantic import BaseModel, Field
 
 from app.api.crud import build_crud_router
 from app.api.deps import CurrentActor, db_dependency, get_current_actor, require_access
@@ -17,10 +19,12 @@ from app.core.exceptions import ValidationError
 from app.db.pool import Database
 from app.repositories.medicine import (
     MedicineBatchRepository,
+    MedicineConsumptionRepository,
     MedicineTypeRepository,
 )
 from app.services.medicine import (
     MedicineBatchService,
+    MedicineConsumptionService,
     MedicineTypeService,
 )
 from app.services.storage import get_storage_service
@@ -479,6 +483,129 @@ async def download_public_batch_attachment(
     )
 
 
+class MedicineConsumeRequest(BaseModel):
+    medicine_type_id: UUID
+    quantity: Decimal = Field(gt=0)
+    consumed_on: date
+    department_id: UUID | None = None
+    unit: str | None = None
+    purpose: str | None = None
+    poultry_type_id: UUID | None = None
+    client_id: UUID | None = None
+    factory_flock_id: UUID | None = None
+
+
+@router.post(
+    "/consume",
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_access("medicine_consumption.create", roles=("admin", "manager")))],
+)
+async def consume_medicine_fefo(
+    payload: MedicineConsumeRequest,
+    current_actor: CurrentActor = Depends(get_current_actor),
+    db: Database = Depends(db_dependency),
+) -> dict[str, Any]:
+    requested = payload.quantity.quantize(Decimal("0.001"))
+    organization_id = current_actor.organization_id
+    if payload.department_id is not None:
+        department_filter: str | None = str(payload.department_id)
+    elif _actor_bypasses_department_scope(current_actor):
+        department_filter = None
+    else:
+        department_filter = current_actor.department_id
+
+    allocations: list[dict[str, Any]] = []
+    async with db.transaction():
+        if department_filter is not None:
+            batches = await db.fetch(
+                """
+                SELECT id, batch_code, expiry_date, remaining_quantity, unit, department_id
+                FROM medicine_batches
+                WHERE organization_id = $1
+                  AND medicine_type_id = $2
+                  AND department_id = $3
+                  AND remaining_quantity > 0
+                ORDER BY expiry_date ASC NULLS LAST, arrived_on ASC
+                FOR UPDATE
+                """,
+                organization_id,
+                str(payload.medicine_type_id),
+                department_filter,
+            )
+        else:
+            batches = await db.fetch(
+                """
+                SELECT id, batch_code, expiry_date, remaining_quantity, unit, department_id
+                FROM medicine_batches
+                WHERE organization_id = $1
+                  AND medicine_type_id = $2
+                  AND remaining_quantity > 0
+                ORDER BY expiry_date ASC NULLS LAST, arrived_on ASC
+                FOR UPDATE
+                """,
+                organization_id,
+                str(payload.medicine_type_id),
+            )
+
+        total_available = sum(
+            (Decimal(str(row["remaining_quantity"])) for row in batches),
+            Decimal("0"),
+        )
+        if total_available < requested:
+            raise ValidationError(
+                f"Insufficient stock: requested {requested}, available {total_available}",
+            )
+
+        service = MedicineConsumptionService(MedicineConsumptionRepository(db))
+        remaining_to_allocate = requested
+        for row in batches:
+            if remaining_to_allocate <= 0:
+                break
+            batch_remaining = Decimal(str(row["remaining_quantity"]))
+            take = min(batch_remaining, remaining_to_allocate)
+            consumption_data = {
+                "batch_id": str(row["id"]),
+                "organization_id": organization_id,
+                "department_id": str(row["department_id"]),
+                "quantity": str(take),
+                "consumed_on": payload.consumed_on,
+                "unit": payload.unit or row.get("unit"),
+            }
+            if payload.purpose is not None:
+                consumption_data["purpose"] = payload.purpose
+            if payload.poultry_type_id is not None:
+                consumption_data["poultry_type_id"] = str(payload.poultry_type_id)
+            if payload.client_id is not None:
+                consumption_data["client_id"] = str(payload.client_id)
+            if payload.factory_flock_id is not None:
+                consumption_data["factory_flock_id"] = str(payload.factory_flock_id)
+
+            result = await service.create(consumption_data, actor=current_actor)
+            if not result.ok:
+                raise ValidationError(result.error or "Failed to create consumption")
+            created = result.data
+            if isinstance(created, dict):
+                consumption_id = str(created.get("id"))
+            else:
+                consumption_id = str(getattr(created, "id", ""))
+            allocations.append(
+                {
+                    "batch_id": str(row["id"]),
+                    "batch_code": row.get("batch_code"),
+                    "expiry_date": row.get("expiry_date"),
+                    "quantity": str(take),
+                    "consumption_id": consumption_id,
+                }
+            )
+            remaining_to_allocate -= take
+
+    return {
+        "requested": str(requested),
+        "consumed_total": str(requested - remaining_to_allocate),
+        "allocations": allocations,
+    }
+
+
 router.include_router(
     build_crud_router(
         prefix="batches",
@@ -497,6 +624,15 @@ router.include_router(
     )
 )
 
+router.include_router(
+    build_crud_router(
+        prefix="consumptions",
+        service_factory=lambda db: MedicineConsumptionService(MedicineConsumptionRepository(db)),
+        permission_prefix="medicine_consumption",
+        tags=["medicine-consumption"],
+    )
+)
+
 register_module_stats_route(
     router,
     module="medicine",
@@ -504,6 +640,7 @@ register_module_stats_route(
     tables=(
         ModuleStatsTable(key="batches", label="Batches", table="medicine_batches"),
         ModuleStatsTable(key="types", label="Types", table="medicine_types"),
+        ModuleStatsTable(key="consumptions", label="Consumptions", table="medicine_consumptions"),
     ),
 )
 

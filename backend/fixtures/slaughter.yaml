@@ -1,857 +1,304 @@
+# Slaughter (so'yish majmuasi) fixtures: processings, semi-products,
+# quality checks, semi-product shipments.
+#
+# Depts: 99991111 (SLH parent) — warehouse 89012be7... (SLH-WH)
+#        99992222 (SLH-CUT child) — warehouse 29d273a0... (SLH-CUT-WH)
+# Sources:
+#   - factory_shipment a2111111...01 (2200 birds, ~5060 kg)
+#   - factory_shipment a2111111...02 (2000 birds, ~4640 kg)
+#   - external supplier CL-006 Yusupov Agro
+# Buyers:
+#   - CL-002 Oila supermarket  (e1111111...02)
+#   - CL-005 Malika Restoran   (e1111111...05)
+# Inspector employee: 70444444 (EMP-ADM-00) for simplicity
+
 slaughter_processings:
-- id: "e1e1e1e1-1111-1111-1111-111111111111"
-  organization_id: "11111111-1111-1111-1111-111111111111"
-  department_id: "44444444-4444-4444-4444-444444444444"
-  source_type: "external"
-  supplier_client_id: "77777777-7777-7777-7777-777777777777"
-  poultry_type_id: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
-  arrived_on: "2026-02-15"
-  birds_received: 1500
-  arrival_total_weight_kg: 3450.0
-  arrival_unit_price: 1100.0
-  arrival_currency: "UZS"
-  arrival_invoice_no: "S-ARR-001"
-  processed_on: "2026-02-18"
-  birds_processed: 1500
-  first_sort_count: 900
-  second_sort_count: 500
-  bad_count: 100
-  first_sort_weight_kg: 1800.0
-  second_sort_weight_kg: 950.0
-  bad_weight_kg: 200.0
-  processed_by: "70111111-1111-1111-1111-111111111111"
-  note: "birinchi pererabotka (external supplier)"
-- id: "e2e2e2e2-2222-2222-2222-222222222222"
-  organization_id: "11111111-1111-1111-1111-111111111111"
-  department_id: "55555555-5555-5555-5555-555555555555"
-  source_type: "external"
-  supplier_client_id: "88888888-8888-8888-8888-888888888888"
-  poultry_type_id: "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
-  arrived_on: "2026-02-16"
-  birds_received: 1800
-  arrival_total_weight_kg: 3780.0
-  arrival_unit_price: 1080.0
-  arrival_currency: "UZS"
-  arrival_invoice_no: "S-ARR-002"
-  processed_on: "2026-02-19"
-  birds_processed: 1800
-  first_sort_count: 1100
-  second_sort_count: 600
-  bad_count: 100
-  first_sort_weight_kg: 2300.0
-  second_sort_weight_kg: 1200.0
-  bad_weight_kg: 180.0
-  processed_by: "70222222-2222-2222-2222-222222222222"
-  note: "asosiy pererabotka (external supplier)"
-- id: "e3e3e3e3-3333-3333-3333-333333333333"
-  organization_id: "22222222-2222-2222-2222-222222222222"
-  department_id: "66666666-6666-6666-6666-666666666666"
-  source_type: "external"
-  supplier_client_id: "99999999-9999-9999-9999-999999999999"
-  poultry_type_id: "cccccccc-cccc-cccc-cccc-cccccccccccc"
-  arrived_on: "2026-02-17"
-  birds_received: 1300
-  arrival_total_weight_kg: 3250.0
-  arrival_unit_price: 1150.0
-  arrival_currency: "UZS"
-  arrival_invoice_no: "S-ARR-003"
-  processed_on: "2026-02-20"
-  birds_processed: 1300
-  first_sort_count: 870
-  second_sort_count: 350
-  bad_count: 80
-  first_sort_weight_kg: 1700.0
-  second_sort_weight_kg: 650.0
-  bad_weight_kg: 150.0
-  processed_by: "70333333-3333-3333-3333-333333333333"
-  note: "itogoviy zagotovitelniy oqim (external supplier)"
-- id: "e4e4e4e4-4444-4444-4444-444444444444"
-  organization_id: "11111111-1111-1111-1111-111111111111"
-  department_id: "99991111-1111-1111-1111-111111111111"
-  source_type: "external"
-  supplier_client_id: "77777777-7777-7777-7777-777777777777"
-  poultry_type_id: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
-  arrived_on: "2026-02-27"
-  birds_received: 1650
-  arrival_total_weight_kg: 3712.5
-  arrival_unit_price: 1120.0
-  arrival_currency: "UZS"
-  arrival_invoice_no: "S-ARR-004"
-  processed_on: "2026-03-01"
-  birds_processed: 1650
-  first_sort_count: 990
-  second_sort_count: 560
-  bad_count: 100
-  first_sort_weight_kg: 1960.0
-  second_sort_weight_kg: 1020.0
-  bad_weight_kg: 210.0
-  processed_by: "70777777-7777-7777-7777-777777777777"
-  note: "kuchaytirilgan smena (external supplier)"
-- id: "e5e5e5e5-5555-5555-5555-555555555556"
-  organization_id: "11111111-1111-1111-1111-111111111111"
-  department_id: "99992222-2222-2222-2222-222222222222"
-  source_type: "external"
-  supplier_client_id: "88888888-8888-8888-8888-888888888888"
-  poultry_type_id: "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
-  arrived_on: "2026-02-28"
-  birds_received: 1725
-  arrival_total_weight_kg: 3795.0
-  arrival_unit_price: 1110.0
-  arrival_currency: "UZS"
-  arrival_invoice_no: "S-ARR-005"
-  processed_on: "2026-03-02"
-  birds_processed: 1725
-  first_sort_count: 1040
-  second_sort_count: 590
-  bad_count: 95
-  first_sort_weight_kg: 2140.0
-  second_sort_weight_kg: 1110.0
-  bad_weight_kg: 170.0
-  processed_by: "70777777-7777-7777-7777-777777777777"
-  note: "smena liniya razdelki (external supplier)"
-- id: "e6e6e6e6-6666-6666-6666-666666666666"
-  organization_id: "11111111-1111-1111-1111-111111111111"
-  department_id: "99991111-1111-1111-1111-111111111111"
-  source_type: "external"
-  supplier_client_id: "17171717-1717-1717-1717-171717171717"
-  poultry_type_id: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
-  arrived_on: "2026-03-04"
-  birds_received: 1685
-  arrival_total_weight_kg: 3841.8
-  arrival_unit_price: 1135.0
-  arrival_currency: "UZS"
-  arrival_invoice_no: "S-ARR-006"
-  processed_on: "2026-03-05"
-  birds_processed: 1685
-  first_sort_count: 1015
-  second_sort_count: 575
-  bad_count: 95
-  first_sort_weight_kg: 2015.0
-  second_sort_weight_kg: 1045.0
-  bad_weight_kg: 175.0
-  processed_by: "70777777-7777-7777-7777-777777777777"
-  note: "yangi sikl razdelki (external supplier)"
-- id: "e7e7e7e7-7777-7777-7777-777777777777"
-  organization_id: "11111111-1111-1111-1111-111111111111"
-  department_id: "99992222-2222-2222-2222-222222222222"
-  source_type: "external"
-  supplier_client_id: "19191919-1919-1919-1919-191919191919"
-  poultry_type_id: "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
-  arrived_on: "2026-03-05"
-  birds_received: 1740
-  arrival_total_weight_kg: 3793.2
-  arrival_unit_price: 1125.0
-  arrival_currency: "UZS"
-  arrival_invoice_no: "S-ARR-007"
-  processed_on: "2026-03-06"
-  birds_processed: 1740
-  first_sort_count: 1055
-  second_sort_count: 595
-  bad_count: 90
-  first_sort_weight_kg: 2160.0
-  second_sort_weight_kg: 1125.0
-  bad_weight_kg: 165.0
-  processed_by: "71313131-3131-3131-3131-313131313131"
-  note: "kengaytirilgan sortirovka liniya (external supplier)"
-- id: "e8e8e8e8-8888-8888-8888-888888888888"
-  organization_id: "11111111-1111-1111-1111-111111111111"
-  department_id: "99991111-1111-1111-1111-111111111111"
-  source_type: "external"
-  supplier_client_id: "25252525-2525-2525-2525-252525252525"
-  poultry_type_id: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
-  arrived_on: "2026-03-21"
-  birds_received: 1845
-  arrival_total_weight_kg: 4317.3
-  arrival_unit_price: 1195.0
-  arrival_currency: "UZS"
-  arrival_invoice_no: "S-ARR-009"
-  processed_on: "2026-03-22"
-  birds_processed: 1845
-  first_sort_count: 1125
-  second_sort_count: 615
-  bad_count: 105
-  first_sort_weight_kg: 2235.0
-  second_sort_weight_kg: 1185.0
-  bad_weight_kg: 185.0
-  processed_by: "70777777-7777-7777-7777-777777777777"
-  note: "bugungi kuchaytirilgan pererabotka (external supplier)"
-- id: "edededed-1111-1111-1111-111111111111"
-  organization_id: "11111111-1111-1111-1111-111111111111"
-  department_id: "99991111-1111-1111-1111-111111111111"
-  source_type: "external"
-  supplier_client_id: "17171717-1717-1717-1717-171717171717"
-  poultry_type_id: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
-  arrived_on: "2026-03-28"
-  birds_received: 1765
-  arrival_total_weight_kg: 4041.9
-  arrival_unit_price: 1145.0
-  arrival_currency: "UZS"
-  arrival_invoice_no: "S-ARR-010"
-  processed_on: "2026-03-29"
-  birds_processed: 1765
-  first_sort_count: 1070
-  second_sort_count: 600
-  bad_count: 95
-  first_sort_weight_kg: 2145.0
-  second_sort_weight_kg: 1140.0
-  bad_weight_kg: 178.0
-  processed_by: "70777777-7777-7777-7777-777777777777"
-  note: "mart yakunidagi kuchli smena (external supplier)"
-- id: "efefefef-2222-2222-2222-222222222222"
-  organization_id: "11111111-1111-1111-1111-111111111111"
-  department_id: "99992222-2222-2222-2222-222222222222"
-  source_type: "external"
-  supplier_client_id: "19191919-1919-1919-1919-191919191919"
-  poultry_type_id: "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
-  arrived_on: "2026-04-02"
-  birds_received: 1825
-  arrival_total_weight_kg: 4088.0
-  arrival_unit_price: 1160.0
-  arrival_currency: "UZS"
-  arrival_invoice_no: "S-ARR-011"
-  processed_on: "2026-04-03"
-  birds_processed: 1825
-  first_sort_count: 1110
-  second_sort_count: 625
-  bad_count: 90
-  first_sort_weight_kg: 2260.0
-  second_sort_weight_kg: 1185.0
-  bad_weight_kg: 170.0
-  processed_by: "71313131-3131-3131-3131-313131313131"
-  note: "aprel boshidagi ajratish liniyasi smenasi (external supplier)"
-- id: "f0f0f0f0-3333-3333-3333-333333333333"
-  organization_id: "11111111-1111-1111-1111-111111111111"
-  department_id: "99991111-1111-1111-1111-111111111111"
-  source_type: "external"
-  supplier_client_id: "25252525-2525-2525-2525-252525252525"
-  poultry_type_id: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
-  arrived_on: "2026-04-05"
-  birds_received: 1880
-  arrival_total_weight_kg: 4436.8
-  arrival_unit_price: 1190.0
-  arrival_currency: "UZS"
-  arrival_invoice_no: "S-ARR-012"
-  processed_on: "2026-04-06"
-  birds_processed: 1880
-  first_sort_count: 1145
-  second_sort_count: 635
-  bad_count: 100
-  first_sort_weight_kg: 2320.0
-  second_sort_weight_kg: 1220.0
-  bad_weight_kg: 180.0
-  processed_by: "70777777-7777-7777-7777-777777777777"
-  note: "bugungi demo kuni uchun asosiy qayta ishlash (external supplier)"
+  # Internal source — first factory shipment processed full
+  - id: c0111111-1111-1111-1111-111111111101
+    organization_id: 11111111-1111-1111-1111-111111111111
+    department_id: 99991111-1111-1111-1111-111111111111
+    source_type: factory
+    factory_shipment_id: a2111111-1111-1111-1111-111111111101
+    supplier_client_id: null
+    poultry_type_id: b0000000-0000-0000-0000-000000000001
+    arrived_on: now-12d
+    birds_received: 2200
+    arrival_total_weight_kg: 5060
+    arrival_unit_price: 38000
+    arrival_currency: UZS
+    arrival_invoice_no: BRO-SHIP-0201
+    processed_on: now-11d
+    birds_processed: 2200
+    first_sort_count: 1900
+    second_sort_count: 240
+    bad_count: 60
+    first_sort_weight_kg: 4370
+    second_sort_weight_kg: 540
+    bad_weight_kg: 130
+    processed_by: 70444444-4444-4444-4444-444444444444
+    note: Birinchi partiya — to'liq qayta ishlandi
+
+  # Internal source — second factory shipment
+  - id: c0111111-1111-1111-1111-111111111102
+    organization_id: 11111111-1111-1111-1111-111111111111
+    department_id: 99991111-1111-1111-1111-111111111111
+    source_type: factory
+    factory_shipment_id: a2111111-1111-1111-1111-111111111102
+    supplier_client_id: null
+    poultry_type_id: b0000000-0000-0000-0000-000000000001
+    arrived_on: now-8d
+    birds_received: 2000
+    arrival_total_weight_kg: 4640
+    arrival_unit_price: 38500
+    arrival_currency: UZS
+    arrival_invoice_no: BRO-SHIP-0202
+    processed_on: now-7d
+    birds_processed: 2000
+    first_sort_count: 1750
+    second_sort_count: 200
+    bad_count: 50
+    first_sort_weight_kg: 4060
+    second_sort_weight_kg: 460
+    bad_weight_kg: 110
+    processed_by: 70444444-4444-4444-4444-444444444444
+    note: Ikkinchi partiya
+
+  # External source — Yusupov Agro tirik qush yetkazib berdi
+  - id: c0111111-1111-1111-1111-111111111103
+    organization_id: 11111111-1111-1111-1111-111111111111
+    department_id: 99991111-1111-1111-1111-111111111111
+    source_type: external
+    factory_shipment_id: null
+    supplier_client_id: e1111111-0000-0000-0000-000000000006
+    poultry_type_id: b0000000-0000-0000-0000-000000000001
+    arrived_on: now-3d
+    birds_received: 1500
+    arrival_total_weight_kg: 3525
+    arrival_unit_price: 36000
+    arrival_currency: UZS
+    arrival_invoice_no: EXT-YUS-0301
+    processed_on: now-2d
+    birds_processed: 1500
+    first_sort_count: 1280
+    second_sort_count: 175
+    bad_count: 45
+    first_sort_weight_kg: 3000
+    second_sort_weight_kg: 410
+    bad_weight_kg: 100
+    processed_by: 70444444-4444-4444-4444-444444444444
+    note: Yusupov Agro tashqi yetkazma
+
+
 slaughter_semi_products:
-- id: "f1f1f1f1-1111-1111-1111-111111111111"
-  organization_id: "11111111-1111-1111-1111-111111111111"
-  department_id: "44444444-4444-4444-4444-444444444444"
-  processing_id: "e1e1e1e1-1111-1111-1111-111111111111"
-  poultry_type_id: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
-  code: "SP-B1"
-  part_name: "Boldir"
-  quality: "first"
-  produced_on: "2026-02-21"
-  quantity: 900.0
-  unit: "kg"
-  note: "birinchi nav"
-- id: "f4f4f4f4-4444-4444-4444-444444444444"
-  organization_id: "11111111-1111-1111-1111-111111111111"
-  department_id: "44444444-4444-4444-4444-444444444444"
-  processing_id: "e1e1e1e1-1111-1111-1111-111111111111"
-  poultry_type_id: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
-  code: "SP-B4"
-  part_name: "Son"
-  quality: "first"
-  produced_on: "2026-02-21"
-  quantity: 540.0
-  unit: "kg"
-  note: "son posle razdelki"
-- id: "f2f2f2f2-2222-2222-2222-222222222222"
-  organization_id: "11111111-1111-1111-1111-111111111111"
-  department_id: "55555555-5555-5555-5555-555555555555"
-  processing_id: "e2e2e2e2-2222-2222-2222-222222222222"
-  poultry_type_id: "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
-  code: "SP-B2"
-  part_name: "Qanot"
-  quality: "second"
-  produced_on: "2026-02-22"
-  quantity: 750.0
-  unit: "kg"
-  note: "ikkinchi nav"
-- id: "f5f5f5f5-5555-5555-5555-555555555555"
-  organization_id: "11111111-1111-1111-1111-111111111111"
-  department_id: "55555555-5555-5555-5555-555555555555"
-  processing_id: "e2e2e2e2-2222-2222-2222-222222222222"
-  poultry_type_id: "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
-  code: "SP-B5"
-  part_name: "Kokrak"
-  quality: "first"
-  produced_on: "2026-02-22"
-  quantity: 680.0
-  unit: "kg"
-  note: "kokrak posle razdelki"
-- id: "f3f3f3f3-3333-3333-3333-333333333333"
-  organization_id: "22222222-2222-2222-2222-222222222222"
-  department_id: "66666666-6666-6666-6666-666666666666"
-  processing_id: "e3e3e3e3-3333-3333-3333-333333333333"
-  poultry_type_id: "cccccccc-cccc-cccc-cccc-cccccccccccc"
-  code: "SP-B3"
-  part_name: "File"
-  quality: "first"
-  produced_on: "2026-02-23"
-  quantity: 700.0
-  unit: "kg"
-  note: "itogoviy partionniy kontrol"
-- id: "f6f6f6f6-6666-6666-6666-666666666666"
-  organization_id: "11111111-1111-1111-1111-111111111111"
-  department_id: "99991111-1111-1111-1111-111111111111"
-  processing_id: "e4e4e4e4-4444-4444-4444-444444444444"
-  poultry_type_id: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
-  code: "SP-B6"
-  part_name: "File"
-  quality: "first"
-  produced_on: "2026-03-02"
-  quantity: 620.0
-  unit: "kg"
-  note: "file posle yangi smeni"
-- id: "f7f7f7f7-7777-7777-7777-777777777777"
-  organization_id: "11111111-1111-1111-1111-111111111111"
-  department_id: "99991111-1111-1111-1111-111111111111"
-  processing_id: "e4e4e4e4-4444-4444-4444-444444444444"
-  poultry_type_id: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
-  code: "SP-B7"
-  part_name: "Kokrak"
-  quality: "first"
-  produced_on: "2026-03-02"
-  quantity: 410.0
-  unit: "kg"
-  note: "kokrak posle yangi smeni"
-- id: "f8f8f8f8-8888-8888-8888-888888888888"
-  organization_id: "11111111-1111-1111-1111-111111111111"
-  department_id: "99992222-2222-2222-2222-222222222222"
-  processing_id: "e5e5e5e5-5555-5555-5555-555555555556"
-  poultry_type_id: "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
-  code: "SP-B8"
-  part_name: "Boldir"
-  quality: "first"
-  produced_on: "2026-03-03"
-  quantity: 530.0
-  unit: "kg"
-  note: "boldir boyicha yangi liniya"
-- id: "f9f9f9f9-9999-9999-9999-999999999999"
-  organization_id: "11111111-1111-1111-1111-111111111111"
-  department_id: "99992222-2222-2222-2222-222222222222"
-  processing_id: "e5e5e5e5-5555-5555-5555-555555555556"
-  poultry_type_id: "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
-  code: "SP-B9"
-  part_name: "Qanot"
-  quality: "second"
-  produced_on: "2026-03-03"
-  quantity: 360.0
-  unit: "kg"
-  note: "qanot posle sortirovki"
-- id: "fafafafa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
-  organization_id: "11111111-1111-1111-1111-111111111111"
-  department_id: "99991111-1111-1111-1111-111111111111"
-  processing_id: "e6e6e6e6-6666-6666-6666-666666666666"
-  poultry_type_id: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
-  code: "SP-C1"
-  part_name: "Son"
-  quality: "first"
-  produced_on: "2026-03-06"
-  quantity: 455.0
-  unit: "kg"
-  note: "son yangi partiya"
-- id: "fbfbfbfb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
-  organization_id: "11111111-1111-1111-1111-111111111111"
-  department_id: "99991111-1111-1111-1111-111111111111"
-  processing_id: "e6e6e6e6-6666-6666-6666-666666666666"
-  poultry_type_id: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
-  code: "SP-C2"
-  part_name: "Qanot"
-  quality: "second"
-  produced_on: "2026-03-06"
-  quantity: 335.0
-  unit: "kg"
-  note: "qanot yangi partiya"
-- id: "fcfcfcfc-cccc-cccc-cccc-cccccccccccc"
-  organization_id: "11111111-1111-1111-1111-111111111111"
-  department_id: "99992222-2222-2222-2222-222222222222"
-  processing_id: "e7e7e7e7-7777-7777-7777-777777777777"
-  poultry_type_id: "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
-  code: "SP-C3"
-  part_name: "File"
-  quality: "first"
-  produced_on: "2026-03-07"
-  quantity: 645.0
-  unit: "kg"
-  note: "file yangi partiya"
-- id: "fdfdfdfd-dddd-dddd-dddd-dddddddddddd"
-  organization_id: "11111111-1111-1111-1111-111111111111"
-  department_id: "99992222-2222-2222-2222-222222222222"
-  processing_id: "e7e7e7e7-7777-7777-7777-777777777777"
-  poultry_type_id: "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
-  code: "SP-C4"
-  part_name: "Kokrak"
-  quality: "first"
-  produced_on: "2026-03-07"
-  quantity: 470.0
-  unit: "kg"
-  note: "kokrak yangi partiya"
-- id: "eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee"
-  organization_id: "11111111-1111-1111-1111-111111111111"
-  department_id: "99991111-1111-1111-1111-111111111111"
-  processing_id: "e8e8e8e8-8888-8888-8888-888888888888"
-  poultry_type_id: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
-  code: "SP-D1"
-  part_name: "Boldir"
-  quality: "first"
-  produced_on: "2026-03-22"
-  quantity: 560.0
-  unit: "kg"
-  note: "bugungi boldir partiyasi"
-- id: "ababcdcd-abab-cdcd-abab-cdcdababcdcd"
-  organization_id: "11111111-1111-1111-1111-111111111111"
-  department_id: "99991111-1111-1111-1111-111111111111"
-  processing_id: "e8e8e8e8-8888-8888-8888-888888888888"
-  poultry_type_id: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
-  code: "SP-D2"
-  part_name: "File"
-  quality: "first"
-  produced_on: "2026-03-22"
-  quantity: 690.0
-  unit: "kg"
-  note: "bugungi file partiyasi"
-- id: "acacacac-1111-1111-1111-111111111111"
-  organization_id: "11111111-1111-1111-1111-111111111111"
-  department_id: "99991111-1111-1111-1111-111111111111"
-  processing_id: "edededed-1111-1111-1111-111111111111"
-  poultry_type_id: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
-  code: "SP-D3"
-  part_name: "File"
-  quality: "first"
-  produced_on: "2026-03-30"
-  quantity: 655.0
-  unit: "kg"
-  note: "mart oxiridagi file partiyasi"
-- id: "adadadad-2222-2222-2222-222222222222"
-  organization_id: "11111111-1111-1111-1111-111111111111"
-  department_id: "99991111-1111-1111-1111-111111111111"
-  processing_id: "edededed-1111-1111-1111-111111111111"
-  poultry_type_id: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
-  code: "SP-D4"
-  part_name: "Qanot"
-  quality: "second"
-  produced_on: "2026-03-30"
-  quantity: 350.0
-  unit: "kg"
-  note: "mart oxiridagi qanot partiyasi"
-- id: "aeaeaeae-3333-3333-3333-333333333333"
-  organization_id: "11111111-1111-1111-1111-111111111111"
-  department_id: "99992222-2222-2222-2222-222222222222"
-  processing_id: "efefefef-2222-2222-2222-222222222222"
-  poultry_type_id: "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
-  code: "SP-E1"
-  part_name: "Kokrak"
-  quality: "first"
-  produced_on: "2026-04-04"
-  quantity: 690.0
-  unit: "kg"
-  note: "aprel boshidagi premium ko'krak partiyasi"
-- id: "afafafaf-4444-4444-4444-444444444444"
-  organization_id: "11111111-1111-1111-1111-111111111111"
-  department_id: "99992222-2222-2222-2222-222222222222"
-  processing_id: "efefefef-2222-2222-2222-222222222222"
-  poultry_type_id: "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
-  code: "SP-E2"
-  part_name: "Boldir"
-  quality: "first"
-  produced_on: "2026-04-04"
-  quantity: 540.0
-  unit: "kg"
-  note: "aprel boshidagi boldir partiyasi"
-- id: "b0b0b0b0-5555-5555-5555-555555555555"
-  organization_id: "11111111-1111-1111-1111-111111111111"
-  department_id: "99991111-1111-1111-1111-111111111111"
-  processing_id: "f0f0f0f0-3333-3333-3333-333333333333"
-  poultry_type_id: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
-  code: "SP-F1"
-  part_name: "File"
-  quality: "first"
-  produced_on: "2026-04-06"
-  quantity: 720.0
-  unit: "kg"
-  note: "bugungi premium file partiyasi"
-- id: "b1b1b1b1-6666-6666-6666-666666666666"
-  organization_id: "11111111-1111-1111-1111-111111111111"
-  department_id: "99991111-1111-1111-1111-111111111111"
-  processing_id: "f0f0f0f0-3333-3333-3333-333333333333"
-  poultry_type_id: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
-  code: "SP-F2"
-  part_name: "Son"
-  quality: "first"
-  produced_on: "2026-04-06"
-  quantity: 490.0
-  unit: "kg"
-  note: "bugungi son partiyasi"
-slaughter_semi_product_shipments:
-- id: "a1d1a1d1-1111-1111-1111-111111111111"
-  organization_id: "11111111-1111-1111-1111-111111111111"
-  department_id: "44444444-4444-4444-4444-444444444444"
-  semi_product_id: "f1f1f1f1-1111-1111-1111-111111111111"
-  client_id: "77777777-7777-7777-7777-777777777777"
-  shipped_on: "2026-02-24"
-  quantity: 300.0
-  unit: "kg"
-  unit_price: 12500.0
-  currency: "UZS"
-  invoice_no: "SP-SH-001"
-  note: "jonatma birinchi nav"
-  created_by: "70111111-1111-1111-1111-111111111111"
-- id: "a4d4a4d4-4444-4444-4444-444444444444"
-  organization_id: "11111111-1111-1111-1111-111111111111"
-  department_id: "44444444-4444-4444-4444-444444444444"
-  semi_product_id: "f4f4f4f4-4444-4444-4444-444444444444"
-  client_id: "77777777-7777-7777-7777-777777777777"
-  shipped_on: "2026-02-24"
-  quantity: 180.0
-  unit: "kg"
-  unit_price: 12900.0
-  currency: "UZS"
-  invoice_no: "SP-SH-004"
-  note: "yetkazish bedra"
-  created_by: "70111111-1111-1111-1111-111111111111"
-- id: "a2d2a2d2-2222-2222-2222-222222222222"
-  organization_id: "11111111-1111-1111-1111-111111111111"
-  department_id: "55555555-5555-5555-5555-555555555555"
-  semi_product_id: "f2f2f2f2-2222-2222-2222-222222222222"
-  client_id: "88888888-8888-8888-8888-888888888888"
-  shipped_on: "2026-02-25"
-  quantity: 250.0
-  unit: "kg"
-  unit_price: 11500.0
-  currency: "UZS"
-  invoice_no: "SP-SH-002"
-  note: "yetkazish ikkinchi nav"
-  created_by: "70222222-2222-2222-2222-222222222222"
-- id: "a5d5a5d5-5555-5555-5555-555555555555"
-  organization_id: "11111111-1111-1111-1111-111111111111"
-  department_id: "55555555-5555-5555-5555-555555555555"
-  semi_product_id: "f5f5f5f5-5555-5555-5555-555555555555"
-  client_id: "88888888-8888-8888-8888-888888888888"
-  shipped_on: "2026-02-25"
-  quantity: 210.0
-  unit: "kg"
-  unit_price: 13100.0
-  currency: "UZS"
-  invoice_no: "SP-SH-005"
-  note: "yetkazish grudki"
-  created_by: "70222222-2222-2222-2222-222222222222"
-- id: "a3d3a3d3-3333-3333-3333-333333333333"
-  organization_id: "22222222-2222-2222-2222-222222222222"
-  department_id: "66666666-6666-6666-6666-666666666666"
-  semi_product_id: "f3f3f3f3-3333-3333-3333-333333333333"
-  client_id: "99999999-9999-9999-9999-999999999999"
-  shipped_on: "2026-02-26"
-  quantity: 220.0
-  unit: "kg"
-  unit_price: 11800.0
-  currency: "UZS"
-  invoice_no: "SP-SH-003"
-  note: "yakuniy partiya"
-  created_by: "70333333-3333-3333-3333-333333333333"
-- id: "a6d6a6d6-6666-6666-6666-666666666666"
-  organization_id: "11111111-1111-1111-1111-111111111111"
-  department_id: "99991111-1111-1111-1111-111111111111"
-  semi_product_id: "f6f6f6f6-6666-6666-6666-666666666666"
-  client_id: "14141414-1414-1414-1414-141414141414"
-  shipped_on: "2026-03-04"
-  quantity: 190.0
-  unit: "kg"
-  unit_price: 13300.0
-  currency: "UZS"
-  invoice_no: "SP-SH-006"
-  note: "jonatma file"
-  created_by: "70777777-7777-7777-7777-777777777777"
-- id: "a7d7a7d7-7777-7777-7777-777777777777"
-  organization_id: "11111111-1111-1111-1111-111111111111"
-  department_id: "99992222-2222-2222-2222-222222222222"
-  semi_product_id: "f8f8f8f8-8888-8888-8888-888888888888"
-  client_id: "15151515-1515-1515-1515-151515151515"
-  shipped_on: "2026-03-04"
-  quantity: 170.0
-  unit: "kg"
-  unit_price: 12750.0
-  currency: "UZS"
-  invoice_no: "SP-SH-007"
-  note: "jonatma boldir"
-  created_by: "70777777-7777-7777-7777-777777777777"
-- id: "a8d8a8d8-8888-8888-8888-888888888888"
-  organization_id: "11111111-1111-1111-1111-111111111111"
-  department_id: "99991111-1111-1111-1111-111111111111"
-  semi_product_id: "eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee"
-  client_id: "28282828-2828-2828-2828-282828282828"
-  shipped_on: "2026-03-23"
-  quantity: 210.0
-  unit: "kg"
-  unit_price: 13450.0
-  currency: "UZS"
-  invoice_no: "SP-SH-008"
-  note: "bugungi boldir savdosi"
-  created_by: "70777777-7777-7777-7777-777777777777"
-- id: "a9d9a9d9-9999-9999-9999-999999999999"
-  organization_id: "11111111-1111-1111-1111-111111111111"
-  department_id: "99991111-1111-1111-1111-111111111111"
-  semi_product_id: "ababcdcd-abab-cdcd-abab-cdcdababcdcd"
-  client_id: "20202020-1212-1212-1212-121212121212"
-  shipped_on: "2026-03-23"
-  quantity: 240.0
-  unit: "kg"
-  unit_price: 13900.0
-  currency: "UZS"
-  invoice_no: "SP-SH-009"
-  note: "bugungi file savdosi"
-  created_by: "70777777-7777-7777-7777-777777777777"
-- id: "b2c2b2c2-1111-1111-1111-111111111111"
-  organization_id: "11111111-1111-1111-1111-111111111111"
-  department_id: "99991111-1111-1111-1111-111111111111"
-  semi_product_id: "acacacac-1111-1111-1111-111111111111"
-  client_id: "30303030-3030-3030-3030-303030303034"
-  shipped_on: "2026-03-31"
-  quantity: 220.0
-  unit: "kg"
-  unit_price: 14150.0
-  currency: "UZS"
-  invoice_no: "SP-SH-010"
-  note: "mart yakuni uchun file savdosi"
-  created_by: "70777777-7777-7777-7777-777777777777"
-- id: "b3c3b3c3-2222-2222-2222-222222222222"
-  organization_id: "11111111-1111-1111-1111-111111111111"
-  department_id: "99992222-2222-2222-2222-222222222222"
-  semi_product_id: "aeaeaeae-3333-3333-3333-333333333333"
-  client_id: "30303030-3030-3030-3030-303030303032"
-  shipped_on: "2026-04-04"
-  quantity: 260.0
-  unit: "kg"
-  unit_price: 14320.0
-  currency: "UZS"
-  invoice_no: "SP-SH-011"
-  note: "aprel boshidagi premium ko'krak savdosi"
-  created_by: "71313131-3131-3131-3131-313131313131"
-- id: "b4c4b4c4-3333-3333-3333-333333333333"
-  organization_id: "11111111-1111-1111-1111-111111111111"
-  department_id: "99992222-2222-2222-2222-222222222222"
-  semi_product_id: "afafafaf-4444-4444-4444-444444444444"
-  client_id: "28282828-2828-2828-2828-282828282828"
-  shipped_on: "2026-04-05"
-  quantity: 190.0
-  unit: "kg"
-  unit_price: 13980.0
-  currency: "UZS"
-  invoice_no: "SP-SH-012"
-  note: "retail segmentiga boldir savdosi"
-  created_by: "71313131-3131-3131-3131-313131313131"
-- id: "b5c5b5c5-4444-4444-4444-444444444444"
-  organization_id: "11111111-1111-1111-1111-111111111111"
-  department_id: "99991111-1111-1111-1111-111111111111"
-  semi_product_id: "b0b0b0b0-5555-5555-5555-555555555555"
-  client_id: "20202020-1212-1212-1212-121212121212"
-  shipped_on: "2026-04-06"
-  quantity: 280.0
-  unit: "kg"
-  unit_price: 14550.0
-  currency: "UZS"
-  invoice_no: "SP-SH-013"
-  note: "bugungi premium file savdosi"
-  created_by: "70777777-7777-7777-7777-777777777777"
+  # From processing 01 — broken into parts
+  - id: c1111111-1111-1111-1111-111111111101
+    organization_id: 11111111-1111-1111-1111-111111111111
+    department_id: 99991111-1111-1111-1111-111111111111
+    processing_id: c0111111-1111-1111-1111-111111111101
+    poultry_type_id: b0000000-0000-0000-0000-000000000001
+    code: SP-2026-0301-TUSHKA-1
+    part_name: Butun tushka
+    quality: first
+    produced_on: now-11d
+    quantity: 2800
+    unit: kg
+    note: Birinchi sortli butun tushka
+    warehouse_id: 89012be7-30bd-57b3-bf91-1ebb39dd2a76
+
+  - id: c1111111-1111-1111-1111-111111111102
+    organization_id: 11111111-1111-1111-1111-111111111111
+    department_id: 99991111-1111-1111-1111-111111111111
+    processing_id: c0111111-1111-1111-1111-111111111101
+    poultry_type_id: b0000000-0000-0000-0000-000000000001
+    code: SP-2026-0301-FILE-1
+    part_name: Ko'krak file
+    quality: first
+    produced_on: now-11d
+    quantity: 950
+    unit: kg
+    note: Premium file
+    warehouse_id: 89012be7-30bd-57b3-bf91-1ebb39dd2a76
+
+  - id: c1111111-1111-1111-1111-111111111103
+    organization_id: 11111111-1111-1111-1111-111111111111
+    department_id: 99991111-1111-1111-1111-111111111111
+    processing_id: c0111111-1111-1111-1111-111111111101
+    poultry_type_id: b0000000-0000-0000-0000-000000000001
+    code: SP-2026-0301-OYOQ-2
+    part_name: Oyoq qismi
+    quality: second
+    produced_on: now-11d
+    quantity: 540
+    unit: kg
+    note: Ikkinchi sort oyoqlar
+    warehouse_id: 89012be7-30bd-57b3-bf91-1ebb39dd2a76
+
+  - id: c1111111-1111-1111-1111-111111111104
+    organization_id: 11111111-1111-1111-1111-111111111111
+    department_id: 99991111-1111-1111-1111-111111111111
+    processing_id: c0111111-1111-1111-1111-111111111101
+    poultry_type_id: b0000000-0000-0000-0000-000000000001
+    code: SP-2026-0301-SUBPROD
+    part_name: Subprodukt (jigar, yurak)
+    quality: byproduct
+    produced_on: now-11d
+    quantity: 220
+    unit: kg
+    note: Ichki organlar
+    warehouse_id: 89012be7-30bd-57b3-bf91-1ebb39dd2a76
+
+  # From processing 02
+  - id: c1111111-1111-1111-1111-111111111105
+    organization_id: 11111111-1111-1111-1111-111111111111
+    department_id: 99991111-1111-1111-1111-111111111111
+    processing_id: c0111111-1111-1111-1111-111111111102
+    poultry_type_id: b0000000-0000-0000-0000-000000000001
+    code: SP-2026-0302-TUSHKA-1
+    part_name: Butun tushka
+    quality: first
+    produced_on: now-7d
+    quantity: 2600
+    unit: kg
+    warehouse_id: 89012be7-30bd-57b3-bf91-1ebb39dd2a76
+
+  - id: c1111111-1111-1111-1111-111111111106
+    organization_id: 11111111-1111-1111-1111-111111111111
+    department_id: 99991111-1111-1111-1111-111111111111
+    processing_id: c0111111-1111-1111-1111-111111111102
+    poultry_type_id: b0000000-0000-0000-0000-000000000001
+    code: SP-2026-0302-FILE-1
+    part_name: Ko'krak file
+    quality: first
+    produced_on: now-7d
+    quantity: 880
+    unit: kg
+    warehouse_id: 89012be7-30bd-57b3-bf91-1ebb39dd2a76
+
+  # From processing 03 (external)
+  - id: c1111111-1111-1111-1111-111111111107
+    organization_id: 11111111-1111-1111-1111-111111111111
+    department_id: 99991111-1111-1111-1111-111111111111
+    processing_id: c0111111-1111-1111-1111-111111111103
+    poultry_type_id: b0000000-0000-0000-0000-000000000001
+    code: SP-2026-0303-TUSHKA-MIX
+    part_name: Butun tushka
+    quality: mixed
+    produced_on: now-2d
+    quantity: 1900
+    unit: kg
+    note: Tashqi yetkazma — aralash sortlar
+    warehouse_id: 89012be7-30bd-57b3-bf91-1ebb39dd2a76
+
 
 slaughter_quality_checks:
-- id: "c1c1c1c1-1111-1111-1111-111111111111"
-  organization_id: "11111111-1111-1111-1111-111111111111"
-  department_id: "44444444-4444-4444-4444-444444444444"
-  semi_product_id: "f1f1f1f1-1111-1111-1111-111111111111"
-  checked_on: "2026-02-21"
-  status: "passed"
-  grade: "first"
-  inspector_id: "70111111-1111-1111-1111-111111111111"
-  notes: "sifat sinovidan muvaffaqiyatli o'tdi"
-- id: "c4c4c4c4-4444-4444-4444-444444444444"
-  organization_id: "11111111-1111-1111-1111-111111111111"
-  department_id: "44444444-4444-4444-4444-444444444444"
-  semi_product_id: "f4f4f4f4-4444-4444-4444-444444444444"
-  checked_on: "2026-02-21"
-  status: "passed"
-  grade: "first"
-  inspector_id: "70111111-1111-1111-1111-111111111111"
-  notes: "sifat sinovidan muvaffaqiyatli o'tdi"
-- id: "c2c2c2c2-2222-2222-2222-222222222222"
-  organization_id: "11111111-1111-1111-1111-111111111111"
-  department_id: "55555555-5555-5555-5555-555555555555"
-  semi_product_id: "f2f2f2f2-2222-2222-2222-222222222222"
-  checked_on: "2026-02-22"
-  status: "passed"
-  grade: "second"
-  inspector_id: "70111111-1111-1111-1111-111111111111"
-  notes: null
-- id: "c5c5c5c5-5555-5555-5555-555555555555"
-  organization_id: "11111111-1111-1111-1111-111111111111"
-  department_id: "55555555-5555-5555-5555-555555555555"
-  semi_product_id: "f5f5f5f5-5555-5555-5555-555555555555"
-  checked_on: "2026-02-22"
-  status: "passed"
-  grade: "first"
-  inspector_id: "70111111-1111-1111-1111-111111111111"
-  notes: null
-- id: "c3c3c3c3-3333-3333-3333-333333333333"
-  organization_id: "22222222-2222-2222-2222-222222222222"
-  department_id: "66666666-6666-6666-6666-666666666666"
-  semi_product_id: "f3f3f3f3-3333-3333-3333-333333333333"
-  checked_on: "2026-02-23"
-  status: "passed"
-  grade: "first"
-  inspector_id: "70111111-1111-1111-1111-111111111111"
-  notes: null
-- id: "c6c6c6c6-6666-6666-6666-666666666666"
-  organization_id: "11111111-1111-1111-1111-111111111111"
-  department_id: "99991111-1111-1111-1111-111111111111"
-  semi_product_id: "f6f6f6f6-6666-6666-6666-666666666666"
-  checked_on: "2026-03-02"
-  status: "passed"
-  grade: "first"
-  inspector_id: "70111111-1111-1111-1111-111111111111"
-  notes: null
-- id: "c7c7c7c7-7777-7777-7777-777777777777"
-  organization_id: "11111111-1111-1111-1111-111111111111"
-  department_id: "99991111-1111-1111-1111-111111111111"
-  semi_product_id: "f7f7f7f7-7777-7777-7777-777777777777"
-  checked_on: "2026-03-02"
-  status: "passed"
-  grade: "first"
-  inspector_id: "70111111-1111-1111-1111-111111111111"
-  notes: null
-- id: "c8c8c8c8-8888-8888-8888-888888888888"
-  organization_id: "11111111-1111-1111-1111-111111111111"
-  department_id: "99992222-2222-2222-2222-222222222222"
-  semi_product_id: "f8f8f8f8-8888-8888-8888-888888888888"
-  checked_on: "2026-03-03"
-  status: "passed"
-  grade: "second"
-  inspector_id: "70111111-1111-1111-1111-111111111111"
-  notes: null
-- id: "c9c9c9c9-9999-9999-9999-999999999999"
-  organization_id: "11111111-1111-1111-1111-111111111111"
-  department_id: "99992222-2222-2222-2222-222222222222"
-  semi_product_id: "f9f9f9f9-9999-9999-9999-999999999999"
-  checked_on: "2026-03-03"
-  status: "passed"
-  grade: "first"
-  inspector_id: "70111111-1111-1111-1111-111111111111"
-  notes: null
-- id: "cacacaca-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
-  organization_id: "11111111-1111-1111-1111-111111111111"
-  department_id: "99991111-1111-1111-1111-111111111111"
-  semi_product_id: "fafafafa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
-  checked_on: "2026-03-06"
-  status: "passed"
-  grade: "first"
-  inspector_id: "70111111-1111-1111-1111-111111111111"
-  notes: null
-- id: "cbcbcbcb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
-  organization_id: "11111111-1111-1111-1111-111111111111"
-  department_id: "99991111-1111-1111-1111-111111111111"
-  semi_product_id: "fbfbfbfb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
-  checked_on: "2026-03-06"
-  status: "passed"
-  grade: "first"
-  inspector_id: "70111111-1111-1111-1111-111111111111"
-  notes: null
-- id: "cccccccc-cccc-cccc-cccc-cccccccccccc"
-  organization_id: "11111111-1111-1111-1111-111111111111"
-  department_id: "99992222-2222-2222-2222-222222222222"
-  semi_product_id: "fcfcfcfc-cccc-cccc-cccc-cccccccccccc"
-  checked_on: "2026-03-07"
-  status: "passed"
-  grade: "first"
-  inspector_id: "70111111-1111-1111-1111-111111111111"
-  notes: null
-- id: "cdcdcdcd-dddd-dddd-dddd-dddddddddddd"
-  organization_id: "11111111-1111-1111-1111-111111111111"
-  department_id: "99992222-2222-2222-2222-222222222222"
-  semi_product_id: "fdfdfdfd-dddd-dddd-dddd-dddddddddddd"
-  checked_on: "2026-03-07"
-  status: "passed"
-  grade: "second"
-  inspector_id: "70111111-1111-1111-1111-111111111111"
-  notes: null
-- id: "ceeeeeee-eeee-eeee-eeee-eeeeeeeeeeee"
-  organization_id: "11111111-1111-1111-1111-111111111111"
-  department_id: "99991111-1111-1111-1111-111111111111"
-  semi_product_id: "eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee"
-  checked_on: "2026-03-22"
-  status: "passed"
-  grade: "first"
-  inspector_id: "70111111-1111-1111-1111-111111111111"
-  notes: null
-- id: "cbcdcdcd-abab-cdcd-abab-cdcdababcdcd"
-  organization_id: "11111111-1111-1111-1111-111111111111"
-  department_id: "99991111-1111-1111-1111-111111111111"
-  semi_product_id: "ababcdcd-abab-cdcd-abab-cdcdababcdcd"
-  checked_on: "2026-03-22"
-  status: "passed"
-  grade: "first"
-  inspector_id: "70111111-1111-1111-1111-111111111111"
-  notes: null
-- id: "cccacaca-1111-1111-1111-111111111111"
-  organization_id: "11111111-1111-1111-1111-111111111111"
-  department_id: "99991111-1111-1111-1111-111111111111"
-  semi_product_id: "acacacac-1111-1111-1111-111111111111"
-  checked_on: "2026-03-30"
-  status: "passed"
-  grade: "first"
-  inspector_id: "70111111-1111-1111-1111-111111111111"
-  notes: null
-- id: "cdadadad-2222-2222-2222-222222222222"
-  organization_id: "11111111-1111-1111-1111-111111111111"
-  department_id: "99991111-1111-1111-1111-111111111111"
-  semi_product_id: "adadadad-2222-2222-2222-222222222222"
-  checked_on: "2026-03-30"
-  status: "passed"
-  grade: "first"
-  inspector_id: "70111111-1111-1111-1111-111111111111"
-  notes: null
-- id: "ceaeaeae-3333-3333-3333-333333333333"
-  organization_id: "11111111-1111-1111-1111-111111111111"
-  department_id: "99992222-2222-2222-2222-222222222222"
-  semi_product_id: "aeaeaeae-3333-3333-3333-333333333333"
-  checked_on: "2026-04-04"
-  status: "passed"
-  grade: "second"
-  inspector_id: "70111111-1111-1111-1111-111111111111"
-  notes: null
-- id: "cfafafaf-4444-4444-4444-444444444444"
-  organization_id: "11111111-1111-1111-1111-111111111111"
-  department_id: "99992222-2222-2222-2222-222222222222"
-  semi_product_id: "afafafaf-4444-4444-4444-444444444444"
-  checked_on: "2026-04-04"
-  status: "passed"
-  grade: "first"
-  inspector_id: "70111111-1111-1111-1111-111111111111"
-  notes: null
-- id: "c0b0b0b0-5555-5555-5555-555555555555"
-  organization_id: "11111111-1111-1111-1111-111111111111"
-  department_id: "99991111-1111-1111-1111-111111111111"
-  semi_product_id: "b0b0b0b0-5555-5555-5555-555555555555"
-  checked_on: "2026-04-06"
-  status: "passed"
-  grade: "first"
-  inspector_id: "70111111-1111-1111-1111-111111111111"
-  notes: null
-- id: "c1b1b1b1-6666-6666-6666-666666666666"
-  organization_id: "11111111-1111-1111-1111-111111111111"
-  department_id: "99991111-1111-1111-1111-111111111111"
-  semi_product_id: "b1b1b1b1-6666-6666-6666-666666666666"
-  checked_on: "2026-04-06"
-  status: "passed"
-  grade: "first"
-  inspector_id: "70111111-1111-1111-1111-111111111111"
-  notes: null
+  - id: c2111111-1111-1111-1111-111111111101
+    organization_id: 11111111-1111-1111-1111-111111111111
+    department_id: 99991111-1111-1111-1111-111111111111
+    semi_product_id: c1111111-1111-1111-1111-111111111101
+    checked_on: now-11d
+    status: passed
+    grade: first
+    inspector_id: 70444444-4444-4444-4444-444444444444
+    notes: Veterinar nazoratidan o'tdi
+
+  - id: c2111111-1111-1111-1111-111111111102
+    organization_id: 11111111-1111-1111-1111-111111111111
+    department_id: 99991111-1111-1111-1111-111111111111
+    semi_product_id: c1111111-1111-1111-1111-111111111102
+    checked_on: now-11d
+    status: passed
+    grade: first
+    inspector_id: 70444444-4444-4444-4444-444444444444
+
+  - id: c2111111-1111-1111-1111-111111111103
+    organization_id: 11111111-1111-1111-1111-111111111111
+    department_id: 99991111-1111-1111-1111-111111111111
+    semi_product_id: c1111111-1111-1111-1111-111111111103
+    checked_on: now-11d
+    status: passed
+    grade: second
+    inspector_id: 70444444-4444-4444-4444-444444444444
+
+  - id: c2111111-1111-1111-1111-111111111104
+    organization_id: 11111111-1111-1111-1111-111111111111
+    department_id: 99991111-1111-1111-1111-111111111111
+    semi_product_id: c1111111-1111-1111-1111-111111111105
+    checked_on: now-7d
+    status: passed
+    grade: first
+    inspector_id: 70444444-4444-4444-4444-444444444444
+
+  - id: c2111111-1111-1111-1111-111111111105
+    organization_id: 11111111-1111-1111-1111-111111111111
+    department_id: 99991111-1111-1111-1111-111111111111
+    semi_product_id: c1111111-1111-1111-1111-111111111107
+    checked_on: now-2d
+    status: pending
+    grade: null
+    inspector_id: 70444444-4444-4444-4444-444444444444
+    notes: Laboratoriya tahlili kutilmoqda
+
+
+slaughter_semi_product_shipments:
+  # Tushka to Oila supermarket
+  - id: c3111111-1111-1111-1111-111111111101
+    organization_id: 11111111-1111-1111-1111-111111111111
+    department_id: 99991111-1111-1111-1111-111111111111
+    semi_product_id: c1111111-1111-1111-1111-111111111101
+    client_id: e1111111-0000-0000-0000-000000000002
+    shipped_on: now-10d
+    quantity: 1500
+    unit: kg
+    unit_price: 52000
+    currency: UZS
+    invoice_no: SLH-SHIP-0301
+    note: Oila supermarket — butun tushka
+    created_by: 70444444-4444-4444-4444-444444444444
+    warehouse_id: 89012be7-30bd-57b3-bf91-1ebb39dd2a76
+
+  # File to Malika Restoran
+  - id: c3111111-1111-1111-1111-111111111102
+    organization_id: 11111111-1111-1111-1111-111111111111
+    department_id: 99991111-1111-1111-1111-111111111111
+    semi_product_id: c1111111-1111-1111-1111-111111111102
+    client_id: e1111111-0000-0000-0000-000000000005
+    shipped_on: now-10d
+    quantity: 600
+    unit: kg
+    unit_price: 78000
+    currency: UZS
+    invoice_no: SLH-SHIP-0302
+    note: Malika Restoran — premium file
+    created_by: 70444444-4444-4444-4444-444444444444
+    warehouse_id: 89012be7-30bd-57b3-bf91-1ebb39dd2a76
+
+  # Subprodukt — chakana (Gulnora)
+  - id: c3111111-1111-1111-1111-111111111103
+    organization_id: 11111111-1111-1111-1111-111111111111
+    department_id: 99991111-1111-1111-1111-111111111111
+    semi_product_id: c1111111-1111-1111-1111-111111111104
+    client_id: e1111111-0000-0000-0000-000000000007
+    shipped_on: now-9d
+    quantity: 80
+    unit: kg
+    unit_price: 28000
+    currency: UZS
+    invoice_no: SLH-SHIP-0303
+    note: Gulnora — subproduktlar (chakana)
+    warehouse_id: 89012be7-30bd-57b3-bf91-1ebb39dd2a76
+
+  # Tushka 2nd batch to Oila
+  - id: c3111111-1111-1111-1111-111111111104
+    organization_id: 11111111-1111-1111-1111-111111111111
+    department_id: 99991111-1111-1111-1111-111111111111
+    semi_product_id: c1111111-1111-1111-1111-111111111105
+    client_id: e1111111-0000-0000-0000-000000000002
+    shipped_on: now-5d
+    quantity: 1800
+    unit: kg
+    unit_price: 53000
+    currency: UZS
+    invoice_no: SLH-SHIP-0304
+    note: Oila supermarket — ikkinchi yetkazma
+    created_by: 70444444-4444-4444-4444-444444444444
+    warehouse_id: 89012be7-30bd-57b3-bf91-1ebb39dd2a76

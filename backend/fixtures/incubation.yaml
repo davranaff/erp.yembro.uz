@@ -1,873 +1,214 @@
-chick_arrivals:
-- id: "11111111-1111-2222-1111-111111111111"
-  organization_id: "11111111-1111-1111-1111-111111111111"
-  department_id: "44444444-4444-4444-4444-444444444444"
-  poultry_type_id: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
-  source_client_id: "77777777-7777-7777-7777-777777777777"
-  run_id: "11111111-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
-  arrived_on: "2026-02-12"
-  chicks_count: 1500
-  unit_price: 1200.0
-  currency: "UZS"
-  note: "birinchi vxodyashiy oqim"
-- id: "22222222-2222-3333-2222-222222222222"
-  organization_id: "11111111-1111-1111-1111-111111111111"
-  department_id: "55555555-5555-5555-5555-555555555555"
-  poultry_type_id: "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
-  source_client_id: "88888888-8888-8888-8888-888888888888"
-  arrived_on: "2026-02-13"
-  chicks_count: 1700
-  unit_price: 1180.0
-  currency: "UZS"
-  note: "qoshimcha oqim"
-- id: "33333333-3333-4444-3333-333333333333"
-  organization_id: "22222222-2222-2222-2222-222222222222"
-  department_id: "66666666-6666-6666-6666-666666666666"
-  poultry_type_id: "cccccccc-cccc-cccc-cccc-cccccccccccc"
-  source_client_id: "99999999-9999-9999-9999-999999999999"
-  arrived_on: "2026-02-14"
-  chicks_count: 1200
-  unit_price: 1300.0
-  currency: "UZS"
-  note: "partiya ot distribyutora"
-- id: "44444444-5555-6666-7777-888888888888"
-  organization_id: "11111111-1111-1111-1111-111111111111"
-  department_id: "55551111-1111-1111-1111-111111111111"
-  poultry_type_id: "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
-  source_client_id: "17171717-1717-1717-1717-171717171717"
-  arrived_on: "2026-02-24"
-  chicks_count: 1850
-  unit_price: 1190.0
-  currency: "UZS"
-  note: "oqim uchun fabrichnoy ploshadki"
-- id: "55555555-6666-7777-8888-999999999998"
-  organization_id: "11111111-1111-1111-1111-111111111111"
-  department_id: "55551111-1111-1111-1111-111111111111"
-  poultry_type_id: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
-  source_client_id: "77777777-7777-7777-7777-777777777777"
-  arrived_on: "2026-02-26"
-  chicks_count: 1600
-  unit_price: 1210.0
-  currency: "UZS"
-  note: "ikkinchi fabrika yetkazib"
-- id: "66667777-7777-7777-7777-777777777777"
-  organization_id: "11111111-1111-1111-1111-111111111111"
-  department_id: "55555555-5555-5555-5555-555555555555"
-  poultry_type_id: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
-  source_client_id: "17171717-1717-1717-1717-171717171717"
-  arrived_on: "2026-03-01"
-  chicks_count: 1750
-  unit_price: 1225.0
-  currency: "UZS"
-  note: "fabrika pritok yanvar"
-- id: "77778888-8888-8888-8888-888888888888"
-  organization_id: "11111111-1111-1111-1111-111111111111"
-  department_id: "55551111-1111-1111-1111-111111111111"
-  poultry_type_id: "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
-  source_client_id: "17171717-1717-1717-1717-171717171717"
-  arrived_on: "2026-03-03"
-  chicks_count: 1690
-  unit_price: 1230.0
-  currency: "UZS"
-  note: "qoshimcha yetkazib ga ploshadku"
-- id: "88889999-9999-9999-9999-999999999999"
-  organization_id: "11111111-1111-1111-1111-111111111111"
-  department_id: "55551111-1111-1111-1111-111111111111"
-  poultry_type_id: "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
-  source_client_id: "17171717-1717-1717-1717-171717171717"
-  arrived_on: "2026-03-18"
-  chicks_count: 1920
-  unit_price: 1290.0
-  currency: "UZS"
-  note: "mart uchun yangi joja oqimi"
-- id: "9999aaaa-1111-1111-1111-111111111111"
-  organization_id: "11111111-1111-1111-1111-111111111111"
-  department_id: "55555555-5555-5555-5555-555555555555"
-  poultry_type_id: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
-  source_client_id: "17171717-1717-1717-1717-171717171717"
-  run_id: "9a9a9a9a-1111-1111-1111-111111111111"
-  arrived_on: "2026-04-03"
-  chicks_count: 1840
-  unit_price: 1315.0
-  currency: "UZS"
-  note: "aprel boshidagi yirik jo'ja qabul partiyasi"
-- id: "9999bbbb-2222-2222-2222-222222222222"
-  organization_id: "11111111-1111-1111-1111-111111111111"
-  department_id: "55551111-1111-1111-1111-111111111111"
-  poultry_type_id: "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
-  source_client_id: "30303030-3030-3030-3030-303030303035"
-  run_id: "9a9a9a9a-1111-1111-1111-111111111111"
-  arrived_on: "2026-04-04"
-  chicks_count: 1715
-  unit_price: 1325.0
-  currency: "UZS"
-  note: "saralangan jo'jalar maydon uchun qabul qilindi"
-- id: "9999cccc-3333-3333-3333-333333333333"
-  organization_id: "11111111-1111-1111-1111-111111111111"
-  department_id: "55555555-5555-5555-5555-555555555555"
-  poultry_type_id: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
-  source_client_id: "30303030-3030-3030-3030-303030303035"
-  run_id: "9b9b9b9b-2222-2222-2222-222222222222"
-  arrived_on: "2026-04-05"
-  chicks_count: 1760
-  unit_price: 1335.0
-  currency: "UZS"
-  note: "aprelning ikkinchi oqimi broyler sexiga"
-- id: "9999dddd-4444-4444-4444-444444444444"
-  organization_id: "11111111-1111-1111-1111-111111111111"
-  department_id: "55551111-1111-1111-1111-111111111111"
-  poultry_type_id: "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
-  source_client_id: "17171717-1717-1717-1717-171717171717"
-  run_id: "9b9b9b9b-2222-2222-2222-222222222222"
-  arrived_on: "2026-04-06"
-  chicks_count: 1895
-  unit_price: 1340.0
-  currency: "UZS"
-  note: "bugungi demo uchun faol jo'ja qabul"
-chick_shipments:
-- id: "11111111-1111-2222-3333-333333333333"
-  organization_id: "11111111-1111-1111-1111-111111111111"
-  run_id: null
-  department_id: "44444444-4444-4444-4444-444444444444"
-  client_id: "77777777-7777-7777-7777-777777777777"
-  shipped_on: "2026-02-21"
-  chicks_count: 500
-  unit_price: 1300.0
-  currency: "UZS"
-  invoice_no: "CH-SHIP-001"
-  note: "chiqim birinchi 500"
-- id: "22222222-2222-3333-4444-444444444444"
-  organization_id: "11111111-1111-1111-1111-111111111111"
-  run_id: null
-  department_id: "55555555-5555-5555-5555-555555555555"
-  client_id: "88888888-8888-8888-8888-888888888888"
-  shipped_on: "2026-02-22"
-  chicks_count: 600
-  unit_price: 1320.0
-  currency: "UZS"
-  invoice_no: "CH-SHIP-002"
-  note: "ikkinchi oqim"
-- id: "33333333-3333-4444-5555-555555555555"
-  organization_id: "22222222-2222-2222-2222-222222222222"
-  run_id: null
-  department_id: "66666666-6666-6666-6666-666666666666"
-  client_id: "99999999-9999-9999-9999-999999999999"
-  shipped_on: "2026-02-23"
-  chicks_count: 450
-  unit_price: 1280.0
-  currency: "UZS"
-  invoice_no: "CH-SHIP-003"
-  note: "yakuniy oqim"
-- id: "44445555-6666-7777-8888-999999999999"
-  organization_id: "22222222-2222-2222-2222-222222222222"
-  run_id: "4a4a4a4a-1111-1111-1111-111111111111"
-  department_id: "66661111-1111-1111-1111-111111111111"
-  client_id: "14141414-1414-1414-1414-141414141414"
-  shipped_on: "2026-03-21"
-  chicks_count: 520
-  unit_price: 1340.0
-  currency: "UZS"
-  invoice_no: "CH-SHIP-004"
-  note: "yangi jonatma boyicha sortu 1"
-- id: "55556666-7777-8888-9999-aaaaaaaaaaaa"
-  organization_id: "22222222-2222-2222-2222-222222222222"
-  run_id: "5b5b5b5b-2222-2222-2222-222222222222"
-  department_id: "66661111-1111-1111-1111-111111111111"
-  client_id: "15151515-1515-1515-1515-151515151515"
-  shipped_on: "2026-03-23"
-  chicks_count: 610
-  unit_price: 1350.0
-  currency: "UZS"
-  invoice_no: "CH-SHIP-005"
-  note: "yangi yetkazib mijozga"
-- id: "66669999-9999-9999-9999-999999999999"
-  organization_id: "22222222-2222-2222-2222-222222222222"
-  run_id: "6c6c6c6c-3333-3333-3333-333333333333"
-  department_id: "66666666-6666-6666-6666-666666666666"
-  client_id: "24242424-2424-2424-2424-242424242424"
-  shipped_on: "2026-03-25"
-  chicks_count: 540
-  unit_price: 1365.0
-  currency: "UZS"
-  invoice_no: "CH-SHIP-006"
-  note: "yetkazib regionalnomu mijozga"
-- id: "77779999-9999-9999-9999-999999999998"
-  organization_id: "22222222-2222-2222-2222-222222222222"
-  run_id: "7d7d7d7d-4444-4444-4444-444444444444"
-  department_id: "66661111-1111-1111-1111-111111111111"
-  client_id: "14141414-1414-1414-1414-141414141414"
-  shipped_on: "2026-03-27"
-  chicks_count: 640
-  unit_price: 1375.0
-  currency: "UZS"
-  invoice_no: "CH-SHIP-007"
-  note: "yangi jonatma boyicha shartnoma"
-- id: "8888aaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
-  organization_id: "22222222-2222-2222-2222-222222222222"
-  run_id: "8e8e8e8e-5555-5555-5555-555555555555"
-  department_id: "66661111-1111-1111-1111-111111111111"
-  client_id: "28282828-2828-2828-2828-282828282828"
-  shipped_on: "2026-03-23"
-  chicks_count: 680
-  unit_price: 1385.0
-  currency: "UZS"
-  invoice_no: "CH-SHIP-008"
-  note: "bugungi joja jo'natmasi yangi retail mijozga"
-- id: "9999eeee-5555-5555-5555-555555555555"
-  organization_id: "22222222-2222-2222-2222-222222222222"
-  run_id: "9a9a9a9a-1111-1111-1111-111111111111"
-  department_id: "66661111-1111-1111-1111-111111111111"
-  client_id: "24242424-2424-2424-2424-242424242424"
-  shipped_on: "2026-04-03"
-  chicks_count: 560
-  unit_price: 1390.0
-  currency: "UZS"
-  invoice_no: "CH-SHIP-009"
-  note: "hududiy klasterga aprel boshidagi jo'natma"
-- id: "9999ffff-6666-6666-6666-666666666666"
-  organization_id: "22222222-2222-2222-2222-222222222222"
-  run_id: "9a9a9a9a-1111-1111-1111-111111111111"
-  department_id: "66661111-1111-1111-1111-111111111111"
-  client_id: "30303030-3030-3030-3030-303030303036"
-  shipped_on: "2026-04-04"
-  chicks_count: 640
-  unit_price: 1405.0
-  currency: "UZS"
-  invoice_no: "CH-SHIP-010"
-  note: "Qashqadaryo klasteriga to'g'ridan-to'g'ri jo'natma"
-- id: "aaaabbbb-7777-7777-7777-777777777777"
-  organization_id: "22222222-2222-2222-2222-222222222222"
-  run_id: "9b9b9b9b-2222-2222-2222-222222222222"
-  department_id: "66666666-6666-6666-6666-666666666666"
-  client_id: "30303030-3030-3030-3030-303030303036"
-  shipped_on: "2026-04-06"
-  chicks_count: 710
-  unit_price: 1415.0
-  currency: "UZS"
-  invoice_no: "CH-SHIP-011"
-  note: "bugungi jo'ja realizatsiyasi"
+# Incubation fixtures: batches, runs, chick shipments, chick arrivals, monthly analytics.
+#
+# Dept (primary org): 152db9b5-3cd7-44cf-a1c3-79b9fe3e91df (Inkubatsiya)
+# Warehouse:         b0a92633-6363-596b-ad7b-22326d7adfbb (INCU-WH)
+# Parent-stock source clients: CL-006 Yusupov Agro (vip)
+# Chick destination clients: CL-001 Alimov Trade, CL-003 Qodirov Farm
+# Also one batch in org2 (Oqsaroy Tuxum) using dept 66666666.
+
 incubation_batches:
-- id: "aaaaaaaa-1111-1111-1111-111111111111"
-  organization_id: "11111111-1111-1111-1111-111111111111"
-  department_id: "44444444-4444-4444-4444-444444444444"
-  source_client_id: "77777777-7777-7777-7777-777777777777"
-  production_id: "10555555-5555-5555-5555-555555555555"
-  batch_code: "IB-001"
-  eggs_arrived: 2400
-  arrived_on: "2026-02-15"
-  expected_hatch_on: "2026-03-08"
-  note: "asosiy inkubasionniy zaxod"
-- id: "bbbbbbbb-2222-2222-2222-222222222222"
-  organization_id: "11111111-1111-1111-1111-111111111111"
-  department_id: "55555555-5555-5555-5555-555555555555"
-  source_client_id: "88888888-8888-8888-8888-888888888888"
-  batch_code: "IB-002"
-  eggs_arrived: 2600
-  arrived_on: "2026-02-16"
-  expected_hatch_on: "2026-03-09"
-  note: "qoshimcha zaxod"
-- id: "cccccccc-3333-3333-3333-333333333333"
-  organization_id: "22222222-2222-2222-2222-222222222222"
-  department_id: "66666666-6666-6666-6666-666666666666"
-  source_client_id: "99999999-9999-9999-9999-999999999999"
-  batch_code: "IB-003"
-  eggs_arrived: 2100
-  arrived_on: "2026-02-17"
-  expected_hatch_on: "2026-03-10"
-  note: "zagruzka uchun utki"
-- id: "dddddddd-4444-4444-4444-444444444444"
-  organization_id: "22222222-2222-2222-2222-222222222222"
-  department_id: "66661111-1111-1111-1111-111111111111"
-  source_client_id: "17171717-1717-1717-1717-171717171717"
-  batch_code: "IB-004"
-  eggs_arrived: 2250
-  arrived_on: "2026-02-21"
-  expected_hatch_on: "2026-03-14"
-  note: "yangi blok sortirovki"
-- id: "eeeeeeee-5555-5555-5555-555555555555"
-  organization_id: "22222222-2222-2222-2222-222222222222"
-  department_id: "66661111-1111-1111-1111-111111111111"
-  source_client_id: "99999999-9999-9999-9999-999999999999"
-  batch_code: "IB-005"
-  eggs_arrived: 2320
-  arrived_on: "2026-02-23"
-  expected_hatch_on: "2026-03-16"
-  note: "pozdnyaya zakladka"
-- id: "ffffffff-6666-6666-6666-666666666666"
-  organization_id: "22222222-2222-2222-2222-222222222222"
-  department_id: "66666666-6666-6666-6666-666666666666"
-  source_client_id: "17171717-1717-1717-1717-171717171717"
-  batch_code: "IB-006"
-  eggs_arrived: 2180
-  arrived_on: "2026-02-25"
-  expected_hatch_on: "2026-03-18"
-  note: "qoshimcha yanvar zakladka"
-- id: "abababab-7777-7777-7777-777777777777"
-  organization_id: "22222222-2222-2222-2222-222222222222"
-  department_id: "66661111-1111-1111-1111-111111111111"
-  source_client_id: "24242424-2424-2424-2424-242424242424"
-  batch_code: "IB-007"
-  eggs_arrived: 2380
-  arrived_on: "2026-02-27"
-  expected_hatch_on: "2026-03-20"
-  note: "zakladka uchun yangi shartnoma"
-- id: "cdcdcdcd-8888-8888-8888-888888888888"
-  organization_id: "22222222-2222-2222-2222-222222222222"
-  department_id: "66661111-1111-1111-1111-111111111111"
-  source_client_id: "17171717-1717-1717-1717-171717171717"
-  batch_code: "IB-008"
-  eggs_arrived: 2460
-  arrived_on: "2026-03-02"
-  expected_hatch_on: "2026-03-18"
-  note: "mart oyidagi yangi inkubatsion zakladka"
-- id: "1234abcd-1111-1111-1111-111111111111"
-  organization_id: "22222222-2222-2222-2222-222222222222"
-  department_id: "66661111-1111-1111-1111-111111111111"
-  source_client_id: "30303030-3030-3030-3030-303030303035"
-  batch_code: "IB-009"
-  eggs_arrived: 2450
-  arrived_on: "2026-03-15"
-  expected_hatch_on: "2026-04-05"
-  note: "aprel boshidagi sotuvlar uchun eksport tuxumi zakladkasi"
-- id: "2345bcde-2222-2222-2222-222222222222"
-  organization_id: "22222222-2222-2222-2222-222222222222"
-  department_id: "66666666-6666-6666-6666-666666666666"
-  source_client_id: "17171717-1717-1717-1717-171717171717"
-  batch_code: "IB-010"
-  eggs_arrived: 2520
-  arrived_on: "2026-03-18"
-  expected_hatch_on: "2026-04-06"
-  note: "bugungi demo davri uchun faol zakladka"
+  - id: 84111111-1111-1111-1111-111111111101
+    organization_id: 11111111-1111-1111-1111-111111111111
+    department_id: 152db9b5-3cd7-44cf-a1c3-79b9fe3e91df
+    source_client_id: e1111111-0000-0000-0000-000000000006
+    production_id: 81111111-1111-1111-1111-111111111101
+    batch_code: INC-2026-0301
+    eggs_arrived: 12000
+    arrived_on: now-35d
+    expected_hatch_on: now-14d
+    note: Yusupov Agro ota-ona to'dasidan inkubatsion tuxum
+    is_active: true
+    warehouse_id: b0a92633-6363-596b-ad7b-22326d7adfbb
+
+  - id: 84111111-1111-1111-1111-111111111102
+    organization_id: 11111111-1111-1111-1111-111111111111
+    department_id: 152db9b5-3cd7-44cf-a1c3-79b9fe3e91df
+    source_client_id: null
+    batch_code: INC-2026-0302
+    eggs_arrived: 10000
+    arrived_on: now-28d
+    expected_hatch_on: now-7d
+    note: Ichki tuxumchilik majmuasi tuxumlari
+    production_id: 81111111-1111-1111-1111-111111111102
+    is_active: true
+    warehouse_id: b0a92633-6363-596b-ad7b-22326d7adfbb
+
+  - id: 84111111-1111-1111-1111-111111111103
+    organization_id: 11111111-1111-1111-1111-111111111111
+    department_id: 152db9b5-3cd7-44cf-a1c3-79b9fe3e91df
+    source_client_id: e1111111-0000-0000-0000-000000000006
+    production_id: 81111111-1111-1111-1111-111111111103
+    batch_code: INC-2026-0303
+    eggs_arrived: 11000
+    arrived_on: now-14d
+    expected_hatch_on: now+7d
+    note: Joriy davrdagi asosiy partiya
+    is_active: true
+    warehouse_id: b0a92633-6363-596b-ad7b-22326d7adfbb
+
+  # Org2 — Oqsaroy Tuxum (dept 66666666)
+  - id: 84222222-2222-2222-2222-222222222201
+    organization_id: 22222222-2222-2222-2222-222222222222
+    department_id: 66666666-6666-6666-6666-666666666666
+    source_client_id: null
+    batch_code: INC-OQS-2026-01
+    eggs_arrived: 15000
+    arrived_on: now-21d
+    expected_hatch_on: now
+    note: Oqsaroy asosiy inkubatsiya partiyasi
+    is_active: true
+
+
 incubation_runs:
-- id: "11111111-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
-  organization_id: "11111111-1111-1111-1111-111111111111"
-  batch_id: "aaaaaaaa-1111-1111-1111-111111111111"
-  department_id: "44444444-4444-4444-4444-444444444444"
-  start_date: "2026-02-18"
-  end_date: "2026-03-14"
-  eggs_set: 2400
-  grade_1_count: 1200
-  grade_2_count: 900
-  bad_eggs_count: 100
-  chicks_hatched: 2100
-  chicks_destroyed: 30
-  note: "barqaror chiqim"
-- id: "22222222-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
-  organization_id: "11111111-1111-1111-1111-111111111111"
-  batch_id: "bbbbbbbb-2222-2222-2222-222222222222"
-  department_id: "55555555-5555-5555-5555-555555555555"
-  start_date: "2026-02-19"
-  end_date: "2026-03-15"
-  eggs_set: 2600
-  grade_1_count: 1300
-  grade_2_count: 980
-  bad_eggs_count: 120
-  chicks_hatched: 2200
-  chicks_destroyed: 20
-  note: "yuqori inkubasiya"
-- id: "33333333-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
-  organization_id: "22222222-2222-2222-2222-222222222222"
-  batch_id: "cccccccc-3333-3333-3333-333333333333"
-  department_id: "66666666-6666-6666-6666-666666666666"
-  start_date: "2026-02-20"
-  end_date: "2026-03-16"
-  eggs_set: 2100
-  grade_1_count: 980
-  grade_2_count: 870
-  bad_eggs_count: 70
-  chicks_hatched: 1800
-  chicks_destroyed: 25
-  note: "sezonnaya partiya"
-- id: "4a4a4a4a-1111-1111-1111-111111111111"
-  organization_id: "22222222-2222-2222-2222-222222222222"
-  batch_id: "dddddddd-4444-4444-4444-444444444444"
-  department_id: "66661111-1111-1111-1111-111111111111"
-  start_date: "2026-02-22"
-  end_date: "2026-03-20"
-  eggs_set: 2250
-  grade_1_count: 1100
-  grade_2_count: 930
-  bad_eggs_count: 90
-  chicks_hatched: 2030
-  chicks_destroyed: 18
-  note: "kengaytirilgan sortirovka"
-- id: "5b5b5b5b-2222-2222-2222-222222222222"
-  organization_id: "22222222-2222-2222-2222-222222222222"
-  batch_id: "eeeeeeee-5555-5555-5555-555555555555"
-  department_id: "66661111-1111-1111-1111-111111111111"
-  start_date: "2026-02-24"
-  end_date: "2026-03-22"
-  eggs_set: 2320
-  grade_1_count: 1140
-  grade_2_count: 960
-  bad_eggs_count: 110
-  chicks_hatched: 2100
-  chicks_destroyed: 22
-  note: "rasshirenniy oqim fevral"
-- id: "6c6c6c6c-3333-3333-3333-333333333333"
-  organization_id: "22222222-2222-2222-2222-222222222222"
-  batch_id: "ffffffff-6666-6666-6666-666666666666"
-  department_id: "66666666-6666-6666-6666-666666666666"
-  start_date: "2026-02-26"
-  end_date: "2026-03-24"
-  eggs_set: 2180
-  grade_1_count: 1060
-  grade_2_count: 910
-  bad_eggs_count: 95
-  chicks_hatched: 1970
-  chicks_destroyed: 21
-  note: "tortinchi oqim"
-- id: "7d7d7d7d-4444-4444-4444-444444444444"
-  organization_id: "22222222-2222-2222-2222-222222222222"
-  batch_id: "abababab-7777-7777-7777-777777777777"
-  department_id: "66661111-1111-1111-1111-111111111111"
-  start_date: "2026-02-28"
-  end_date: "2026-03-26"
-  eggs_set: 2380
-  grade_1_count: 1180
-  grade_2_count: 950
-  bad_eggs_count: 110
-  chicks_hatched: 2130
-  chicks_destroyed: 24
-  note: "beshinchi oqim sortirovki"
-- id: "8e8e8e8e-5555-5555-5555-555555555555"
-  organization_id: "22222222-2222-2222-2222-222222222222"
-  batch_id: "cdcdcdcd-8888-8888-8888-888888888888"
-  department_id: "66661111-1111-1111-1111-111111111111"
-  start_date: "2026-03-04"
-  end_date: "2026-03-23"
-  eggs_set: 2460
-  grade_1_count: 1235
-  grade_2_count: 985
-  bad_eggs_count: 105
-  chicks_hatched: 2220
-  chicks_destroyed: 20
-  note: "bugungi ko'rsatkichlar uchun yangi yugurish"
-- id: "9a9a9a9a-1111-1111-1111-111111111111"
-  organization_id: "22222222-2222-2222-2222-222222222222"
-  batch_id: "1234abcd-1111-1111-1111-111111111111"
-  department_id: "66661111-1111-1111-1111-111111111111"
-  start_date: "2026-03-16"
-  end_date: "2026-04-05"
-  eggs_set: 2450
-  grade_1_count: 1240
-  grade_2_count: 980
-  bad_eggs_count: 110
-  chicks_hatched: 2220
-  chicks_destroyed: 22
-  note: "aprel boshidagi tijoriy inkubatsiya yugurishi"
-- id: "9b9b9b9b-2222-2222-2222-222222222222"
-  organization_id: "22222222-2222-2222-2222-222222222222"
-  batch_id: "2345bcde-2222-2222-2222-222222222222"
-  department_id: "66666666-6666-6666-6666-666666666666"
-  start_date: "2026-03-19"
-  end_date: "2026-04-06"
-  eggs_set: 2520
-  grade_1_count: 1280
-  grade_2_count: 1000
-  bad_eggs_count: 105
-  chicks_hatched: 2280
-  chicks_destroyed: 19
-  note: "bugungi demo davrigacha yetgan asosiy yugurish"
+  - id: 85111111-1111-1111-1111-111111111101
+    organization_id: 11111111-1111-1111-1111-111111111111
+    batch_id: 84111111-1111-1111-1111-111111111101
+    department_id: 152db9b5-3cd7-44cf-a1c3-79b9fe3e91df
+    start_date: now-35d
+    end_date: now-14d
+    eggs_set: 11800
+    grade_1_count: 9800
+    grade_2_count: 1400
+    bad_eggs_count: 600
+    chicks_hatched: 9400
+    chicks_destroyed: 120
+    note: Birinchi partiya — 82% hatch rate
+    warehouse_id: b0a92633-6363-596b-ad7b-22326d7adfbb
+
+  - id: 85111111-1111-1111-1111-111111111102
+    organization_id: 11111111-1111-1111-1111-111111111111
+    batch_id: 84111111-1111-1111-1111-111111111102
+    department_id: 152db9b5-3cd7-44cf-a1c3-79b9fe3e91df
+    start_date: now-28d
+    end_date: now-7d
+    eggs_set: 9800
+    grade_1_count: 8200
+    grade_2_count: 1100
+    bad_eggs_count: 500
+    chicks_hatched: 7800
+    chicks_destroyed: 90
+    note: Ichki tuxum partiyasi
+    warehouse_id: b0a92633-6363-596b-ad7b-22326d7adfbb
+
+  - id: 85111111-1111-1111-1111-111111111103
+    organization_id: 11111111-1111-1111-1111-111111111111
+    batch_id: 84111111-1111-1111-1111-111111111103
+    department_id: 152db9b5-3cd7-44cf-a1c3-79b9fe3e91df
+    start_date: now-14d
+    end_date: null
+    eggs_set: 10800
+    grade_1_count: 0
+    grade_2_count: 0
+    bad_eggs_count: 0
+    chicks_hatched: 0
+    chicks_destroyed: 0
+    note: Inkubatsiyada — kuzatuv davri
+    warehouse_id: b0a92633-6363-596b-ad7b-22326d7adfbb
+
+  # Org2 run
+  - id: 85222222-2222-2222-2222-222222222201
+    organization_id: 22222222-2222-2222-2222-222222222222
+    batch_id: 84222222-2222-2222-2222-222222222201
+    department_id: 66666666-6666-6666-6666-666666666666
+    start_date: now-21d
+    end_date: now
+    eggs_set: 14800
+    grade_1_count: 12300
+    grade_2_count: 1800
+    bad_eggs_count: 700
+    chicks_hatched: 12000
+    chicks_destroyed: 150
+
+
+chick_shipments:
+  - id: 86111111-1111-1111-1111-111111111101
+    organization_id: 11111111-1111-1111-1111-111111111111
+    run_id: 85111111-1111-1111-1111-111111111101
+    department_id: 152db9b5-3cd7-44cf-a1c3-79b9fe3e91df
+    client_id: e1111111-0000-0000-0000-000000000001
+    shipped_on: now-13d
+    chicks_count: 4000
+    unit_price: 12500
+    currency: UZS
+    invoice_no: CHK-SHIP-0101
+    note: Alimov Trade MCHJ — broyler jo'jalari
+    warehouse_id: b0a92633-6363-596b-ad7b-22326d7adfbb
+
+  - id: 86111111-1111-1111-1111-111111111102
+    organization_id: 11111111-1111-1111-1111-111111111111
+    run_id: 85111111-1111-1111-1111-111111111101
+    department_id: 152db9b5-3cd7-44cf-a1c3-79b9fe3e91df
+    client_id: e1111111-0000-0000-0000-000000000003
+    shipped_on: now-12d
+    chicks_count: 3000
+    unit_price: 12500
+    currency: UZS
+    invoice_no: CHK-SHIP-0102
+    note: Qodirov Farm — broyler jo'jalari
+    warehouse_id: b0a92633-6363-596b-ad7b-22326d7adfbb
+
+  - id: 86111111-1111-1111-1111-111111111103
+    organization_id: 11111111-1111-1111-1111-111111111111
+    run_id: 85111111-1111-1111-1111-111111111102
+    department_id: 152db9b5-3cd7-44cf-a1c3-79b9fe3e91df
+    client_id: e1111111-0000-0000-0000-000000000006
+    shipped_on: now-6d
+    chicks_count: 3500
+    unit_price: 12800
+    currency: UZS
+    invoice_no: CHK-SHIP-0103
+    note: Yusupov Agro vip buyurtmasi
+    warehouse_id: b0a92633-6363-596b-ad7b-22326d7adfbb
+
+
+chick_arrivals:
+  # Broyler dept (55555555) receives chicks internally
+  - id: 87111111-1111-1111-1111-111111111101
+    organization_id: 11111111-1111-1111-1111-111111111111
+    department_id: 55555555-5555-5555-5555-555555555555
+    poultry_type_id: b0000000-0000-0000-0000-000000000001
+    source_client_id: null
+    arrived_on: now-13d
+    chicks_count: 3900
+    unit_price: 12000
+    currency: UZS
+    note: Inkubatsiya partiyasidan broyler sexiga
+    run_id: 85111111-1111-1111-1111-111111111101
+    chick_shipment_id: null
+
+  - id: 87111111-1111-1111-1111-111111111102
+    organization_id: 11111111-1111-1111-1111-111111111111
+    department_id: 55551111-1111-1111-1111-111111111111
+    poultry_type_id: b0000000-0000-0000-0000-000000000001
+    source_client_id: null
+    arrived_on: now-6d
+    chicks_count: 3400
+    unit_price: 12200
+    currency: UZS
+    note: Broyler maydoni 1 — ikkinchi partiya
+    run_id: 85111111-1111-1111-1111-111111111102
+    chick_shipment_id: null
+
+
 incubation_monthly_analytics:
-- id: "1111aaaa-1111-1111-1111-111111111111"
-  organization_id: "11111111-1111-1111-1111-111111111111"
-  department_id: "44444444-4444-4444-4444-444444444444"
-  month_start: "2025-12-01"
-  eggs_arrived: 18240
-  grade1_count: 9010
-  grade2_count: 7440
-  bad_eggs_count: 820
-  chicks_hatched: 16540
-  chicks_shipped: 4380
-- id: "2222aaaa-2222-2222-2222-222222222222"
-  organization_id: "11111111-1111-1111-1111-111111111111"
-  department_id: "44444444-4444-4444-4444-444444444444"
-  month_start: "2026-01-01"
-  eggs_arrived: 18890
-  grade1_count: 9320
-  grade2_count: 7715
-  bad_eggs_count: 835
-  chicks_hatched: 17120
-  chicks_shipped: 4520
-- id: "3333aaaa-3333-3333-3333-333333333333"
-  organization_id: "11111111-1111-1111-1111-111111111111"
-  department_id: "44444444-4444-4444-4444-444444444444"
-  month_start: "2026-02-01"
-  eggs_arrived: 19470
-  grade1_count: 9660
-  grade2_count: 7925
-  bad_eggs_count: 860
-  chicks_hatched: 17680
-  chicks_shipped: 4710
-- id: "4444aaaa-4444-4444-4444-444444444444"
-  organization_id: "11111111-1111-1111-1111-111111111111"
-  department_id: "44444444-4444-4444-4444-444444444444"
-  month_start: "2026-03-01"
-  eggs_arrived: 20760
-  grade1_count: 10310
-  grade2_count: 8410
-  bad_eggs_count: 905
-  chicks_hatched: 18890
-  chicks_shipped: 5030
-- id: "5555aaaa-5555-5555-5555-555555555555"
-  organization_id: "11111111-1111-1111-1111-111111111111"
-  department_id: "44444444-4444-4444-4444-444444444444"
-  month_start: "2026-04-01"
-  eggs_arrived: 4260
-  grade1_count: 2130
-  grade2_count: 1705
-  bad_eggs_count: 195
-  chicks_hatched: 3875
-  chicks_shipped: 980
-- id: "6666aaaa-6666-6666-6666-666666666666"
-  organization_id: "11111111-1111-1111-1111-111111111111"
-  department_id: "55555555-5555-5555-5555-555555555555"
-  month_start: "2025-12-01"
-  eggs_arrived: 19120
-  grade1_count: 9440
-  grade2_count: 7810
-  bad_eggs_count: 860
-  chicks_hatched: 17310
-  chicks_shipped: 4460
-- id: "7777aaaa-7777-7777-7777-777777777777"
-  organization_id: "11111111-1111-1111-1111-111111111111"
-  department_id: "55555555-5555-5555-5555-555555555555"
-  month_start: "2026-01-01"
-  eggs_arrived: 19740
-  grade1_count: 9780
-  grade2_count: 8045
-  bad_eggs_count: 880
-  chicks_hatched: 17920
-  chicks_shipped: 4630
-- id: "8888aaaa-8888-8888-8888-888888888888"
-  organization_id: "11111111-1111-1111-1111-111111111111"
-  department_id: "55555555-5555-5555-5555-555555555555"
-  month_start: "2026-02-01"
-  eggs_arrived: 20380
-  grade1_count: 10090
-  grade2_count: 8290
-  bad_eggs_count: 905
-  chicks_hatched: 18510
-  chicks_shipped: 4810
-- id: "9999aaaa-9999-9999-9999-999999999999"
-  organization_id: "11111111-1111-1111-1111-111111111111"
-  department_id: "55555555-5555-5555-5555-555555555555"
-  month_start: "2026-03-01"
-  eggs_arrived: 21420
-  grade1_count: 10640
-  grade2_count: 8695
-  bad_eggs_count: 930
-  chicks_hatched: 19440
-  chicks_shipped: 5190
-- id: "aaaa9999-aaaa-9999-aaaa-999999999999"
-  organization_id: "11111111-1111-1111-1111-111111111111"
-  department_id: "55555555-5555-5555-5555-555555555555"
-  month_start: "2026-04-01"
-  eggs_arrived: 4510
-  grade1_count: 2250
-  grade2_count: 1810
-  bad_eggs_count: 205
-  chicks_hatched: 4100
-  chicks_shipped: 1045
-- id: "44444444-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
-  organization_id: "22222222-2222-2222-2222-222222222222"
-  department_id: "66666666-6666-6666-6666-666666666666"
-  month_start: "2025-12-01"
-  eggs_arrived: 22400
-  grade1_count: 10980
-  grade2_count: 9140
-  bad_eggs_count: 1020
-  chicks_hatched: 20120
-  chicks_shipped: 5280
-- id: "55555555-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
-  organization_id: "22222222-2222-2222-2222-222222222222"
-  department_id: "66666666-6666-6666-6666-666666666666"
-  month_start: "2026-01-01"
-  eggs_arrived: 23150
-  grade1_count: 11340
-  grade2_count: 9490
-  bad_eggs_count: 1030
-  chicks_hatched: 20800
-  chicks_shipped: 5520
-- id: "66666666-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
-  organization_id: "22222222-2222-2222-2222-222222222222"
-  department_id: "66666666-6666-6666-6666-666666666666"
-  month_start: "2026-02-01"
-  eggs_arrived: 23880
-  grade1_count: 11720
-  grade2_count: 9710
-  bad_eggs_count: 1085
-  chicks_hatched: 21430
-  chicks_shipped: 5840
-- id: "7777bbbb-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
-  organization_id: "22222222-2222-2222-2222-222222222222"
-  department_id: "66666666-6666-6666-6666-666666666666"
-  month_start: "2026-03-01"
-  eggs_arrived: 24960
-  grade1_count: 12260
-  grade2_count: 10090
-  bad_eggs_count: 1120
-  chicks_hatched: 22290
-  chicks_shipped: 6035
-- id: "8888bbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
-  organization_id: "22222222-2222-2222-2222-222222222222"
-  department_id: "66666666-6666-6666-6666-666666666666"
-  month_start: "2026-04-01"
-  eggs_arrived: 5040
-  grade1_count: 2510
-  grade2_count: 2030
-  bad_eggs_count: 220
-  chicks_hatched: 4550
-  chicks_shipped: 1200
-- id: "9999bbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
-  organization_id: "22222222-2222-2222-2222-222222222222"
-  department_id: "66661111-1111-1111-1111-111111111111"
-  month_start: "2025-12-01"
-  eggs_arrived: 21780
-  grade1_count: 10680
-  grade2_count: 8870
-  bad_eggs_count: 970
-  chicks_hatched: 19650
-  chicks_shipped: 4980
-- id: "aaaa1111-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
-  organization_id: "22222222-2222-2222-2222-222222222222"
-  department_id: "66661111-1111-1111-1111-111111111111"
-  month_start: "2026-01-01"
-  eggs_arrived: 22540
-  grade1_count: 11020
-  grade2_count: 9210
-  bad_eggs_count: 980
-  chicks_hatched: 20230
-  chicks_shipped: 5210
-- id: "bbbb2222-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
-  organization_id: "22222222-2222-2222-2222-222222222222"
-  department_id: "66661111-1111-1111-1111-111111111111"
-  month_start: "2026-02-01"
-  eggs_arrived: 23390
-  grade1_count: 11480
-  grade2_count: 9530
-  bad_eggs_count: 1040
-  chicks_hatched: 21010
-  chicks_shipped: 5480
-- id: "cccc3333-cccc-cccc-cccc-cccccccccccc"
-  organization_id: "22222222-2222-2222-2222-222222222222"
-  department_id: "66661111-1111-1111-1111-111111111111"
-  month_start: "2026-03-01"
-  eggs_arrived: 24670
-  grade1_count: 12120
-  grade2_count: 9945
-  bad_eggs_count: 1080
-  chicks_hatched: 22150
-  chicks_shipped: 5890
-- id: "dddd4444-dddd-dddd-dddd-dddddddddddd"
-  organization_id: "22222222-2222-2222-2222-222222222222"
-  department_id: "66661111-1111-1111-1111-111111111111"
-  month_start: "2026-04-01"
-  eggs_arrived: 4900
-  grade1_count: 2440
-  grade2_count: 1960
-  bad_eggs_count: 210
-  chicks_hatched: 4410
-  chicks_shipped: 1180
-factory_monthly_analytics:
-- id: "77777777-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
-  organization_id: "11111111-1111-1111-1111-111111111111"
-  department_id: "55555555-5555-5555-5555-555555555555"
-  poultry_type_id: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
-  month_start: "2025-12-01"
-  chicks_arrived: 5100
-  feed_quantity: 18200.0
-  feed_quantity_unit: "kg"
-  medicines_arrived: 1180.0
-  note: "qish mavsumidagi asosiy fabrika sikli"
-- id: "88888888-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
-  organization_id: "11111111-1111-1111-1111-111111111111"
-  department_id: "55555555-5555-5555-5555-555555555555"
-  poultry_type_id: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
-  month_start: "2026-01-01"
-  chicks_arrived: 5360
-  feed_quantity: 18840.0
-  feed_quantity_unit: "kg"
-  medicines_arrived: 1260.0
-  note: "yanvar oyidagi barqaror boqish oqimi"
-- id: "99999999-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
-  organization_id: "11111111-1111-1111-1111-111111111111"
-  department_id: "55555555-5555-5555-5555-555555555555"
-  poultry_type_id: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
-  month_start: "2026-02-01"
-  chicks_arrived: 5590
-  feed_quantity: 19620.0
-  feed_quantity_unit: "kg"
-  medicines_arrived: 1340.0
-  note: "fevral oyidagi asosiy broyler sikli"
-- id: "aaaa7777-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
-  organization_id: "11111111-1111-1111-1111-111111111111"
-  department_id: "55555555-5555-5555-5555-555555555555"
-  poultry_type_id: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
-  month_start: "2026-03-01"
-  chicks_arrived: 5820
-  feed_quantity: 20580.0
-  feed_quantity_unit: "kg"
-  medicines_arrived: 1425.0
-  note: "mart oyidagi yuqori yuklama"
-- id: "bbbb8888-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
-  organization_id: "11111111-1111-1111-1111-111111111111"
-  department_id: "55555555-5555-5555-5555-555555555555"
-  poultry_type_id: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
-  month_start: "2026-04-01"
-  chicks_arrived: 1240
-  feed_quantity: 4380.0
-  feed_quantity_unit: "kg"
-  medicines_arrived: 310.0
-  note: "aprelning birinchi haftasi"
-- id: "bbbb7777-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
-  organization_id: "11111111-1111-1111-1111-111111111111"
-  department_id: "55551111-1111-1111-1111-111111111111"
-  poultry_type_id: "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
-  month_start: "2025-12-01"
-  chicks_arrived: 4880
-  feed_quantity: 17460.0
-  feed_quantity_unit: "kg"
-  medicines_arrived: 1090.0
-  note: "qish mavsumidagi maydon natijalari"
-- id: "cccc7777-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
-  organization_id: "11111111-1111-1111-1111-111111111111"
-  department_id: "55551111-1111-1111-1111-111111111111"
-  poultry_type_id: "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
-  month_start: "2026-01-01"
-  chicks_arrived: 5090
-  feed_quantity: 18040.0
-  feed_quantity_unit: "kg"
-  medicines_arrived: 1160.0
-  note: "yanvar oyida maydonning o'sish bosqichi"
-- id: "dddd7777-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
-  organization_id: "11111111-1111-1111-1111-111111111111"
-  department_id: "55551111-1111-1111-1111-111111111111"
-  poultry_type_id: "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
-  month_start: "2026-02-01"
-  chicks_arrived: 5340
-  feed_quantity: 18870.0
-  feed_quantity_unit: "kg"
-  medicines_arrived: 1240.0
-  note: "fevral maydon sikli"
-- id: "eeee7777-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
-  organization_id: "11111111-1111-1111-1111-111111111111"
-  department_id: "55551111-1111-1111-1111-111111111111"
-  poultry_type_id: "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
-  month_start: "2026-03-01"
-  chicks_arrived: 5710
-  feed_quantity: 20030.0
-  feed_quantity_unit: "kg"
-  medicines_arrived: 1335.0
-  note: "mart oyidagi asosiy maydon yuki"
-- id: "ffff7777-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
-  organization_id: "11111111-1111-1111-1111-111111111111"
-  department_id: "55551111-1111-1111-1111-111111111111"
-  poultry_type_id: "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
-  month_start: "2026-04-01"
-  chicks_arrived: 1300
-  feed_quantity: 4520.0
-  feed_quantity_unit: "kg"
-  medicines_arrived: 325.0
-  note: "aprelning birinchi haftasidagi maydon natijalari"
-- id: "11112222-3333-4444-5555-666677778888"
-  organization_id: "22222222-2222-2222-2222-222222222222"
-  department_id: "66666666-6666-6666-6666-666666666666"
-  poultry_type_id: "cccccccc-cccc-cccc-cccc-cccccccccccc"
-  month_start: "2025-12-01"
-  chicks_arrived: 4360
-  feed_quantity: 14880.0
-  feed_quantity_unit: "kg"
-  medicines_arrived: 940.0
-  note: "inkubatsiya bilan bog'langan qishki jo'ja oqimi"
-- id: "22223333-4444-5555-6666-777788889999"
-  organization_id: "22222222-2222-2222-2222-222222222222"
-  department_id: "66666666-6666-6666-6666-666666666666"
-  poultry_type_id: "cccccccc-cccc-cccc-cccc-cccccccccccc"
-  month_start: "2026-01-01"
-  chicks_arrived: 4525
-  feed_quantity: 15340.0
-  feed_quantity_unit: "kg"
-  medicines_arrived: 985.0
-  note: "yanvar oyida jo'ja yetkazib berish barqaror bo'lgan"
-- id: "33334444-5555-6666-7777-88889999aaaa"
-  organization_id: "22222222-2222-2222-2222-222222222222"
-  department_id: "66666666-6666-6666-6666-666666666666"
-  poultry_type_id: "cccccccc-cccc-cccc-cccc-cccccccccccc"
-  month_start: "2026-02-01"
-  chicks_arrived: 4690
-  feed_quantity: 15910.0
-  feed_quantity_unit: "kg"
-  medicines_arrived: 1030.0
-  note: "fevral oyidagi inkubatsiya-fabrika bog'lamasi"
-- id: "44445555-6666-7777-8888-9999aaaabbbb"
-  organization_id: "22222222-2222-2222-2222-222222222222"
-  department_id: "66666666-6666-6666-6666-666666666666"
-  poultry_type_id: "cccccccc-cccc-cccc-cccc-cccccccccccc"
-  month_start: "2026-03-01"
-  chicks_arrived: 4880
-  feed_quantity: 16570.0
-  feed_quantity_unit: "kg"
-  medicines_arrived: 1085.0
-  note: "martda jo'ja chiqimi kuchaygan davr"
-- id: "55556666-7777-8888-9999-aaaabbbbcccc"
-  organization_id: "22222222-2222-2222-2222-222222222222"
-  department_id: "66666666-6666-6666-6666-666666666666"
-  poultry_type_id: "cccccccc-cccc-cccc-cccc-cccccccccccc"
-  month_start: "2026-04-01"
-  chicks_arrived: 980
-  feed_quantity: 3420.0
-  feed_quantity_unit: "kg"
-  medicines_arrived: 225.0
-  note: "aprelning birinchi haftasidagi qisqa demo kesimi"
-- id: "66667777-8888-9999-aaaa-bbbbccccdddd"
-  organization_id: "22222222-2222-2222-2222-222222222222"
-  department_id: "66661111-1111-1111-1111-111111111111"
-  poultry_type_id: "cccccccc-cccc-cccc-cccc-cccccccccccc"
-  month_start: "2025-12-01"
-  chicks_arrived: 4210
-  feed_quantity: 14310.0
-  feed_quantity_unit: "kg"
-  medicines_arrived: 905.0
-  note: "saralash bo'limining qishki natijalari"
-- id: "77778888-9999-aaaa-bbbb-ccccddddeeee"
-  organization_id: "22222222-2222-2222-2222-222222222222"
-  department_id: "66661111-1111-1111-1111-111111111111"
-  poultry_type_id: "cccccccc-cccc-cccc-cccc-cccccccccccc"
-  month_start: "2026-01-01"
-  chicks_arrived: 4385
-  feed_quantity: 14820.0
-  feed_quantity_unit: "kg"
-  medicines_arrived: 952.0
-  note: "yanvar oyida saralash bo'limi yuklamasi oshgan"
-- id: "88889999-aaaa-bbbb-cccc-ddddeeeeffff"
-  organization_id: "22222222-2222-2222-2222-222222222222"
-  department_id: "66661111-1111-1111-1111-111111111111"
-  poultry_type_id: "cccccccc-cccc-cccc-cccc-cccccccccccc"
-  month_start: "2026-02-01"
-  chicks_arrived: 4540
-  feed_quantity: 15390.0
-  feed_quantity_unit: "kg"
-  medicines_arrived: 998.0
-  note: "fevral oyidagi saralangan jo'jalar oqimi"
-- id: "9999aaaa-bbbb-cccc-dddd-eeeeffff0000"
-  organization_id: "22222222-2222-2222-2222-222222222222"
-  department_id: "66661111-1111-1111-1111-111111111111"
-  poultry_type_id: "cccccccc-cccc-cccc-cccc-cccccccccccc"
-  month_start: "2026-03-01"
-  chicks_arrived: 4795
-  feed_quantity: 16120.0
-  feed_quantity_unit: "kg"
-  medicines_arrived: 1060.0
-  note: "mart oyidagi sortlash bo'limi bo'yicha faol davr"
-- id: "aaaabbbb-cccc-dddd-eeee-ffff00001111"
-  organization_id: "22222222-2222-2222-2222-222222222222"
-  department_id: "66661111-1111-1111-1111-111111111111"
-  poultry_type_id: "cccccccc-cccc-cccc-cccc-cccccccccccc"
-  month_start: "2026-04-01"
-  chicks_arrived: 1015
-  feed_quantity: 3510.0
-  feed_quantity_unit: "kg"
-  medicines_arrived: 238.0
-  note: "demo haftasi uchun qisqa konsolidatsiya"
+  - id: 88111111-1111-1111-1111-111111111101
+    organization_id: 11111111-1111-1111-1111-111111111111
+    department_id: 152db9b5-3cd7-44cf-a1c3-79b9fe3e91df
+    month_start: 2026-03-01
+    eggs_arrived: 33000
+    grade1_count: 28000
+    grade2_count: 3300
+    bad_eggs_count: 1700
+    chicks_hatched: 26500
+    chicks_shipped: 24000
+
+  - id: 88111111-1111-1111-1111-111111111102
+    organization_id: 11111111-1111-1111-1111-111111111111
+    department_id: 152db9b5-3cd7-44cf-a1c3-79b9fe3e91df
+    month_start: 2026-02-01
+    eggs_arrived: 28000
+    grade1_count: 23800
+    grade2_count: 2800
+    bad_eggs_count: 1400
+    chicks_hatched: 22500
+    chicks_shipped: 21000

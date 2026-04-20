@@ -9,7 +9,7 @@ MEDICINE_RESOURCES = [
     ("/api/v1/medicine/batches", "medicine_batch"),
     ("/api/v1/medicine/types", "medicine_type"),
 ]
-HOME_BATCH_ID = "70707070-7070-7070-7070-707070707070"
+HOME_BATCH_ID = "93111111-1111-1111-1111-111111111101"
 FOREIGN_ORG_BATCH_ID = "90909090-9090-9090-9090-909090909090"
 
 

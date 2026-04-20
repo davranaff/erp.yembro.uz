@@ -1,5 +1,5 @@
 import { EmptyState } from '@/components/ui/empty-state';
-import { InlineLoader } from '@/components/ui/inline-loader';
+import { CardSkeleton, TableSkeleton } from '@/components/ui/skeleton';
 import type { CrudFieldMeta, CrudRecord } from '@/shared/api/backend-crud';
 import { cn } from '@/shared/lib/cn';
 
@@ -73,7 +73,7 @@ export function RecordsTableView({
     <div className={`${frostedPanelClassName} overflow-hidden`}>
       <div className="max-h-[680px] overflow-y-auto p-3 sm:hidden">
         {isLoading ? (
-          <InlineLoader label={t('crud.loadingRecords', undefined, 'Загружаем данные…')} />
+          <CardSkeleton lines={3} />
         ) : totalCount === 0 ? (
           <EmptyState title={emptyTitle} description={emptyDescription} />
         ) : (
@@ -189,6 +189,13 @@ export function RecordsTableView({
             </tr>
           </thead>
           <tbody>
+            {isLoading ? (
+              <tr>
+                <td colSpan={tableFields.length + (hasRecordActions ? 1 : 0)} className="px-5 py-4">
+                  <TableSkeleton rows={6} cols={Math.min(tableFields.length, 4)} />
+                </td>
+              </tr>
+            ) : null}
             {records.map((record, rowIndex) => {
               const recordId = getRecordId(record, idColumn);
               const isActive = recordId !== EMPTY_TEXT && recordId === selectedRecordId;

@@ -6,6 +6,7 @@ from typing import Callable, Iterable
 from fastapi import Depends, Header, HTTPException, Request, status
 
 from app.core.config import get_settings
+from app.core.scope import UserScope, load_user_scope
 from app.db.pool import Database
 from app.db.redis_client import RedisClient
 from app.services.auth_access import (
@@ -26,6 +27,19 @@ class CurrentActor:
     roles: frozenset[str]
     permissions: frozenset[str]
     implicit_read_permissions: frozenset[str]
+    scope: UserScope = UserScope.unbounded()
+
+    @property
+    def allowed_department_ids(self) -> frozenset[str] | None:
+        return self.scope.allowed_department_ids
+
+    @property
+    def allowed_warehouse_ids(self) -> frozenset[str] | None:
+        return self.scope.allowed_warehouse_ids
+
+    @property
+    def is_org_admin(self) -> bool:
+        return self.scope.is_org_admin
 
 
 def _split_csv(raw: str | None) -> frozenset[str]:
@@ -72,15 +86,24 @@ async def get_current_actor(
                 detail="Authentication required",
             )
 
+        roles = frozenset(profile.roles)
+        scope = await load_user_scope(
+            db,
+            employee_id=profile.employee_id,
+            organization_id=profile.organization_id,
+            roles=roles,
+            enabled=settings.enable_row_level_scope,
+        )
         return CurrentActor(
             employee_id=profile.employee_id,
             organization_id=profile.organization_id,
             department_id=profile.department_id,
             department_module_key=profile.department_module_key,
             username=profile.username,
-            roles=frozenset(profile.roles),
+            roles=roles,
             permissions=frozenset(profile.permissions),
             implicit_read_permissions=frozenset(profile.implicit_read_permissions),
+            scope=scope,
         )
 
     allow_header_override = (
@@ -94,6 +117,14 @@ async def get_current_actor(
                 detail="Authentication required",
             )
         has_claim_overrides = x_roles is not None or x_permissions is not None
+        roles = _split_csv(x_roles) or frozenset(profile.roles)
+        scope = await load_user_scope(
+            db,
+            employee_id=profile.employee_id,
+            organization_id=profile.organization_id,
+            roles=roles,
+            enabled=settings.enable_row_level_scope,
+        )
         return CurrentActor(
             employee_id=profile.employee_id,
             organization_id=profile.organization_id,
@@ -102,13 +133,14 @@ async def get_current_actor(
                 None if has_claim_overrides else profile.department_module_key
             ),
             username=profile.username,
-            roles=_split_csv(x_roles) or frozenset(profile.roles),
+            roles=roles,
             permissions=_split_csv(x_permissions) or frozenset(profile.permissions),
             implicit_read_permissions=(
                 frozenset()
                 if has_claim_overrides
                 else frozenset(profile.implicit_read_permissions)
             ),
+            scope=scope,
         )
 
     raise HTTPException(

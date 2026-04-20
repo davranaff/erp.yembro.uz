@@ -98,3 +98,40 @@ export const getPublicMedicineBatch = (token: string) =>
       skipAuth: true,
     },
   );
+
+export const medicineConsumeRequestSchema = z.object({
+  medicine_type_id: z.string().trim().min(1),
+  quantity: z.union([z.number(), z.string()]),
+  consumed_on: z.string().trim().min(1),
+  unit: z.string().trim().min(1).optional(),
+  department_id: z.string().trim().min(1).optional(),
+  purpose: z.string().trim().optional(),
+  poultry_type_id: z.string().trim().min(1).optional(),
+  client_id: z.string().trim().min(1).optional(),
+  factory_flock_id: z.string().trim().min(1).optional(),
+});
+
+const medicineConsumeAllocationSchema = z.object({
+  batch_id: z.string(),
+  batch_code: z.string().nullable().optional(),
+  expiry_date: z.string().nullable().optional(),
+  quantity: z.union([z.number(), z.string()]),
+  consumption_id: z.string(),
+});
+
+export const medicineConsumeResponseSchema = z.object({
+  requested: z.union([z.number(), z.string()]),
+  consumed_total: z.union([z.number(), z.string()]),
+  allocations: z.array(medicineConsumeAllocationSchema),
+});
+
+export type MedicineConsumeRequest = z.infer<typeof medicineConsumeRequestSchema>;
+export type MedicineConsumeAllocation = z.infer<typeof medicineConsumeAllocationSchema>;
+export type MedicineConsumeResponse = z.infer<typeof medicineConsumeResponseSchema>;
+
+export const consumeMedicine = (payload: MedicineConsumeRequest) =>
+  apiClient.post<MedicineConsumeResponse, MedicineConsumeRequest>(
+    `/medicine/consume`,
+    payload,
+    medicineConsumeResponseSchema,
+  );
