@@ -56,7 +56,7 @@ department_modules:
   sort_order: 40
   is_department_assignable: true
   analytics_section_key: "factory"
-  implicit_read_permissions: '["factory_flock.read", "factory_daily_log.read", "factory_shipment.read", "factory_medicine_usage.read", "factory_vaccination_plan.read", "stock_movement.read", "stock_take.read", "stock_reorder_level.read", "warehouse.read"]'
+  implicit_read_permissions: '["factory_flock.read", "factory_daily_log.read", "factory_shipment.read", "factory_medicine_usage.read", "factory_vaccination_plan.read", "factory_monthly_analytics.read", "stock_movement.read", "stock_take.read", "stock_reorder_level.read", "warehouse.read"]'
   analytics_read_permissions: '["factory_flock.read", "factory_shipment.read"]'
   is_active: true
 - id: "31444444-4444-4444-4444-444444444444"
@@ -566,7 +566,7 @@ workspace_resources:
   permission_prefix: "factory_flock"
   api_module_key: "factory"
   sort_order: 10
-  is_head_visible: false
+  is_head_visible: true
   is_active: true
 - id: "32000000-0000-0000-0000-000000000201"
   module_key: "factory"
@@ -577,7 +577,7 @@ workspace_resources:
   permission_prefix: "factory_daily_log"
   api_module_key: "factory"
   sort_order: 20
-  is_head_visible: false
+  is_head_visible: true
   is_active: true
 - id: "32000000-0000-0000-0000-000000000202"
   module_key: "factory"
@@ -588,7 +588,7 @@ workspace_resources:
   permission_prefix: "factory_shipment"
   api_module_key: "factory"
   sort_order: 30
-  is_head_visible: false
+  is_head_visible: true
   is_active: true
 - id: "32000000-0000-0000-0000-000000000203"
   module_key: "factory"
@@ -599,7 +599,7 @@ workspace_resources:
   permission_prefix: "factory_medicine_usage"
   api_module_key: "factory"
   sort_order: 25
-  is_head_visible: false
+  is_head_visible: true
   is_active: true
 - id: "32000000-0000-0000-0000-000000000205"
   module_key: "factory"
@@ -610,7 +610,18 @@ workspace_resources:
   permission_prefix: "factory_vaccination_plan"
   api_module_key: "factory"
   sort_order: 28
-  is_head_visible: false
+  is_head_visible: true
+  is_active: true
+- id: "32000000-0000-0000-0000-000000000206"
+  module_key: "factory"
+  key: "monthly-analytics"
+  name: "Месячная аналитика"
+  path: "factory-monthly-analytics"
+  description: "Помесячные показатели фабрики"
+  permission_prefix: "factory_monthly_analytics"
+  api_module_key: "incubation"
+  sort_order: 34
+  is_head_visible: true
   is_active: true
 - id: "32000000-0000-0000-0000-000000000075"
   module_key: "factory"
