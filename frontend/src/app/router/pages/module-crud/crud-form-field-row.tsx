@@ -1,5 +1,7 @@
 import { CustomSelect } from '@/components/ui/custom-select';
+import { HierarchicalCategorySelect } from '@/components/ui/hierarchical-category-select';
 import { Input } from '@/components/ui/input';
+import { MeasurementUnitSelect } from '@/components/ui/measurement-unit-select';
 import { SearchableReferenceSelect } from '@/components/ui/searchable-reference-select';
 import type {
   CrudFieldMeta,
@@ -247,6 +249,22 @@ export function CrudFormFieldRow({ field, value, fieldError, context }: CrudForm
           />
           <span className="text-sm text-foreground">{`${yesLabel} / ${noLabel}`}</span>
         </label>
+      ) : field.name === 'category_id' || field.name === 'expense_category_id' ? (
+        <HierarchicalCategorySelect
+          value={typeof value === 'string' ? value : EMPTY_TEXT}
+          onChange={(nextValue) => onInputChange(field, nextValue)}
+          disabled={isFormReadOnly || pendingAction}
+          className={inputBaseClassName}
+          placeholder={t('common.chooseValue')}
+        />
+      ) : field.name === 'unit' ? (
+        <MeasurementUnitSelect
+          value={typeof value === 'string' ? value : EMPTY_TEXT}
+          onChange={(nextValue) => onInputChange(field, nextValue)}
+          disabled={isFormReadOnly || pendingAction}
+          className={inputBaseClassName}
+          placeholder={t('common.chooseValue')}
+        />
       ) : useCompactReferenceSelect ? (
         <CustomSelect
           value={typeof value === 'string' ? value : EMPTY_TEXT}
