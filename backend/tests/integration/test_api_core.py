@@ -196,21 +196,25 @@ async def test_client_notification_context_and_bulk_send_endpoint(api_client) ->
 
 @pytest.mark.asyncio
 async def test_client_debt_rejects_due_date_before_issue_date(api_client) -> None:
-    debt_id = "f1000000-0000-0000-0000-000000000001"
-    current_response = await api_client.get(
-        f"/api/v1/core/client-debts/{debt_id}",
+    # F0.8 locks fixture-seeded debts to posting_status='posted', which makes
+    # them immutable. Work on a freshly created draft debt so the due-date
+    # validation is the one that fires.
+    from tests.helpers import build_create_payload
+
+    create_payload = await build_create_payload(api_client, "/api/v1/core/client-debts")
+    create_response = await api_client.post(
+        "/api/v1/core/client-debts",
+        json=create_payload,
         headers=make_auth_headers("client_debt"),
     )
-    assert current_response.status_code == 200, current_response.text
-    current_payload = extract_data(current_response)
-    issued_on = date.fromisoformat(str(current_payload["issued_on"]))
+    assert create_response.status_code == 201, create_response.text
+    draft_debt_id = extract_data(create_response)["id"]
+    issued_on = date.fromisoformat(str(extract_data(create_response)["issued_on"]))
     invalid_due_on = (issued_on - timedelta(days=1)).isoformat()
 
     response = await api_client.put(
-        f"/api/v1/core/client-debts/{debt_id}",
-        json={
-            "due_on": invalid_due_on,
-        },
+        f"/api/v1/core/client-debts/{draft_debt_id}",
+        json={"due_on": invalid_due_on},
         headers=make_auth_headers("client_debt"),
     )
     assert response.status_code == 400, response.text

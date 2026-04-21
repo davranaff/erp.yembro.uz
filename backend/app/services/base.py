@@ -726,6 +726,39 @@ class BaseService(ABC):
 
         return scoped_filters
 
+    def _apply_default_posting_status_on_create(self, data: dict[str, Any]) -> None:
+        """User-facing creates on posting_status tables always land in 'draft'.
+
+        Auto-sync services (auto-AR/AP) use the repository layer directly
+        and never hit this hook — they snapshot via the DB's server_default
+        of 'posted', which is the correct immutable state for shipment-driven
+        rows.
+        """
+        if not self.repository.has_column("posting_status"):
+            return
+        data["posting_status"] = "draft"
+
+    def _ensure_posting_mutable(self, entity: Mapping[str, Any]) -> None:
+        """Block user-facing updates on rows whose posting_status is locked.
+
+        Tables with a `posting_status` column (currently client_debts and
+        supplier_debts) graduate rows from 'draft' to 'posted' when the
+        underlying business event has happened. Posted rows are
+        immutable — edits go through a reversal entry.
+
+        Auto-sync services use the repository layer directly and therefore
+        bypass this check, which matches the intent: shipment-driven
+        upserts continue to track the parent's state; only manual
+        user edits are locked.
+        """
+        if not self.repository.has_column("posting_status"):
+            return
+        status = str(entity.get("posting_status") or "").strip().lower()
+        if status == "posted":
+            raise ValidationError(
+                "This record is posted and cannot be edited. Create a reversal entry instead."
+            )
+
     def _ensure_actor_can_access_entity(
         self,
         entity: dict[str, Any],
@@ -997,6 +1030,7 @@ class BaseService(ABC):
         data = await self._auto_resolve_measurement_unit(data, existing=None)
         data = self._prepare_create_payload(data, actor=actor)
         data = await self._validate_catalog_fields(data, actor=actor, existing=None, is_create=True)
+        self._apply_default_posting_status_on_create(data)
         async with self.repository.db.transaction():
             data = await self._before_create(data, actor=actor)
             entity = await self.repository.create(data)
@@ -1078,6 +1112,7 @@ class BaseService(ABC):
         async with self.repository.db.transaction():
             existing = await self.repository.get_by_id(entity_id)
             self._ensure_actor_can_access_entity(existing, actor=actor)
+            self._ensure_posting_mutable(existing)
             before_snapshot = await self._capture_audit_snapshot(
                 entity_id,
                 entity=existing,
@@ -1233,6 +1268,7 @@ class BaseService(ABC):
         async with self.repository.db.transaction():
             existing = await self.repository.get_by_id(entity_id)
             self._ensure_actor_can_access_entity(existing, actor=actor)
+            self._ensure_posting_mutable(existing)
             before_snapshot = await self._capture_audit_snapshot(
                 entity_id,
                 entity=existing,

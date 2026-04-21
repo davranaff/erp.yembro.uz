@@ -53,6 +53,13 @@ class ClientDebt(Base, IDMixin, TimestampMixin):
     issued_on: Mapped[date] = mapped_column(Date, nullable=False, index=True)
     due_on: Mapped[date | None] = mapped_column(Date, nullable=True, index=True)
     status: Mapped[str] = mapped_column(String(24), nullable=False, default="open", server_default="open", index=True)
+    posting_status: Mapped[str] = mapped_column(
+        String(20),
+        nullable=False,
+        default="posted",
+        server_default="posted",
+        index=True,
+    )
     note: Mapped[str | None] = mapped_column(Text, nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default="true")
 

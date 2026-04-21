@@ -151,6 +151,24 @@ async def test_viewer_list_hides_other_department_records(api_client) -> None:
 
 
 @pytest.mark.asyncio
+async def test_posted_debt_is_immutable(api_client) -> None:
+    """Client debts with posting_status='posted' reject user-facing updates.
+
+    Existing fixture rows are marked posted by the F0.8 migration; editing
+    them must return a validation error that mentions reversal.
+    """
+    existing_debt_id = "f1000000-0000-0000-0000-000000000001"
+    response = await api_client.put(
+        f"/api/v1/core/client-debts/{existing_debt_id}",
+        json={"note": "attempt to mutate posted debt"},
+        headers=_headers("client_debt"),
+    )
+    assert response.status_code == 400, response.text
+    message = response.json()["error"]["message"]
+    assert "posted" in message.lower() or "reversal" in message.lower()
+
+
+@pytest.mark.asyncio
 async def test_viewer_cannot_read_entity_from_other_department(api_client) -> None:
     """Direct GET by id on a cross-department entity must 403/404 for viewer."""
     other_dept_batch_id = "93111111-1111-1111-1111-111111111101"
