@@ -169,6 +169,36 @@ async def test_posted_debt_is_immutable(api_client) -> None:
 
 
 @pytest.mark.asyncio
+async def test_viewer_cannot_read_entity_from_other_organization(api_client) -> None:
+    """Viewer scoped to org 11111111 must not read an incubation_batch from org 22222222.
+
+    Cross-org access is blocked by the organization_id filter in
+    BaseService._scope_filters_to_actor regardless of department scope.
+    """
+    other_org_batch_id = "84222222-2222-2222-2222-222222222201"
+    response = await api_client.get(
+        f"/api/v1/incubation/batches/{other_org_batch_id}",
+        headers=_headers("incubation_batch", role="viewer"),
+    )
+    assert response.status_code in (403, 404), (
+        f"viewer in org 11111111 accessed batch from org 22222222: got {response.status_code}"
+    )
+
+
+@pytest.mark.asyncio
+async def test_viewer_cannot_delete_cross_department_entity(api_client) -> None:
+    """Viewer in HOME_DEPARTMENT cannot DELETE a medicine_batch from another dept."""
+    other_dept_batch_id = "93111111-1111-1111-1111-111111111102"
+    response = await api_client.delete(
+        f"/api/v1/medicine/batches/{other_dept_batch_id}",
+        headers=_headers("medicine_batch", role="viewer"),
+    )
+    assert response.status_code in (403, 404), (
+        f"viewer deleted cross-dept medicine batch: got {response.status_code}"
+    )
+
+
+@pytest.mark.asyncio
 async def test_viewer_cannot_read_entity_from_other_department(api_client) -> None:
     """Direct GET by id on a cross-department entity must 403/404 for viewer."""
     other_dept_batch_id = "93111111-1111-1111-1111-111111111101"
