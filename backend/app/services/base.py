@@ -1198,7 +1198,7 @@ class BaseService(ABC):
 
             entity = await self.repository.update_by_id(entity_id, payload)
             await self._record_audit_event(
-                action="acknowledge",
+                action="update",
                 entity_id=entity_id,
                 before_data=self._normalize_audit_snapshot(existing),
                 after_data=self._normalize_audit_snapshot(entity),
