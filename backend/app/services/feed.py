@@ -391,15 +391,70 @@ class FeedRawArrivalService(CreatedByActorMixin, BaseService):
 class FeedConsumptionService(CreatedByActorMixin, BaseService):
     """Feed consumed by broilers — factory-side view of feed_consumptions.
 
-    Records linked to factory_daily_logs get auto-managed by
-    FactoryDailyLogService._sync_feed_consumption_row; manually-created
-    rows (without daily_log_id) are preserved as-is.
+    Rows linked to factory_daily_logs are written by
+    FactoryDailyLogService (which already emits the stock movement with
+    reference_table='factory_daily_logs'). Manually-created rows (without
+    daily_log_id) emit their own outgoing feed movement here.
     """
 
     read_schema = FeedConsumptionReadSchema
 
     def __init__(self, repository: FeedConsumptionRepository) -> None:
         super().__init__(repository=repository)
+
+    async def _sync_stock(self, entity: Mapping[str, Any]) -> None:
+        # Skip when the daily log owns this row — daily-log service already
+        # emitted the outgoing movement to avoid double-counting.
+        if entity.get("daily_log_id"):
+            ledger = StockLedgerService(StockMovementRepository(self.repository.db))
+            await ledger.clear_reference_movements(
+                reference_table="feed_consumptions",
+                reference_id=str(entity["id"]),
+            )
+            return
+
+        quantity = _as_decimal(entity.get("quantity"))
+        movements: list[StockMovementDraft] = []
+        if quantity > 0:
+            batch_id = entity.get("production_batch_id")
+            if batch_id:
+                item_key = _feed_product_key(str(batch_id))
+            else:
+                item_key = _feed_product_key_by_type(str(entity["feed_type_id"]))
+            movements.append(
+                StockMovementDraft(
+                    organization_id=str(entity["organization_id"]),
+                    department_id=str(entity["department_id"]),
+                    item_type="feed",
+                    item_key=item_key,
+                    movement_kind="outgoing",
+                    quantity=quantity,
+                    unit=str(entity.get("unit") or "kg"),
+                    occurred_on=_as_date(entity["consumed_on"]),
+                    reference_table="feed_consumptions",
+                    reference_id=str(entity["id"]),
+                    note=str(entity.get("note") or "") or None,
+                )
+            )
+        ledger = StockLedgerService(StockMovementRepository(self.repository.db))
+        await ledger.replace_reference_movements(
+            reference_table="feed_consumptions",
+            reference_id=str(entity["id"]),
+            movements=movements,
+        )
+
+    async def _after_create(self, entity: Mapping[str, Any], *, actor=None) -> None:
+        await self._sync_stock(entity)
+
+    async def _after_update(self, *, before: Mapping[str, Any], after: Mapping[str, Any], actor=None) -> None:
+        await self._sync_stock(after)
+
+    async def _after_delete(self, *, deleted_entity: Mapping[str, Any], actor=None) -> None:
+        ledger = StockLedgerService(StockMovementRepository(self.repository.db))
+        await ledger.clear_reference_movements(
+            reference_table="feed_consumptions",
+            reference_id=str(deleted_entity["id"]),
+        )
 
 
 class FeedRawConsumptionService(CreatedByActorMixin, BaseService):

@@ -318,14 +318,53 @@ class SlaughterArrivalService(CreatedByActorMixin, BaseService):
             return
         await SupplierDebtRepository(self.repository.db).delete_by_id(str(existing_debt["id"]))
 
+    async def _sync_stock(self, entity: Mapping[str, Any]) -> None:
+        """Incoming `chick` at slaughter warehouse when live birds arrive."""
+        birds_received = int(entity.get("birds_received") or 0)
+        movements: list[StockMovementDraft] = []
+        if birds_received > 0:
+            movements.append(
+                StockMovementDraft(
+                    organization_id=str(entity["organization_id"]),
+                    department_id=str(entity["department_id"]),
+                    item_type="chick",
+                    item_key=_slaughter_arrival_chick_key(str(entity["id"])),
+                    movement_kind="incoming",
+                    quantity=Decimal(birds_received),
+                    unit="dona",
+                    occurred_on=_as_date(entity["arrived_on"]),
+                    reference_table="slaughter_arrivals",
+                    reference_id=str(entity["id"]),
+                    note=str(entity.get("arrival_invoice_no") or "") or None,
+                )
+            )
+        ledger = StockLedgerService(StockMovementRepository(self.repository.db))
+        await ledger.replace_reference_movements(
+            reference_table="slaughter_arrivals",
+            reference_id=str(entity["id"]),
+            movements=movements,
+        )
+
     async def _after_create(self, entity: Mapping[str, Any], *, actor=None) -> None:
+        await self._sync_stock(entity)
         await self._sync_auto_ap(entity)
 
     async def _after_update(self, *, before: Mapping[str, Any], after: Mapping[str, Any], actor=None) -> None:
+        await self._sync_stock(after)
         await self._sync_auto_ap(after)
 
     async def _after_delete(self, *, deleted_entity: Mapping[str, Any], actor=None) -> None:
+        ledger = StockLedgerService(StockMovementRepository(self.repository.db))
+        await ledger.clear_reference_movements(
+            reference_table="slaughter_arrivals",
+            reference_id=str(deleted_entity["id"]),
+        )
         await self._delete_auto_ap(str(deleted_entity["id"]))
+
+
+def _slaughter_arrival_chick_key(arrival_id: str) -> str:
+    """Item key that ties arrival (incoming) and processing (outgoing) chick flows."""
+    return f"chick_slaughter:{arrival_id}"
 
 
 class SlaughterProcessingService(CreatedByActorMixin, BaseService):
@@ -402,6 +441,50 @@ class SlaughterProcessingService(CreatedByActorMixin, BaseService):
         if "arrival_id" in data and str(data["arrival_id"]) != str(existing.get("arrival_id")):
             raise ValidationError("arrival_id cannot be changed")
         return await self._resolve_fields(data, existing=existing)
+
+    async def _sync_stock(self, entity: Mapping[str, Any]) -> None:
+        """Outgoing `chick` from slaughter warehouse: live birds consumed by processing.
+
+        Uses the same item_key as SlaughterArrivalService._sync_stock so that
+        balance per arrival = birds_received − sum(birds_processed).
+        """
+        birds_processed = int(entity.get("birds_processed") or 0)
+        movements: list[StockMovementDraft] = []
+        if birds_processed > 0:
+            movements.append(
+                StockMovementDraft(
+                    organization_id=str(entity["organization_id"]),
+                    department_id=str(entity["department_id"]),
+                    item_type="chick",
+                    item_key=_slaughter_arrival_chick_key(str(entity["arrival_id"])),
+                    movement_kind="outgoing",
+                    quantity=Decimal(birds_processed),
+                    unit="dona",
+                    occurred_on=_as_date(entity["processed_on"]),
+                    reference_table="slaughter_processings",
+                    reference_id=str(entity["id"]),
+                    note=str(entity.get("note") or "") or None,
+                )
+            )
+        ledger = StockLedgerService(StockMovementRepository(self.repository.db))
+        await ledger.replace_reference_movements(
+            reference_table="slaughter_processings",
+            reference_id=str(entity["id"]),
+            movements=movements,
+        )
+
+    async def _after_create(self, entity: Mapping[str, Any], *, actor=None) -> None:
+        await self._sync_stock(entity)
+
+    async def _after_update(self, *, before: Mapping[str, Any], after: Mapping[str, Any], actor=None) -> None:
+        await self._sync_stock(after)
+
+    async def _after_delete(self, *, deleted_entity: Mapping[str, Any], actor=None) -> None:
+        ledger = StockLedgerService(StockMovementRepository(self.repository.db))
+        await ledger.clear_reference_movements(
+            reference_table="slaughter_processings",
+            reference_id=str(deleted_entity["id"]),
+        )
 
 
 class SlaughterSemiProductService(BaseService):

@@ -292,6 +292,7 @@ def _seed_test_stock_buffers(
         ("egg", rows_by_table.get("egg_production", []), lambda r: f"egg:{r['id']}", "pcs"),
         ("chick", rows_by_table.get("incubation_runs", []), lambda r: f"chick_run:{r['id']}", "pcs"),
         ("chick", rows_by_table.get("chick_arrivals", []), lambda r: f"chick_arrival:{r['id']}", "pcs"),
+        ("chick", rows_by_table.get("slaughter_arrivals", []), lambda r: f"chick_slaughter:{r['id']}", "dona"),
         ("feed", rows_by_table.get("feed_production_batches", []), lambda r: f"feed_product:{r['id']}", "kg"),
         ("feed_raw", rows_by_table.get("feed_ingredients", []), lambda r: f"feed_raw:{r['id']}", "kg"),
         ("medicine", rows_by_table.get("medicine_batches", []), lambda r: f"medicine_batch:{r['id']}", "pcs"),
