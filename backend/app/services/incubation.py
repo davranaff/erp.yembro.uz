@@ -3,8 +3,10 @@ from __future__ import annotations
 from datetime import date
 from decimal import Decimal
 from typing import Any, Mapping
+from uuid import uuid4
 
 from app.core.exceptions import ValidationError
+from app.repositories.core import ClientDebtRepository
 from app.repositories.incubation import (
     ChickShipmentRepository,
     FactoryMonthlyAnalyticsRepository,
@@ -22,6 +24,31 @@ from app.schemas.incubation import (
 )
 from app.services.base import BaseService
 from app.services.inventory import StockLedgerService, StockMovementDraft
+from app.services.units import resolve_measurement_unit_id
+
+
+AUTO_CHICK_SHIPMENT_AR_MARKER_PREFIX = "[auto-chick-shipment-ar:"
+
+
+def _build_auto_ar_marker(shipment_id: str) -> str:
+    return f"{AUTO_CHICK_SHIPMENT_AR_MARKER_PREFIX}{shipment_id}]"
+
+
+def _compose_auto_debt_note(marker: str, source_note: Any) -> str:
+    note_text = str(source_note).strip() if source_note is not None else ""
+    if not note_text:
+        return marker
+    if marker in note_text:
+        return note_text
+    return f"{note_text}\n{marker}"
+
+
+def _resolve_auto_debt_status(amount_total: Decimal, amount_paid: Decimal) -> str:
+    if amount_paid <= Decimal("0"):
+        return "open"
+    if amount_paid >= amount_total:
+        return "closed"
+    return "partially_paid"
 
 
 def _as_date(raw_value: object) -> date:
@@ -77,6 +104,85 @@ class ChickShipmentService(BaseService):
             movements=movement_rows,
         )
 
+    async def _find_auto_ar_debt(self, shipment_id: str) -> dict[str, Any] | None:
+        marker = _build_auto_ar_marker(shipment_id)
+        row = await self.repository.db.fetchrow(
+            """
+            SELECT *
+            FROM client_debts
+            WHERE note LIKE $1
+            ORDER BY created_at DESC
+            LIMIT 1
+            """,
+            f"%{marker}%",
+        )
+        return dict(row) if row is not None else None
+
+    async def _sync_auto_ar(self, entity: Mapping[str, Any]) -> None:
+        shipment_id = str(entity["id"])
+        unit_price = entity.get("unit_price")
+        quantity = _as_decimal(entity.get("chicks_count"))
+        debt_repo = ClientDebtRepository(self.repository.db)
+        existing_debt = await self._find_auto_ar_debt(shipment_id)
+
+        if (
+            not entity.get("client_id")
+            or unit_price is None
+            or Decimal(str(unit_price or 0)) <= 0
+            or quantity <= 0
+        ):
+            if existing_debt is not None:
+                await debt_repo.delete_by_id(str(existing_debt["id"]))
+            return
+
+        unit_price_decimal = Decimal(str(unit_price)).quantize(Decimal("0.01"))
+        amount_total = (unit_price_decimal * quantity).quantize(Decimal("0.01"))
+        amount_paid = Decimal(str((existing_debt or {}).get("amount_paid") or 0)).quantize(Decimal("0.01"))
+        if amount_paid > amount_total:
+            raise ValidationError(
+                "Cannot reduce shipment total below already recorded debt payments",
+            )
+
+        marker = _build_auto_ar_marker(shipment_id)
+        note = _compose_auto_debt_note(
+            marker,
+            (existing_debt or {}).get("note") if existing_debt else None,
+        )
+        status = _resolve_auto_debt_status(amount_total, amount_paid)
+        issued_on = _as_date(entity["shipped_on"])
+        measurement_unit_id = await resolve_measurement_unit_id(
+            self.repository.db, str(entity["organization_id"]), "dona",
+        )
+
+        payload: dict[str, Any] = {
+            "organization_id": str(entity["organization_id"]),
+            "department_id": str(entity["department_id"]),
+            "client_id": str(entity["client_id"]),
+            "item_type": "chick",
+            "item_key": f"chick_shipment:{shipment_id}",
+            "quantity": str(quantity),
+            "unit": "dona",
+            "measurement_unit_id": measurement_unit_id,
+            "amount_total": str(amount_total),
+            "amount_paid": str(amount_paid),
+            "currency": str(entity.get("currency") or ""),
+            "issued_on": issued_on,
+            "status": status,
+            "note": note,
+            "is_active": True,
+        }
+
+        if existing_debt is None:
+            await debt_repo.create({"id": str(uuid4()), **payload})
+        else:
+            await debt_repo.update_by_id(str(existing_debt["id"]), payload)
+
+    async def _delete_auto_ar(self, shipment_id: str) -> None:
+        existing_debt = await self._find_auto_ar_debt(shipment_id)
+        if existing_debt is None:
+            return
+        await ClientDebtRepository(self.repository.db).delete_by_id(str(existing_debt["id"]))
+
     async def _after_create(
         self,
         entity: Mapping[str, Any],
@@ -84,6 +190,7 @@ class ChickShipmentService(BaseService):
         actor=None,
     ) -> None:
         await self._sync_stock(entity)
+        await self._sync_auto_ar(entity)
 
     async def _after_update(
         self,
@@ -93,6 +200,7 @@ class ChickShipmentService(BaseService):
         actor=None,
     ) -> None:
         await self._sync_stock(after)
+        await self._sync_auto_ar(after)
 
     async def _after_delete(
         self,
@@ -105,6 +213,7 @@ class ChickShipmentService(BaseService):
             reference_table="chick_shipments",
             reference_id=str(deleted_entity["id"]),
         )
+        await self._delete_auto_ar(str(deleted_entity["id"]))
 
 
 class IncubationBatchService(BaseService):

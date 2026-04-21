@@ -896,7 +896,12 @@ class SlaughterSemiProductShipmentService(CreatedByActorMixin, BaseService):
         debt_repo = ClientDebtRepository(self.repository.db)
         existing_debt = await self._find_auto_ar_debt(shipment_id)
 
-        if unit_price is None or Decimal(str(unit_price or 0)) <= 0 or quantity <= 0:
+        if (
+            not entity.get("client_id")
+            or unit_price is None
+            or Decimal(str(unit_price or 0)) <= 0
+            or quantity <= 0
+        ):
             if existing_debt is not None:
                 await debt_repo.delete_by_id(str(existing_debt["id"]))
             return
