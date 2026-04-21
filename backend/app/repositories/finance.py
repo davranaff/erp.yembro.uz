@@ -27,6 +27,10 @@ class DebtPaymentRepository(BaseRepository[dict[str, object]]):
     table = "debt_payments"
 
 
+class EmployeeAdvanceRepository(BaseRepository[dict[str, object]]):
+    table = "employee_advances"
+
+
 __all__ = [
     "ExpenseCategoryRepository",
     "ExpenseRepository",
@@ -34,4 +38,5 @@ __all__ = [
     "CashTransactionRepository",
     "SupplierDebtRepository",
     "DebtPaymentRepository",
+    "EmployeeAdvanceRepository",
 ]

@@ -130,6 +130,26 @@ class DebtPaymentListResponse(CRUDListResponse[DebtPaymentReadSchema]):
     """Paginated debt payment response."""
 
 
+class EmployeeAdvanceCreateSchema(OpenSchema, BaseCreateSchema):
+    """Input payload to create employee advance."""
+
+
+class EmployeeAdvanceUpdateSchema(OpenSchema, BaseUpdateSchema):
+    """Input payload to update employee advance."""
+
+
+class EmployeeAdvanceReadSchema(OpenSchema, BaseReadSchema):
+    """Readable employee advance response."""
+
+
+class EmployeeAdvanceListParams(CRUDBaseParams):
+    """Pagination + query params for employee advance list."""
+
+
+class EmployeeAdvanceListResponse(CRUDListResponse[EmployeeAdvanceReadSchema]):
+    """Paginated employee advance response."""
+
+
 __all__ = [
     "ExpenseCategoryCreateSchema",
     "ExpenseCategoryUpdateSchema",
@@ -161,4 +181,9 @@ __all__ = [
     "DebtPaymentReadSchema",
     "DebtPaymentListParams",
     "DebtPaymentListResponse",
+    "EmployeeAdvanceCreateSchema",
+    "EmployeeAdvanceUpdateSchema",
+    "EmployeeAdvanceReadSchema",
+    "EmployeeAdvanceListParams",
+    "EmployeeAdvanceListResponse",
 ]

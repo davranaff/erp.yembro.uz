@@ -49,6 +49,7 @@ FIXTURE_LOAD_ORDER = [
     "expense_categories",
     "expenses",
     "cash_accounts",
+    "employee_advances",
     "cash_transactions",
     "feed_types",
     "feed_ingredients",

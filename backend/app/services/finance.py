@@ -11,6 +11,7 @@ from app.repositories.finance import (
     CashAccountRepository,
     CashTransactionRepository,
     DebtPaymentRepository,
+    EmployeeAdvanceRepository,
     ExpenseCategoryRepository,
     ExpenseRepository,
     SupplierDebtRepository,
@@ -19,6 +20,7 @@ from app.schemas.finance import (
     CashAccountReadSchema,
     CashTransactionReadSchema,
     DebtPaymentReadSchema,
+    EmployeeAdvanceReadSchema,
     ExpenseCategoryReadSchema,
     ExpenseReadSchema,
     SupplierDebtReadSchema,
@@ -1753,6 +1755,48 @@ class DebtPaymentService(CreatedByActorMixin, BaseService):
         return Result.ok_result(deleted)
 
 
+class EmployeeAdvanceService(CreatedByActorMixin, BaseService):
+    """Подотчётные — cash handed out to an employee, reconciled by receipts.
+
+    Balance is derived from cash_transactions via source_type/source_id:
+    - 'advance': issuance (initial outflow)
+    - 'advance_reconciliation': receipts submitted (becomes expense)
+    - 'advance_return': leftover back to cash
+    outstanding = issued − reconciled − returned.
+    """
+
+    read_schema = EmployeeAdvanceReadSchema
+
+    def __init__(self, repository: EmployeeAdvanceRepository) -> None:
+        super().__init__(repository=repository)
+
+    async def compute_balance(self, advance_id: str) -> dict[str, Decimal]:
+        advance = await self.repository.get_by_id(advance_id)
+        totals_row = await self.repository.db.fetchrow(
+            """
+            SELECT
+                COALESCE(SUM(CASE WHEN source_type = 'advance_reconciliation' THEN amount ELSE 0 END), 0) AS reconciled,
+                COALESCE(SUM(CASE WHEN source_type = 'advance_return' THEN amount ELSE 0 END), 0) AS returned
+            FROM cash_transactions
+            WHERE source_id = $1
+            """,
+            advance_id,
+        )
+        issued = Decimal(str(advance.get("amount_issued") or 0))
+        reconciled = Decimal(str((totals_row or {}).get("reconciled") or 0))
+        returned = Decimal(str((totals_row or {}).get("returned") or 0))
+        outstanding = (issued - reconciled - returned).quantize(Decimal("0.01"))
+        return {
+            "advance_id": advance_id,
+            "amount_issued": issued,
+            "amount_reconciled": reconciled,
+            "amount_returned": returned,
+            "amount_outstanding": outstanding,
+            "currency": advance.get("currency"),
+            "status": advance.get("status"),
+        }
+
+
 __all__ = [
     "ExpenseCategoryService",
     "ExpenseService",
@@ -1760,4 +1804,5 @@ __all__ = [
     "CashTransactionService",
     "SupplierDebtService",
     "DebtPaymentService",
+    "EmployeeAdvanceService",
 ]

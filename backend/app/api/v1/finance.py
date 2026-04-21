@@ -13,6 +13,7 @@ from app.repositories.finance import (
     CashAccountRepository,
     CashTransactionRepository,
     DebtPaymentRepository,
+    EmployeeAdvanceRepository,
     ExpenseCategoryRepository,
     ExpenseRepository,
     SupplierDebtRepository,
@@ -21,6 +22,7 @@ from app.services.finance import (
     CashAccountService,
     CashTransactionService,
     DebtPaymentService,
+    EmployeeAdvanceService,
     ExpenseCategoryService,
     ExpenseService,
     SupplierDebtService,
@@ -155,6 +157,32 @@ router.include_router(
     )
 )
 
+router.include_router(
+    build_crud_router(
+        prefix="advances",
+        service_factory=lambda db: EmployeeAdvanceService(EmployeeAdvanceRepository(db)),
+        permission_prefix="employee_advance",
+        tags=["employee-advance"],
+    )
+)
+
+
+@router.get(
+    "/advances/{advance_id}/balance",
+    dependencies=[Depends(require_access("employee_advance.read"))],
+)
+async def get_advance_balance(
+    advance_id: str,
+    current_actor: CurrentActor = Depends(get_current_actor),
+    db: Database = Depends(db_dependency),
+) -> dict[str, Any]:
+    service = EmployeeAdvanceService(EmployeeAdvanceRepository(db))
+    advance = await service.repository.get_by_id(advance_id)
+    service._ensure_actor_can_access_entity(advance, actor=current_actor)
+    balance = await service.compute_balance(advance_id)
+    return {key: (str(value) if hasattr(value, "quantize") else value) for key, value in balance.items()}
+
+
 register_module_stats_route(
     router,
     module="finance",
@@ -166,6 +194,7 @@ register_module_stats_route(
         ModuleStatsTable(key="cash_transactions", label="Cash Transactions", table="cash_transactions"),
         ModuleStatsTable(key="supplier_debts", label="Supplier Debts", table="supplier_debts"),
         ModuleStatsTable(key="debt_payments", label="Debt Payments", table="debt_payments"),
+        ModuleStatsTable(key="employee_advances", label="Employee Advances", table="employee_advances"),
     ),
 )
 
