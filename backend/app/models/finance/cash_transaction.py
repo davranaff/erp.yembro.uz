@@ -33,7 +33,11 @@ class CashTransaction(Base, IDMixin, TimestampMixin):
         nullable=True,
         index=True,
     )
-    category_id: Mapped[UUID | None] = mapped_column(nullable=True, index=True)
+    category_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("expense_categories.id", ondelete="RESTRICT"),
+        nullable=True,
+        index=True,
+    )
     counterparty_client_id: Mapped[UUID | None] = mapped_column(
         ForeignKey("clients.id", ondelete="SET NULL"),
         nullable=True,

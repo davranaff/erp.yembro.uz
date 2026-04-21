@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import List
 from uuid import UUID
 
-from sqlalchemy import Boolean, ForeignKey, String, Text, UniqueConstraint
+from sqlalchemy import Boolean, CheckConstraint, ForeignKey, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from ..base import Base, IDMixin, TimestampMixin
@@ -20,6 +20,18 @@ class ExpenseCategory(Base, IDMixin, TimestampMixin):
     department_id: Mapped[UUID] = mapped_column(
         ForeignKey("departments.id", ondelete="RESTRICT"),
         nullable=False,
+        index=True,
+    )
+    parent_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("expense_categories.id", ondelete="RESTRICT"),
+        nullable=True,
+        index=True,
+    )
+    flow_type: Mapped[str] = mapped_column(
+        String(16),
+        nullable=False,
+        default="expense",
+        server_default="expense",
         index=True,
     )
     name: Mapped[str] = mapped_column(String(140), nullable=False)
@@ -48,5 +60,9 @@ class ExpenseCategory(Base, IDMixin, TimestampMixin):
             "department_id",
             "code",
             name="uq_expense_category_org_department_code",
+        ),
+        CheckConstraint(
+            "flow_type IN ('income', 'expense')",
+            name="ck_expense_categories_flow_type",
         ),
     )

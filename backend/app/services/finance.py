@@ -747,6 +747,23 @@ class CashTransactionService(CreatedByActorMixin, BaseService):
         next_payload = super()._prepare_create_payload(payload, actor=actor)
         return self._normalize_transaction_type_payload(next_payload, is_create=True)
 
+    async def _enforce_leaf_category(self, category_id: str | None) -> None:
+        """Raise if the referenced expense_category has children (non-leaf).
+
+        Only leaves may be used in a posted transaction — non-leaf rollups
+        are there for reporting, not for bookkeeping.
+        """
+        if not category_id:
+            return
+        row = await self.repository.db.fetchrow(
+            "SELECT 1 FROM expense_categories WHERE parent_id = $1 LIMIT 1",
+            category_id,
+        )
+        if row is not None:
+            raise ValidationError(
+                "category_id must reference a leaf category (no child categories)"
+            )
+
     async def _fill_transaction_structured_fields(
         self,
         data: dict[str, Any],
@@ -789,6 +806,8 @@ class CashTransactionService(CreatedByActorMixin, BaseService):
             )
             if row is not None:
                 data["currency_id"] = str(row["id"])
+
+        await self._enforce_leaf_category(data.get("category_id"))
 
     def _prepare_update_payload(
         self,
