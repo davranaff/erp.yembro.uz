@@ -1108,6 +1108,74 @@ class BaseService(ABC):
             )
         return Result.ok_result(self._map_read(entity))
 
+    async def acknowledge_shipment(
+        self,
+        entity_id: Any,
+        *,
+        received_quantity: Any,
+        note: str | None = None,
+        actor: "CurrentActor | None" = None,
+    ) -> Result[Any]:
+        """Mark a shipment as received by the destination department.
+
+        Works on any service whose table carries the transfer-ack columns
+        (`status`, `acknowledged_at`, `acknowledged_by`, `received_quantity`).
+        Sets status to 'received' on exact match, 'discrepancy' otherwise.
+        """
+        if not self.repository.has_column("status") or not self.repository.has_column("acknowledged_at"):
+            raise ValidationError("This entity does not support acknowledgment")
+
+        import decimal
+        from datetime import datetime, timezone
+
+        try:
+            received = decimal.Decimal(str(received_quantity))
+        except (decimal.InvalidOperation, ValueError, TypeError) as exc:
+            raise ValidationError("received_quantity must be a number") from exc
+        if received < 0:
+            raise ValidationError("received_quantity must be non-negative")
+
+        async with self.repository.db.transaction():
+            existing = await self.repository.get_by_id(entity_id)
+            self._ensure_actor_can_access_entity(existing, actor=actor)
+
+            shipped_quantity_col = None
+            for candidate in ("eggs_count", "chicks_count", "birds_count", "quantity"):
+                if self.repository.has_column(candidate) and candidate in existing:
+                    shipped_quantity_col = candidate
+                    break
+            if shipped_quantity_col is None:
+                raise ValidationError("Cannot resolve shipped quantity column")
+
+            shipped_quantity = decimal.Decimal(str(existing.get(shipped_quantity_col) or 0))
+            status = "received" if received == shipped_quantity else "discrepancy"
+
+            actor_employee_id = None
+            if actor is not None and getattr(actor, "employee_id", None) is not None:
+                actor_employee_id = str(actor.employee_id)
+
+            payload: dict[str, Any] = {
+                "status": status,
+                "acknowledged_at": datetime.now(timezone.utc),
+                "acknowledged_by": actor_employee_id,
+                "received_quantity": str(received),
+            }
+            if note is not None:
+                if self.repository.has_column("note"):
+                    existing_note = str(existing.get("note") or "").strip()
+                    note_suffix = f"[ack]: {note}".strip()
+                    payload["note"] = f"{existing_note}\n{note_suffix}".strip() if existing_note else note_suffix
+
+            entity = await self.repository.update_by_id(entity_id, payload)
+            await self._record_audit_event(
+                action="acknowledge",
+                entity_id=entity_id,
+                before_data=self._normalize_audit_snapshot(existing),
+                after_data=self._normalize_audit_snapshot(entity),
+                actor=actor,
+            )
+        return Result.ok_result(self._map_read(entity))
+
     async def update_by_ids(self, ids: Sequence[Any], payload: Any) -> Result[list[Any]]:
         data = self._payload_to_dict(payload)
         rows = await self.repository.update_by_ids(ids=ids, payload=data)

@@ -1,11 +1,11 @@
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, datetime
 from decimal import Decimal
 from typing import List
 from uuid import UUID
 
-from sqlalchemy import CheckConstraint, Date, ForeignKey, Numeric, String, Text, UniqueConstraint
+from sqlalchemy import CheckConstraint, Date, DateTime, ForeignKey, Numeric, String, Text, UniqueConstraint
 from sqlalchemy.ext.hybrid import hybrid_property
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -120,6 +120,24 @@ class FeedProductShipment(Base, IDMixin, TimestampMixin):
     currency: Mapped[str] = mapped_column(String(8), nullable=False)
     invoice_no: Mapped[str | None] = mapped_column(String(120), nullable=True)
     note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    destination_department_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("departments.id", ondelete="RESTRICT"),
+        nullable=True,
+        index=True,
+    )
+    acknowledged_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    acknowledged_by: Mapped[UUID | None] = mapped_column(
+        ForeignKey("employees.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    received_quantity: Mapped[Decimal | None] = mapped_column(
+        Numeric(16, 3), nullable=True
+    )
+    status: Mapped[str] = mapped_column(
+        String(20), nullable=False, default="sent", server_default="sent", index=True
+    )
     created_by: Mapped[UUID | None] = mapped_column(
         ForeignKey("employees.id", ondelete="SET NULL"),
         nullable=True,

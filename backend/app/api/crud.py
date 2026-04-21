@@ -965,4 +965,35 @@ def build_crud_router(
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Entity not found")
         return {"deleted": data}
 
+    @router.post(
+        "/{entity_id}/acknowledge",
+        status_code=status.HTTP_200_OK,
+        dependencies=[Depends(write_dep)],
+    )
+    async def acknowledge_item(
+        entity_id: str,
+        payload: dict[str, Any],
+        current_actor: CurrentActor = Depends(get_current_actor),
+        db: Database = Depends(db_dependency),
+    ) -> Any:
+        service = service_factory(db)
+        if not service.repository.has_column("status") or not service.repository.has_column("acknowledged_at"):
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="This resource does not support acknowledgment",
+            )
+        received_quantity = payload.get("received_quantity")
+        if received_quantity is None:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="received_quantity is required",
+            )
+        result = await service.acknowledge_shipment(
+            entity_id,
+            received_quantity=received_quantity,
+            note=payload.get("note"),
+            actor=current_actor,
+        )
+        return _ensure_ok(result)
+
     return router

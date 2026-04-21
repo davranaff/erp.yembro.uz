@@ -1,10 +1,10 @@
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, datetime
 from decimal import Decimal
 from uuid import UUID
 
-from sqlalchemy import Boolean, CheckConstraint, Date, ForeignKey, Integer, Numeric, String, Text, UniqueConstraint
+from sqlalchemy import Boolean, CheckConstraint, Date, DateTime, ForeignKey, Integer, Numeric, String, Text, UniqueConstraint
 from sqlalchemy.ext.hybrid import hybrid_property
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -53,6 +53,24 @@ class EggShipment(Base, IDMixin, TimestampMixin):
     invoice_no: Mapped[str | None] = mapped_column(String(120), nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default="true")
     note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    destination_department_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("departments.id", ondelete="RESTRICT"),
+        nullable=True,
+        index=True,
+    )
+    acknowledged_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    acknowledged_by: Mapped[UUID | None] = mapped_column(
+        ForeignKey("employees.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    received_quantity: Mapped[Decimal | None] = mapped_column(
+        Numeric(16, 3), nullable=True
+    )
+    status: Mapped[str] = mapped_column(
+        String(20), nullable=False, default="sent", server_default="sent", index=True
+    )
 
     organization: Mapped["Organization"] = relationship("Organization", back_populates="egg_shipments")
     production: Mapped["EggProduction | None"] = relationship(
