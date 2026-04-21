@@ -119,6 +119,7 @@ import {
   getTableFields,
   heroCardClassName,
   humanizeKey,
+  resolveLocalizedText,
   resolveResourceCategoryGroupId,
   resolveDefaultDepartmentSelection,
   resolveDefaultFormDepartmentId,
@@ -133,7 +134,7 @@ import {
 } from './module-crud-page.helpers';
 
 export function ModuleCrudPage() {
-  const { t, locale } = useI18n();
+  const { t, locale, language } = useI18n();
   const navigate = useNavigate();
   const { moduleKey = '' } = useParams<{ moduleKey: string }>();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -934,7 +935,10 @@ export function ModuleCrudPage() {
     }
     const byName = new Map(renderedFormFields.map((field) => [field.name, field]));
     const consumed = new Set<string>();
-    const groups: Array<{ title: string; fields: typeof renderedFormFields }> = [];
+    type GroupTitle = NonNullable<
+      NonNullable<typeof resourceUiConfig>['formSections']
+    >[number]['title'];
+    const groups: Array<{ title: GroupTitle; fields: typeof renderedFormFields }> = [];
     for (const section of sections) {
       const groupFields = section.fields
         .map((name) => {
@@ -2080,7 +2084,13 @@ export function ModuleCrudPage() {
       payload.organization_id = currentDepartmentOrganizationId;
     }
 
-    const crossFieldErrors = resourceUiConfig?.crossFieldValidator?.(formValues) ?? {};
+    const rawCrossFieldErrors = resourceUiConfig?.crossFieldValidator?.(formValues) ?? {};
+    const crossFieldErrors: FormErrors = Object.fromEntries(
+      Object.entries(rawCrossFieldErrors).map(([fieldName, message]) => [
+        fieldName,
+        resolveLocalizedText(message, language),
+      ]),
+    );
     const mergedErrors: FormErrors = { ...errors, ...crossFieldErrors };
 
     if (Object.keys(mergedErrors).length > 0) {
@@ -2916,50 +2926,56 @@ export function ModuleCrudPage() {
                     <AdvanceBalancePanel advance={selectedRecord} />
                   ) : null}
                   <div className="flex flex-col gap-5" data-tour="module-form-fields">
-                    {formFieldGroups.map((group, groupIndex) => (
-                      <div key={`form-group-${groupIndex}`} className="flex flex-col gap-3">
-                        {group.title ? (
-                          <h3 className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                            {group.title}
-                          </h3>
-                        ) : null}
-                        <div className="grid gap-4 md:grid-cols-2">
-                          {group.fields.map((field) => (
-                            <CrudFormFieldRow
-                              key={field.name}
-                              field={field}
-                              value={formValues[field.name]}
-                              fieldError={formErrors[field.name]}
-                              context={{
-                                t,
-                                translateReferenceLabel,
-                                yesLabel,
-                                noLabel,
-                                isFormReadOnly,
-                                pendingAction,
-                                supportsDepartmentFilter,
-                                isInventoryMovementsResource,
-                                isClientDebtsResource,
-                                isTransferMovementForm,
-                                formValues,
-                                selectedDepartmentId,
-                                fallbackDepartmentId,
-                                movementDepartmentId,
-                                departmentNodeMap,
-                                departmentReferenceOptions,
-                                movementWarehouseReferenceOptions,
-                                movementCounterpartyWarehouseReferenceOptions,
-                                inventoryMovementItemKeyField,
-                                resourceModuleKey,
-                                resourcePath: activeResource!.path,
-                                fieldHelpers: resourceUiConfig?.fieldHelpers,
-                                onInputChange: handleInputChange,
-                              }}
-                            />
-                          ))}
+                    {formFieldGroups.map((group, groupIndex) => {
+                      const sectionTitle = group.title
+                        ? resolveLocalizedText(group.title, language)
+                        : '';
+                      return (
+                        <div key={`form-group-${groupIndex}`} className="flex flex-col gap-3">
+                          {sectionTitle ? (
+                            <h3 className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                              {sectionTitle}
+                            </h3>
+                          ) : null}
+                          <div className="grid gap-4 md:grid-cols-2">
+                            {group.fields.map((field) => (
+                              <CrudFormFieldRow
+                                key={field.name}
+                                field={field}
+                                value={formValues[field.name]}
+                                fieldError={formErrors[field.name]}
+                                context={{
+                                  t,
+                                  translateReferenceLabel,
+                                  yesLabel,
+                                  noLabel,
+                                  isFormReadOnly,
+                                  pendingAction,
+                                  supportsDepartmentFilter,
+                                  isInventoryMovementsResource,
+                                  isClientDebtsResource,
+                                  isTransferMovementForm,
+                                  formValues,
+                                  selectedDepartmentId,
+                                  fallbackDepartmentId,
+                                  movementDepartmentId,
+                                  departmentNodeMap,
+                                  departmentReferenceOptions,
+                                  movementWarehouseReferenceOptions,
+                                  movementCounterpartyWarehouseReferenceOptions,
+                                  inventoryMovementItemKeyField,
+                                  resourceModuleKey,
+                                  resourcePath: activeResource!.path,
+                                  fieldHelpers: resourceUiConfig?.fieldHelpers,
+                                  language,
+                                  onInputChange: handleInputChange,
+                                }}
+                              />
+                            ))}
+                          </div>
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </CrudDrawer>
               </Sheet>

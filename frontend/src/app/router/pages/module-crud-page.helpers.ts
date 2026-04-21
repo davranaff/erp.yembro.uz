@@ -1,10 +1,25 @@
 import type { CrudFieldMeta, CrudFieldReference, CrudRecord } from '@/shared/api/backend-crud';
 import type { InventoryItemType } from '@/shared/api/inventory';
+import type { Language } from '@/shared/i18n/types';
 import { getReadableReferenceLabel } from '@/shared/lib/reference-label';
 import { isValidUuid } from '@/shared/lib/uuid';
 
 export type FormValues = Record<string, string | boolean | string[]>;
 export type FormErrors = Record<string, string>;
+
+/**
+ * Per-language strings stored inline in the ResourceUiConfig. Used for
+ * field helpers, section titles, and validation error messages instead
+ * of full i18n-key indirection — keeps the resource config self-contained.
+ */
+export type LocalizedText = { ru: string; uz: string; en: string };
+
+export function resolveLocalizedText(value: string | LocalizedText, language: Language): string {
+  if (typeof value === 'string') {
+    return value;
+  }
+  return value[language] || value.ru;
+}
 export type SubmitMode = 'create' | 'update';
 export type ModuleViewMode = 'records' | 'stats';
 export type ResourceCategoryGroupId =
@@ -30,22 +45,22 @@ export type ResourceUiConfig = {
   readOnly?: boolean;
   /**
    * Short helper line shown under the input to explain non-obvious fields.
-   * The string is used as-is (already localized at author time) — we don't
-   * treat it as an i18n key.
+   * Values can be a plain string (treated as pre-localized) or a
+   * LocalizedText object with ru/uz/en variants.
    */
-  fieldHelpers?: Record<string, string>;
+  fieldHelpers?: Record<string, string | LocalizedText>;
   /**
    * Groups form fields under section headers. Fields not listed in any
-   * section are rendered as a tail group without a title. Titles are used
-   * as-is (already localized at author time).
+   * section are rendered as a tail group without a title. Titles accept
+   * a plain string or a LocalizedText object.
    */
-  formSections?: Array<{ title: string; fields: string[] }>;
+  formSections?: Array<{ title: string | LocalizedText; fields: string[] }>;
   /**
    * Cross-field validation executed in handleSubmit after buildPayload.
    * Returns a map of { fieldName: errorMessage } to merge into formErrors.
-   * Return an empty object when everything is fine.
+   * Messages can be plain strings or LocalizedText objects.
    */
-  crossFieldValidator?: (values: FormValues) => FormErrors;
+  crossFieldValidator?: (values: FormValues) => Record<string, string | LocalizedText>;
 };
 export type DepartmentRecord = CrudRecord & {
   id?: string;
@@ -260,37 +275,74 @@ const resourceUiConfigs: Record<string, ResourceUiConfig> = {
       'posting_status',
     ],
     fieldHelpers: {
-      item_type:
-        'Что продали клиенту: chick (птенцы), bird (взрослая птица), egg, feed, medicine, meat и т.п.',
-      item_key:
-        'Ссылка на конкретную отгрузку/партию. Обычно подставляется автоматически при создании из документа.',
-      amount_total:
-        'Полная сумма задолженности. После проведения документ становится неизменяемым.',
-      amount_paid: 'Сумма уже полученной оплаты. Увеличивается при регистрации платежей.',
-      due_on: 'Крайняя дата оплаты. Долг с просроченной датой попадает в отчёт по просрочке.',
-      posting_status:
-        'Черновик — можно редактировать и удалять. Проведён — учтён в отчётности, изменения только через сторнирование.',
+      item_type: {
+        ru: 'Что продали клиенту: chick (птенцы), bird (взрослая птица), egg, feed, medicine, meat и т.п.',
+        uz: 'Mijozga nima sotilgan: chick (jo‘jalar), bird (katta parranda), egg, feed, medicine, meat va h.k.',
+        en: 'What was sold to the client: chick, bird, egg, feed, medicine, meat, etc.',
+      },
+      item_key: {
+        ru: 'Ссылка на конкретную отгрузку/партию. Обычно подставляется автоматически при создании из документа.',
+        uz: 'Aniq jo‘natma/partiyaga havola. Odatda hujjatdan avtomatik to‘ldiriladi.',
+        en: 'Link to the specific shipment/batch. Usually filled automatically when created from a document.',
+      },
+      amount_total: {
+        ru: 'Полная сумма задолженности. После проведения документ становится неизменяемым.',
+        uz: 'Qarzning umumiy summasi. Hujjat o‘tkazilgandan so‘ng o‘zgartirilmaydi.',
+        en: 'Total debt amount. Once posted, the document becomes immutable.',
+      },
+      amount_paid: {
+        ru: 'Сумма уже полученной оплаты. Увеличивается при регистрации платежей.',
+        uz: 'Olingan to‘lov summasi. To‘lovlar ro‘yxatga olinganda ortadi.',
+        en: 'Amount already paid. Increases as payments are registered.',
+      },
+      due_on: {
+        ru: 'Крайняя дата оплаты. Долг с просроченной датой попадает в отчёт по просрочке.',
+        uz: 'To‘lov oxirgi muddati. Muddati o‘tgan qarzlar muddati o‘tgan hisobotga tushadi.',
+        en: 'Payment due date. Overdue debts appear in the overdue report.',
+      },
+      posting_status: {
+        ru: 'Черновик — можно редактировать и удалять. Проведён — учтён в отчётности, изменения только через сторнирование.',
+        uz: 'Qoralama — tahrirlash va o‘chirish mumkin. O‘tkazilgan — hisobotda hisobga olingan, o‘zgartirish faqat storno orqali.',
+        en: 'Draft — editable and deletable. Posted — recorded in reports, changes only via reversal.',
+      },
     },
     formSections: [
       {
-        title: 'Клиент и предмет',
+        title: { ru: 'Клиент и предмет', uz: 'Mijoz va mahsulot', en: 'Client and subject' },
         fields: ['client_id', 'department_id', 'item_type', 'item_key'],
       },
-      { title: 'Сумма', fields: ['quantity', 'unit', 'amount_total', 'amount_paid', 'currency'] },
-      { title: 'Даты и статус', fields: ['issued_on', 'due_on', 'status', 'posting_status'] },
-      { title: 'Дополнительно', fields: ['note', 'is_active'] },
+      {
+        title: { ru: 'Сумма', uz: 'Summa', en: 'Amount' },
+        fields: ['quantity', 'unit', 'amount_total', 'amount_paid', 'currency'],
+      },
+      {
+        title: { ru: 'Даты и статус', uz: 'Sanalar va holat', en: 'Dates and status' },
+        fields: ['issued_on', 'due_on', 'status', 'posting_status'],
+      },
+      {
+        title: { ru: 'Дополнительно', uz: 'Qo‘shimcha', en: 'Extras' },
+        fields: ['note', 'is_active'],
+      },
     ],
     crossFieldValidator: (values) => {
-      const errors: FormErrors = {};
+      const errors: Record<string, LocalizedText> = {};
       const issuedOn = typeof values.issued_on === 'string' ? values.issued_on : '';
       const dueOn = typeof values.due_on === 'string' ? values.due_on : '';
       if (issuedOn && dueOn && dueOn < issuedOn) {
-        errors.due_on = 'Дата оплаты не может быть раньше даты выставления.';
+        errors.due_on = {
+          ru: 'Дата оплаты не может быть раньше даты выставления.',
+          uz: 'To‘lov sanasi chiqarilgan sanadan oldin bo‘lishi mumkin emas.',
+          en: 'Due date cannot be earlier than the issue date.',
+        };
       }
       const amountTotal = Number(values.amount_total);
       const amountPaid = Number(values.amount_paid);
       if (Number.isFinite(amountTotal) && Number.isFinite(amountPaid) && amountPaid > amountTotal) {
-        errors.amount_paid = 'Оплата не может превышать общую сумму долга.';
+        errors.amount_paid = {
+          ru: 'Оплата не может превышать общую сумму долга.',
+          uz: 'To‘lov qarzning umumiy summasidan oshmasligi kerak.',
+          en: 'Payment cannot exceed the total debt amount.',
+        };
       }
       return errors;
     },
@@ -331,35 +383,73 @@ const resourceUiConfigs: Record<string, ResourceUiConfig> = {
       'posting_status',
     ],
     fieldHelpers: {
-      client_id: 'Поставщик, перед которым возникла задолженность.',
-      item_type:
-        'Категория закупки: raw (сырьё), medicine, service и т.д. Обычно подставляется автоматически из прихода.',
-      amount_total: 'Сумма нашей задолженности перед поставщиком.',
-      amount_paid:
-        'Сколько уже оплачено поставщику. Пополняется при регистрации исходящих платежей.',
-      posting_status:
-        'Черновик — можно редактировать и удалять. Проведён — учтён в отчётности, изменения только через сторнирование.',
+      client_id: {
+        ru: 'Поставщик, перед которым возникла задолженность.',
+        uz: 'Qarzdor bo‘lgan yetkazib beruvchi.',
+        en: 'Supplier to whom the debt is owed.',
+      },
+      item_type: {
+        ru: 'Категория закупки: raw (сырьё), medicine, service и т.д. Обычно подставляется автоматически из прихода.',
+        uz: 'Xarid toifasi: raw (xomashyo), medicine, service va h.k. Odatda kirimdan avtomatik to‘ldiriladi.',
+        en: 'Purchase category: raw, medicine, service, etc. Usually auto-filled from the goods receipt.',
+      },
+      amount_total: {
+        ru: 'Сумма нашей задолженности перед поставщиком.',
+        uz: 'Yetkazib beruvchiga bo‘lgan qarzimiz summasi.',
+        en: 'Amount we owe the supplier.',
+      },
+      amount_paid: {
+        ru: 'Сколько уже оплачено поставщику. Пополняется при регистрации исходящих платежей.',
+        uz: 'Yetkazib beruvchiga to‘langan summa. Chiquvchi to‘lovlarda yangilanadi.',
+        en: 'How much has been paid to the supplier. Updated as outgoing payments are registered.',
+      },
+      posting_status: {
+        ru: 'Черновик — можно редактировать и удалять. Проведён — учтён в отчётности, изменения только через сторнирование.',
+        uz: 'Qoralama — tahrirlash va o‘chirish mumkin. O‘tkazilgan — hisobotda hisobga olingan, o‘zgartirish faqat storno orqali.',
+        en: 'Draft — editable and deletable. Posted — recorded in reports, changes only via reversal.',
+      },
     },
     formSections: [
       {
-        title: 'Поставщик и предмет',
+        title: {
+          ru: 'Поставщик и предмет',
+          uz: 'Yetkazib beruvchi va mahsulot',
+          en: 'Supplier and subject',
+        },
         fields: ['client_id', 'department_id', 'item_type', 'item_key'],
       },
-      { title: 'Сумма', fields: ['quantity', 'unit', 'amount_total', 'amount_paid', 'currency'] },
-      { title: 'Даты и статус', fields: ['issued_on', 'due_on', 'status', 'posting_status'] },
-      { title: 'Дополнительно', fields: ['note', 'is_active'] },
+      {
+        title: { ru: 'Сумма', uz: 'Summa', en: 'Amount' },
+        fields: ['quantity', 'unit', 'amount_total', 'amount_paid', 'currency'],
+      },
+      {
+        title: { ru: 'Даты и статус', uz: 'Sanalar va holat', en: 'Dates and status' },
+        fields: ['issued_on', 'due_on', 'status', 'posting_status'],
+      },
+      {
+        title: { ru: 'Дополнительно', uz: 'Qo‘shimcha', en: 'Extras' },
+        fields: ['note', 'is_active'],
+      },
     ],
     crossFieldValidator: (values) => {
-      const errors: FormErrors = {};
+      const errors: Record<string, LocalizedText> = {};
       const issuedOn = typeof values.issued_on === 'string' ? values.issued_on : '';
       const dueOn = typeof values.due_on === 'string' ? values.due_on : '';
       if (issuedOn && dueOn && dueOn < issuedOn) {
-        errors.due_on = 'Дата оплаты не может быть раньше даты выставления.';
+        errors.due_on = {
+          ru: 'Дата оплаты не может быть раньше даты выставления.',
+          uz: 'To‘lov sanasi chiqarilgan sanadan oldin bo‘lishi mumkin emas.',
+          en: 'Due date cannot be earlier than the issue date.',
+        };
       }
       const amountTotal = Number(values.amount_total);
       const amountPaid = Number(values.amount_paid);
       if (Number.isFinite(amountTotal) && Number.isFinite(amountPaid) && amountPaid > amountTotal) {
-        errors.amount_paid = 'Оплата не может превышать общую сумму долга.';
+        errors.amount_paid = {
+          ru: 'Оплата не может превышать общую сумму долга.',
+          uz: 'To‘lov qarzning umumiy summasidan oshmasligi kerak.',
+          en: 'Payment cannot exceed the total debt amount.',
+        };
       }
       return errors;
     },
@@ -380,28 +470,58 @@ const resourceUiConfigs: Record<string, ResourceUiConfig> = {
     ],
     tableOrder: ['issued_on', 'due_on', 'employee_id', 'amount_issued', 'currency', 'status'],
     fieldHelpers: {
-      amount_issued:
-        'Сумма аванса, выданного сотруднику. Остаток и удержания отображаются в панели справа после сохранения.',
-      due_on: 'Дата, до которой сотрудник должен погасить аванс или вернуть разницу.',
-      status:
-        'Открыт — пока аванс не закрыт. Закрыт — после полного возврата или удержания из зарплаты.',
+      amount_issued: {
+        ru: 'Сумма аванса, выданного сотруднику. Остаток и удержания отображаются в панели справа после сохранения.',
+        uz: 'Xodimga berilgan avans summasi. Qoldiq va ushlab qolishlar saqlashdan keyin o‘ng paneldan ko‘rinadi.',
+        en: 'Advance amount issued to the employee. Balance and deductions appear in the right-side panel after saving.',
+      },
+      due_on: {
+        ru: 'Дата, до которой сотрудник должен погасить аванс или вернуть разницу.',
+        uz: 'Xodim avansni qoplashi yoki qoldiqni qaytarishi kerak bo‘lgan sana.',
+        en: 'Date by which the employee must repay the advance or return the remainder.',
+      },
+      status: {
+        ru: 'Открыт — пока аванс не закрыт. Закрыт — после полного возврата или удержания из зарплаты.',
+        uz: 'Ochiq — avans yopilmaguncha. Yopiq — to‘liq qaytarilgandan yoki maoshdan ushlab qolingandan keyin.',
+        en: 'Open — until the advance is settled. Closed — after full return or deduction from payroll.',
+      },
     },
     formSections: [
-      { title: 'Получатель', fields: ['employee_id', 'department_id'] },
-      { title: 'Сумма', fields: ['amount_issued', 'currency'] },
-      { title: 'Даты и статус', fields: ['issued_on', 'due_on', 'status'] },
-      { title: 'Дополнительно', fields: ['note'] },
+      {
+        title: { ru: 'Получатель', uz: 'Oluvchi', en: 'Recipient' },
+        fields: ['employee_id', 'department_id'],
+      },
+      {
+        title: { ru: 'Сумма', uz: 'Summa', en: 'Amount' },
+        fields: ['amount_issued', 'currency'],
+      },
+      {
+        title: { ru: 'Даты и статус', uz: 'Sanalar va holat', en: 'Dates and status' },
+        fields: ['issued_on', 'due_on', 'status'],
+      },
+      {
+        title: { ru: 'Дополнительно', uz: 'Qo‘shimcha', en: 'Extras' },
+        fields: ['note'],
+      },
     ],
     crossFieldValidator: (values) => {
-      const errors: FormErrors = {};
+      const errors: Record<string, LocalizedText> = {};
       const issuedOn = typeof values.issued_on === 'string' ? values.issued_on : '';
       const dueOn = typeof values.due_on === 'string' ? values.due_on : '';
       if (issuedOn && dueOn && dueOn < issuedOn) {
-        errors.due_on = 'Срок возврата не может быть раньше даты выдачи.';
+        errors.due_on = {
+          ru: 'Срок возврата не может быть раньше даты выдачи.',
+          uz: 'Qaytarish muddati berilgan sanadan oldin bo‘lishi mumkin emas.',
+          en: 'Return date cannot be earlier than the issue date.',
+        };
       }
       const amount = Number(values.amount_issued);
       if (Number.isFinite(amount) && amount <= 0) {
-        errors.amount_issued = 'Сумма аванса должна быть больше нуля.';
+        errors.amount_issued = {
+          ru: 'Сумма аванса должна быть больше нуля.',
+          uz: 'Avans summasi noldan katta bo‘lishi kerak.',
+          en: 'Advance amount must be greater than zero.',
+        };
       }
       return errors;
     },
@@ -500,30 +620,57 @@ const resourceUiConfigs: Record<string, ResourceUiConfig> = {
     ],
     hiddenFields: ['expense_id'],
     fieldHelpers: {
-      transaction_type:
-        'income — поступление (приход), expense — списание (расход). Определяет знак движения по кассе.',
-      cash_account_id:
-        'Касса или банковский счёт, через который проводим операцию. Остаток кассы обновится после сохранения.',
-      expense_category_id:
-        'Статья БДДС. Нужна для расходов — определяет, в какой раздел отчёта о движении денег попадёт операция.',
-      counterparty_client_id:
-        'Клиент или поставщик по операции. Для внутренних перемещений оставьте пустым.',
-      amount: 'Сумма в валюте кассы. Проверьте, что валюта совпадает с валютой счёта.',
-      reference_no: 'Номер чека/платёжного поручения или ссылка на внешний документ.',
+      transaction_type: {
+        ru: 'income — поступление (приход), expense — списание (расход). Определяет знак движения по кассе.',
+        uz: 'income — kirim, expense — chiqim. Kassa harakatining ishorasini belgilaydi.',
+        en: 'income — inflow, expense — outflow. Defines the sign of the cash movement.',
+      },
+      cash_account_id: {
+        ru: 'Касса или банковский счёт, через который проводим операцию. Остаток кассы обновится после сохранения.',
+        uz: 'Operatsiya o‘tkaziladigan kassa yoki bank hisobi. Kassa qoldig‘i saqlashdan keyin yangilanadi.',
+        en: 'Cash account or bank account used for the operation. The balance updates after saving.',
+      },
+      expense_category_id: {
+        ru: 'Статья БДДС. Нужна для расходов — определяет, в какой раздел отчёта о движении денег попадёт операция.',
+        uz: 'PPHH moddasi. Xarajatlar uchun kerak — pul oqimi hisobotining qaysi qismiga tushishini belgilaydi.',
+        en: 'Cash-flow category. Required for expenses — determines which section of the cash-flow report the operation lands in.',
+      },
+      counterparty_client_id: {
+        ru: 'Клиент или поставщик по операции. Для внутренних перемещений оставьте пустым.',
+        uz: 'Operatsiya bo‘yicha mijoz yoki yetkazib beruvchi. Ichki ko‘chirishlar uchun bo‘sh qoldiring.',
+        en: 'Client or supplier for the operation. Leave empty for internal transfers.',
+      },
+      amount: {
+        ru: 'Сумма в валюте кассы. Проверьте, что валюта совпадает с валютой счёта.',
+        uz: 'Kassa valyutasidagi summa. Valyuta hisob valyutasiga mos kelishini tekshiring.',
+        en: 'Amount in the cash-account currency. Check that the currency matches the account.',
+      },
+      reference_no: {
+        ru: 'Номер чека/платёжного поручения или ссылка на внешний документ.',
+        uz: 'Chek/to‘lov topshiriqnomasi raqami yoki tashqi hujjatga havola.',
+        en: 'Check or payment-order number, or a link to an external document.',
+      },
     },
     formSections: [
       {
-        title: 'Операция',
+        title: { ru: 'Операция', uz: 'Operatsiya', en: 'Operation' },
         fields: ['title', 'transaction_type', 'cash_account_id', 'expense_category_id'],
       },
       {
-        title: 'Контрагент и сумма',
+        title: {
+          ru: 'Контрагент и сумма',
+          uz: 'Kontragent va summa',
+          en: 'Counterparty and amount',
+        },
         fields: ['counterparty_client_id', 'amount', 'currency'],
       },
-      { title: 'Документ', fields: ['transaction_date', 'reference_no', 'note'] },
+      {
+        title: { ru: 'Документ', uz: 'Hujjat', en: 'Document' },
+        fields: ['transaction_date', 'reference_no', 'note'],
+      },
     ],
     crossFieldValidator: (values) => {
-      const errors: FormErrors = {};
+      const errors: Record<string, LocalizedText> = {};
       const type =
         typeof values.transaction_type === 'string'
           ? values.transaction_type.trim().toLowerCase()
@@ -531,11 +678,19 @@ const resourceUiConfigs: Record<string, ResourceUiConfig> = {
       const categoryId =
         typeof values.expense_category_id === 'string' ? values.expense_category_id.trim() : '';
       if (type === 'expense' && !categoryId) {
-        errors.expense_category_id = 'Для расхода необходимо указать статью БДДС.';
+        errors.expense_category_id = {
+          ru: 'Для расхода необходимо указать статью БДДС.',
+          uz: 'Xarajat uchun PPHH moddasini ko‘rsatish shart.',
+          en: 'For an expense you must specify a cash-flow category.',
+        };
       }
       const amount = Number(values.amount);
       if (Number.isFinite(amount) && amount <= 0) {
-        errors.amount = 'Сумма должна быть больше нуля.';
+        errors.amount = {
+          ru: 'Сумма должна быть больше нуля.',
+          uz: 'Summa noldan katta bo‘lishi kerak.',
+          en: 'Amount must be greater than zero.',
+        };
       }
       return errors;
     },
@@ -563,23 +718,39 @@ const resourceUiConfigs: Record<string, ResourceUiConfig> = {
       'arrival_unit_price',
     ],
     fieldHelpers: {
-      source_type:
-        'Откуда пришла партия: «factory» — внутренняя отгрузка из фабрики, «supplier» — внешний поставщик.',
-      factory_shipment_id:
-        'Указывайте, если партия пришла из фабрики по отгрузке. Для внешних поставщиков оставьте пустым.',
-      supplier_client_id:
-        'Клиент-поставщик для внешнего прихода. Для фабричных партий оставьте пустым.',
-      birds_received:
-        'Фактическое количество птицы на приёмке. Может отличаться от отгрузки — расхождение фиксируется через акт.',
-      arrival_unit_price: 'Цена за 1 кг живой массы. Общая стоимость = цена × вес.',
+      source_type: {
+        ru: 'Откуда пришла партия: «factory» — внутренняя отгрузка из фабрики, «supplier» — внешний поставщик.',
+        uz: 'Partiya qayerdan kelgan: «factory» — fabrikadan ichki jo‘natma, «supplier» — tashqi yetkazib beruvchi.',
+        en: 'Where the batch came from: "factory" — internal shipment from the factory, "supplier" — external supplier.',
+      },
+      factory_shipment_id: {
+        ru: 'Указывайте, если партия пришла из фабрики по отгрузке. Для внешних поставщиков оставьте пустым.',
+        uz: 'Fabrikadan jo‘natma bilan kelganda to‘ldiring. Tashqi yetkazib beruvchilar uchun bo‘sh qoldiring.',
+        en: 'Fill in if the batch arrived via a factory shipment. Leave empty for external suppliers.',
+      },
+      supplier_client_id: {
+        ru: 'Клиент-поставщик для внешнего прихода. Для фабричных партий оставьте пустым.',
+        uz: 'Tashqi kirim uchun mijoz-yetkazib beruvchi. Fabrika partiyalari uchun bo‘sh qoldiring.',
+        en: 'Supplier client for an external receipt. Leave empty for factory batches.',
+      },
+      birds_received: {
+        ru: 'Фактическое количество птицы на приёмке. Может отличаться от отгрузки — расхождение фиксируется через акт.',
+        uz: 'Qabul qilingan haqiqiy parranda soni. Jo‘natmadan farq qilishi mumkin — farq dalolatnoma orqali qayd etiladi.',
+        en: 'Actual number of birds on receipt. May differ from the shipment — the gap is recorded in the act.',
+      },
+      arrival_unit_price: {
+        ru: 'Цена за 1 кг живой массы. Общая стоимость = цена × вес.',
+        uz: '1 kg tirik vazn narxi. Umumiy qiymat = narx × vazn.',
+        en: 'Price per 1 kg of live weight. Total cost = price × weight.',
+      },
     },
     formSections: [
       {
-        title: 'Источник',
+        title: { ru: 'Источник', uz: 'Manba', en: 'Source' },
         fields: ['source_type', 'factory_shipment_id', 'supplier_client_id', 'poultry_type_id'],
       },
       {
-        title: 'Количество и стоимость',
+        title: { ru: 'Количество и стоимость', uz: 'Miqdor va qiymat', en: 'Quantity and cost' },
         fields: [
           'arrived_on',
           'birds_received',
@@ -588,10 +759,13 @@ const resourceUiConfigs: Record<string, ResourceUiConfig> = {
           'arrival_currency',
         ],
       },
-      { title: 'Документ', fields: ['arrival_invoice_no', 'note'] },
+      {
+        title: { ru: 'Документ', uz: 'Hujjat', en: 'Document' },
+        fields: ['arrival_invoice_no', 'note'],
+      },
     ],
     crossFieldValidator: (values) => {
-      const errors: FormErrors = {};
+      const errors: Record<string, LocalizedText> = {};
       const sourceType =
         typeof values.source_type === 'string' ? values.source_type.trim().toLowerCase() : '';
       const factoryShipmentId =
@@ -599,17 +773,30 @@ const resourceUiConfigs: Record<string, ResourceUiConfig> = {
       const supplierClientId =
         typeof values.supplier_client_id === 'string' ? values.supplier_client_id.trim() : '';
       if (sourceType === 'factory' && !factoryShipmentId) {
-        errors.factory_shipment_id = 'Для источника «factory» укажите отгрузку из фабрики.';
+        errors.factory_shipment_id = {
+          ru: 'Для источника «factory» укажите отгрузку из фабрики.',
+          uz: '«factory» manbasi uchun fabrikadan jo‘natmani ko‘rsating.',
+          en: 'For source "factory", specify the factory shipment.',
+        };
       }
       if (sourceType === 'supplier' && !supplierClientId) {
-        errors.supplier_client_id = 'Для источника «supplier» укажите клиента-поставщика.';
+        errors.supplier_client_id = {
+          ru: 'Для источника «supplier» укажите клиента-поставщика.',
+          uz: '«supplier» manbasi uchun yetkazib beruvchi mijozni ko‘rsating.',
+          en: 'For source "supplier", specify the supplier client.',
+        };
       }
       const birds = Number(values.birds_received);
       const weight = Number(values.arrival_total_weight_kg);
       if (Number.isFinite(birds) && birds > 0 && Number.isFinite(weight) && weight > 0) {
         const avg = weight / birds;
         if (avg < 0.5 || avg > 6) {
-          errors.arrival_total_weight_kg = `Средний вес тушки ${avg.toFixed(2)} кг выходит за разумные пределы (0.5–6 кг). Проверьте данные.`;
+          const avgStr = avg.toFixed(2);
+          errors.arrival_total_weight_kg = {
+            ru: `Средний вес тушки ${avgStr} кг выходит за разумные пределы (0.5–6 кг). Проверьте данные.`,
+            uz: `O‘rtacha tushka vazni ${avgStr} kg oqilona chegaralardan tashqarida (0.5–6 kg). Ma’lumotlarni tekshiring.`,
+            en: `Average carcass weight ${avgStr} kg is outside the reasonable range (0.5–6 kg). Check the data.`,
+          };
         }
       }
       return errors;
@@ -640,27 +827,60 @@ const resourceUiConfigs: Record<string, ResourceUiConfig> = {
       'bad_count',
     ],
     fieldHelpers: {
-      arrival_id:
-        'Партия живой птицы, из которой переработаны тушки. Определяет пул доступного сырья.',
-      birds_processed: 'Суммарно переработано голов. Должно совпадать с «1 сорт + 2 сорт + брак».',
-      first_sort_count: 'Количество тушек высшего сорта — товарные, без дефектов.',
-      second_sort_count: 'Количество тушек второго сорта — мелкие/с дефектами, но пригодные.',
-      bad_count: 'Отбраковано — непригодно для реализации (учитывается как потеря).',
+      arrival_id: {
+        ru: 'Партия живой птицы, из которой переработаны тушки. Определяет пул доступного сырья.',
+        uz: 'Tushkalar qayta ishlangan tirik parranda partiyasi. Mavjud xomashyo fondini belgilaydi.',
+        en: 'Live-bird batch the carcasses were processed from. Defines the available raw-material pool.',
+      },
+      birds_processed: {
+        ru: 'Суммарно переработано голов. Должно совпадать с «1 сорт + 2 сорт + брак».',
+        uz: 'Jami qayta ishlangan boshlar soni. «1-navli + 2-navli + brak» yig‘indisiga teng bo‘lishi kerak.',
+        en: 'Total birds processed. Must equal "1st grade + 2nd grade + reject".',
+      },
+      first_sort_count: {
+        ru: 'Количество тушек высшего сорта — товарные, без дефектов.',
+        uz: 'Oliy nav tushkalar soni — tovar sifatli, nuqsonsiz.',
+        en: 'Number of first-grade carcasses — marketable, defect-free.',
+      },
+      second_sort_count: {
+        ru: 'Количество тушек второго сорта — мелкие/с дефектами, но пригодные.',
+        uz: 'Ikkinchi nav tushkalar soni — mayda/nuqsonli, lekin yaroqli.',
+        en: 'Number of second-grade carcasses — small or with defects but still usable.',
+      },
+      bad_count: {
+        ru: 'Отбраковано — непригодно для реализации (учитывается как потеря).',
+        uz: 'Brak — sotishga yaroqsiz (yo‘qotish sifatida hisobga olinadi).',
+        en: 'Rejected — unfit for sale (counted as a loss).',
+      },
     },
     formSections: [
-      { title: 'Партия и смена', fields: ['arrival_id', 'processed_on', 'processed_by'] },
       {
-        title: 'Разбивка по сортам (голов)',
+        title: { ru: 'Партия и смена', uz: 'Partiya va smena', en: 'Batch and shift' },
+        fields: ['arrival_id', 'processed_on', 'processed_by'],
+      },
+      {
+        title: {
+          ru: 'Разбивка по сортам (голов)',
+          uz: 'Navlar bo‘yicha taqsimot (bosh)',
+          en: 'Breakdown by grade (heads)',
+        },
         fields: ['birds_processed', 'first_sort_count', 'second_sort_count', 'bad_count'],
       },
       {
-        title: 'Разбивка по сортам (вес, кг)',
+        title: {
+          ru: 'Разбивка по сортам (вес, кг)',
+          uz: 'Navlar bo‘yicha taqsimot (vazn, kg)',
+          en: 'Breakdown by grade (weight, kg)',
+        },
         fields: ['first_sort_weight_kg', 'second_sort_weight_kg', 'bad_weight_kg'],
       },
-      { title: 'Дополнительно', fields: ['note'] },
+      {
+        title: { ru: 'Дополнительно', uz: 'Qo‘shimcha', en: 'Extras' },
+        fields: ['note'],
+      },
     ],
     crossFieldValidator: (values) => {
-      const errors: FormErrors = {};
+      const errors: Record<string, LocalizedText> = {};
       const total = Number(values.birds_processed);
       const s1 = Number(values.first_sort_count);
       const s2 = Number(values.second_sort_count);
@@ -675,7 +895,11 @@ const resourceUiConfigs: Record<string, ResourceUiConfig> = {
         const sum = s1 + s2 + bad;
         if (sum !== total) {
           const delta = total - sum;
-          errors.birds_processed = `«1 сорт + 2 сорт + брак» = ${sum}, должно быть ${total} (расхождение ${delta}).`;
+          errors.birds_processed = {
+            ru: `«1 сорт + 2 сорт + брак» = ${sum}, должно быть ${total} (расхождение ${delta}).`,
+            uz: `«1-nav + 2-nav + brak» = ${sum}, ${total} bo‘lishi kerak (farq ${delta}).`,
+            en: `"1st grade + 2nd grade + reject" = ${sum}, should be ${total} (gap ${delta}).`,
+          };
         }
       }
       return errors;
@@ -806,29 +1030,51 @@ const resourceUiConfigs: Record<string, ResourceUiConfig> = {
       'is_active',
     ],
     fieldHelpers: {
-      source_client_id:
-        'Поставщик — если яйцо куплено извне. Для собственной яйцепродукции оставьте пустым.',
-      production_id:
-        'Ссылка на собственное производство яйца. Заполняется, если источник — внутренний цех.',
-      eggs_arrived:
-        'Количество яиц при закладке. Оплодотворённость и вывод рассчитываются на этапе «Инкубации».',
-      expected_hatch_on:
-        'Ожидаемая дата вывода — обычно +21 день для куры-несушки. Используется для планирования.',
+      source_client_id: {
+        ru: 'Поставщик — если яйцо куплено извне. Для собственной яйцепродукции оставьте пустым.',
+        uz: 'Yetkazib beruvchi — tuxum tashqaridan sotib olingan bo‘lsa. O‘z tuxum ishlab chiqarishi uchun bo‘sh qoldiring.',
+        en: 'Supplier — when eggs are purchased externally. Leave empty for your own egg production.',
+      },
+      production_id: {
+        ru: 'Ссылка на собственное производство яйца. Заполняется, если источник — внутренний цех.',
+        uz: 'O‘z tuxum ishlab chiqarishiga havola. Manba ichki tsex bo‘lganda to‘ldiriladi.',
+        en: 'Reference to our own egg production. Fill in when the source is an internal workshop.',
+      },
+      eggs_arrived: {
+        ru: 'Количество яиц при закладке. Оплодотворённость и вывод рассчитываются на этапе «Инкубации».',
+        uz: 'Yuklash paytidagi tuxumlar soni. Urug‘lanish va chiqish «Inkubatsiya» bosqichida hisoblanadi.',
+        en: 'Number of eggs at setting. Fertility and hatching are computed during the "Incubation" stage.',
+      },
+      expected_hatch_on: {
+        ru: 'Ожидаемая дата вывода — обычно +21 день для куры-несушки. Используется для планирования.',
+        uz: 'Kutilayotgan chiqish sanasi — odatda tuxum beruvchi tovuq uchun +21 kun. Rejalashtirish uchun ishlatiladi.',
+        en: 'Expected hatch date — typically +21 days for laying hens. Used for planning.',
+      },
     },
     formSections: [
       {
-        title: 'Партия',
+        title: { ru: 'Партия', uz: 'Partiya', en: 'Batch' },
         fields: ['arrived_on', 'batch_code', 'warehouse_id', 'source_client_id', 'production_id'],
       },
-      { title: 'Закладка', fields: ['eggs_arrived', 'expected_hatch_on'] },
-      { title: 'Дополнительно', fields: ['note', 'is_active'] },
+      {
+        title: { ru: 'Закладка', uz: 'Yuklash', en: 'Setting' },
+        fields: ['eggs_arrived', 'expected_hatch_on'],
+      },
+      {
+        title: { ru: 'Дополнительно', uz: 'Qo‘shimcha', en: 'Extras' },
+        fields: ['note', 'is_active'],
+      },
     ],
     crossFieldValidator: (values) => {
-      const errors: FormErrors = {};
+      const errors: Record<string, LocalizedText> = {};
       const arrivedOn = typeof values.arrived_on === 'string' ? values.arrived_on : '';
       const hatchOn = typeof values.expected_hatch_on === 'string' ? values.expected_hatch_on : '';
       if (arrivedOn && hatchOn && hatchOn < arrivedOn) {
-        errors.expected_hatch_on = 'Дата вывода не может быть раньше даты закладки.';
+        errors.expected_hatch_on = {
+          ru: 'Дата вывода не может быть раньше даты закладки.',
+          uz: 'Chiqish sanasi yuklash sanasidan oldin bo‘lishi mumkin emas.',
+          en: 'Hatch date cannot be earlier than the setting date.',
+        };
       }
       return errors;
     },
@@ -950,25 +1196,50 @@ const resourceUiConfigs: Record<string, ResourceUiConfig> = {
     tableOrder: ['consumed_on', 'feed_type_id', 'quantity', 'unit', 'poultry_type_id'],
     hiddenFields: ['daily_log_id', 'measurement_unit_id'],
     fieldHelpers: {
-      feed_type_id: 'Тип корма, который списываем (стартер / гровер / финишер и т.д.).',
-      production_batch_id:
-        'Партия-производитель корма. Оставьте пустым, если корм внешний — тогда списание идёт по общему остатку.',
-      poultry_type_id: 'Порода/группа птицы, на которую пошёл корм. Нужен для расчёта FCR.',
-      quantity: 'Сколько корма ушло. Снимается с остатка после сохранения.',
+      feed_type_id: {
+        ru: 'Тип корма, который списываем (стартер / гровер / финишер и т.д.).',
+        uz: 'Chiqim qilinadigan em turi (starter / grower / finisher va h.k.).',
+        en: 'Feed type being consumed (starter / grower / finisher, etc.).',
+      },
+      production_batch_id: {
+        ru: 'Партия-производитель корма. Оставьте пустым, если корм внешний — тогда списание идёт по общему остатку.',
+        uz: 'Em ishlab chiqargan partiya. Em tashqi bo‘lsa bo‘sh qoldiring — bu holda umumiy qoldiqdan chiqim qilinadi.',
+        en: 'Production batch that produced the feed. Leave empty for external feed — then the write-off draws from the general stock.',
+      },
+      poultry_type_id: {
+        ru: 'Порода/группа птицы, на которую пошёл корм. Нужен для расчёта FCR.',
+        uz: 'Em ketgan parranda zoti/guruhi. FCR hisoblash uchun kerak.',
+        en: 'Poultry breed/group the feed went to. Needed for FCR calculation.',
+      },
+      quantity: {
+        ru: 'Сколько корма ушло. Снимается с остатка после сохранения.',
+        uz: 'Qancha em ketgan. Saqlashdan keyin qoldiqdan yechiladi.',
+        en: 'How much feed was used. Deducted from stock after saving.',
+      },
     },
     formSections: [
       {
-        title: 'Что списываем',
+        title: { ru: 'Что списываем', uz: 'Nima chiqim qilinadi', en: 'What is consumed' },
         fields: ['consumed_on', 'feed_type_id', 'production_batch_id', 'poultry_type_id'],
       },
-      { title: 'Количество', fields: ['quantity', 'unit'] },
-      { title: 'Дополнительно', fields: ['note'] },
+      {
+        title: { ru: 'Количество', uz: 'Miqdor', en: 'Quantity' },
+        fields: ['quantity', 'unit'],
+      },
+      {
+        title: { ru: 'Дополнительно', uz: 'Qo‘shimcha', en: 'Extras' },
+        fields: ['note'],
+      },
     ],
     crossFieldValidator: (values) => {
-      const errors: FormErrors = {};
+      const errors: Record<string, LocalizedText> = {};
       const qty = Number(values.quantity);
       if (Number.isFinite(qty) && qty <= 0) {
-        errors.quantity = 'Количество должно быть больше нуля.';
+        errors.quantity = {
+          ru: 'Количество должно быть больше нуля.',
+          uz: 'Miqdor noldan katta bo‘lishi kerak.',
+          en: 'Quantity must be greater than zero.',
+        };
       }
       return errors;
     },
@@ -1085,22 +1356,38 @@ const resourceUiConfigs: Record<string, ResourceUiConfig> = {
     ],
     hiddenFields: ['chick_arrival_id'],
     fieldHelpers: {
-      source_client_id:
-        'Если птенцы куплены у внешнего поставщика — укажите клиента. Для собственного инкубатора оставьте пустым.',
-      initial_count:
-        'Количество птенцов при постановке партии. Меняется только через корректировку.',
-      current_count: 'Пересчитывается автоматически по падежу и отгрузкам.',
+      source_client_id: {
+        ru: 'Если птенцы куплены у внешнего поставщика — укажите клиента. Для собственного инкубатора оставьте пустым.',
+        uz: 'Jo‘jalar tashqi yetkazib beruvchidan sotib olingan bo‘lsa — mijozni ko‘rsating. O‘z inkubatoringiz uchun bo‘sh qoldiring.',
+        en: 'If the chicks were bought from an external supplier — pick the client. Leave empty for your own incubator.',
+      },
+      initial_count: {
+        ru: 'Количество птенцов при постановке партии. Меняется только через корректировку.',
+        uz: 'Partiya boshlanganidagi jo‘jalar soni. Faqat tuzatish orqali o‘zgartiriladi.',
+        en: 'Number of chicks when the batch was placed. Changed only via an adjustment.',
+      },
+      current_count: {
+        ru: 'Пересчитывается автоматически по падежу и отгрузкам.',
+        uz: 'O‘lim va jo‘natmalarga qarab avtomatik qayta hisoblanadi.',
+        en: 'Recalculated automatically from mortality and shipments.',
+      },
     },
     formSections: [
       {
-        title: 'Партия',
+        title: { ru: 'Партия', uz: 'Partiya', en: 'Batch' },
         fields: ['arrived_on', 'flock_code', 'warehouse_id', 'poultry_type_id', 'source_client_id'],
       },
-      { title: 'Поголовье', fields: ['initial_count', 'current_count', 'status'] },
-      { title: 'Дополнительно', fields: ['note', 'is_active'] },
+      {
+        title: { ru: 'Поголовье', uz: 'Bosh soni', en: 'Livestock' },
+        fields: ['initial_count', 'current_count', 'status'],
+      },
+      {
+        title: { ru: 'Дополнительно', uz: 'Qo‘shimcha', en: 'Extras' },
+        fields: ['note', 'is_active'],
+      },
     ],
     crossFieldValidator: (values) => {
-      const errors: FormErrors = {};
+      const errors: Record<string, LocalizedText> = {};
       const initial = Number(values.initial_count);
       const current = Number(values.current_count);
       if (
@@ -1109,8 +1396,11 @@ const resourceUiConfigs: Record<string, ResourceUiConfig> = {
         initial > 0 &&
         current > initial
       ) {
-        errors.current_count =
-          'Текущее поголовье не может быть больше исходного. Оставьте пустым — пересчитается автоматически.';
+        errors.current_count = {
+          ru: 'Текущее поголовье не может быть больше исходного. Оставьте пустым — пересчитается автоматически.',
+          uz: 'Hozirgi bosh soni boshlang‘ich sondan ko‘p bo‘lishi mumkin emas. Bo‘sh qoldirsangiz — avtomatik qayta hisoblanadi.',
+          en: 'Current head count cannot exceed the initial count. Leave empty — it will be recalculated automatically.',
+        };
       }
       return errors;
     },
@@ -1181,18 +1471,44 @@ const resourceUiConfigs: Record<string, ResourceUiConfig> = {
     ],
     hiddenFields: ['invoice_no'],
     fieldHelpers: {
-      client_id:
-        'Внешний покупатель — для продажи. Для внутренней передачи между отделами оставьте пустым и заполните «Отдел-получатель».',
-      destination_department_id:
-        'Отдел-получатель — для внутренней передачи (например, на убой). После отгрузки получатель подтверждает приёмку.',
-      birds_count: 'Количество голов в отгрузке. Спишется из остатка партии после сохранения.',
-      total_weight_kg: 'Общий живой вес. Используется для биллинга и расчёта цены.',
-      unit_price: 'Цена за 1 кг. Итог = цена × вес.',
-      status: 'draft → sent → received. «received» выставляется получателем при подтверждении.',
+      client_id: {
+        ru: 'Внешний покупатель — для продажи. Для внутренней передачи между отделами оставьте пустым и заполните «Отдел-получатель».',
+        uz: 'Tashqi xaridor — sotuv uchun. Bo‘limlar o‘rtasida ichki uzatish uchun bo‘sh qoldiring va «Qabul qiluvchi bo‘lim»ni to‘ldiring.',
+        en: 'External buyer — for sales. For internal inter-department transfers leave empty and fill "Destination department".',
+      },
+      destination_department_id: {
+        ru: 'Отдел-получатель — для внутренней передачи (например, на убой). После отгрузки получатель подтверждает приёмку.',
+        uz: 'Qabul qiluvchi bo‘lim — ichki uzatish uchun (masalan, so‘yishga). Jo‘natmadan so‘ng qabul qiluvchi qabulni tasdiqlaydi.',
+        en: 'Destination department — for internal transfers (e.g. to slaughter). After shipment the receiver confirms the hand-off.',
+      },
+      birds_count: {
+        ru: 'Количество голов в отгрузке. Спишется из остатка партии после сохранения.',
+        uz: 'Jo‘natmadagi bosh soni. Saqlashdan keyin partiya qoldig‘idan yechiladi.',
+        en: 'Head count in the shipment. Deducted from the batch balance after saving.',
+      },
+      total_weight_kg: {
+        ru: 'Общий живой вес. Используется для биллинга и расчёта цены.',
+        uz: 'Umumiy tirik vazn. Billing va narxni hisoblash uchun ishlatiladi.',
+        en: 'Total live weight. Used for billing and price calculation.',
+      },
+      unit_price: {
+        ru: 'Цена за 1 кг. Итог = цена × вес.',
+        uz: '1 kg narxi. Jami = narx × vazn.',
+        en: 'Price per 1 kg. Total = price × weight.',
+      },
+      status: {
+        ru: 'draft → sent → received. «received» выставляется получателем при подтверждении.',
+        uz: 'draft → sent → received. «received» qabul qiluvchi tasdiqlaganda qo‘yiladi.',
+        en: 'draft → sent → received. "received" is set by the receiver upon confirmation.',
+      },
     },
     formSections: [
       {
-        title: 'Источник и получатель',
+        title: {
+          ru: 'Источник и получатель',
+          uz: 'Manba va qabul qiluvchi',
+          en: 'Source and receiver',
+        },
         fields: [
           'shipped_on',
           'flock_id',
@@ -1202,29 +1518,43 @@ const resourceUiConfigs: Record<string, ResourceUiConfig> = {
         ],
       },
       {
-        title: 'Количество и цена',
+        title: { ru: 'Количество и цена', uz: 'Miqdor va narx', en: 'Quantity and price' },
         fields: ['birds_count', 'total_weight_kg', 'unit_price', 'currency'],
       },
-      { title: 'Приёмка', fields: ['received_quantity', 'status'] },
-      { title: 'Дополнительно', fields: ['note'] },
+      {
+        title: { ru: 'Приёмка', uz: 'Qabul qilish', en: 'Acceptance' },
+        fields: ['received_quantity', 'status'],
+      },
+      {
+        title: { ru: 'Дополнительно', uz: 'Qo‘shimcha', en: 'Extras' },
+        fields: ['note'],
+      },
     ],
     crossFieldValidator: (values) => {
-      const errors: FormErrors = {};
+      const errors: Record<string, LocalizedText> = {};
       const clientId = typeof values.client_id === 'string' ? values.client_id.trim() : '';
       const destDept =
         typeof values.destination_department_id === 'string'
           ? values.destination_department_id.trim()
           : '';
       if (clientId && destDept) {
-        errors.destination_department_id =
-          'Укажите либо внешнего клиента, либо отдел-получатель — но не оба.';
+        errors.destination_department_id = {
+          ru: 'Укажите либо внешнего клиента, либо отдел-получатель — но не оба.',
+          uz: 'Tashqi mijozni yoki qabul qiluvchi bo‘limni ko‘rsating — ikkalasini emas.',
+          en: 'Specify either an external client or a destination department — not both.',
+        };
       }
       const birds = Number(values.birds_count);
       const weight = Number(values.total_weight_kg);
       if (Number.isFinite(birds) && birds > 0 && Number.isFinite(weight) && weight > 0) {
         const avg = weight / birds;
         if (avg < 0.3 || avg > 6) {
-          errors.total_weight_kg = `Средний живой вес ${avg.toFixed(2)} кг выходит за разумные пределы (0.3–6 кг). Проверьте данные.`;
+          const avgStr = avg.toFixed(2);
+          errors.total_weight_kg = {
+            ru: `Средний живой вес ${avgStr} кг выходит за разумные пределы (0.3–6 кг). Проверьте данные.`,
+            uz: `O‘rtacha tirik vazn ${avgStr} kg oqilona chegaralardan tashqarida (0.3–6 kg). Ma’lumotlarni tekshiring.`,
+            en: `Average live weight ${avgStr} kg is outside the reasonable range (0.3–6 kg). Check the data.`,
+          };
         }
       }
       return errors;
@@ -1336,28 +1666,55 @@ const resourceUiConfigs: Record<string, ResourceUiConfig> = {
     tableOrder: ['consumed_on', 'batch_id', 'quantity', 'unit', 'purpose', 'factory_flock_id'],
     hiddenFields: ['measurement_unit_id', 'created_by'],
     fieldHelpers: {
-      batch_id:
-        'Партия препарата. Рекомендуется списывать по FEFO — партии с ближайшим сроком годности первыми.',
-      factory_flock_id:
-        'Партия птицы, на которой использовали препарат. Оставьте пустым, если не по конкретной партии.',
-      client_id:
-        'Клиент — если препарат отпущен внешнему покупателю. Для внутреннего использования оставьте пустым.',
-      quantity: 'Количество препарата в единицах партии. Вычитается из остатка после сохранения.',
-      purpose: 'Коротко: профилактика, лечение, вакцинация и т.п.',
+      batch_id: {
+        ru: 'Партия препарата. Рекомендуется списывать по FEFO — партии с ближайшим сроком годности первыми.',
+        uz: 'Dori partiyasi. FEFO bo‘yicha chiqim qilish tavsiya etiladi — avval yaroqlilik muddati yaqin bo‘lgan partiyalar.',
+        en: 'Medicine batch. FEFO is recommended — batches with the nearest expiry date first.',
+      },
+      factory_flock_id: {
+        ru: 'Партия птицы, на которой использовали препарат. Оставьте пустым, если не по конкретной партии.',
+        uz: 'Dori qo‘llanilgan parranda partiyasi. Aniq partiyaga bog‘liq bo‘lmasa bo‘sh qoldiring.',
+        en: 'Poultry batch the medicine was used on. Leave empty if not tied to a specific batch.',
+      },
+      client_id: {
+        ru: 'Клиент — если препарат отпущен внешнему покупателю. Для внутреннего использования оставьте пустым.',
+        uz: 'Mijoz — dori tashqi xaridorga berilganda. Ichki foydalanish uchun bo‘sh qoldiring.',
+        en: 'Client — if the medicine was issued to an external buyer. Leave empty for internal use.',
+      },
+      quantity: {
+        ru: 'Количество препарата в единицах партии. Вычитается из остатка после сохранения.',
+        uz: 'Partiya birliklarida dori miqdori. Saqlashdan keyin qoldiqdan ayriladi.',
+        en: 'Amount of medicine in batch units. Deducted from stock after saving.',
+      },
+      purpose: {
+        ru: 'Коротко: профилактика, лечение, вакцинация и т.п.',
+        uz: 'Qisqacha: profilaktika, davolash, emlash va h.k.',
+        en: 'Short note: prevention, treatment, vaccination, etc.',
+      },
     },
     formSections: [
       {
-        title: 'Кому и откуда',
+        title: { ru: 'Кому и откуда', uz: 'Kimga va qayerdan', en: 'From and to' },
         fields: ['consumed_on', 'batch_id', 'factory_flock_id', 'poultry_type_id', 'client_id'],
       },
-      { title: 'Сколько', fields: ['quantity', 'unit'] },
-      { title: 'Дополнительно', fields: ['purpose', 'notes'] },
+      {
+        title: { ru: 'Сколько', uz: 'Qancha', en: 'How much' },
+        fields: ['quantity', 'unit'],
+      },
+      {
+        title: { ru: 'Дополнительно', uz: 'Qo‘shimcha', en: 'Extras' },
+        fields: ['purpose', 'notes'],
+      },
     ],
     crossFieldValidator: (values) => {
-      const errors: FormErrors = {};
+      const errors: Record<string, LocalizedText> = {};
       const qty = Number(values.quantity);
       if (Number.isFinite(qty) && qty <= 0) {
-        errors.quantity = 'Количество должно быть больше нуля.';
+        errors.quantity = {
+          ru: 'Количество должно быть больше нуля.',
+          uz: 'Miqdor noldan katta bo‘lishi kerak.',
+          en: 'Quantity must be greater than zero.',
+        };
       }
       return errors;
     },

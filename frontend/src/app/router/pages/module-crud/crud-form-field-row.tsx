@@ -8,6 +8,7 @@ import type {
   CrudFieldReference,
   CrudReferenceOption,
 } from '@/shared/api/backend-crud';
+import type { Language } from '@/shared/i18n/types';
 import { cn } from '@/shared/lib/cn';
 
 import {
@@ -19,7 +20,9 @@ import {
   humanizeKey,
   inputBaseClassName,
   isMultiReferenceField,
+  resolveLocalizedText,
   type FormValues,
+  type LocalizedText,
 } from '../module-crud-page.helpers';
 
 type TranslateFn = (
@@ -65,7 +68,8 @@ export interface CrudFormFieldRowContext {
   inventoryMovementItemKeyField: InventoryMovementItemKeyField;
   resourceModuleKey: string;
   resourcePath: string;
-  fieldHelpers?: Record<string, string>;
+  fieldHelpers?: Record<string, string | LocalizedText>;
+  language: Language;
   onInputChange: (field: CrudFieldMeta, value: string | boolean | string[]) => void;
 }
 
@@ -100,9 +104,13 @@ export function CrudFormFieldRow({ field, value, fieldError, context }: CrudForm
     resourceModuleKey,
     resourcePath,
     fieldHelpers,
+    language,
     onInputChange,
   } = context;
-  const fieldHelperText = fieldHelpers?.[field.name];
+  const rawFieldHelper = fieldHelpers?.[field.name];
+  const fieldHelperText = rawFieldHelper
+    ? resolveLocalizedText(rawFieldHelper, language)
+    : undefined;
 
   const fieldInputKind = getFieldInputKind(field);
   const isDepartmentReferenceField = supportsDepartmentFilter && field.name === 'department_id';
