@@ -106,6 +106,7 @@ import {
   canExecuteModuleCrudAction,
   cloneFormValues,
   compactPillClassName,
+  EMPTY_TEXT,
   formatDateTimeDisplayValue,
   FORM_HIDDEN_FIELDS,
   frostedPanelClassName,
@@ -1750,6 +1751,38 @@ export function ModuleCrudPage() {
       }
     }
 
+    // Smart defaults: today's date for common operational date fields,
+    // is_active=true for catalog-like entities, currency from the org
+    // default when the field exists.
+    const DATE_FIELDS_TODAY = [
+      'arrived_on',
+      'shipped_on',
+      'consumed_on',
+      'produced_on',
+      'issued_on',
+      'occurred_on',
+      'checked_on',
+      'paid_on',
+      'log_date',
+      'start_date',
+      'processed_on',
+      'batch_date',
+      'transaction_date',
+      'operation_date',
+      'started_on',
+    ];
+    for (const dateField of DATE_FIELDS_TODAY) {
+      if (
+        nextValues[dateField] === EMPTY_TEXT &&
+        fields.some((field) => field.name === dateField)
+      ) {
+        nextValues[dateField] = todayDate;
+      }
+    }
+    if (fields.some((field) => field.name === 'is_active') && nextValues.is_active === false) {
+      nextValues.is_active = true;
+    }
+
     return nextValues;
   };
 
@@ -2880,6 +2913,7 @@ export function ModuleCrudPage() {
                           inventoryMovementItemKeyField,
                           resourceModuleKey,
                           resourcePath: activeResource!.path,
+                          fieldHelpers: resourceUiConfig?.fieldHelpers,
                           onInputChange: handleInputChange,
                         }}
                       />

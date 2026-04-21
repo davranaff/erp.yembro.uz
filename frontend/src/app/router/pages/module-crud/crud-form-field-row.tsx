@@ -65,6 +65,7 @@ export interface CrudFormFieldRowContext {
   inventoryMovementItemKeyField: InventoryMovementItemKeyField;
   resourceModuleKey: string;
   resourcePath: string;
+  fieldHelpers?: Record<string, string>;
   onInputChange: (field: CrudFieldMeta, value: string | boolean | string[]) => void;
 }
 
@@ -98,8 +99,10 @@ export function CrudFormFieldRow({ field, value, fieldError, context }: CrudForm
     inventoryMovementItemKeyField,
     resourceModuleKey,
     resourcePath,
+    fieldHelpers,
     onInputChange,
   } = context;
+  const fieldHelperText = fieldHelpers?.[field.name];
 
   const fieldInputKind = getFieldInputKind(field);
   const isDepartmentReferenceField = supportsDepartmentFilter && field.name === 'department_id';
@@ -365,7 +368,11 @@ export function CrudFormFieldRow({ field, value, fieldError, context }: CrudForm
         />
       )}
 
-      {fieldError ? <p className="text-xs text-destructive">{fieldError}</p> : null}
+      {fieldError ? (
+        <p className="text-xs text-destructive">{fieldError}</p>
+      ) : fieldHelperText ? (
+        <p className="text-xs text-muted-foreground">{fieldHelperText}</p>
+      ) : null}
     </div>
   );
 }

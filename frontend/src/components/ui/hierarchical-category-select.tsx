@@ -9,7 +9,6 @@ import { useApiQuery } from '@/shared/api/react-query';
 import { useI18n } from '@/shared/i18n';
 import { cn } from '@/shared/lib/cn';
 
-import { Button } from './button';
 import {
   Command,
   CommandEmpty,
@@ -195,22 +194,16 @@ export function HierarchicalCategorySelect({
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <Button
-          type="button"
-          variant="outline"
-          role="combobox"
-          aria-expanded={open}
-          disabled={disabled}
-          className={cn(
-            'w-full justify-between border-border/75 bg-card text-left font-normal',
-            !value && 'text-muted-foreground',
-            className,
-          )}
-        >
-          <span className="truncate">{triggerLabel}</span>
-          <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-        </Button>
+      <PopoverTrigger
+        disabled={disabled}
+        className={cn(
+          'inline-flex h-10 w-full items-center justify-between rounded-2xl border border-border/75 bg-card px-3 py-2 text-left text-sm font-normal shadow-[0_16px_38px_-30px_rgba(15,23,42,0.12)] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50',
+          !value && 'text-muted-foreground',
+          className,
+        )}
+      >
+        <span className="truncate">{triggerLabel}</span>
+        <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
       </PopoverTrigger>
       <PopoverContent className="w-[min(420px,92vw)] p-0" align="start">
         <Command shouldFilter={false}>

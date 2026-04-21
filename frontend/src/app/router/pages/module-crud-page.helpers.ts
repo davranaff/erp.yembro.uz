@@ -28,6 +28,12 @@ export type ResourceUiConfig = {
    * rows that are upserted by Taskiq jobs and must not be hand-edited.
    */
   readOnly?: boolean;
+  /**
+   * Short helper line shown under the input to explain non-obvious fields.
+   * The string is used as-is (already localized at author time) — we don't
+   * treat it as an i18n key.
+   */
+  fieldHelpers?: Record<string, string>;
 };
 export type DepartmentRecord = CrudRecord & {
   id?: string;
@@ -241,6 +247,18 @@ const resourceUiConfigs: Record<string, ResourceUiConfig> = {
       'status',
       'posting_status',
     ],
+    fieldHelpers: {
+      item_type:
+        'Что продали клиенту: chick (птенцы), bird (взрослая птица), egg, feed, medicine, meat и т.п.',
+      item_key:
+        'Ссылка на конкретную отгрузку/партию. Обычно подставляется автоматически при создании из документа.',
+      amount_total:
+        'Полная сумма задолженности. После проведения документ становится неизменяемым.',
+      amount_paid: 'Сумма уже полученной оплаты. Увеличивается при регистрации платежей.',
+      due_on: 'Крайняя дата оплаты. Долг с просроченной датой попадает в отчёт по просрочке.',
+      posting_status:
+        'Черновик — можно редактировать и удалять. Проведён — учтён в отчётности, изменения только через сторнирование.',
+    },
     hideDepartmentFieldWhenScoped: true,
     hideOrganizationFieldWhenScoped: true,
     detailPanelKey: 'debt_summary',
@@ -277,6 +295,16 @@ const resourceUiConfigs: Record<string, ResourceUiConfig> = {
       'status',
       'posting_status',
     ],
+    fieldHelpers: {
+      client_id: 'Поставщик, перед которым возникла задолженность.',
+      item_type:
+        'Категория закупки: raw (сырьё), medicine, service и т.д. Обычно подставляется автоматически из прихода.',
+      amount_total: 'Сумма нашей задолженности перед поставщиком.',
+      amount_paid:
+        'Сколько уже оплачено поставщику. Пополняется при регистрации исходящих платежей.',
+      posting_status:
+        'Черновик — можно редактировать и удалять. Проведён — учтён в отчётности, изменения только через сторнирование.',
+    },
     hideDepartmentFieldWhenScoped: true,
     hideOrganizationFieldWhenScoped: true,
     detailPanelKey: 'debt_summary',
@@ -293,6 +321,13 @@ const resourceUiConfigs: Record<string, ResourceUiConfig> = {
       'note',
     ],
     tableOrder: ['issued_on', 'due_on', 'employee_id', 'amount_issued', 'currency', 'status'],
+    fieldHelpers: {
+      amount_issued:
+        'Сумма аванса, выданного сотруднику. Остаток и удержания отображаются в панели справа после сохранения.',
+      due_on: 'Дата, до которой сотрудник должен погасить аванс или вернуть разницу.',
+      status:
+        'Открыт — пока аванс не закрыт. Закрыт — после полного возврата или удержания из зарплаты.',
+    },
     hideDepartmentFieldWhenScoped: true,
     hideOrganizationFieldWhenScoped: true,
     detailPanelKey: 'advance_balance',
@@ -387,6 +422,18 @@ const resourceUiConfigs: Record<string, ResourceUiConfig> = {
       'reference_no',
     ],
     hiddenFields: ['expense_id'],
+    fieldHelpers: {
+      transaction_type:
+        'income — поступление (приход), expense — списание (расход). Определяет знак движения по кассе.',
+      cash_account_id:
+        'Касса или банковский счёт, через который проводим операцию. Остаток кассы обновится после сохранения.',
+      expense_category_id:
+        'Статья БДДС. Нужна для расходов — определяет, в какой раздел отчёта о движении денег попадёт операция.',
+      counterparty_client_id:
+        'Клиент или поставщик по операции. Для внутренних перемещений оставьте пустым.',
+      amount: 'Сумма в валюте кассы. Проверьте, что валюта совпадает с валютой счёта.',
+      reference_no: 'Номер чека/платёжного поручения или ссылка на внешний документ.',
+    },
     hideOrganizationFieldWhenScoped: true,
   },
   'slaughter:arrivals': {
@@ -410,6 +457,17 @@ const resourceUiConfigs: Record<string, ResourceUiConfig> = {
       'arrival_total_weight_kg',
       'arrival_unit_price',
     ],
+    fieldHelpers: {
+      source_type:
+        'Откуда пришла партия: «factory» — внутренняя отгрузка из фабрики, «supplier» — внешний поставщик.',
+      factory_shipment_id:
+        'Указывайте, если партия пришла из фабрики по отгрузке. Для внешних поставщиков оставьте пустым.',
+      supplier_client_id:
+        'Клиент-поставщик для внешнего прихода. Для фабричных партий оставьте пустым.',
+      birds_received:
+        'Фактическое количество птицы на приёмке. Может отличаться от отгрузки — расхождение фиксируется через акт.',
+      arrival_unit_price: 'Цена за 1 кг живой массы. Общая стоимость = цена × вес.',
+    },
     hideDepartmentFieldWhenScoped: true,
     hideOrganizationFieldWhenScoped: true,
   },
@@ -435,6 +493,14 @@ const resourceUiConfigs: Record<string, ResourceUiConfig> = {
       'second_sort_count',
       'bad_count',
     ],
+    fieldHelpers: {
+      arrival_id:
+        'Партия живой птицы, из которой переработаны тушки. Определяет пул доступного сырья.',
+      birds_processed: 'Суммарно переработано голов. Должно совпадать с «1 сорт + 2 сорт + брак».',
+      first_sort_count: 'Количество тушек высшего сорта — товарные, без дефектов.',
+      second_sort_count: 'Количество тушек второго сорта — мелкие/с дефектами, но пригодные.',
+      bad_count: 'Отбраковано — непригодно для реализации (учитывается как потеря).',
+    },
     hideDepartmentFieldWhenScoped: true,
     hideOrganizationFieldWhenScoped: true,
   },
@@ -560,6 +626,16 @@ const resourceUiConfigs: Record<string, ResourceUiConfig> = {
       'note',
       'is_active',
     ],
+    fieldHelpers: {
+      source_client_id:
+        'Поставщик — если яйцо куплено извне. Для собственной яйцепродукции оставьте пустым.',
+      production_id:
+        'Ссылка на собственное производство яйца. Заполняется, если источник — внутренний цех.',
+      eggs_arrived:
+        'Количество яиц при закладке. Оплодотворённость и вывод рассчитываются на этапе «Инкубации».',
+      expected_hatch_on:
+        'Ожидаемая дата вывода — обычно +21 день для куры-несушки. Используется для планирования.',
+    },
     hideDepartmentFieldWhenScoped: true,
     hideOrganizationFieldWhenScoped: true,
   },
@@ -677,6 +753,13 @@ const resourceUiConfigs: Record<string, ResourceUiConfig> = {
     ],
     tableOrder: ['consumed_on', 'feed_type_id', 'quantity', 'unit', 'poultry_type_id'],
     hiddenFields: ['daily_log_id', 'measurement_unit_id'],
+    fieldHelpers: {
+      feed_type_id: 'Тип корма, который списываем (стартер / гровер / финишер и т.д.).',
+      production_batch_id:
+        'Партия-производитель корма. Оставьте пустым, если корм внешний — тогда списание идёт по общему остатку.',
+      poultry_type_id: 'Порода/группа птицы, на которую пошёл корм. Нужен для расчёта FCR.',
+      quantity: 'Сколько корма ушло. Снимается с остатка после сохранения.',
+    },
     hideDepartmentFieldWhenScoped: true,
     hideOrganizationFieldWhenScoped: true,
   },
@@ -789,6 +872,13 @@ const resourceUiConfigs: Record<string, ResourceUiConfig> = {
       'is_active',
     ],
     hiddenFields: ['chick_arrival_id'],
+    fieldHelpers: {
+      source_client_id:
+        'Если птенцы куплены у внешнего поставщика — укажите клиента. Для собственного инкубатора оставьте пустым.',
+      initial_count:
+        'Количество птенцов при постановке партии. Меняется только через корректировку.',
+      current_count: 'Пересчитывается автоматически по падежу и отгрузкам.',
+    },
     tableOrder: [
       'arrived_on',
       'flock_code',
@@ -855,6 +945,16 @@ const resourceUiConfigs: Record<string, ResourceUiConfig> = {
       'status',
     ],
     hiddenFields: ['invoice_no'],
+    fieldHelpers: {
+      client_id:
+        'Внешний покупатель — для продажи. Для внутренней передачи между отделами оставьте пустым и заполните «Отдел-получатель».',
+      destination_department_id:
+        'Отдел-получатель — для внутренней передачи (например, на убой). После отгрузки получатель подтверждает приёмку.',
+      birds_count: 'Количество голов в отгрузке. Спишется из остатка партии после сохранения.',
+      total_weight_kg: 'Общий живой вес. Используется для биллинга и расчёта цены.',
+      unit_price: 'Цена за 1 кг. Итог = цена × вес.',
+      status: 'draft → sent → received. «received» выставляется получателем при подтверждении.',
+    },
     hideDepartmentFieldWhenScoped: true,
     hideOrganizationFieldWhenScoped: true,
   },
@@ -961,6 +1061,16 @@ const resourceUiConfigs: Record<string, ResourceUiConfig> = {
     ],
     tableOrder: ['consumed_on', 'batch_id', 'quantity', 'unit', 'purpose', 'factory_flock_id'],
     hiddenFields: ['measurement_unit_id', 'created_by'],
+    fieldHelpers: {
+      batch_id:
+        'Партия препарата. Рекомендуется списывать по FEFO — партии с ближайшим сроком годности первыми.',
+      factory_flock_id:
+        'Партия птицы, на которой использовали препарат. Оставьте пустым, если не по конкретной партии.',
+      client_id:
+        'Клиент — если препарат отпущен внешнему покупателю. Для внутреннего использования оставьте пустым.',
+      quantity: 'Количество препарата в единицах партии. Вычитается из остатка после сохранения.',
+      purpose: 'Коротко: профилактика, лечение, вакцинация и т.п.',
+    },
     hideDepartmentFieldWhenScoped: true,
     hideOrganizationFieldWhenScoped: true,
   },
@@ -1344,8 +1454,6 @@ const RESOURCE_ICON_KEY_MAP: Record<string, string> = {
   formulas: 'FlaskConical',
   ingredients: 'Leaf',
   'formula-ingredients': 'FlaskRound',
-  processings: 'Scissors',
-  'semi-products': 'Package',
   flocks: 'Bird',
   'daily-logs': 'ClipboardList',
   'medicine-usages': 'Pill',
