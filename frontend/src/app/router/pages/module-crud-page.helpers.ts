@@ -713,6 +713,7 @@ const resourceUiConfigs: Record<string, ResourceUiConfig> = {
       'note',
       'is_active',
     ],
+    hiddenFields: ['chick_arrival_id'],
     tableOrder: [
       'arrived_on',
       'flock_code',
