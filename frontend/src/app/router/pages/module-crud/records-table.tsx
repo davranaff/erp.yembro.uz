@@ -1,3 +1,4 @@
+import { Badge } from '@/components/ui/badge';
 import { EmptyState } from '@/components/ui/empty-state';
 import { CardSkeleton, TableSkeleton } from '@/components/ui/skeleton';
 import type { CrudFieldMeta, CrudRecord } from '@/shared/api/backend-crud';
@@ -8,6 +9,7 @@ import {
   frostedPanelClassName,
   getDisplayValue,
   getRecordId,
+  getStatusBadge,
   humanizeKey,
 } from '../module-crud-page.helpers';
 
@@ -215,9 +217,18 @@ export function RecordsTableView({
                   )}
                 >
                   {tableFields.map((field) => {
+                    const rawValue = record[field.name];
+                    const badge = getStatusBadge(field.name, rawValue);
+                    if (badge) {
+                      return (
+                        <td key={field.name} className="px-5 py-4 align-top">
+                          <Badge variant={badge.variant}>{badge.label}</Badge>
+                        </td>
+                      );
+                    }
                     const displayValue = getDisplayValue(
                       field,
-                      record[field.name],
+                      rawValue,
                       yesLabel,
                       noLabel,
                       emptyLabel,

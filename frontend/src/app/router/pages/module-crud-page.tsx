@@ -22,11 +22,13 @@ import { Sheet } from '@/components/ui/sheet';
 import { useToast } from '@/components/ui/toast';
 import { getMyProfile } from '@/shared/api/auth';
 import {
+  acknowledgeShipment,
   createCrudRecord,
   deleteCrudRecord,
   getCrudRecordAuditHistory,
   getCrudResourceMeta,
   listCrudRecords,
+  type AcknowledgeShipmentPayload,
   type CrudAuditResponse,
   type CrudFieldMeta,
   type CrudListResponse,
@@ -59,6 +61,7 @@ import { getReadableReferenceLabel } from '@/shared/lib/reference-label';
 import { isValidUuid } from '@/shared/lib/uuid';
 import { useWorkspaceStore } from '@/shared/workspace';
 
+import { AdvanceBalancePanel } from './advance-balance-panel';
 import { DebtPaymentsPanel } from './debt-payments-panel';
 import { DebtsAgingPanel } from './debts-aging-panel';
 import { FlockKpiPanel } from './flock-kpi-panel';
@@ -79,6 +82,7 @@ import { MedicineBatchQrSheet } from './module-crud/medicine-batch-qr-sheet';
 import { renderRecordActionButtons as renderRecordActionButtonsView } from './module-crud/record-action-buttons';
 import { RecordsPaginationBar } from './module-crud/records-pagination-bar';
 import { RecordsTableView } from './module-crud/records-table';
+import { ShipmentAcknowledgeDialog } from './module-crud/shipment-acknowledge-dialog';
 import { StockMovementCards } from './module-crud/stock-movement-cards';
 import { useAuditFormatters } from './module-crud/use-audit-formatters';
 import { useClientNotifications } from './module-crud/use-client-notifications';
@@ -194,6 +198,8 @@ export function ModuleCrudPage() {
   const [isAuditSheetOpen, setIsAuditSheetOpen] = useState(false);
   const [auditRecordId, setAuditRecordId] = useState('');
   const [auditRecordLabel, setAuditRecordLabel] = useState('');
+  const [acknowledgeTarget, setAcknowledgeTarget] = useState<CrudRecord | null>(null);
+  const [reversalTarget, setReversalTarget] = useState<CrudRecord | null>(null);
   const [selectedResourceGroupId, setSelectedResourceGroupId] = useState<
     ResourceCategoryGroupId | ''
   >('');
@@ -537,6 +543,20 @@ export function ModuleCrudPage() {
     activeResource &&
     activeResource.apiModuleKey === 'inventory' &&
     activeResource.path === 'movements',
+  );
+  const isShipmentResource = Boolean(
+    activeView === 'records' &&
+    activeResource &&
+    (activeResource.path === 'shipments' ||
+      activeResource.path === 'chick-shipments' ||
+      activeResource.path === 'product-shipments' ||
+      activeResource.path === 'semi-product-shipments'),
+  );
+  const isDebtResource = Boolean(
+    activeView === 'records' &&
+    activeResource &&
+    (activeResource.permissionPrefix === 'client_debt' ||
+      activeResource.permissionPrefix === 'supplier_debt'),
   );
   const canEditRecordEntries = canEditActiveResource && !isInventoryMovementsResource;
   const moduleCrudActionAccess = useMemo(
@@ -1417,6 +1437,40 @@ export function ModuleCrudPage() {
     },
   });
 
+  const acknowledgeMutation = useApiMutation<
+    CrudRecord,
+    Error,
+    { recordId: string; payload: AcknowledgeShipmentPayload }
+  >({
+    mutationKey: toQueryKey(
+      'crud',
+      'acknowledge',
+      moduleKey || 'unknown',
+      activeResource?.key ?? 'unknown',
+    ),
+    mutationFn: ({ recordId, payload }) => {
+      if (!canEditActiveResource) {
+        throw new Error('Недостаточно прав для приёмки отгрузки.');
+      }
+      return acknowledgeShipment(resourceModuleKey, activeResource!.path, recordId, payload);
+    },
+    onSuccess: async () => {
+      setAcknowledgeTarget(null);
+      showToast({
+        tone: 'success',
+        title: t('crud.acknowledgedTitle', undefined, 'Партия принята'),
+      });
+      await invalidateResource();
+    },
+    onError: (error) => {
+      showToast({
+        tone: 'error',
+        title: t('common.errorTitle', undefined, 'Ошибка'),
+        description: getErrorMessage(error),
+      });
+    },
+  });
+
   const stockTransferMutation = useApiMutation<
     {
       transfer_id: string;
@@ -1795,6 +1849,34 @@ export function ModuleCrudPage() {
     commitDeleteRecord(recordId);
   };
 
+  const handleAcknowledgeShipment = (record: CrudRecord) => {
+    setAcknowledgeTarget(record);
+  };
+
+  const handleShowReversalInfo = (record: CrudRecord) => {
+    setReversalTarget(record);
+  };
+
+  const resolveDefaultReceivedQuantity = (record: CrudRecord | null): string => {
+    if (!record) {
+      return '';
+    }
+    const candidates = [
+      'received_quantity',
+      'eggs_count',
+      'chicks_count',
+      'birds_count',
+      'quantity',
+    ];
+    for (const key of candidates) {
+      const value = record[key];
+      if (value !== null && value !== undefined && value !== '') {
+        return String(value);
+      }
+    }
+    return '';
+  };
+
   const handleInputChange = (field: CrudFieldMeta, value: string | boolean | string[]) => {
     setFormValues((current) => {
       const nextValues: FormValues = { ...current, [field.name]: value };
@@ -2049,6 +2131,9 @@ export function ModuleCrudPage() {
         edit: t('common.edit'),
         history: t('common.history'),
         delete: t('common.delete'),
+        acknowledge: t('crud.acknowledge', undefined, 'Принять'),
+        reverse: t('crud.reverse', undefined, 'Сторно'),
+        postedLock: t('crud.postedLock', undefined, 'Проведено'),
       },
       isMedicineBatchesResource,
       canManageMedicineBatchOps,
@@ -2056,6 +2141,8 @@ export function ModuleCrudPage() {
       canEditActiveResource,
       canReadAuditActiveResource,
       canDeleteActiveResource,
+      isShipmentResource,
+      isDebtResource,
       isMedicineBatchActionBusy: medicineBatchQr.isMedicineBatchActionBusy,
       onOpenMedicineBatchQrCenter: medicineBatchQr.handleOpenCenter,
       onOpenMedicineBatchAttachmentPicker: medicineBatchQr.handleOpenAttachmentPicker,
@@ -2063,6 +2150,8 @@ export function ModuleCrudPage() {
       onEditRecord: handleEditRecord,
       onOpenAudit: handleOpenAudit,
       onDeleteRecord: handleDeleteRecord,
+      onAcknowledgeShipment: handleAcknowledgeShipment,
+      onShowReversalInfo: handleShowReversalInfo,
     });
 
   const renderRecordsTable = () => (
@@ -2751,6 +2840,9 @@ export function ModuleCrudPage() {
                   {selectedRecord && resourceUiConfig?.detailPanelKey === 'flock_kpi' ? (
                     <FlockKpiPanel flock={selectedRecord} />
                   ) : null}
+                  {selectedRecord && resourceUiConfig?.detailPanelKey === 'advance_balance' ? (
+                    <AdvanceBalancePanel advance={selectedRecord} />
+                  ) : null}
                   <div className="grid gap-4 md:grid-cols-2" data-tour="module-form-fields">
                     {renderedFormFields.map((field) => (
                       <CrudFormFieldRow
@@ -2796,6 +2888,60 @@ export function ModuleCrudPage() {
                 confirmLabel={t('common.discard', undefined, 'Не сохранять')}
                 confirmVariant="destructive"
                 onConfirm={closeFormSheet}
+              />
+
+              <ShipmentAcknowledgeDialog
+                open={acknowledgeTarget !== null}
+                onOpenChange={(open) => {
+                  if (!open) {
+                    setAcknowledgeTarget(null);
+                  }
+                }}
+                title={t('crud.acknowledgeTitle', undefined, 'Принять партию')}
+                description={t(
+                  'crud.acknowledgeDescription',
+                  undefined,
+                  'Зафиксируйте фактически принятое количество. Расхождение с отгруженным автоматически переведёт запись в статус «Расхождение».',
+                )}
+                receivedQuantityLabel={t(
+                  'crud.receivedQuantityLabel',
+                  undefined,
+                  'Фактически принято',
+                )}
+                noteLabel={t('crud.acknowledgeNoteLabel', undefined, 'Комментарий (опционально)')}
+                confirmLabel={t('crud.acknowledgeConfirm', undefined, 'Принять')}
+                cancelLabel={t('common.cancel', undefined, 'Отмена')}
+                defaultReceivedQuantity={resolveDefaultReceivedQuantity(acknowledgeTarget)}
+                submitting={acknowledgeMutation.isPending}
+                onConfirm={(payload) => {
+                  const recordId = acknowledgeTarget
+                    ? getRecordId(acknowledgeTarget, idColumn)
+                    : '';
+                  if (!recordId) {
+                    setAcknowledgeTarget(null);
+                    return;
+                  }
+                  acknowledgeMutation.mutate({ recordId, payload });
+                }}
+              />
+
+              <ConfirmDialog
+                open={reversalTarget !== null}
+                onOpenChange={(open) => {
+                  if (!open) {
+                    setReversalTarget(null);
+                  }
+                }}
+                title={t('crud.reversalInfoTitle', undefined, 'Сторно проведённой записи')}
+                description={t(
+                  'crud.reversalInfoDescription',
+                  undefined,
+                  'Эта запись проведена и не редактируется. Создайте новую сторно-запись с отрицательной суммой вместо правки оригинала.',
+                )}
+                cancelLabel={t('common.close', undefined, 'Закрыть')}
+                confirmLabel={t('crud.reversalCreate', undefined, 'Ок, понял')}
+                confirmVariant="default"
+                onConfirm={() => setReversalTarget(null)}
               />
 
               <AuditHistorySheet

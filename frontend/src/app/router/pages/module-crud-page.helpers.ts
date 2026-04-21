@@ -14,7 +14,7 @@ export type ResourceCategoryGroupId =
   | 'operations'
   | 'catalogs'
   | 'analytics';
-export type ResourceDetailPanelKey = 'debt_summary' | 'flock_kpi';
+export type ResourceDetailPanelKey = 'debt_summary' | 'flock_kpi' | 'advance_balance';
 export type ResourceUiConfig = {
   formOrder?: string[];
   tableOrder?: string[];
@@ -289,6 +289,7 @@ const resourceUiConfigs: Record<string, ResourceUiConfig> = {
     tableOrder: ['issued_on', 'due_on', 'employee_id', 'amount_issued', 'currency', 'status'],
     hideDepartmentFieldWhenScoped: true,
     hideOrganizationFieldWhenScoped: true,
+    detailPanelKey: 'advance_balance',
   },
   'finance:debt-payments': {
     formOrder: [
@@ -1261,6 +1262,60 @@ const RESOURCE_ICON_KEY_MAP: Record<string, string> = {
 
 export const resolveResourceIconKey = (resourceKey: string): string =>
   RESOURCE_ICON_KEY_MAP[resourceKey] ?? 'FileText';
+
+type BadgeVariant =
+  | 'default'
+  | 'secondary'
+  | 'outline'
+  | 'muted'
+  | 'success'
+  | 'warning'
+  | 'destructive';
+
+const POSTING_STATUS_BADGES: Record<string, { variant: BadgeVariant; label: string }> = {
+  draft: { variant: 'muted', label: 'Черновик' },
+  posted: { variant: 'success', label: 'Проведён' },
+  reversed: { variant: 'destructive', label: 'Сторно' },
+};
+
+const SHIPMENT_STATUS_BADGES: Record<string, { variant: BadgeVariant; label: string }> = {
+  sent: { variant: 'warning', label: 'Отправлено' },
+  received: { variant: 'success', label: 'Принято' },
+  discrepancy: { variant: 'destructive', label: 'Расхождение' },
+};
+
+const DEBT_PAYMENT_STATUS_BADGES: Record<string, { variant: BadgeVariant; label: string }> = {
+  open: { variant: 'warning', label: 'Открыт' },
+  partially_paid: { variant: 'default', label: 'Частично оплачен' },
+  closed: { variant: 'success', label: 'Закрыт' },
+  cancelled: { variant: 'muted', label: 'Отменён' },
+};
+
+export function getStatusBadge(
+  fieldName: string,
+  rawValue: unknown,
+): { variant: BadgeVariant; label: string } | null {
+  if (rawValue === null || rawValue === undefined) {
+    return null;
+  }
+  const value = String(rawValue).trim().toLowerCase();
+  if (!value) {
+    return null;
+  }
+  if (fieldName === 'posting_status') {
+    return POSTING_STATUS_BADGES[value] ?? null;
+  }
+  if (fieldName === 'status') {
+    if (value in SHIPMENT_STATUS_BADGES) {
+      return SHIPMENT_STATUS_BADGES[value];
+    }
+    if (value in DEBT_PAYMENT_STATUS_BADGES) {
+      return DEBT_PAYMENT_STATUS_BADGES[value];
+    }
+    return null;
+  }
+  return null;
+}
 
 export const shouldExposeResourceInModule = (
   moduleKey: string,

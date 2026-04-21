@@ -300,6 +300,37 @@ export const deleteCrudRecord = (moduleKey: string, resourcePath: string, record
   return apiClient.delete<{ deleted?: boolean }>(`/${moduleKey}/${resourcePath}/${recordId}`);
 };
 
+export interface AcknowledgeShipmentPayload {
+  received_quantity: number | string;
+  note?: string;
+}
+
+export const acknowledgeShipment = (
+  moduleKey: string,
+  resourcePath: string,
+  recordId: string,
+  payload: AcknowledgeShipmentPayload,
+) => {
+  return apiClient.post<CrudRecord, AcknowledgeShipmentPayload>(
+    `/${moduleKey}/${resourcePath}/${recordId}/acknowledge`,
+    payload,
+  );
+};
+
+export interface AdvanceBalance {
+  advance_id: string;
+  amount_issued: string;
+  amount_reconciled: string;
+  amount_returned: string;
+  amount_outstanding: string;
+  currency: string | null;
+  status: string | null;
+}
+
+export const getAdvanceBalance = (advanceId: string) => {
+  return apiClient.get<AdvanceBalance>(`/finance/advances/${advanceId}/balance`);
+};
+
 export const getCrudRecordAuditHistory = (
   moduleKey: string,
   resourcePath: string,

@@ -1,4 +1,14 @@
-import { History, Paperclip, Pencil, QrCode, Send, Trash2 } from 'lucide-react';
+import {
+  CheckCircle2,
+  History,
+  Lock,
+  Paperclip,
+  Pencil,
+  QrCode,
+  Send,
+  Trash2,
+  Undo2,
+} from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import type { CrudRecord } from '@/shared/api/backend-crud';
@@ -23,6 +33,9 @@ export interface RecordActionButtonsProps {
     edit: string;
     history: string;
     delete: string;
+    acknowledge: string;
+    reverse: string;
+    postedLock: string;
   };
   isMedicineBatchesResource: boolean;
   canManageMedicineBatchOps: boolean;
@@ -30,6 +43,8 @@ export interface RecordActionButtonsProps {
   canEditActiveResource: boolean;
   canReadAuditActiveResource: boolean;
   canDeleteActiveResource: boolean;
+  isShipmentResource: boolean;
+  isDebtResource: boolean;
   isMedicineBatchActionBusy: (recordId: string) => boolean;
   onOpenMedicineBatchQrCenter: (record: CrudRecord) => void | Promise<void>;
   onOpenMedicineBatchAttachmentPicker: (record: CrudRecord) => void;
@@ -37,6 +52,8 @@ export interface RecordActionButtonsProps {
   onEditRecord: (record: CrudRecord) => void;
   onOpenAudit: (record: CrudRecord) => void;
   onDeleteRecord: (event: ReactMouseEvent<HTMLButtonElement>, record: CrudRecord) => void;
+  onAcknowledgeShipment: (record: CrudRecord) => void;
+  onShowReversalInfo: (record: CrudRecord) => void;
 }
 
 export function renderRecordActionButtons({
@@ -54,6 +71,8 @@ export function renderRecordActionButtons({
   canEditActiveResource,
   canReadAuditActiveResource,
   canDeleteActiveResource,
+  isShipmentResource,
+  isDebtResource,
   isMedicineBatchActionBusy,
   onOpenMedicineBatchQrCenter,
   onOpenMedicineBatchAttachmentPicker,
@@ -61,6 +80,8 @@ export function renderRecordActionButtons({
   onEditRecord,
   onOpenAudit,
   onDeleteRecord,
+  onAcknowledgeShipment,
+  onShowReversalInfo,
 }: RecordActionButtonsProps): ReactNode[] {
   const recordId = getRecordId(record, idColumn);
   const actionKeyPrefix = recordId || 'record';
@@ -135,7 +156,36 @@ export function renderRecordActionButtons({
     );
   }
 
-  if (canEditActiveResource) {
+  const shipmentStatus =
+    isShipmentResource && record.status ? String(record.status).trim().toLowerCase() : '';
+  if (isShipmentResource && shipmentStatus === 'sent') {
+    buttons.push(
+      <Button
+        key={`${actionKeyPrefix}-acknowledge`}
+        type="button"
+        size="sm"
+        variant="outline"
+        className="border-emerald-300/70 bg-emerald-50/80 text-emerald-700 hover:bg-emerald-100/90 hover:text-emerald-800"
+        onClick={(event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          onAcknowledgeShipment(record);
+        }}
+        disabled={pendingAction}
+      >
+        <CheckCircle2 className="h-3.5 w-3.5" />
+        {labels.acknowledge}
+      </Button>,
+    );
+  }
+
+  const postingStatus =
+    isDebtResource && record.posting_status
+      ? String(record.posting_status).trim().toLowerCase()
+      : '';
+  const isDebtPosted = isDebtResource && postingStatus === 'posted';
+
+  if (canEditActiveResource && !isDebtPosted) {
     buttons.push(
       <Button
         key={`${actionKeyPrefix}-edit`}
@@ -153,6 +203,40 @@ export function renderRecordActionButtons({
         <Pencil className="h-3.5 w-3.5" />
         {labels.edit}
       </Button>,
+    );
+  }
+
+  if (isDebtPosted && canEditActiveResource) {
+    buttons.push(
+      <Button
+        key={`${actionKeyPrefix}-reverse`}
+        type="button"
+        size="sm"
+        variant="outline"
+        className="border-rose-200/70 bg-rose-50/80 text-rose-700 hover:bg-rose-100/90 hover:text-rose-800"
+        onClick={(event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          onShowReversalInfo(record);
+        }}
+        disabled={pendingAction}
+      >
+        <Undo2 className="h-3.5 w-3.5" />
+        {labels.reverse}
+      </Button>,
+    );
+  }
+
+  if (isDebtPosted) {
+    buttons.push(
+      <span
+        key={`${actionKeyPrefix}-posted-lock`}
+        className="inline-flex items-center gap-1 rounded-md border border-amber-200/70 bg-amber-50/80 px-2 py-1 text-[11px] font-medium uppercase tracking-[0.14em] text-amber-700"
+        title={labels.postedLock}
+      >
+        <Lock className="h-3 w-3" />
+        {labels.postedLock}
+      </span>,
     );
   }
 
