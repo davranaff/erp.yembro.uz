@@ -45,6 +45,7 @@ export interface RecordActionButtonsProps {
   canDeleteActiveResource: boolean;
   isShipmentResource: boolean;
   isDebtResource: boolean;
+  sessionDepartmentId: string | null | undefined;
   isMedicineBatchActionBusy: (recordId: string) => boolean;
   onOpenMedicineBatchQrCenter: (record: CrudRecord) => void | Promise<void>;
   onOpenMedicineBatchAttachmentPicker: (record: CrudRecord) => void;
@@ -73,6 +74,7 @@ export function renderRecordActionButtons({
   canDeleteActiveResource,
   isShipmentResource,
   isDebtResource,
+  sessionDepartmentId,
   isMedicineBatchActionBusy,
   onOpenMedicineBatchQrCenter,
   onOpenMedicineBatchAttachmentPicker,
@@ -158,7 +160,20 @@ export function renderRecordActionButtons({
 
   const shipmentStatus =
     isShipmentResource && record.status ? String(record.status).trim().toLowerCase() : '';
-  if (isShipmentResource && shipmentStatus === 'sent') {
+  const destinationDepartmentId =
+    isShipmentResource && record.destination_department_id
+      ? String(record.destination_department_id).trim()
+      : '';
+  const normalizedSessionDept = sessionDepartmentId ? String(sessionDepartmentId).trim() : '';
+  // Acknowledge is only for internal inter-dept transfers, and only the
+  // receiving side can click — the sending side sees its own shipment in
+  // "sent" state waiting for the destination to confirm.
+  const canAcknowledgeShipment =
+    isShipmentResource &&
+    shipmentStatus === 'sent' &&
+    destinationDepartmentId.length > 0 &&
+    (!normalizedSessionDept || normalizedSessionDept === destinationDepartmentId);
+  if (canAcknowledgeShipment) {
     buttons.push(
       <Button
         key={`${actionKeyPrefix}-acknowledge`}

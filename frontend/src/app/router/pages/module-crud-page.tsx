@@ -2143,6 +2143,7 @@ export function ModuleCrudPage() {
       canDeleteActiveResource,
       isShipmentResource,
       isDebtResource,
+      sessionDepartmentId,
       isMedicineBatchActionBusy: medicineBatchQr.isMedicineBatchActionBusy,
       onOpenMedicineBatchQrCenter: medicineBatchQr.handleOpenCenter,
       onOpenMedicineBatchAttachmentPicker: medicineBatchQr.handleOpenAttachmentPicker,
