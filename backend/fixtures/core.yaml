@@ -1207,6 +1207,16 @@ workspace_resources:
   sort_order: 40
   is_head_visible: false
   is_active: true
+- id: "32000000-0000-0000-0000-000000000401"
+  module_key: "finance"
+  key: "advances"
+  name: "Подотчётные"
+  path: "advances"
+  description: "Наличные, выданные сотрудникам под отчёт"
+  permission_prefix: "employee_advance"
+  sort_order: 50
+  is_head_visible: false
+  is_active: true
 - id: "32000000-0000-0000-0000-000000000067"
   module_key: "hr"
   key: "employees"
