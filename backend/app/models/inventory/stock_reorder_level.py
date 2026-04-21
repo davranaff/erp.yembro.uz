@@ -33,6 +33,11 @@ class StockReorderLevel(Base, IDMixin, TimestampMixin):
     max_quantity: Mapped[Decimal | None] = mapped_column(Numeric(16, 3), nullable=True)
     reorder_quantity: Mapped[Decimal | None] = mapped_column(Numeric(16, 3), nullable=True)
     unit: Mapped[str] = mapped_column(String(20), nullable=False, default="pcs", server_default="pcs")
+    measurement_unit_id: Mapped[UUID] = mapped_column(
+        ForeignKey("measurement_units.id", ondelete="RESTRICT"),
+        nullable=False,
+        index=True,
+    )
     is_active: Mapped[bool] = mapped_column(
         Boolean,
         nullable=False,

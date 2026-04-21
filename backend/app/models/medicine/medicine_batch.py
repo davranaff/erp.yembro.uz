@@ -46,6 +46,11 @@ class MedicineBatch(Base, IDMixin, TimestampMixin):
     received_quantity: Mapped[Decimal] = mapped_column(Numeric(16, 3), nullable=False)
     remaining_quantity: Mapped[Decimal] = mapped_column(Numeric(16, 3), nullable=False)
     unit: Mapped[str] = mapped_column(String(20), nullable=False, default="pcs", server_default="pcs")
+    measurement_unit_id: Mapped[UUID] = mapped_column(
+        ForeignKey("measurement_units.id", ondelete="RESTRICT"),
+        nullable=False,
+        index=True,
+    )
     unit_cost: Mapped[Decimal | None] = mapped_column(Numeric(14, 2), nullable=True)
     currency: Mapped[str] = mapped_column(String(8), nullable=False)
     note: Mapped[str | None] = mapped_column(Text, nullable=True)

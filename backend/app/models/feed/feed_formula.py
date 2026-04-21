@@ -74,6 +74,11 @@ class FeedFormulaIngredient(Base, IDMixin, TimestampMixin):
     )
     quantity_per_batch: Mapped[Decimal] = mapped_column(Numeric(16, 3), nullable=False)
     unit: Mapped[str] = mapped_column(String(20), nullable=False, default="kg", server_default="kg")
+    measurement_unit_id: Mapped[UUID] = mapped_column(
+        ForeignKey("measurement_units.id", ondelete="RESTRICT"),
+        nullable=False,
+        index=True,
+    )
 
     organization: Mapped["Organization"] = relationship("Organization", back_populates="feed_formula_ingredients")
     formula: Mapped["FeedFormula"] = relationship("FeedFormula", back_populates="ingredients")

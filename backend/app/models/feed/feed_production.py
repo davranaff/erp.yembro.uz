@@ -41,6 +41,11 @@ class FeedProductionBatch(Base, IDMixin, TimestampMixin):
     planned_output: Mapped[Decimal] = mapped_column(Numeric(16, 3), nullable=False, default=0)
     actual_output: Mapped[Decimal] = mapped_column(Numeric(16, 3), nullable=False, default=0)
     unit: Mapped[str] = mapped_column(String(20), nullable=False, default="kg", server_default="kg")
+    measurement_unit_id: Mapped[UUID] = mapped_column(
+        ForeignKey("measurement_units.id", ondelete="RESTRICT"),
+        nullable=False,
+        index=True,
+    )
     note: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_by: Mapped[UUID | None] = mapped_column(
         ForeignKey("employees.id", ondelete="SET NULL"),
@@ -106,6 +111,11 @@ class FeedProductShipment(Base, IDMixin, TimestampMixin):
     shipped_on: Mapped[date] = mapped_column(Date, nullable=False, index=True)
     quantity: Mapped[Decimal] = mapped_column(Numeric(16, 3), nullable=False, default=0)
     unit: Mapped[str] = mapped_column(String(20), nullable=False, default="kg", server_default="kg")
+    measurement_unit_id: Mapped[UUID] = mapped_column(
+        ForeignKey("measurement_units.id", ondelete="RESTRICT"),
+        nullable=False,
+        index=True,
+    )
     unit_price: Mapped[Decimal | None] = mapped_column(Numeric(14, 2), nullable=True)
     currency: Mapped[str] = mapped_column(String(8), nullable=False)
     invoice_no: Mapped[str | None] = mapped_column(String(120), nullable=True)

@@ -48,6 +48,11 @@ class SupplierDebt(Base, IDMixin, TimestampMixin):
     item_key: Mapped[str] = mapped_column(String(160), nullable=False, index=True)
     quantity: Mapped[Decimal] = mapped_column(Numeric(16, 3), nullable=False)
     unit: Mapped[str] = mapped_column(String(20), nullable=False, default="pcs", server_default="pcs")
+    measurement_unit_id: Mapped[UUID] = mapped_column(
+        ForeignKey("measurement_units.id", ondelete="RESTRICT"),
+        nullable=False,
+        index=True,
+    )
     amount_total: Mapped[Decimal] = mapped_column(Numeric(16, 2), nullable=False, default=0)
     amount_paid: Mapped[Decimal] = mapped_column(Numeric(16, 2), nullable=False, default=0, server_default="0")
     currency: Mapped[str] = mapped_column(String(8), nullable=False)

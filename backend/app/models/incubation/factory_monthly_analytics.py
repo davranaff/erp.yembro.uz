@@ -32,6 +32,11 @@ class FactoryMonthlyAnalytics(Base, IDMixin, TimestampMixin):
     chicks_arrived: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     feed_quantity: Mapped[Decimal] = mapped_column(Numeric(16, 3), nullable=False, default=0)
     feed_quantity_unit: Mapped[str] = mapped_column(String(16), nullable=False, default="kg", server_default="kg")
+    measurement_unit_id: Mapped[UUID] = mapped_column(
+        ForeignKey("measurement_units.id", ondelete="RESTRICT"),
+        nullable=False,
+        index=True,
+    )
     medicines_arrived: Mapped[Decimal] = mapped_column(Numeric(16, 3), nullable=False, default=0)
     note: Mapped[str | None] = mapped_column(Text, nullable=True)
 

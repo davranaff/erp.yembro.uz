@@ -75,6 +75,77 @@ class BaseService(ABC):
     def _build_static_reference_options(values: list[str]) -> list[dict[str, str]]:
         return [{"value": value, "label": value} for value in values]
 
+    _UNIT_ALIASES = {
+        "pcs": "dona",
+        "bosh": "dona",
+        "l": "litr",
+        "kilogram": "kg",
+        "kilogramm": "kg",
+    }
+
+    async def _auto_resolve_measurement_unit(
+        self,
+        data: dict[str, Any],
+        *,
+        existing: Mapping[str, Any] | None,
+    ) -> dict[str, Any]:
+        """Resolve `unit` code → `measurement_unit_id` FK when a table carries both.
+
+        Service-layer helper for tables migrated to FK-based units. Pass
+        `unit="kg"` in the payload and this auto-sets `measurement_unit_id`.
+        If the payload already has `measurement_unit_id`, leaves it alone.
+        """
+        if not self.repository.has_column("measurement_unit_id"):
+            return data
+        if data.get("measurement_unit_id"):
+            return data
+
+        unit_raw = data.get("unit")
+        if unit_raw is None and existing is not None:
+            unit_raw = existing.get("unit")
+        if unit_raw is None:
+            if existing is not None and existing.get("measurement_unit_id"):
+                data["measurement_unit_id"] = existing["measurement_unit_id"]
+                return data
+            unit_raw = "kg"
+
+        unit_code = str(unit_raw).strip().lower()
+        unit_code = self._UNIT_ALIASES.get(unit_code, unit_code)
+
+        organization_id = data.get("organization_id") or (
+            existing.get("organization_id") if existing is not None else None
+        )
+        if organization_id is None and self.repository.table == "stock_take_lines":
+            stock_take_id = data.get("stock_take_id") or (
+                existing.get("stock_take_id") if existing is not None else None
+            )
+            if stock_take_id:
+                parent = await self.repository.db.fetchrow(
+                    "SELECT organization_id FROM stock_takes WHERE id = $1",
+                    stock_take_id,
+                )
+                if parent is not None:
+                    organization_id = parent["organization_id"]
+
+        if organization_id is None:
+            raise ValidationError("cannot resolve measurement unit without organization_id")
+
+        row = await self.repository.db.fetchrow(
+            "SELECT id FROM measurement_units WHERE organization_id = $1 AND code = $2 LIMIT 1",
+            organization_id,
+            unit_code,
+        )
+        if row is None:
+            row = await self.repository.db.fetchrow(
+                "SELECT id FROM measurement_units WHERE organization_id = $1 AND code = 'kg' LIMIT 1",
+                organization_id,
+            )
+        if row is None:
+            raise ValidationError(f"measurement_unit not found for code '{unit_code}'")
+
+        data["measurement_unit_id"] = row["id"]
+        return data
+
     async def get_additional_meta_fields(self, db) -> list[dict[str, Any]]:
         fields: list[dict[str, Any]] = []
         if self.repository.has_column("currency"):
@@ -927,8 +998,9 @@ class BaseService(ABC):
 
     async def create(self, payload: Any, *, actor: CurrentActor | None = None) -> Result[Any]:
         data = self._payload_to_dict(payload)
-        data = self._prepare_create_payload(data, actor=actor)
         data = self._apply_actor_organization_on_create(data, actor=actor)
+        data = await self._auto_resolve_measurement_unit(data, existing=None)
+        data = self._prepare_create_payload(data, actor=actor)
         data = await self._validate_catalog_fields(data, actor=actor, existing=None, is_create=True)
         async with self.repository.db.transaction():
             data = await self._before_create(data, actor=actor)
@@ -1017,6 +1089,7 @@ class BaseService(ABC):
                 actor=actor,
             )
             data = self._apply_actor_organization_on_update(data, actor=actor)
+            data = await self._auto_resolve_measurement_unit(data, existing=existing)
             data = await self._validate_catalog_fields(data, actor=actor, existing=existing, is_create=False)
             data = await self._before_update(entity_id, data, existing=existing, actor=actor)
             entity = await self.repository.update_by_id(entity_id, data)

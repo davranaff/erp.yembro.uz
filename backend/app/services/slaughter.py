@@ -32,6 +32,8 @@ from app.services.base import BaseService, CreatedByActorMixin
 from app.services.inventory import StockLedgerService, StockMovementDraft
 
 
+from app.services.units import resolve_measurement_unit_id as _resolve_measurement_unit_id
+
 SLAUGHTER_SOURCE_TYPES = ("factory", "external")
 SEMI_PRODUCT_QUALITIES = ("first", "second", "mixed", "byproduct")
 SEMI_PRODUCT_CODE_PATTERN = re.compile(r"^SP-(\d{8})-(\d{3,})$")
@@ -284,6 +286,9 @@ class SlaughterArrivalService(CreatedByActorMixin, BaseService):
         status = _resolve_auto_debt_status(amount_total, amount_paid)
         issued_on = _as_date(entity["arrived_on"])
 
+        measurement_unit_id = await _resolve_measurement_unit_id(
+            self.repository.db, str(entity["organization_id"]), "kg",
+        )
         payload: dict[str, Any] = {
             "organization_id": str(entity["organization_id"]),
             "department_id": str(entity["department_id"]),
@@ -292,6 +297,7 @@ class SlaughterArrivalService(CreatedByActorMixin, BaseService):
             "item_key": f"slaughter_arrival:{arrival_id}",
             "quantity": str(weight),
             "unit": "kg",
+            "measurement_unit_id": measurement_unit_id,
             "amount_total": str(amount_total),
             "amount_paid": str(amount_paid),
             "currency": currency,
@@ -828,6 +834,10 @@ class SlaughterSemiProductShipmentService(CreatedByActorMixin, BaseService):
         status = _resolve_auto_debt_status(amount_total, amount_paid)
         issued_on = _as_date(entity["shipped_on"])
 
+        unit_code = str(entity.get("unit") or "kg")
+        measurement_unit_id = await _resolve_measurement_unit_id(
+            self.repository.db, str(entity["organization_id"]), unit_code,
+        )
         payload: dict[str, Any] = {
             "organization_id": str(entity["organization_id"]),
             "department_id": str(entity["department_id"]),
@@ -835,7 +845,8 @@ class SlaughterSemiProductShipmentService(CreatedByActorMixin, BaseService):
             "item_type": "semi_product",
             "item_key": f"slaughter_shipment:{shipment_id}",
             "quantity": str(quantity),
-            "unit": str(entity.get("unit") or "kg"),
+            "unit": unit_code,
+            "measurement_unit_id": measurement_unit_id,
             "amount_total": str(amount_total),
             "amount_paid": str(amount_paid),
             "currency": str(entity.get("currency") or ""),

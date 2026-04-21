@@ -91,9 +91,10 @@ async def test_egg_shipment_rejects_negative_stock(api_client) -> None:
 
 
 @pytest.mark.asyncio
-async def test_slaughter_processing_requires_source(api_client) -> None:
+async def test_slaughter_arrival_requires_source(api_client) -> None:
+    """External source on slaughter arrival must carry supplier_client_id."""
     response = await api_client.post(
-        "/api/v1/slaughter/processings",
+        "/api/v1/slaughter/arrivals",
         json={
             "id": str(uuid.uuid4()),
             "organization_id": ORG_ID,
@@ -102,13 +103,8 @@ async def test_slaughter_processing_requires_source(api_client) -> None:
             "poultry_type_id": HOME_POULTRY_TYPE_ID,
             "arrived_on": "2026-03-24",
             "birds_received": 100,
-            "processed_on": "2026-03-25",
-            "birds_processed": 100,
-            "first_sort_count": 60,
-            "second_sort_count": 30,
-            "bad_count": 10,
         },
-        headers=_headers("slaughter_processing"),
+        headers=_headers("slaughter_arrival"),
     )
     assert response.status_code == 400, response.text
     assert "supplier_client_id is required" in response.json()["error"]["message"]

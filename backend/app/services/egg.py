@@ -263,6 +263,11 @@ class EggShipmentService(BaseService):
         status = _resolve_auto_debt_status(amount_total, amount_paid)
         issued_on = _as_date(entity["shipped_on"])
 
+        from app.services.units import resolve_measurement_unit_id
+        unit_code = str(entity.get("unit") or "pcs")
+        measurement_unit_id = await resolve_measurement_unit_id(
+            self.repository.db, str(entity["organization_id"]), unit_code,
+        )
         payload: dict[str, Any] = {
             "organization_id": str(entity["organization_id"]),
             "department_id": str(entity["department_id"]),
@@ -270,7 +275,8 @@ class EggShipmentService(BaseService):
             "item_type": "egg",
             "item_key": f"egg_shipment:{shipment_id}",
             "quantity": str(quantity),
-            "unit": str(entity.get("unit") or "pcs"),
+            "unit": unit_code,
+            "measurement_unit_id": measurement_unit_id,
             "amount_total": str(amount_total),
             "amount_paid": str(amount_paid),
             "currency": str(entity.get("currency") or ""),

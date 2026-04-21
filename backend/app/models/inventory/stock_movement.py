@@ -43,6 +43,11 @@ class StockMovement(Base, IDMixin, TimestampMixin):
     movement_kind: Mapped[str] = mapped_column(String(30), nullable=False, index=True)
     quantity: Mapped[Decimal] = mapped_column(Numeric(16, 3), nullable=False)
     unit: Mapped[str] = mapped_column(String(20), nullable=False, default="pcs", server_default="pcs")
+    measurement_unit_id: Mapped[UUID] = mapped_column(
+        ForeignKey("measurement_units.id", ondelete="RESTRICT"),
+        nullable=False,
+        index=True,
+    )
     occurred_on: Mapped[date] = mapped_column(Date, nullable=False, index=True)
     reference_table: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
     reference_id: Mapped[UUID] = mapped_column(nullable=False, index=True)

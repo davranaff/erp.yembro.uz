@@ -51,6 +51,11 @@ class MedicineConsumption(Base, IDMixin, TimestampMixin):
     consumed_on: Mapped[date] = mapped_column(Date, nullable=False, index=True)
     quantity: Mapped[Decimal] = mapped_column(Numeric(16, 3), nullable=False)
     unit: Mapped[str] = mapped_column(String(20), nullable=False, default="pcs", server_default="pcs")
+    measurement_unit_id: Mapped[UUID] = mapped_column(
+        ForeignKey("measurement_units.id", ondelete="RESTRICT"),
+        nullable=False,
+        index=True,
+    )
     purpose: Mapped[str | None] = mapped_column(String(140), nullable=True)
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
 

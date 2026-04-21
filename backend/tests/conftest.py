@@ -298,18 +298,30 @@ def _seed_test_stock_buffers(
         ("semi_product", rows_by_table.get("slaughter_semi_products", []), lambda r: f"semi_product:{r['id']}", "kg"),
     ]
 
+    unit_aliases = {"pcs": "dona", "bosh": "dona", "l": "litr"}
+    measurement_unit_index: dict[tuple[str, str], str] = {}
+    for mu in rows_by_table.get("measurement_units", []):
+        measurement_unit_index[(str(mu["organization_id"]), str(mu["code"]).lower())] = str(mu["id"])
+
     for item_type, items, key_fn, unit in item_sources:
         for item in items:
             organization_id = str(item.get("organization_id") or "")
             if not organization_id:
                 continue
             item_key = key_fn(item)
+            unit_code = unit_aliases.get(unit, unit)
+            mu_id = (
+                measurement_unit_index.get((organization_id, unit_code))
+                or measurement_unit_index.get((organization_id, "kg"))
+            )
+            if mu_id is None:
+                continue
             for warehouse in warehouses_by_org.get(organization_id, []):
                 conn.execute(
                     'INSERT INTO "stock_movements" '
                     "(id, organization_id, department_id, warehouse_id, item_type, item_key, "
-                    "movement_kind, quantity, unit, occurred_on, reference_table, reference_id, note) "
-                    "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                    "movement_kind, quantity, unit, measurement_unit_id, occurred_on, reference_table, reference_id, note) "
+                    "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                     (
                         str(uuid4()),
                         str(warehouse["organization_id"]),
@@ -320,6 +332,7 @@ def _seed_test_stock_buffers(
                         "incoming",
                         "1000000",
                         unit,
+                        mu_id,
                         "2000-01-01",
                         "test_stock_buffer",
                         str(uuid4()),

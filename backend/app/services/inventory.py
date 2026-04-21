@@ -590,6 +590,8 @@ async def _inventory_item_key_exists(
 
 
 class StockLedgerService:
+    _UNIT_ALIASES = {"pcs": "dona", "bosh": "dona", "l": "litr"}
+
     def __init__(
         self,
         repository: StockMovementRepository,
@@ -597,6 +599,23 @@ class StockLedgerService:
     ) -> None:
         self.repository = repository
         self.warehouse_repository = warehouse_repository or WarehouseRepository(repository.db)
+
+    async def _resolve_unit_to_id(self, *, organization_id: str, unit_code: str) -> str:
+        code = (unit_code or "kg").strip().lower()
+        code = self._UNIT_ALIASES.get(code, code)
+        row = await self.repository.db.fetchrow(
+            "SELECT id FROM measurement_units WHERE organization_id = $1 AND code = $2 LIMIT 1",
+            organization_id,
+            code,
+        )
+        if row is None:
+            row = await self.repository.db.fetchrow(
+                "SELECT id FROM measurement_units WHERE organization_id = $1 AND code = 'kg' LIMIT 1",
+                organization_id,
+            )
+        if row is None:
+            raise ValidationError(f"measurement_unit '{code}' not found for organization")
+        return str(row["id"])
 
     @staticmethod
     def _to_decimal(raw_value: object) -> Decimal:
@@ -893,6 +912,11 @@ class StockLedgerService:
                     f"Available={available_balance}, requested={quantity}."
                 )
 
+        measurement_unit_id = await self._resolve_unit_to_id(
+            organization_id=str(normalized_scope["organization_id"]),
+            unit_code=movement.unit,
+        )
+
         payload: dict[str, object] = {
             "id": str(uuid4()),
             "organization_id": normalized_scope["organization_id"],
@@ -905,6 +929,7 @@ class StockLedgerService:
             "movement_kind": movement.movement_kind,
             "quantity": str(quantity),
             "unit": movement.unit,
+            "measurement_unit_id": measurement_unit_id,
             "occurred_on": movement.occurred_on,
             "reference_table": movement.reference_table,
             "reference_id": movement.reference_id,

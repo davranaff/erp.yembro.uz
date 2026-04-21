@@ -29,13 +29,13 @@ FIXTURE_LOAD_ORDER = [
     "workspace_resources",
     "departments",
     "warehouses",
+    "currencies",
+    "poultry_types",
+    "measurement_units",
     "clients",
     "client_debts",
     "supplier_debts",
     "debt_payments",
-    "currencies",
-    "poultry_types",
-    "measurement_units",
     "client_categories",
     "positions",
     "roles",
@@ -802,7 +802,79 @@ def _load_fixture_rows(fixtures_dir: Path) -> dict[str, list[dict[str, object]]]
     prepared_rows["warehouses"] = _build_default_warehouse_rows(prepared_rows)
     prepared_rows["stock_movements"] = _build_generated_stock_movements(prepared_rows)
     prepared_rows["stock_movements"] = _apply_default_warehouses_to_stock_movements(prepared_rows)
+    _resolve_measurement_unit_ids(prepared_rows)
     return prepared_rows
+
+
+UNIT_FK_TABLES: dict[str, str] = {
+    "egg_shipments": "unit",
+    "client_debts": "unit",
+    "feed_arrivals": "unit",
+    "feed_consumptions": "unit",
+    "feed_ingredients": "unit",
+    "feed_types": "unit",
+    "feed_formula_ingredients": "unit",
+    "feed_raw_consumptions": "unit",
+    "feed_production_batches": "unit",
+    "feed_product_shipments": "unit",
+    "feed_raw_arrivals": "unit",
+    "stock_reorder_levels": "unit",
+    "stock_take_lines": "unit",
+    "stock_movements": "unit",
+    "medicine_consumptions": "unit",
+    "medicine_batches": "unit",
+    "medicine_arrivals": "unit",
+    "supplier_debts": "unit",
+    "slaughter_semi_product_shipments": "unit",
+    "slaughter_semi_products": "unit",
+    "factory_monthly_analytics": "feed_quantity_unit",
+}
+
+UNIT_ALIASES: dict[str, str] = {
+    "pcs": "dona",
+    "bosh": "dona",
+    "l": "litr",
+    "kilogram": "kg",
+    "kilogramm": "kg",
+}
+
+
+def _resolve_measurement_unit_ids(rows_by_table: dict[str, list[dict[str, object]]]) -> None:
+    """Populate measurement_unit_id FK on every row of unit-bearing tables, using
+    measurement_units entries as lookup table. Applied in-place."""
+    unit_index: dict[tuple[str, str], str] = {}
+    for row in rows_by_table.get("measurement_units", []):
+        org = str(row["organization_id"])
+        code = str(row["code"]).strip().lower()
+        unit_index[(org, code)] = str(row["id"])
+
+    # stock_take_lines has no organization_id — index by stock_take_id → org via parent
+    stock_take_org: dict[str, str] = {
+        str(row["id"]): str(row["organization_id"])
+        for row in rows_by_table.get("stock_takes", [])
+    }
+
+    for table, unit_col in UNIT_FK_TABLES.items():
+        for row in rows_by_table.get(table, []):
+            if row.get("measurement_unit_id"):
+                continue
+            unit_raw = row.get(unit_col) or "kg"
+            unit_code = str(unit_raw).strip().lower()
+            unit_code = UNIT_ALIASES.get(unit_code, unit_code)
+
+            org = row.get("organization_id")
+            if org is None and table == "stock_take_lines":
+                stock_take_id = row.get("stock_take_id")
+                if stock_take_id is not None:
+                    org = stock_take_org.get(str(stock_take_id))
+            if org is None:
+                continue
+            org = str(org)
+
+            unit_id = unit_index.get((org, unit_code)) or unit_index.get((org, "kg"))
+            if unit_id is None:
+                continue
+            row["measurement_unit_id"] = unit_id
 
 
 def _quote_identifier(name: str) -> str:

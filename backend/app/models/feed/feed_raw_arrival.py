@@ -42,6 +42,11 @@ class FeedRawArrival(Base, IDMixin, TimestampMixin):
     lot_no: Mapped[str | None] = mapped_column(String(80), nullable=True)
     quantity: Mapped[Decimal] = mapped_column(Numeric(16, 3), nullable=False, default=0)
     unit: Mapped[str] = mapped_column(String(20), nullable=False, default="kg", server_default="kg")
+    measurement_unit_id: Mapped[UUID] = mapped_column(
+        ForeignKey("measurement_units.id", ondelete="RESTRICT"),
+        nullable=False,
+        index=True,
+    )
     unit_price: Mapped[Decimal | None] = mapped_column(Numeric(14, 2), nullable=True)
     currency: Mapped[str] = mapped_column(
         String(8),

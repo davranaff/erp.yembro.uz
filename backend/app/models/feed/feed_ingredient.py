@@ -20,6 +20,11 @@ class FeedIngredient(Base, IDMixin, TimestampMixin):
     name: Mapped[str] = mapped_column(String(140), nullable=False, index=True)
     code: Mapped[str] = mapped_column(String(80), nullable=False, index=True)
     unit: Mapped[str] = mapped_column(String(20), nullable=False, default="kg", server_default="kg")
+    measurement_unit_id: Mapped[UUID] = mapped_column(
+        ForeignKey("measurement_units.id", ondelete="RESTRICT"),
+        nullable=False,
+        index=True,
+    )
     supplier_category: Mapped[str | None] = mapped_column(String(120), nullable=True)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default="true")
