@@ -34,6 +34,18 @@ export type ResourceUiConfig = {
    * treat it as an i18n key.
    */
   fieldHelpers?: Record<string, string>;
+  /**
+   * Groups form fields under section headers. Fields not listed in any
+   * section are rendered as a tail group without a title. Titles are used
+   * as-is (already localized at author time).
+   */
+  formSections?: Array<{ title: string; fields: string[] }>;
+  /**
+   * Cross-field validation executed in handleSubmit after buildPayload.
+   * Returns a map of { fieldName: errorMessage } to merge into formErrors.
+   * Return an empty object when everything is fine.
+   */
+  crossFieldValidator?: (values: FormValues) => FormErrors;
 };
 export type DepartmentRecord = CrudRecord & {
   id?: string;
@@ -259,6 +271,29 @@ const resourceUiConfigs: Record<string, ResourceUiConfig> = {
       posting_status:
         'Черновик — можно редактировать и удалять. Проведён — учтён в отчётности, изменения только через сторнирование.',
     },
+    formSections: [
+      {
+        title: 'Клиент и предмет',
+        fields: ['client_id', 'department_id', 'item_type', 'item_key'],
+      },
+      { title: 'Сумма', fields: ['quantity', 'unit', 'amount_total', 'amount_paid', 'currency'] },
+      { title: 'Даты и статус', fields: ['issued_on', 'due_on', 'status', 'posting_status'] },
+      { title: 'Дополнительно', fields: ['note', 'is_active'] },
+    ],
+    crossFieldValidator: (values) => {
+      const errors: FormErrors = {};
+      const issuedOn = typeof values.issued_on === 'string' ? values.issued_on : '';
+      const dueOn = typeof values.due_on === 'string' ? values.due_on : '';
+      if (issuedOn && dueOn && dueOn < issuedOn) {
+        errors.due_on = 'Дата оплаты не может быть раньше даты выставления.';
+      }
+      const amountTotal = Number(values.amount_total);
+      const amountPaid = Number(values.amount_paid);
+      if (Number.isFinite(amountTotal) && Number.isFinite(amountPaid) && amountPaid > amountTotal) {
+        errors.amount_paid = 'Оплата не может превышать общую сумму долга.';
+      }
+      return errors;
+    },
     hideDepartmentFieldWhenScoped: true,
     hideOrganizationFieldWhenScoped: true,
     detailPanelKey: 'debt_summary',
@@ -305,6 +340,29 @@ const resourceUiConfigs: Record<string, ResourceUiConfig> = {
       posting_status:
         'Черновик — можно редактировать и удалять. Проведён — учтён в отчётности, изменения только через сторнирование.',
     },
+    formSections: [
+      {
+        title: 'Поставщик и предмет',
+        fields: ['client_id', 'department_id', 'item_type', 'item_key'],
+      },
+      { title: 'Сумма', fields: ['quantity', 'unit', 'amount_total', 'amount_paid', 'currency'] },
+      { title: 'Даты и статус', fields: ['issued_on', 'due_on', 'status', 'posting_status'] },
+      { title: 'Дополнительно', fields: ['note', 'is_active'] },
+    ],
+    crossFieldValidator: (values) => {
+      const errors: FormErrors = {};
+      const issuedOn = typeof values.issued_on === 'string' ? values.issued_on : '';
+      const dueOn = typeof values.due_on === 'string' ? values.due_on : '';
+      if (issuedOn && dueOn && dueOn < issuedOn) {
+        errors.due_on = 'Дата оплаты не может быть раньше даты выставления.';
+      }
+      const amountTotal = Number(values.amount_total);
+      const amountPaid = Number(values.amount_paid);
+      if (Number.isFinite(amountTotal) && Number.isFinite(amountPaid) && amountPaid > amountTotal) {
+        errors.amount_paid = 'Оплата не может превышать общую сумму долга.';
+      }
+      return errors;
+    },
     hideDepartmentFieldWhenScoped: true,
     hideOrganizationFieldWhenScoped: true,
     detailPanelKey: 'debt_summary',
@@ -327,6 +385,25 @@ const resourceUiConfigs: Record<string, ResourceUiConfig> = {
       due_on: 'Дата, до которой сотрудник должен погасить аванс или вернуть разницу.',
       status:
         'Открыт — пока аванс не закрыт. Закрыт — после полного возврата или удержания из зарплаты.',
+    },
+    formSections: [
+      { title: 'Получатель', fields: ['employee_id', 'department_id'] },
+      { title: 'Сумма', fields: ['amount_issued', 'currency'] },
+      { title: 'Даты и статус', fields: ['issued_on', 'due_on', 'status'] },
+      { title: 'Дополнительно', fields: ['note'] },
+    ],
+    crossFieldValidator: (values) => {
+      const errors: FormErrors = {};
+      const issuedOn = typeof values.issued_on === 'string' ? values.issued_on : '';
+      const dueOn = typeof values.due_on === 'string' ? values.due_on : '';
+      if (issuedOn && dueOn && dueOn < issuedOn) {
+        errors.due_on = 'Срок возврата не может быть раньше даты выдачи.';
+      }
+      const amount = Number(values.amount_issued);
+      if (Number.isFinite(amount) && amount <= 0) {
+        errors.amount_issued = 'Сумма аванса должна быть больше нуля.';
+      }
+      return errors;
     },
     hideDepartmentFieldWhenScoped: true,
     hideOrganizationFieldWhenScoped: true,
@@ -434,6 +511,34 @@ const resourceUiConfigs: Record<string, ResourceUiConfig> = {
       amount: 'Сумма в валюте кассы. Проверьте, что валюта совпадает с валютой счёта.',
       reference_no: 'Номер чека/платёжного поручения или ссылка на внешний документ.',
     },
+    formSections: [
+      {
+        title: 'Операция',
+        fields: ['title', 'transaction_type', 'cash_account_id', 'expense_category_id'],
+      },
+      {
+        title: 'Контрагент и сумма',
+        fields: ['counterparty_client_id', 'amount', 'currency'],
+      },
+      { title: 'Документ', fields: ['transaction_date', 'reference_no', 'note'] },
+    ],
+    crossFieldValidator: (values) => {
+      const errors: FormErrors = {};
+      const type =
+        typeof values.transaction_type === 'string'
+          ? values.transaction_type.trim().toLowerCase()
+          : '';
+      const categoryId =
+        typeof values.expense_category_id === 'string' ? values.expense_category_id.trim() : '';
+      if (type === 'expense' && !categoryId) {
+        errors.expense_category_id = 'Для расхода необходимо указать статью БДДС.';
+      }
+      const amount = Number(values.amount);
+      if (Number.isFinite(amount) && amount <= 0) {
+        errors.amount = 'Сумма должна быть больше нуля.';
+      }
+      return errors;
+    },
     hideOrganizationFieldWhenScoped: true,
   },
   'slaughter:arrivals': {
@@ -468,6 +573,47 @@ const resourceUiConfigs: Record<string, ResourceUiConfig> = {
         'Фактическое количество птицы на приёмке. Может отличаться от отгрузки — расхождение фиксируется через акт.',
       arrival_unit_price: 'Цена за 1 кг живой массы. Общая стоимость = цена × вес.',
     },
+    formSections: [
+      {
+        title: 'Источник',
+        fields: ['source_type', 'factory_shipment_id', 'supplier_client_id', 'poultry_type_id'],
+      },
+      {
+        title: 'Количество и стоимость',
+        fields: [
+          'arrived_on',
+          'birds_received',
+          'arrival_total_weight_kg',
+          'arrival_unit_price',
+          'arrival_currency',
+        ],
+      },
+      { title: 'Документ', fields: ['arrival_invoice_no', 'note'] },
+    ],
+    crossFieldValidator: (values) => {
+      const errors: FormErrors = {};
+      const sourceType =
+        typeof values.source_type === 'string' ? values.source_type.trim().toLowerCase() : '';
+      const factoryShipmentId =
+        typeof values.factory_shipment_id === 'string' ? values.factory_shipment_id.trim() : '';
+      const supplierClientId =
+        typeof values.supplier_client_id === 'string' ? values.supplier_client_id.trim() : '';
+      if (sourceType === 'factory' && !factoryShipmentId) {
+        errors.factory_shipment_id = 'Для источника «factory» укажите отгрузку из фабрики.';
+      }
+      if (sourceType === 'supplier' && !supplierClientId) {
+        errors.supplier_client_id = 'Для источника «supplier» укажите клиента-поставщика.';
+      }
+      const birds = Number(values.birds_received);
+      const weight = Number(values.arrival_total_weight_kg);
+      if (Number.isFinite(birds) && birds > 0 && Number.isFinite(weight) && weight > 0) {
+        const avg = weight / birds;
+        if (avg < 0.5 || avg > 6) {
+          errors.arrival_total_weight_kg = `Средний вес тушки ${avg.toFixed(2)} кг выходит за разумные пределы (0.5–6 кг). Проверьте данные.`;
+        }
+      }
+      return errors;
+    },
     hideDepartmentFieldWhenScoped: true,
     hideOrganizationFieldWhenScoped: true,
   },
@@ -500,6 +646,39 @@ const resourceUiConfigs: Record<string, ResourceUiConfig> = {
       first_sort_count: 'Количество тушек высшего сорта — товарные, без дефектов.',
       second_sort_count: 'Количество тушек второго сорта — мелкие/с дефектами, но пригодные.',
       bad_count: 'Отбраковано — непригодно для реализации (учитывается как потеря).',
+    },
+    formSections: [
+      { title: 'Партия и смена', fields: ['arrival_id', 'processed_on', 'processed_by'] },
+      {
+        title: 'Разбивка по сортам (голов)',
+        fields: ['birds_processed', 'first_sort_count', 'second_sort_count', 'bad_count'],
+      },
+      {
+        title: 'Разбивка по сортам (вес, кг)',
+        fields: ['first_sort_weight_kg', 'second_sort_weight_kg', 'bad_weight_kg'],
+      },
+      { title: 'Дополнительно', fields: ['note'] },
+    ],
+    crossFieldValidator: (values) => {
+      const errors: FormErrors = {};
+      const total = Number(values.birds_processed);
+      const s1 = Number(values.first_sort_count);
+      const s2 = Number(values.second_sort_count);
+      const bad = Number(values.bad_count);
+      if (
+        Number.isFinite(total) &&
+        total > 0 &&
+        Number.isFinite(s1) &&
+        Number.isFinite(s2) &&
+        Number.isFinite(bad)
+      ) {
+        const sum = s1 + s2 + bad;
+        if (sum !== total) {
+          const delta = total - sum;
+          errors.birds_processed = `«1 сорт + 2 сорт + брак» = ${sum}, должно быть ${total} (расхождение ${delta}).`;
+        }
+      }
+      return errors;
     },
     hideDepartmentFieldWhenScoped: true,
     hideOrganizationFieldWhenScoped: true,
@@ -636,6 +815,23 @@ const resourceUiConfigs: Record<string, ResourceUiConfig> = {
       expected_hatch_on:
         'Ожидаемая дата вывода — обычно +21 день для куры-несушки. Используется для планирования.',
     },
+    formSections: [
+      {
+        title: 'Партия',
+        fields: ['arrived_on', 'batch_code', 'warehouse_id', 'source_client_id', 'production_id'],
+      },
+      { title: 'Закладка', fields: ['eggs_arrived', 'expected_hatch_on'] },
+      { title: 'Дополнительно', fields: ['note', 'is_active'] },
+    ],
+    crossFieldValidator: (values) => {
+      const errors: FormErrors = {};
+      const arrivedOn = typeof values.arrived_on === 'string' ? values.arrived_on : '';
+      const hatchOn = typeof values.expected_hatch_on === 'string' ? values.expected_hatch_on : '';
+      if (arrivedOn && hatchOn && hatchOn < arrivedOn) {
+        errors.expected_hatch_on = 'Дата вывода не может быть раньше даты закладки.';
+      }
+      return errors;
+    },
     hideDepartmentFieldWhenScoped: true,
     hideOrganizationFieldWhenScoped: true,
   },
@@ -760,6 +956,22 @@ const resourceUiConfigs: Record<string, ResourceUiConfig> = {
       poultry_type_id: 'Порода/группа птицы, на которую пошёл корм. Нужен для расчёта FCR.',
       quantity: 'Сколько корма ушло. Снимается с остатка после сохранения.',
     },
+    formSections: [
+      {
+        title: 'Что списываем',
+        fields: ['consumed_on', 'feed_type_id', 'production_batch_id', 'poultry_type_id'],
+      },
+      { title: 'Количество', fields: ['quantity', 'unit'] },
+      { title: 'Дополнительно', fields: ['note'] },
+    ],
+    crossFieldValidator: (values) => {
+      const errors: FormErrors = {};
+      const qty = Number(values.quantity);
+      if (Number.isFinite(qty) && qty <= 0) {
+        errors.quantity = 'Количество должно быть больше нуля.';
+      }
+      return errors;
+    },
     hideDepartmentFieldWhenScoped: true,
     hideOrganizationFieldWhenScoped: true,
   },
@@ -879,6 +1091,29 @@ const resourceUiConfigs: Record<string, ResourceUiConfig> = {
         'Количество птенцов при постановке партии. Меняется только через корректировку.',
       current_count: 'Пересчитывается автоматически по падежу и отгрузкам.',
     },
+    formSections: [
+      {
+        title: 'Партия',
+        fields: ['arrived_on', 'flock_code', 'warehouse_id', 'poultry_type_id', 'source_client_id'],
+      },
+      { title: 'Поголовье', fields: ['initial_count', 'current_count', 'status'] },
+      { title: 'Дополнительно', fields: ['note', 'is_active'] },
+    ],
+    crossFieldValidator: (values) => {
+      const errors: FormErrors = {};
+      const initial = Number(values.initial_count);
+      const current = Number(values.current_count);
+      if (
+        Number.isFinite(initial) &&
+        Number.isFinite(current) &&
+        initial > 0 &&
+        current > initial
+      ) {
+        errors.current_count =
+          'Текущее поголовье не может быть больше исходного. Оставьте пустым — пересчитается автоматически.';
+      }
+      return errors;
+    },
     tableOrder: [
       'arrived_on',
       'flock_code',
@@ -954,6 +1189,45 @@ const resourceUiConfigs: Record<string, ResourceUiConfig> = {
       total_weight_kg: 'Общий живой вес. Используется для биллинга и расчёта цены.',
       unit_price: 'Цена за 1 кг. Итог = цена × вес.',
       status: 'draft → sent → received. «received» выставляется получателем при подтверждении.',
+    },
+    formSections: [
+      {
+        title: 'Источник и получатель',
+        fields: [
+          'shipped_on',
+          'flock_id',
+          'warehouse_id',
+          'client_id',
+          'destination_department_id',
+        ],
+      },
+      {
+        title: 'Количество и цена',
+        fields: ['birds_count', 'total_weight_kg', 'unit_price', 'currency'],
+      },
+      { title: 'Приёмка', fields: ['received_quantity', 'status'] },
+      { title: 'Дополнительно', fields: ['note'] },
+    ],
+    crossFieldValidator: (values) => {
+      const errors: FormErrors = {};
+      const clientId = typeof values.client_id === 'string' ? values.client_id.trim() : '';
+      const destDept =
+        typeof values.destination_department_id === 'string'
+          ? values.destination_department_id.trim()
+          : '';
+      if (clientId && destDept) {
+        errors.destination_department_id =
+          'Укажите либо внешнего клиента, либо отдел-получатель — но не оба.';
+      }
+      const birds = Number(values.birds_count);
+      const weight = Number(values.total_weight_kg);
+      if (Number.isFinite(birds) && birds > 0 && Number.isFinite(weight) && weight > 0) {
+        const avg = weight / birds;
+        if (avg < 0.3 || avg > 6) {
+          errors.total_weight_kg = `Средний живой вес ${avg.toFixed(2)} кг выходит за разумные пределы (0.3–6 кг). Проверьте данные.`;
+        }
+      }
+      return errors;
     },
     hideDepartmentFieldWhenScoped: true,
     hideOrganizationFieldWhenScoped: true,
@@ -1070,6 +1344,22 @@ const resourceUiConfigs: Record<string, ResourceUiConfig> = {
         'Клиент — если препарат отпущен внешнему покупателю. Для внутреннего использования оставьте пустым.',
       quantity: 'Количество препарата в единицах партии. Вычитается из остатка после сохранения.',
       purpose: 'Коротко: профилактика, лечение, вакцинация и т.п.',
+    },
+    formSections: [
+      {
+        title: 'Кому и откуда',
+        fields: ['consumed_on', 'batch_id', 'factory_flock_id', 'poultry_type_id', 'client_id'],
+      },
+      { title: 'Сколько', fields: ['quantity', 'unit'] },
+      { title: 'Дополнительно', fields: ['purpose', 'notes'] },
+    ],
+    crossFieldValidator: (values) => {
+      const errors: FormErrors = {};
+      const qty = Number(values.quantity);
+      if (Number.isFinite(qty) && qty <= 0) {
+        errors.quantity = 'Количество должно быть больше нуля.';
+      }
+      return errors;
     },
     hideDepartmentFieldWhenScoped: true,
     hideOrganizationFieldWhenScoped: true,

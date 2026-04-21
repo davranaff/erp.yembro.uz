@@ -927,6 +927,34 @@ export function ModuleCrudPage() {
     () => new Set(renderedFormFields.map((field) => field.name)),
     [renderedFormFields],
   );
+  const formFieldGroups = useMemo(() => {
+    const sections = resourceUiConfig?.formSections;
+    if (!sections || sections.length === 0) {
+      return [{ title: '', fields: renderedFormFields }];
+    }
+    const byName = new Map(renderedFormFields.map((field) => [field.name, field]));
+    const consumed = new Set<string>();
+    const groups: Array<{ title: string; fields: typeof renderedFormFields }> = [];
+    for (const section of sections) {
+      const groupFields = section.fields
+        .map((name) => {
+          const field = byName.get(name);
+          if (field) {
+            consumed.add(name);
+          }
+          return field;
+        })
+        .filter((field): field is (typeof renderedFormFields)[number] => Boolean(field));
+      if (groupFields.length > 0) {
+        groups.push({ title: section.title, fields: groupFields });
+      }
+    }
+    const leftover = renderedFormFields.filter((field) => !consumed.has(field.name));
+    if (leftover.length > 0) {
+      groups.push({ title: '', fields: leftover });
+    }
+    return groups;
+  }, [renderedFormFields, resourceUiConfig?.formSections]);
   const formPayloadFields = useMemo(
     () =>
       editableFields.filter(
@@ -2052,9 +2080,12 @@ export function ModuleCrudPage() {
       payload.organization_id = currentDepartmentOrganizationId;
     }
 
-    if (Object.keys(errors).length > 0) {
+    const crossFieldErrors = resourceUiConfig?.crossFieldValidator?.(formValues) ?? {};
+    const mergedErrors: FormErrors = { ...errors, ...crossFieldErrors };
+
+    if (Object.keys(mergedErrors).length > 0) {
       const visibleErrors = Object.fromEntries(
-        Object.entries(errors).filter(([fieldName]) => renderedFormFieldNames.has(fieldName)),
+        Object.entries(mergedErrors).filter(([fieldName]) => renderedFormFieldNames.has(fieldName)),
       ) as FormErrors;
 
       if (Object.keys(visibleErrors).length > 0) {
@@ -2884,39 +2915,50 @@ export function ModuleCrudPage() {
                   {selectedRecord && resourceUiConfig?.detailPanelKey === 'advance_balance' ? (
                     <AdvanceBalancePanel advance={selectedRecord} />
                   ) : null}
-                  <div className="grid gap-4 md:grid-cols-2" data-tour="module-form-fields">
-                    {renderedFormFields.map((field) => (
-                      <CrudFormFieldRow
-                        key={field.name}
-                        field={field}
-                        value={formValues[field.name]}
-                        fieldError={formErrors[field.name]}
-                        context={{
-                          t,
-                          translateReferenceLabel,
-                          yesLabel,
-                          noLabel,
-                          isFormReadOnly,
-                          pendingAction,
-                          supportsDepartmentFilter,
-                          isInventoryMovementsResource,
-                          isClientDebtsResource,
-                          isTransferMovementForm,
-                          formValues,
-                          selectedDepartmentId,
-                          fallbackDepartmentId,
-                          movementDepartmentId,
-                          departmentNodeMap,
-                          departmentReferenceOptions,
-                          movementWarehouseReferenceOptions,
-                          movementCounterpartyWarehouseReferenceOptions,
-                          inventoryMovementItemKeyField,
-                          resourceModuleKey,
-                          resourcePath: activeResource!.path,
-                          fieldHelpers: resourceUiConfig?.fieldHelpers,
-                          onInputChange: handleInputChange,
-                        }}
-                      />
+                  <div className="flex flex-col gap-5" data-tour="module-form-fields">
+                    {formFieldGroups.map((group, groupIndex) => (
+                      <div key={`form-group-${groupIndex}`} className="flex flex-col gap-3">
+                        {group.title ? (
+                          <h3 className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                            {group.title}
+                          </h3>
+                        ) : null}
+                        <div className="grid gap-4 md:grid-cols-2">
+                          {group.fields.map((field) => (
+                            <CrudFormFieldRow
+                              key={field.name}
+                              field={field}
+                              value={formValues[field.name]}
+                              fieldError={formErrors[field.name]}
+                              context={{
+                                t,
+                                translateReferenceLabel,
+                                yesLabel,
+                                noLabel,
+                                isFormReadOnly,
+                                pendingAction,
+                                supportsDepartmentFilter,
+                                isInventoryMovementsResource,
+                                isClientDebtsResource,
+                                isTransferMovementForm,
+                                formValues,
+                                selectedDepartmentId,
+                                fallbackDepartmentId,
+                                movementDepartmentId,
+                                departmentNodeMap,
+                                departmentReferenceOptions,
+                                movementWarehouseReferenceOptions,
+                                movementCounterpartyWarehouseReferenceOptions,
+                                inventoryMovementItemKeyField,
+                                resourceModuleKey,
+                                resourcePath: activeResource!.path,
+                                fieldHelpers: resourceUiConfig?.fieldHelpers,
+                                onInputChange: handleInputChange,
+                              }}
+                            />
+                          ))}
+                        </div>
+                      </div>
                     ))}
                   </div>
                 </CrudDrawer>
