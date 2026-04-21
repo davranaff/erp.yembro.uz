@@ -803,7 +803,63 @@ def _load_fixture_rows(fixtures_dir: Path) -> dict[str, list[dict[str, object]]]
     prepared_rows["stock_movements"] = _build_generated_stock_movements(prepared_rows)
     prepared_rows["stock_movements"] = _apply_default_warehouses_to_stock_movements(prepared_rows)
     _resolve_measurement_unit_ids(prepared_rows)
+    _backfill_cash_transaction_structure(prepared_rows)
     return prepared_rows
+
+
+def _backfill_cash_transaction_structure(
+    rows_by_table: dict[str, list[dict[str, object]]],
+) -> None:
+    """Populate F0.6 structured fields for cash_transactions rows in fixtures.
+
+    Fixtures stay readable with just cash_account_id + amount + currency;
+    this helper derives `department_id` from the account and snapshots
+    `amount_in_base` (= amount, rate=1.0) so the NOT NULL columns load.
+    """
+    from decimal import Decimal
+
+    account_dept: dict[str, str] = {
+        str(row["id"]): str(row["department_id"])
+        for row in rows_by_table.get("cash_accounts", [])
+        if row.get("department_id") is not None
+    }
+
+    currency_index: dict[tuple[str, str], str] = {}
+    for row in rows_by_table.get("currencies", []):
+        currency_index[(str(row["organization_id"]), str(row["code"]).upper())] = str(row["id"])
+
+    for row in rows_by_table.get("cash_transactions", []):
+        if not row.get("department_id"):
+            cash_account_id = str(row.get("cash_account_id") or "")
+            if cash_account_id and cash_account_id in account_dept:
+                row["department_id"] = account_dept[cash_account_id]
+
+        if not row.get("counterparty_type") and row.get("counterparty_client_id"):
+            row["counterparty_type"] = "client"
+            row["counterparty_id"] = row["counterparty_client_id"]
+
+        if row.get("expense_id") and not row.get("source_type"):
+            row["source_type"] = "expense"
+            row["source_id"] = row["expense_id"]
+
+        if row.get("amount_in_base") is None:
+            amount = Decimal(str(row.get("amount") or 0))
+            rate = Decimal(str(row.get("exchange_rate_to_base") or "1.0"))
+            row["amount_in_base"] = str((amount * rate).quantize(Decimal("0.01")))
+
+        if row.get("exchange_rate_to_base") is None:
+            row["exchange_rate_to_base"] = "1.0"
+
+        if row.get("status") is None:
+            row["status"] = "posted"
+
+        if not row.get("currency_id"):
+            org = str(row.get("organization_id") or "")
+            code = str(row.get("currency") or "").upper()
+            if org and code:
+                cid = currency_index.get((org, code))
+                if cid is not None:
+                    row["currency_id"] = cid
 
 
 UNIT_FK_TABLES: dict[str, str] = {

@@ -51,6 +51,8 @@ class StockMovement(Base, IDMixin, TimestampMixin):
     occurred_on: Mapped[date] = mapped_column(Date, nullable=False, index=True)
     reference_table: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
     reference_id: Mapped[UUID] = mapped_column(nullable=False, index=True)
+    counterparty_type: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    counterparty_id: Mapped[UUID | None] = mapped_column(nullable=True)
     note: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     __table_args__ = (

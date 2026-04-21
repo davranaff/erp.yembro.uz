@@ -18,6 +18,11 @@ class CashTransaction(Base, IDMixin, TimestampMixin):
         nullable=False,
         index=True,
     )
+    department_id: Mapped[UUID] = mapped_column(
+        ForeignKey("departments.id", ondelete="RESTRICT"),
+        nullable=False,
+        index=True,
+    )
     cash_account_id: Mapped[UUID] = mapped_column(
         ForeignKey("cash_accounts.id", ondelete="RESTRICT"),
         nullable=False,
@@ -28,10 +33,18 @@ class CashTransaction(Base, IDMixin, TimestampMixin):
         nullable=True,
         index=True,
     )
+    category_id: Mapped[UUID | None] = mapped_column(nullable=True, index=True)
     counterparty_client_id: Mapped[UUID | None] = mapped_column(
         ForeignKey("clients.id", ondelete="SET NULL"),
         nullable=True,
         index=True,
+    )
+    counterparty_type: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    counterparty_id: Mapped[UUID | None] = mapped_column(nullable=True)
+    source_type: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    source_id: Mapped[UUID | None] = mapped_column(nullable=True)
+    status: Mapped[str] = mapped_column(
+        String(32), nullable=False, default="posted", server_default="posted", index=True
     )
     created_by: Mapped[UUID | None] = mapped_column(
         ForeignKey("employees.id", ondelete="SET NULL"),
@@ -42,6 +55,14 @@ class CashTransaction(Base, IDMixin, TimestampMixin):
     transaction_type: Mapped[str] = mapped_column(String(32), nullable=False, index=True)
     amount: Mapped[Decimal] = mapped_column(Numeric(16, 2), nullable=False)
     currency: Mapped[str] = mapped_column(String(8), nullable=False)
+    currency_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("currencies.id", ondelete="RESTRICT"),
+        nullable=True,
+    )
+    exchange_rate_to_base: Mapped[Decimal] = mapped_column(
+        Numeric(10, 6), nullable=False, default=Decimal("1.0"), server_default="1.0"
+    )
+    amount_in_base: Mapped[Decimal] = mapped_column(Numeric(16, 2), nullable=False)
     transaction_date: Mapped[date] = mapped_column(Date, nullable=False, index=True)
     reference_no: Mapped[str | None] = mapped_column(String(120), nullable=True, index=True)
     note: Mapped[str | None] = mapped_column(Text, nullable=True)

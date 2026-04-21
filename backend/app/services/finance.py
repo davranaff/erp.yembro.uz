@@ -747,6 +747,49 @@ class CashTransactionService(CreatedByActorMixin, BaseService):
         next_payload = super()._prepare_create_payload(payload, actor=actor)
         return self._normalize_transaction_type_payload(next_payload, is_create=True)
 
+    async def _fill_transaction_structured_fields(
+        self,
+        data: dict[str, Any],
+        *,
+        actor: CurrentActor | None = None,
+    ) -> None:
+        """Populate F0.6 structured fields on cash_transactions.
+
+        Backs `department_id` from the owning cash_account, snapshots
+        `amount_in_base = amount × exchange_rate_to_base`, and mirrors
+        the legacy client FK into the polymorphic counterparty pair.
+        """
+        if not data.get("department_id"):
+            cash_account_id = data.get("cash_account_id")
+            if cash_account_id:
+                organization_id = str(data.get("organization_id") or "").strip()
+                if not organization_id and actor is not None:
+                    organization_id = actor.organization_id
+                account = await self._get_cash_account_for_transaction(
+                    cash_account_id=str(cash_account_id),
+                    organization_id=organization_id,
+                )
+                data["department_id"] = str(account["department_id"])
+
+        if not data.get("counterparty_type") and data.get("counterparty_client_id"):
+            data["counterparty_type"] = "client"
+            data["counterparty_id"] = data.get("counterparty_client_id")
+
+        rate_raw = data.get("exchange_rate_to_base")
+        rate = Decimal(str(rate_raw)) if rate_raw is not None else Decimal("1.0")
+        amount = Decimal(str(data.get("amount") or 0))
+        data["exchange_rate_to_base"] = str(rate)
+        data["amount_in_base"] = str((amount * rate).quantize(Decimal("0.01")))
+
+        if not data.get("currency_id") and data.get("currency") and data.get("organization_id"):
+            row = await self.repository.db.fetchrow(
+                "SELECT id FROM currencies WHERE organization_id = $1 AND code = $2 LIMIT 1",
+                data["organization_id"],
+                data["currency"],
+            )
+            if row is not None:
+                data["currency_id"] = str(row["id"])
+
     def _prepare_update_payload(
         self,
         payload: dict[str, Any],
@@ -819,6 +862,8 @@ class CashTransactionService(CreatedByActorMixin, BaseService):
                 )
             else:
                 data["expense_id"] = None
+
+            await self._fill_transaction_structured_fields(data, actor=actor)
 
             entity = await self.repository.create(data)
             enriched_entity = (await self._enrich_transaction_rows([entity]))[0]
