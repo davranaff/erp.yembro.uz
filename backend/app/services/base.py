@@ -681,17 +681,12 @@ class BaseService(ABC):
 
         if existing_filter is None:
             scoped_filters["organization_id"] = scoped_organization_id
-            return scoped_filters
-
-        if isinstance(existing_filter, (list, tuple, set)):
+        elif isinstance(existing_filter, (list, tuple, set)):
             scoped_filters["organization_id"] = [
                 value for value in existing_filter if str(value) == scoped_organization_id
             ]
-            return scoped_filters
-
-        if str(existing_filter) != scoped_organization_id:
+        elif str(existing_filter) != scoped_organization_id:
             scoped_filters["organization_id"] = []
-            return scoped_filters
 
         # Row-level scope (flag-gated): when explicit allow-lists are present,
         # delegate to UserScope which intersects with any caller-supplied

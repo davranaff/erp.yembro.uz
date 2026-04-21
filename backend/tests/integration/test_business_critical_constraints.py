@@ -130,3 +130,35 @@ async def test_non_privileged_user_cannot_create_records_in_other_department(api
     assert response.status_code == 201, response.text
     created = extract_data(response)
     assert created["department_id"] == HOME_DEPARTMENT_ID
+
+
+@pytest.mark.asyncio
+async def test_viewer_list_hides_other_department_records(api_client) -> None:
+    """Viewer scoped to HOME_DEPARTMENT must not see medicine_batches from other depts.
+
+    All fixture medicine_batches live in department 88881111/88882222 (medicine
+    department). A viewer anchored to HOME_DEPARTMENT (44444444) should see an
+    empty list, never a batch from elsewhere.
+    """
+    response = await api_client.get(
+        "/api/v1/medicine/batches",
+        headers=_headers("medicine_batch", role="viewer"),
+    )
+    assert response.status_code == 200
+    items = extract_data(response).get("items", [])
+    foreign = [row for row in items if row.get("department_id") != HOME_DEPARTMENT_ID]
+    assert not foreign, f"viewer leaked {len(foreign)} records from other departments"
+
+
+@pytest.mark.asyncio
+async def test_viewer_cannot_read_entity_from_other_department(api_client) -> None:
+    """Direct GET by id on a cross-department entity must 403/404 for viewer."""
+    other_dept_batch_id = "93111111-1111-1111-1111-111111111101"
+    response = await api_client.get(
+        f"/api/v1/medicine/batches/{other_dept_batch_id}",
+        headers=_headers("medicine_batch", role="viewer"),
+    )
+    assert response.status_code in (403, 404), (
+        f"viewer in HOME_DEPT accessed medicine batch from another dept: "
+        f"got {response.status_code}"
+    )
