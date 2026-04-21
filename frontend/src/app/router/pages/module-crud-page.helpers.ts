@@ -22,6 +22,12 @@ export type ResourceUiConfig = {
   hideDepartmentFieldWhenScoped?: boolean;
   hideOrganizationFieldWhenScoped?: boolean;
   detailPanelKey?: ResourceDetailPanelKey;
+  /**
+   * When true, the resource is treated as system-generated: "New record",
+   * Edit and Delete are suppressed in the UI. Useful for monthly-analytics
+   * rows that are upserted by Taskiq jobs and must not be hand-edited.
+   */
+  readOnly?: boolean;
 };
 export type DepartmentRecord = CrudRecord & {
   id?: string;
@@ -636,6 +642,44 @@ const resourceUiConfigs: Record<string, ResourceUiConfig> = {
     hideDepartmentFieldWhenScoped: true,
     hideOrganizationFieldWhenScoped: true,
   },
+  'feed:types': {
+    formOrder: ['name', 'code', 'poultry_type_id', 'unit', 'description', 'is_active'],
+    tableOrder: ['name', 'code', 'poultry_type_id', 'unit', 'is_active'],
+    hiddenFields: ['measurement_unit_id'],
+    hideOrganizationFieldWhenScoped: true,
+  },
+  'feed:ingredients': {
+    formOrder: ['name', 'code', 'supplier_category', 'unit', 'description', 'is_active'],
+    tableOrder: ['name', 'code', 'supplier_category', 'unit', 'is_active'],
+    hiddenFields: ['measurement_unit_id'],
+    hideOrganizationFieldWhenScoped: true,
+  },
+  'feed:formulas': {
+    formOrder: ['name', 'code', 'feed_type_id', 'version', 'description', 'is_active'],
+    tableOrder: ['name', 'code', 'feed_type_id', 'version', 'is_active'],
+    hideOrganizationFieldWhenScoped: true,
+  },
+  'feed:formula-ingredients': {
+    formOrder: ['formula_id', 'ingredient_id', 'quantity_per_batch', 'unit'],
+    tableOrder: ['formula_id', 'ingredient_id', 'quantity_per_batch', 'unit'],
+    hiddenFields: ['measurement_unit_id'],
+    hideOrganizationFieldWhenScoped: true,
+  },
+  'feed:consumptions': {
+    formOrder: [
+      'consumed_on',
+      'feed_type_id',
+      'production_batch_id',
+      'poultry_type_id',
+      'quantity',
+      'unit',
+      'note',
+    ],
+    tableOrder: ['consumed_on', 'feed_type_id', 'quantity', 'unit', 'poultry_type_id'],
+    hiddenFields: ['daily_log_id', 'measurement_unit_id'],
+    hideDepartmentFieldWhenScoped: true,
+    hideOrganizationFieldWhenScoped: true,
+  },
   'feed:monthly-analytics': {
     formOrder: [
       'month_start',
@@ -661,6 +705,37 @@ const resourceUiConfigs: Record<string, ResourceUiConfig> = {
       'quality_passed_count',
       'quality_failed_count',
     ],
+    hideDepartmentFieldWhenScoped: true,
+    hideOrganizationFieldWhenScoped: true,
+    readOnly: true,
+  },
+  'egg:monthly-analytics': {
+    readOnly: true,
+    hideDepartmentFieldWhenScoped: true,
+    hideOrganizationFieldWhenScoped: true,
+  },
+  'incubation:monthly-analytics': {
+    readOnly: true,
+    hideDepartmentFieldWhenScoped: true,
+    hideOrganizationFieldWhenScoped: true,
+  },
+  'incubation:factory-monthly-analytics': {
+    readOnly: true,
+    hideDepartmentFieldWhenScoped: true,
+    hideOrganizationFieldWhenScoped: true,
+  },
+  'factory:monthly-analytics': {
+    readOnly: true,
+    hideDepartmentFieldWhenScoped: true,
+    hideOrganizationFieldWhenScoped: true,
+  },
+  'slaughter:slaughter-monthly-analytics': {
+    readOnly: true,
+    hideDepartmentFieldWhenScoped: true,
+    hideOrganizationFieldWhenScoped: true,
+  },
+  'medicine:medicine-monthly-analytics': {
+    readOnly: true,
     hideDepartmentFieldWhenScoped: true,
     hideOrganizationFieldWhenScoped: true,
   },
@@ -869,6 +944,23 @@ const resourceUiConfigs: Record<string, ResourceUiConfig> = {
       'attachment_content_type',
       'attachment_size_bytes',
     ],
+    hideDepartmentFieldWhenScoped: true,
+    hideOrganizationFieldWhenScoped: true,
+  },
+  'medicine:consumptions': {
+    formOrder: [
+      'consumed_on',
+      'batch_id',
+      'factory_flock_id',
+      'poultry_type_id',
+      'client_id',
+      'quantity',
+      'unit',
+      'purpose',
+      'notes',
+    ],
+    tableOrder: ['consumed_on', 'batch_id', 'quantity', 'unit', 'purpose', 'factory_flock_id'],
+    hiddenFields: ['measurement_unit_id', 'created_by'],
     hideDepartmentFieldWhenScoped: true,
     hideOrganizationFieldWhenScoped: true,
   },

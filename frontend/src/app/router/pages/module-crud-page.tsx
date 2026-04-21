@@ -480,14 +480,21 @@ export function ModuleCrudPage() {
   const resourceUiConfig =
     getResourceUiConfig(resourceModuleKey || moduleKey, activeResource?.key ?? '') ??
     getResourceUiConfig(moduleKey, activeResource?.key ?? '');
+  const isReadOnlyResource = Boolean(resourceUiConfig?.readOnly);
   const canCreateActiveResource = Boolean(
-    activeResource && canCreateCrudResource(sessionRoles, sessionPermissions, activeResource),
+    !isReadOnlyResource &&
+    activeResource &&
+    canCreateCrudResource(sessionRoles, sessionPermissions, activeResource),
   );
   const canEditActiveResource = Boolean(
-    activeResource && canEditCrudResource(sessionRoles, sessionPermissions, activeResource),
+    !isReadOnlyResource &&
+    activeResource &&
+    canEditCrudResource(sessionRoles, sessionPermissions, activeResource),
   );
   const canDeleteActiveResource = Boolean(
-    activeResource && canDeleteCrudResource(sessionRoles, sessionPermissions, activeResource),
+    !isReadOnlyResource &&
+    activeResource &&
+    canDeleteCrudResource(sessionRoles, sessionPermissions, activeResource),
   );
   const canReadAuditActiveResource = Boolean(
     activeResource && canReadAuditLogs(sessionRoles, sessionPermissions),
