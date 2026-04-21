@@ -178,6 +178,12 @@ class Organization(Base, IDMixin, TimestampMixin):
         cascade="all, delete-orphan",
         lazy="selectin",
     )
+    slaughter_arrivals: Mapped[List["SlaughterArrival"]] = relationship(
+        "SlaughterArrival",
+        back_populates="organization",
+        cascade="all, delete-orphan",
+        lazy="selectin",
+    )
     slaughter_processings: Mapped[List["SlaughterProcessing"]] = relationship(
         "SlaughterProcessing",
         back_populates="organization",

@@ -363,18 +363,33 @@ const resourceUiConfigs: Record<string, ResourceUiConfig> = {
     hiddenFields: ['expense_id'],
     hideOrganizationFieldWhenScoped: true,
   },
-  'slaughter:processings': {
+  'slaughter:arrivals': {
     formOrder: [
       'source_type',
       'factory_shipment_id',
       'supplier_client_id',
+      'poultry_type_id',
       'arrived_on',
       'birds_received',
       'arrival_total_weight_kg',
       'arrival_unit_price',
       'arrival_currency',
       'arrival_invoice_no',
-      'poultry_type_id',
+      'note',
+    ],
+    tableOrder: [
+      'arrived_on',
+      'source_type',
+      'birds_received',
+      'arrival_total_weight_kg',
+      'arrival_unit_price',
+    ],
+    hideDepartmentFieldWhenScoped: true,
+    hideOrganizationFieldWhenScoped: true,
+  },
+  'slaughter:processings': {
+    formOrder: [
+      'arrival_id',
       'processed_on',
       'processed_by',
       'birds_processed',
@@ -387,10 +402,8 @@ const resourceUiConfigs: Record<string, ResourceUiConfig> = {
       'note',
     ],
     tableOrder: [
-      'arrived_on',
-      'source_type',
-      'birds_received',
       'processed_on',
+      'arrival_id',
       'birds_processed',
       'first_sort_count',
       'second_sort_count',
@@ -1171,9 +1184,10 @@ const RESOURCE_ICON_KEY_MAP: Record<string, string> = {
   'chick-shipments': 'Truck',
   'product-shipments': 'Truck',
   'semi-product-shipments': 'Truck',
+  arrivals: 'PackagePlus',
+  processings: 'Scissors',
+  'semi-products': 'Package',
   'stock-movements': 'ArrowRightLeft',
-  'stock-takes': 'ClipboardCheck',
-  'reorder-levels': 'AlertTriangle',
   warehouses: 'Warehouse',
   clients: 'Users',
   'factory-clients': 'Users',
@@ -1207,6 +1221,7 @@ const RESOURCE_ICON_KEY_MAP: Record<string, string> = {
   'daily-logs': 'ClipboardList',
   'medicine-usages': 'Pill',
   'vaccination-plans': 'Syringe',
+  'feed-consumptions': 'Wheat',
 };
 
 export const resolveResourceIconKey = (resourceKey: string): string =>

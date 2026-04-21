@@ -35,6 +35,10 @@ class FeedRawConsumptionRepository(BaseRepository[dict[str, object]]):
     table = "feed_raw_consumptions"
 
 
+class FeedConsumptionRepository(BaseRepository[dict[str, object]]):
+    table = "feed_consumptions"
+
+
 class FeedProductionQualityCheckRepository(BaseRepository[dict[str, object]]):
     table = "feed_production_quality_checks"
 
@@ -52,6 +56,7 @@ __all__ = [
     "FeedProductShipmentRepository",
     "FeedRawArrivalRepository",
     "FeedRawConsumptionRepository",
+    "FeedConsumptionRepository",
     "FeedProductionQualityCheckRepository",
     "FeedMonthlyAnalyticsRepository",
 ]

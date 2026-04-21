@@ -73,6 +73,7 @@ FIXTURE_LOAD_ORDER = [
     "medicine_batches",
     "factory_medicine_usages",
     "factory_vaccination_plans",
+    "slaughter_arrivals",
     "slaughter_processings",
     "slaughter_semi_products",
     "slaughter_quality_checks",

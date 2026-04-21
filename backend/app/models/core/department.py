@@ -115,6 +115,11 @@ class Department(Base, IDMixin, TimestampMixin):
         back_populates="department",
         lazy="selectin",
     )
+    slaughter_arrivals: Mapped[List["SlaughterArrival"]] = relationship(
+        "SlaughterArrival",
+        back_populates="department",
+        lazy="selectin",
+    )
     slaughter_processings: Mapped[List["SlaughterProcessing"]] = relationship(
         "SlaughterProcessing",
         back_populates="department",

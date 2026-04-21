@@ -28,8 +28,8 @@ class PoultryType(Base, IDMixin, TimestampMixin):
         back_populates="poultry_type",
         lazy="selectin",
     )
-    slaughter_processings: Mapped[list["SlaughterProcessing"]] = relationship(
-        "SlaughterProcessing",
+    slaughter_arrivals: Mapped[list["SlaughterArrival"]] = relationship(
+        "SlaughterArrival",
         back_populates="poultry_type",
         lazy="selectin",
     )

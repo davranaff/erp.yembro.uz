@@ -12,6 +12,7 @@ from app.repositories.core import (
     WarehouseRepository,
 )
 from app.repositories.feed import (
+    FeedConsumptionRepository,
     FeedFormulaIngredientRepository,
     FeedFormulaRepository,
     FeedIngredientRepository,
@@ -27,6 +28,7 @@ from app.repositories.finance import SupplierDebtRepository
 from app.repositories.hr import EmployeeRepository
 from app.repositories.inventory import StockMovementRepository
 from app.schemas.feed import (
+    FeedConsumptionReadSchema,
     FeedFormulaIngredientReadSchema,
     FeedFormulaReadSchema,
     FeedIngredientReadSchema,
@@ -378,6 +380,20 @@ class FeedRawArrivalService(CreatedByActorMixin, BaseService):
             reference_id=str(deleted_entity["id"]),
         )
         await self._delete_auto_ap(str(deleted_entity["id"]))
+
+
+class FeedConsumptionService(CreatedByActorMixin, BaseService):
+    """Feed consumed by broilers — factory-side view of feed_consumptions.
+
+    Records linked to factory_daily_logs get auto-managed by
+    FactoryDailyLogService._sync_feed_consumption_row; manually-created
+    rows (without daily_log_id) are preserved as-is.
+    """
+
+    read_schema = FeedConsumptionReadSchema
+
+    def __init__(self, repository: FeedConsumptionRepository) -> None:
+        super().__init__(repository=repository)
 
 
 class FeedRawConsumptionService(CreatedByActorMixin, BaseService):

@@ -2202,11 +2202,11 @@ async def _build_slaughterhouse_section(
     flow_rows = await db.fetch(
         f"""
         WITH arrivals AS (
-            SELECT TO_CHAR(sp.arrived_on, 'YYYY-MM-DD') AS label, SUM(sp.birds_received) AS arrivals
-            FROM slaughter_processings sp
-            INNER JOIN departments d ON d.id = sp.department_id
-            WHERE d.module_key = 'slaughter' AND {_date_condition('sp.arrived_on')} AND {_department_condition('sp.department_id')}
-            GROUP BY sp.arrived_on
+            SELECT TO_CHAR(ar.arrived_on, 'YYYY-MM-DD') AS label, SUM(ar.birds_received) AS arrivals
+            FROM slaughter_arrivals ar
+            INNER JOIN departments d ON d.id = ar.department_id
+            WHERE d.module_key = 'slaughter' AND {_date_condition('ar.arrived_on')} AND {_department_condition('ar.department_id')}
+            GROUP BY ar.arrived_on
         ),
         processed AS (
             SELECT TO_CHAR(sp.processed_on, 'YYYY-MM-DD') AS label, SUM(sp.birds_processed) AS processed
@@ -2235,7 +2235,7 @@ async def _build_slaughterhouse_section(
             SUM(sp.second_sort_count) AS second_sort_count,
             SUM(sp.bad_count) AS bad_count,
             SUM(sp.first_sort_count + sp.second_sort_count + sp.bad_count) AS total_sorted,
-            SUM(COALESCE(sp.arrival_total_weight_kg, 0)) AS arrival_weight_kg,
+            SUM(COALESCE(ar.arrival_total_weight_kg, 0)) AS arrival_weight_kg,
             SUM(
                 COALESCE(sp.first_sort_weight_kg, 0)
                 + COALESCE(sp.second_sort_weight_kg, 0)
@@ -2245,6 +2245,7 @@ async def _build_slaughterhouse_section(
             SUM(COALESCE(sp.second_sort_weight_kg, 0)) AS second_sort_weight_kg,
             SUM(COALESCE(sp.bad_weight_kg, 0)) AS bad_weight_kg
         FROM slaughter_processings sp
+        INNER JOIN slaughter_arrivals ar ON ar.id = sp.arrival_id
         INNER JOIN departments d ON d.id = sp.department_id
         WHERE d.module_key = 'slaughter' AND {_date_condition('sp.processed_on')} AND {_department_condition('sp.department_id')}
         GROUP BY sp.processed_on
@@ -2329,16 +2330,31 @@ async def _build_slaughterhouse_section(
         end_date,
         department_ids,
     )
+    expense_rows = await db.fetch(
+        f"""
+        SELECT
+            TO_CHAR(ar.arrived_on, 'YYYY-MM-DD') AS label,
+            SUM(COALESCE(ar.arrival_unit_price, 0) * COALESCE(ar.arrival_total_weight_kg, 0)) AS expenses
+        FROM slaughter_arrivals ar
+        INNER JOIN departments d ON d.id = ar.department_id
+        WHERE d.module_key = 'slaughter' AND {_date_condition('ar.arrived_on')} AND {_department_condition('ar.department_id')}
+        GROUP BY ar.arrived_on
+        ORDER BY ar.arrived_on
+        """,
+        start_date,
+        end_date,
+        department_ids,
+    )
     client_base_count = await db.fetchrow(
         f"""
         WITH active_clients AS (
-            SELECT sp.supplier_client_id AS client_id
-            FROM slaughter_processings sp
-            INNER JOIN departments d ON d.id = sp.department_id
+            SELECT ar.supplier_client_id AS client_id
+            FROM slaughter_arrivals ar
+            INNER JOIN departments d ON d.id = ar.department_id
             WHERE d.module_key = 'slaughter'
-              AND sp.supplier_client_id IS NOT NULL
-              AND {_date_condition('sp.arrived_on')}
-              AND {_department_condition('sp.department_id')}
+              AND ar.supplier_client_id IS NOT NULL
+              AND {_date_condition('ar.arrived_on')}
+              AND {_department_condition('ar.department_id')}
 
             UNION
 
@@ -2362,13 +2378,18 @@ async def _build_slaughterhouse_section(
     total_sorted = _sum_rows(quality_rows, "total_sorted")
     sales_volume_total = _sum_rows(revenue_rows, "quantity")
     sales_revenue_total = _sum_rows(revenue_rows, "revenue")
+    expenses_total = _sum_rows(expense_rows, "expenses")
+    profit_total = sales_revenue_total - expenses_total
     arrival_weight_total = _sum_rows(quality_rows, "arrival_weight_kg")
     processed_weight_total = _sum_rows(quality_rows, "processed_weight_kg")
     first_sort_weight_total = _sum_rows(quality_rows, "first_sort_weight_kg")
+    second_sort_weight_total = _sum_rows(quality_rows, "second_sort_weight_kg")
     bad_weight_total = _sum_rows(quality_rows, "bad_weight_kg")
+    meat_weight_total = first_sort_weight_total + second_sort_weight_total
     dressing_yield_pct = _ratio(processed_weight_total, arrival_weight_total)
     first_sort_weight_share_pct = _ratio(first_sort_weight_total, processed_weight_total)
     bad_weight_share_pct = _ratio(bad_weight_total, processed_weight_total)
+    meat_weight_share_pct = _ratio(meat_weight_total, processed_weight_total)
 
     return DashboardSectionSchema(
         key="slaughterhouse",
@@ -2389,7 +2410,9 @@ async def _build_slaughterhouse_section(
             _metric(key="bad_weight_share_pct", label="Доля брака по весу", value=bad_weight_share_pct, unit="%"),
             _metric(key="semi_products", label="Полуфабриката произведено", value=_sum_rows(semi_rows, "value"), unit="кг"),
             _metric(key="sales_volume", label="Продано полуфабриката", value=sales_volume_total, unit="кг"),
-            _metric(key="sales_revenue", label="Выручка", value=sales_revenue_total, unit="UZS"),
+            _metric(key="sales_revenue", label="Доходы", value=sales_revenue_total, unit="UZS"),
+            _metric(key="expenses_total", label="Расходы", value=expenses_total, unit="UZS"),
+            _metric(key="profit_total", label="Прибыль", value=profit_total, unit="UZS"),
             _metric(
                 key="avg_sale_price",
                 label="Средняя цена",
@@ -2450,14 +2473,36 @@ async def _build_slaughterhouse_section(
             ),
             DashboardChartSchema(
                 key="slaughter_revenue",
-                title="Выручка по полуфабрикату",
+                title="Доходы по полуфабрикату",
                 description="Сколько денег приносят отгрузки полуфабриката по дням.",
                 type="line",
                 unit="UZS",
-                series=_wide_series(revenue_rows, ("revenue", "Выручка", "revenue")),
+                series=_wide_series(revenue_rows, ("revenue", "Доходы", "revenue")),
             ),
         ],
         breakdowns=[
+            DashboardBreakdownSchema(
+                key="slaughter_yield_split",
+                title="Мясо и отход",
+                description="Доля чистого мяса (1 и 2 сорт) и брака/отхода от общего веса после убоя.",
+                items=_breakdown_items(
+                    [
+                        {
+                            "key": "meat",
+                            "label": "Мясо (1 + 2 сорт)",
+                            "value": meat_weight_share_pct or 0.0,
+                            "caption": f"{round(meat_weight_total, 1)} кг",
+                        },
+                        {
+                            "key": "waste",
+                            "label": "Отход / брак",
+                            "value": bad_weight_share_pct or 0.0,
+                            "caption": f"{round(bad_weight_total, 1)} кг",
+                        },
+                    ],
+                    unit="%",
+                ),
+            ),
             DashboardBreakdownSchema(
                 key="slaughter_parts",
                 title="Полуфабрикат и части",
@@ -2466,7 +2511,7 @@ async def _build_slaughterhouse_section(
             ),
             DashboardBreakdownSchema(
                 key="slaughter_clients",
-                title="Выручка по клиентам",
+                title="Доходы по клиентам",
                 description="Какие клиенты приносят основную выручку по полуфабрикату.",
                 items=_breakdown_items(client_rows, unit="UZS"),
             )
@@ -4187,18 +4232,18 @@ async def _build_slaughterhouse_dashboard_module(
         f"""
         WITH active_clients AS (
             SELECT
-                sp.supplier_client_id AS client_id,
+                ar.supplier_client_id AS client_id,
                 COUNT(*) AS arrivals_count,
-                SUM(sp.birds_received) AS birds_arrived,
+                SUM(ar.birds_received) AS birds_arrived,
                 0::bigint AS shipments_count,
                 0::numeric AS semi_shipped
-            FROM slaughter_processings sp
-            INNER JOIN departments d ON d.id = sp.department_id
+            FROM slaughter_arrivals ar
+            INNER JOIN departments d ON d.id = ar.department_id
             WHERE d.module_key = 'slaughter'
-              AND sp.supplier_client_id IS NOT NULL
-              AND {_date_condition('sp.arrived_on')}
-              AND {_department_condition('sp.department_id')}
-            GROUP BY sp.supplier_client_id
+              AND ar.supplier_client_id IS NOT NULL
+              AND {_date_condition('ar.arrived_on')}
+              AND {_department_condition('ar.department_id')}
+            GROUP BY ar.supplier_client_id
 
             UNION ALL
 
@@ -4250,32 +4295,32 @@ async def _build_slaughterhouse_dashboard_module(
     recent_arrivals_rows = await db.fetch(
         f"""
         SELECT
-            sp.id::text AS key,
+            ar.id::text AS key,
             CONCAT(
-                TO_CHAR(sp.arrived_on, 'YYYY-MM-DD'),
+                TO_CHAR(ar.arrived_on, 'YYYY-MM-DD'),
                 ' • ',
                 CASE
-                    WHEN sp.source_type = 'factory' THEN 'собственная фабрика'
+                    WHEN ar.source_type = 'factory' THEN 'собственная фабрика'
                     ELSE COALESCE(NULLIF({_client_label_sql('c')}, 'Клиент'), 'внешний поставщик')
                 END
             ) AS label,
-            sp.birds_received AS value,
+            ar.birds_received AS value,
             CONCAT(
                 'Средний вес: ',
                 CASE
-                    WHEN sp.arrival_total_weight_kg IS NOT NULL AND sp.birds_received > 0
-                    THEN ROUND(sp.arrival_total_weight_kg / sp.birds_received, 3)::text
+                    WHEN ar.arrival_total_weight_kg IS NOT NULL AND ar.birds_received > 0
+                    THEN ROUND(ar.arrival_total_weight_kg / ar.birds_received, 3)::text
                     ELSE '—'
                 END,
                 ' кг'
             ) AS caption
-        FROM slaughter_processings sp
-        INNER JOIN departments d ON d.id = sp.department_id
-        LEFT JOIN clients c ON c.id = sp.supplier_client_id
+        FROM slaughter_arrivals ar
+        INNER JOIN departments d ON d.id = ar.department_id
+        LEFT JOIN clients c ON c.id = ar.supplier_client_id
         WHERE d.module_key = 'slaughter'
-          AND {_date_condition('sp.arrived_on')}
-          AND {_department_condition('sp.department_id')}
-        ORDER BY sp.arrived_on DESC, sp.created_at DESC
+          AND {_date_condition('ar.arrived_on')}
+          AND {_department_condition('ar.department_id')}
+        ORDER BY ar.arrived_on DESC, ar.created_at DESC
         LIMIT 8
         """,
         start_date,

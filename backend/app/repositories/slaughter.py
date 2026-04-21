@@ -3,6 +3,10 @@ from __future__ import annotations
 from app.repositories.base import BaseRepository
 
 
+class SlaughterArrivalRepository(BaseRepository[dict[str, object]]):
+    table = "slaughter_arrivals"
+
+
 class SlaughterProcessingRepository(BaseRepository[dict[str, object]]):
     table = "slaughter_processings"
 
@@ -24,6 +28,7 @@ class SlaughterMonthlyAnalyticsRepository(BaseRepository[dict[str, object]]):
 
 
 __all__ = [
+    "SlaughterArrivalRepository",
     "SlaughterProcessingRepository",
     "SlaughterSemiProductRepository",
     "SlaughterSemiProductShipmentRepository",

@@ -15,6 +15,7 @@ from app.repositories.factory import (
     FactoryShipmentRepository,
     FactoryVaccinationPlanRepository,
 )
+from app.repositories.feed import FeedConsumptionRepository
 from app.services.factory import (
     FactoryDailyLogService,
     FactoryFlockService,
@@ -22,6 +23,7 @@ from app.services.factory import (
     FactoryShipmentService,
     FactoryVaccinationPlanService,
 )
+from app.services.feed import FeedConsumptionService
 
 
 router = APIRouter(prefix="/factory", tags=["factory"])
@@ -187,6 +189,15 @@ router.include_router(
         service_factory=lambda db: FactoryVaccinationPlanService(FactoryVaccinationPlanRepository(db)),
         permission_prefix="factory_vaccination_plan",
         tags=["factory-vaccination-plan"],
+    )
+)
+
+router.include_router(
+    build_crud_router(
+        prefix="feed-consumptions",
+        service_factory=lambda db: FeedConsumptionService(FeedConsumptionRepository(db)),
+        permission_prefix="feed_consumption",
+        tags=["factory-feed-consumption"],
     )
 )
 

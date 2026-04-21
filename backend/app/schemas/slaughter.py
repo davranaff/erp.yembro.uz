@@ -10,6 +10,26 @@ from app.schemas.base import (
 )
 
 
+class SlaughterArrivalCreateSchema(OpenSchema, BaseCreateSchema):
+    """Input payload to create slaughter arrival (incoming batch)."""
+
+
+class SlaughterArrivalUpdateSchema(OpenSchema, BaseUpdateSchema):
+    """Input payload to update slaughter arrival."""
+
+
+class SlaughterArrivalReadSchema(OpenSchema, BaseReadSchema):
+    """Readable slaughter arrival response."""
+
+
+class SlaughterArrivalListParams(CRUDBaseParams):
+    """Pagination + query params for slaughter arrival list."""
+
+
+class SlaughterArrivalListResponse(CRUDListResponse[SlaughterArrivalReadSchema]):
+    """Paginated slaughter arrival response."""
+
+
 class SlaughterProcessingCreateSchema(OpenSchema, BaseCreateSchema):
     """Input payload to create slaughter processing."""
 
@@ -113,6 +133,11 @@ class SlaughterMonthlyAnalyticsListResponse(
 
 
 __all__ = [
+    "SlaughterArrivalCreateSchema",
+    "SlaughterArrivalUpdateSchema",
+    "SlaughterArrivalReadSchema",
+    "SlaughterArrivalListParams",
+    "SlaughterArrivalListResponse",
     "SlaughterProcessingCreateSchema",
     "SlaughterProcessingUpdateSchema",
     "SlaughterProcessingReadSchema",

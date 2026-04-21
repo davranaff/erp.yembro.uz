@@ -5,6 +5,7 @@ from fastapi import APIRouter
 from app.api.crud import build_crud_router
 from app.api.module_stats import ModuleStatsTable, register_module_stats_route
 from app.repositories.slaughter import (
+    SlaughterArrivalRepository,
     SlaughterMonthlyAnalyticsRepository,
     SlaughterProcessingRepository,
     SlaughterQualityCheckRepository,
@@ -12,6 +13,7 @@ from app.repositories.slaughter import (
     SlaughterSemiProductShipmentRepository,
 )
 from app.services.slaughter import (
+    SlaughterArrivalService,
     SlaughterMonthlyAnalyticsService,
     SlaughterProcessingService,
     SlaughterQualityCheckService,
@@ -21,6 +23,15 @@ from app.services.slaughter import (
 
 
 router = APIRouter(prefix="/slaughter", tags=["slaughter"])
+
+router.include_router(
+    build_crud_router(
+        prefix="arrivals",
+        service_factory=lambda db: SlaughterArrivalService(SlaughterArrivalRepository(db)),
+        permission_prefix="slaughter_arrival",
+        tags=["slaughter-arrival"],
+    )
+)
 
 router.include_router(
     build_crud_router(
@@ -78,6 +89,7 @@ register_module_stats_route(
     module="slaughter",
     label="Slaughter",
     tables=(
+        ModuleStatsTable(key="arrivals", label="Arrivals", table="slaughter_arrivals"),
         ModuleStatsTable(key="processings", label="Processings", table="slaughter_processings"),
         ModuleStatsTable(key="semi_products", label="Semi Products", table="slaughter_semi_products"),
         ModuleStatsTable(

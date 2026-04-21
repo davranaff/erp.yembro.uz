@@ -505,23 +505,24 @@ async def _upsert_slaughter_monthly_analytics(db: Database, *, start: date, end:
     processing_rows = await db.fetch(
         """
         SELECT
-            organization_id,
-            department_id,
-            poultry_type_id,
-            COALESCE(SUM(birds_received), 0) AS birds_received,
-            COALESCE(SUM(birds_processed), 0) AS birds_processed,
-            COALESCE(SUM(first_sort_count), 0) AS first_sort_count,
-            COALESCE(SUM(second_sort_count), 0) AS second_sort_count,
-            COALESCE(SUM(bad_count), 0) AS bad_count,
-            COALESCE(SUM(first_sort_weight_kg), 0) AS first_sort_weight_kg,
-            COALESCE(SUM(second_sort_weight_kg), 0) AS second_sort_weight_kg,
-            COALESCE(SUM(bad_weight_kg), 0) AS bad_weight_kg,
-            COALESCE(SUM(COALESCE(arrival_unit_price, 0) * COALESCE(arrival_total_weight_kg, 0)), 0) AS purchased_amount,
-            MAX(arrival_currency) AS arrival_currency
-        FROM slaughter_processings
-        WHERE processed_on >= $1
-          AND processed_on < $2
-        GROUP BY organization_id, department_id, poultry_type_id
+            pr.organization_id,
+            pr.department_id,
+            ar.poultry_type_id,
+            COALESCE(SUM(ar.birds_received), 0) AS birds_received,
+            COALESCE(SUM(pr.birds_processed), 0) AS birds_processed,
+            COALESCE(SUM(pr.first_sort_count), 0) AS first_sort_count,
+            COALESCE(SUM(pr.second_sort_count), 0) AS second_sort_count,
+            COALESCE(SUM(pr.bad_count), 0) AS bad_count,
+            COALESCE(SUM(pr.first_sort_weight_kg), 0) AS first_sort_weight_kg,
+            COALESCE(SUM(pr.second_sort_weight_kg), 0) AS second_sort_weight_kg,
+            COALESCE(SUM(pr.bad_weight_kg), 0) AS bad_weight_kg,
+            COALESCE(SUM(COALESCE(ar.arrival_unit_price, 0) * COALESCE(ar.arrival_total_weight_kg, 0)), 0) AS purchased_amount,
+            MAX(ar.arrival_currency) AS arrival_currency
+        FROM slaughter_processings AS pr
+        JOIN slaughter_arrivals AS ar ON ar.id = pr.arrival_id
+        WHERE pr.processed_on >= $1
+          AND pr.processed_on < $2
+        GROUP BY pr.organization_id, pr.department_id, ar.poultry_type_id
         """,
         start,
         end,
@@ -531,16 +532,17 @@ async def _upsert_slaughter_monthly_analytics(db: Database, *, start: date, end:
         SELECT
             sp.organization_id,
             sp.department_id,
-            COALESCE(sp.poultry_type_id, pr.poultry_type_id) AS poultry_type_id,
+            COALESCE(sp.poultry_type_id, ar.poultry_type_id) AS poultry_type_id,
             COALESCE(SUM(sh.quantity), 0) AS shipped_quantity_kg,
             COALESCE(SUM(COALESCE(sh.unit_price, 0) * sh.quantity), 0) AS shipped_amount,
             MAX(sh.currency) AS currency
         FROM slaughter_semi_product_shipments AS sh
         JOIN slaughter_semi_products AS sp ON sp.id = sh.semi_product_id
         JOIN slaughter_processings AS pr ON pr.id = sp.processing_id
+        JOIN slaughter_arrivals AS ar ON ar.id = pr.arrival_id
         WHERE sh.shipped_on >= $1
           AND sh.shipped_on < $2
-        GROUP BY sp.organization_id, sp.department_id, COALESCE(sp.poultry_type_id, pr.poultry_type_id)
+        GROUP BY sp.organization_id, sp.department_id, COALESCE(sp.poultry_type_id, ar.poultry_type_id)
         """,
         start,
         end,

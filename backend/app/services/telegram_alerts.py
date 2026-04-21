@@ -33,8 +33,9 @@ OPERATIONAL_ALERT_SPECS: dict[str, OperationalAlertSpec] = {
     "feed_product_shipments": OperationalAlertSpec(resource_label="Отгрузки продукта", module_label="Корма"),
     "medicine_batches": OperationalAlertSpec(resource_label="Партии лекарств", module_label="Вет аптека"),
     "medicine_types": OperationalAlertSpec(resource_label="Типы лекарств", module_label="Вет аптека"),
-    "slaughter_processings": OperationalAlertSpec(resource_label="Сортировка", module_label="Убойня"),
-    "slaughter_semi_products": OperationalAlertSpec(resource_label="Полуфабрикаты", module_label="Убойня"),
+    "slaughter_arrivals": OperationalAlertSpec(resource_label="Партии прихода", module_label="Убойня"),
+    "slaughter_processings": OperationalAlertSpec(resource_label="Убой", module_label="Убойня"),
+    "slaughter_semi_products": OperationalAlertSpec(resource_label="Разделка", module_label="Убойня"),
     "slaughter_semi_product_shipments": OperationalAlertSpec(
         resource_label="Отгрузки полуфабрикатов",
         module_label="Убойня",

@@ -170,6 +170,26 @@ class FeedRawConsumptionListResponse(CRUDListResponse[FeedRawConsumptionReadSche
     """Paginated feed raw consumption response."""
 
 
+class FeedConsumptionCreateSchema(OpenSchema, BaseCreateSchema):
+    """Input payload to create feed consumption."""
+
+
+class FeedConsumptionUpdateSchema(OpenSchema, BaseUpdateSchema):
+    """Input payload to update feed consumption."""
+
+
+class FeedConsumptionReadSchema(OpenSchema, BaseReadSchema):
+    """Readable feed consumption response."""
+
+
+class FeedConsumptionListParams(CRUDBaseParams):
+    """Pagination + query params for feed consumption list."""
+
+
+class FeedConsumptionListResponse(CRUDListResponse[FeedConsumptionReadSchema]):
+    """Paginated feed consumption response."""
+
+
 class FeedProductionQualityCheckCreateSchema(OpenSchema, BaseCreateSchema):
     """Input payload to create feed production quality check."""
 
@@ -251,6 +271,11 @@ __all__ = [
     "FeedRawConsumptionReadSchema",
     "FeedRawConsumptionListParams",
     "FeedRawConsumptionListResponse",
+    "FeedConsumptionCreateSchema",
+    "FeedConsumptionUpdateSchema",
+    "FeedConsumptionReadSchema",
+    "FeedConsumptionListParams",
+    "FeedConsumptionListResponse",
     "FeedProductionQualityCheckCreateSchema",
     "FeedProductionQualityCheckUpdateSchema",
     "FeedProductionQualityCheckReadSchema",

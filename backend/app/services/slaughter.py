@@ -13,6 +13,7 @@ from app.repositories.finance import SupplierDebtRepository
 from app.repositories.inventory import StockMovementRepository
 from app.repositories.hr import EmployeeRepository
 from app.repositories.slaughter import (
+    SlaughterArrivalRepository,
     SlaughterMonthlyAnalyticsRepository,
     SlaughterProcessingRepository,
     SlaughterQualityCheckRepository,
@@ -20,6 +21,7 @@ from app.repositories.slaughter import (
     SlaughterSemiProductShipmentRepository,
 )
 from app.schemas.slaughter import (
+    SlaughterArrivalReadSchema,
     SlaughterMonthlyAnalyticsReadSchema,
     SlaughterProcessingReadSchema,
     SlaughterQualityCheckReadSchema,
@@ -43,8 +45,8 @@ def _build_auto_ar_marker(shipment_id: str) -> str:
     return f"{AUTO_SLAUGHTER_SHIPMENT_AR_MARKER_PREFIX}{shipment_id}]"
 
 
-def _build_auto_ap_marker(processing_id: str) -> str:
-    return f"{AUTO_SLAUGHTER_ARRIVAL_AP_MARKER_PREFIX}{processing_id}]"
+def _build_auto_ap_marker(arrival_id: str) -> str:
+    return f"{AUTO_SLAUGHTER_ARRIVAL_AP_MARKER_PREFIX}{arrival_id}]"
 
 
 def _compose_auto_debt_note(marker: str, source_note: Any) -> str:
@@ -108,14 +110,15 @@ def _normalize_currency(raw_value: object) -> str | None:
     return text or None
 
 
-class SlaughterProcessingService(CreatedByActorMixin, BaseService):
-    read_schema = SlaughterProcessingReadSchema
-    created_by_field = "processed_by"
+class SlaughterArrivalService(CreatedByActorMixin, BaseService):
+    """Incoming batch of live birds: either from a factory shipment or external supplier."""
 
-    def __init__(self, repository: SlaughterProcessingRepository) -> None:
+    read_schema = SlaughterArrivalReadSchema
+
+    def __init__(self, repository: SlaughterArrivalRepository) -> None:
         super().__init__(repository=repository)
 
-    async def _resolve_source_fields(
+    async def _resolve_fields(
         self,
         data: dict[str, Any],
         *,
@@ -134,7 +137,6 @@ class SlaughterProcessingService(CreatedByActorMixin, BaseService):
             )
 
         organization_id = str(merged["organization_id"])
-        department_id = str(merged.get("department_id") or "")
         out: dict[str, Any] = dict(data)
         out["source_type"] = source_type
 
@@ -203,21 +205,10 @@ class SlaughterProcessingService(CreatedByActorMixin, BaseService):
         if birds_received_int < 0:
             raise ValidationError("birds_received must be non-negative")
 
-        birds_processed = merged.get("birds_processed") or 0
-        try:
-            birds_processed_int = int(birds_processed)
-        except (TypeError, ValueError) as exc:
-            raise ValidationError("birds_processed must be an integer") from exc
-        if birds_processed_int < 0:
-            raise ValidationError("birds_processed must be non-negative")
-        if birds_processed_int > birds_received_int:
-            raise ValidationError("birds_processed cannot exceed birds_received")
-
-        _ = department_id  # department required by DB NOT NULL; no extra validation here
         return out
 
     async def _before_create(self, data: dict[str, Any], *, actor=None) -> dict[str, Any]:
-        return await self._resolve_source_fields(data, existing=None)
+        return await self._resolve_fields(data, existing=None)
 
     async def _before_update(
         self,
@@ -231,10 +222,10 @@ class SlaughterProcessingService(CreatedByActorMixin, BaseService):
             raise ValidationError("organization_id cannot be changed")
         if "department_id" in data and str(data["department_id"]) != str(existing.get("department_id")):
             raise ValidationError("department_id cannot be changed")
-        return await self._resolve_source_fields(data, existing=existing)
+        return await self._resolve_fields(data, existing=existing)
 
-    async def _find_auto_ap_debt(self, processing_id: str) -> dict[str, Any] | None:
-        marker = _build_auto_ap_marker(processing_id)
+    async def _find_auto_ap_debt(self, arrival_id: str) -> dict[str, Any] | None:
+        marker = _build_auto_ap_marker(arrival_id)
         row = await self.repository.db.fetchrow(
             """
             SELECT *
@@ -248,9 +239,9 @@ class SlaughterProcessingService(CreatedByActorMixin, BaseService):
         return dict(row) if row is not None else None
 
     async def _sync_auto_ap(self, entity: Mapping[str, Any]) -> None:
-        processing_id = str(entity["id"])
+        arrival_id = str(entity["id"])
         debt_repo = SupplierDebtRepository(self.repository.db)
-        existing_debt = await self._find_auto_ap_debt(processing_id)
+        existing_debt = await self._find_auto_ap_debt(arrival_id)
 
         source_type = str(entity.get("source_type") or "").strip().lower()
         supplier_client_id = entity.get("supplier_client_id")
@@ -285,7 +276,7 @@ class SlaughterProcessingService(CreatedByActorMixin, BaseService):
                 "Cannot reduce arrival total below already recorded debt payments",
             )
 
-        marker = _build_auto_ap_marker(processing_id)
+        marker = _build_auto_ap_marker(arrival_id)
         note = _compose_auto_debt_note(
             marker,
             (existing_debt or {}).get("note") if existing_debt else None,
@@ -298,7 +289,7 @@ class SlaughterProcessingService(CreatedByActorMixin, BaseService):
             "department_id": str(entity["department_id"]),
             "client_id": str(supplier_client_id),
             "item_type": "chick",
-            "item_key": f"slaughter_arrival:{processing_id}",
+            "item_key": f"slaughter_arrival:{arrival_id}",
             "quantity": str(weight),
             "unit": "kg",
             "amount_total": str(amount_total),
@@ -315,8 +306,8 @@ class SlaughterProcessingService(CreatedByActorMixin, BaseService):
         else:
             await debt_repo.update_by_id(str(existing_debt["id"]), payload)
 
-    async def _delete_auto_ap(self, processing_id: str) -> None:
-        existing_debt = await self._find_auto_ap_debt(processing_id)
+    async def _delete_auto_ap(self, arrival_id: str) -> None:
+        existing_debt = await self._find_auto_ap_debt(arrival_id)
         if existing_debt is None:
             return
         await SupplierDebtRepository(self.repository.db).delete_by_id(str(existing_debt["id"]))
@@ -329,6 +320,82 @@ class SlaughterProcessingService(CreatedByActorMixin, BaseService):
 
     async def _after_delete(self, *, deleted_entity: Mapping[str, Any], actor=None) -> None:
         await self._delete_auto_ap(str(deleted_entity["id"]))
+
+
+class SlaughterProcessingService(CreatedByActorMixin, BaseService):
+    """Slaughter processing: takes an arrival batch and records yield per quality tier."""
+
+    read_schema = SlaughterProcessingReadSchema
+    created_by_field = "processed_by"
+
+    def __init__(self, repository: SlaughterProcessingRepository) -> None:
+        super().__init__(repository=repository)
+
+    async def _resolve_fields(
+        self,
+        data: dict[str, Any],
+        *,
+        existing: Mapping[str, Any] | None,
+    ) -> dict[str, Any]:
+        merged: dict[str, Any] = dict(existing) if existing is not None else {}
+        merged.update(data)
+        out: dict[str, Any] = dict(data)
+
+        arrival_id_raw = merged.get("arrival_id")
+        if not arrival_id_raw:
+            raise ValidationError("arrival_id is required")
+        arrival_id = str(arrival_id_raw)
+
+        arrival_repo = SlaughterArrivalRepository(self.repository.db)
+        arrival = await arrival_repo.get_by_id_optional(arrival_id)
+        if arrival is None:
+            raise ValidationError("arrival_id not found")
+
+        organization_id = str(merged.get("organization_id") or arrival.get("organization_id"))
+        if existing is None:
+            out["organization_id"] = organization_id
+        if str(arrival.get("organization_id")) != organization_id:
+            raise AccessDeniedError("arrival belongs to another organization")
+
+        arrival_dept = arrival.get("department_id")
+        if arrival_dept is None:
+            raise ValidationError("department_id is required")
+        out["department_id"] = str(arrival_dept)
+        merged["department_id"] = str(arrival_dept)
+        out["arrival_id"] = arrival_id
+
+        birds_received = int(arrival.get("birds_received") or 0)
+
+        birds_processed = merged.get("birds_processed") or 0
+        try:
+            birds_processed_int = int(birds_processed)
+        except (TypeError, ValueError) as exc:
+            raise ValidationError("birds_processed must be an integer") from exc
+        if birds_processed_int < 0:
+            raise ValidationError("birds_processed must be non-negative")
+        if birds_processed_int > birds_received:
+            raise ValidationError("birds_processed cannot exceed arrival.birds_received")
+
+        return out
+
+    async def _before_create(self, data: dict[str, Any], *, actor=None) -> dict[str, Any]:
+        return await self._resolve_fields(data, existing=None)
+
+    async def _before_update(
+        self,
+        entity_id,
+        data: dict[str, Any],
+        *,
+        existing: Mapping[str, Any],
+        actor=None,
+    ) -> dict[str, Any]:
+        if "organization_id" in data and str(data["organization_id"]) != str(existing.get("organization_id")):
+            raise ValidationError("organization_id cannot be changed")
+        if "department_id" in data and str(data["department_id"]) != str(existing.get("department_id")):
+            raise ValidationError("department_id cannot be changed")
+        if "arrival_id" in data and str(data["arrival_id"]) != str(existing.get("arrival_id")):
+            raise ValidationError("arrival_id cannot be changed")
+        return await self._resolve_fields(data, existing=existing)
 
 
 class SlaughterSemiProductService(BaseService):
@@ -910,6 +977,7 @@ class SlaughterMonthlyAnalyticsService(BaseService):
 
 
 __all__ = [
+    "SlaughterArrivalService",
     "SlaughterProcessingService",
     "SlaughterSemiProductService",
     "SlaughterSemiProductShipmentService",
