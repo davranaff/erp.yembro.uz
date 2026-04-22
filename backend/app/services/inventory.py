@@ -1172,6 +1172,17 @@ class StockMovementService(BaseService):
             raise ValidationError("item_type is invalid")
         if movement_kind not in PLUS_MOVEMENTS.union(MINUS_MOVEMENTS):
             raise ValidationError("movement_kind is invalid")
+        # CRUD-level movement creation is operator-facing and must only
+        # expose plain incoming/outgoing. Transfers are written by the
+        # dedicated inventory-transfer endpoint (emits transfer_out +
+        # transfer_in atomically), and adjustments come from stock
+        # takes. Blocking them here mirrors the operator UI.
+        if movement_kind not in {"incoming", "outgoing"}:
+            raise ValidationError(
+                "movement_kind must be 'incoming' or 'outgoing'. "
+                "Use the inventory-transfer endpoint for transfers and "
+                "stock-takes for adjustments."
+            )
         if not item_key:
             raise ValidationError("item_key is required")
 
