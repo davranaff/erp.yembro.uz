@@ -308,6 +308,35 @@ class CashTransactionService(CreatedByActorMixin, BaseService):
 
         return account
 
+    async def _resolve_department_from_cash_account(
+        self,
+        data: dict[str, Any],
+        *,
+        actor: CurrentActor | None = None,
+    ) -> None:
+        """Fill ``department_id`` from the selected cash account.
+
+        The form does not ask operators for a department on a cash
+        transaction — it is always derived from the chosen cash
+        account. Run this before the generic department-required check
+        so payloads validate cleanly.
+        """
+        if data.get("department_id"):
+            return
+        cash_account_id = data.get("cash_account_id")
+        if not cash_account_id:
+            return
+        organization_id = str(data.get("organization_id") or "").strip()
+        if not organization_id and actor is not None:
+            organization_id = actor.organization_id
+        if not organization_id:
+            return
+        account = await self._get_cash_account_for_transaction(
+            cash_account_id=str(cash_account_id),
+            organization_id=organization_id,
+        )
+        data["department_id"] = str(account["department_id"])
+
     async def _enrich_transaction_rows(self, rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
         if not rows:
             return rows
@@ -483,10 +512,6 @@ class CashTransactionService(CreatedByActorMixin, BaseService):
                 )
                 data["department_id"] = str(account["department_id"])
 
-        if not data.get("counterparty_type") and data.get("counterparty_client_id"):
-            data["counterparty_type"] = "client"
-            data["counterparty_id"] = data.get("counterparty_client_id")
-
         # Resolve exchange_rate_to_base from the CBU history table when
         # the caller did not provide an explicit value. The transaction
         # date is used as the lookup key so the snapshot reflects the
@@ -598,6 +623,11 @@ class CashTransactionService(CreatedByActorMixin, BaseService):
             data["category_id"] = virtual_category_id
 
         data = self._prepare_create_payload(data, actor=actor)
+        # Populate ``department_id`` from the cash account *before* the
+        # generic department-required check runs. The form never asks
+        # operators for a department on a cash transaction — it always
+        # comes from the chosen cash account.
+        await self._resolve_department_from_cash_account(data, actor=actor)
         data = self._apply_actor_organization_on_create(data, actor=actor)
         data = await self._validate_catalog_fields(data, actor=actor, existing=None, is_create=True)
 
@@ -1118,12 +1148,10 @@ class DebtPaymentService(CreatedByActorMixin, BaseService):
 
         payment_id = str(payment_row["id"])
         transaction_type = "income" if direction == "incoming" else "expense"
-        counterparty_client_id = str(debt_row.get("client_id") or "")
 
         tx_payload: dict[str, Any] = {
             "organization_id": organization_id,
             "cash_account_id": cash_account_id,
-            "counterparty_client_id": counterparty_client_id or None,
             "created_by": actor.employee_id if actor is not None else None,
             "title": self._compose_title(
                 direction=direction,

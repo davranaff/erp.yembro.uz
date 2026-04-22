@@ -860,9 +860,16 @@ def _backfill_cash_transaction_structure(
             if cash_account_id and cash_account_id in account_dept:
                 row["department_id"] = account_dept[cash_account_id]
 
-        if not row.get("counterparty_type") and row.get("counterparty_client_id"):
-            row["counterparty_type"] = "client"
-            row["counterparty_id"] = row["counterparty_client_id"]
+        # Counterparty + status columns were dropped — strip stale
+        # fixture keys before INSERT so the loader doesn't bind to
+        # non-existent columns.
+        for dropped_key in (
+            "counterparty_client_id",
+            "counterparty_type",
+            "counterparty_id",
+            "status",
+        ):
+            row.pop(dropped_key, None)
 
         if row.get("amount_in_base") is None:
             amount = Decimal(str(row.get("amount") or 0))
@@ -871,9 +878,6 @@ def _backfill_cash_transaction_structure(
 
         if row.get("exchange_rate_to_base") is None:
             row["exchange_rate_to_base"] = "1.0"
-
-        if row.get("status") is None:
-            row["status"] = "posted"
 
 
 UNIT_FK_TABLES: dict[str, str] = {

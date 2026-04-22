@@ -727,7 +727,6 @@ const resourceUiConfigs: Record<string, ResourceUiConfig> = {
       'transaction_type',
       'cash_account_id',
       'expense_category_id',
-      'counterparty_client_id',
       'amount',
       'currency_id',
       'note',
@@ -742,12 +741,15 @@ const resourceUiConfigs: Record<string, ResourceUiConfig> = {
       'amount',
       'currency_id',
     ],
-    // reference_no + counterparty_type/id + operation_date + item_key etc.
+    // reference_no + source_type/id + operation_date + item_key etc.
     // are system-side structured fields we don't ask operators to fill.
+    // `category_id` is hidden in favour of the `expense_category_id`
+    // alias that lives next to `transaction_type` in the form.
     formHiddenFields: [
       'reference_no',
-      'counterparty_type',
-      'counterparty_id',
+      'category_id',
+      'source_type',
+      'source_id',
       'operation_date',
       'item_type',
       'item_key',
@@ -770,11 +772,6 @@ const resourceUiConfigs: Record<string, ResourceUiConfig> = {
         uz: 'PPHH moddasi. Xarajatlar uchun kerak — pul oqimi hisobotining qaysi qismiga tushishini belgilaydi.',
         en: 'Cash-flow category. Required for expenses — determines which section of the cash-flow report the operation lands in.',
       },
-      counterparty_client_id: {
-        ru: 'Клиент или поставщик по операции. Для внутренних перемещений оставьте пустым.',
-        uz: 'Operatsiya bo‘yicha mijoz yoki yetkazib beruvchi. Ichki ko‘chirishlar uchun bo‘sh qoldiring.',
-        en: 'Client or supplier for the operation. Leave empty for internal transfers.',
-      },
       amount: {
         ru: 'Сумма в валюте кассы. Проверьте, что валюта совпадает с валютой счёта.',
         uz: 'Kassa valyutasidagi summa. Valyuta hisob valyutasiga mos kelishini tekshiring.',
@@ -793,12 +790,8 @@ const resourceUiConfigs: Record<string, ResourceUiConfig> = {
         ],
       },
       {
-        title: {
-          ru: 'Контрагент и сумма',
-          uz: 'Kontragent va summa',
-          en: 'Counterparty and amount',
-        },
-        fields: ['counterparty_client_id', 'amount', 'currency_id', 'note'],
+        title: { ru: 'Сумма', uz: 'Summa', en: 'Amount' },
+        fields: ['amount', 'currency_id', 'note'],
       },
     ],
     fieldEnums: {

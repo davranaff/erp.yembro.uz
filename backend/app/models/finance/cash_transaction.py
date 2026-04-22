@@ -33,18 +33,8 @@ class CashTransaction(Base, IDMixin, TimestampMixin):
         nullable=True,
         index=True,
     )
-    counterparty_client_id: Mapped[UUID | None] = mapped_column(
-        ForeignKey("clients.id", ondelete="SET NULL"),
-        nullable=True,
-        index=True,
-    )
-    counterparty_type: Mapped[str | None] = mapped_column(String(32), nullable=True)
-    counterparty_id: Mapped[UUID | None] = mapped_column(nullable=True)
     source_type: Mapped[str | None] = mapped_column(String(64), nullable=True)
     source_id: Mapped[UUID | None] = mapped_column(nullable=True)
-    status: Mapped[str] = mapped_column(
-        String(32), nullable=False, default="posted", server_default="posted", index=True
-    )
     created_by: Mapped[UUID | None] = mapped_column(
         ForeignKey("employees.id", ondelete="SET NULL"),
         nullable=True,
@@ -69,7 +59,6 @@ class CashTransaction(Base, IDMixin, TimestampMixin):
 
     organization: Mapped["Organization"] = relationship("Organization", back_populates="cash_transactions")
     cash_account: Mapped["CashAccount"] = relationship("CashAccount", back_populates="transactions")
-    counterparty_client: Mapped["Client | None"] = relationship("Client", lazy="selectin")
     created_by_employee: Mapped["Employee | None"] = relationship("Employee", lazy="selectin")
 
     __table_args__ = (
