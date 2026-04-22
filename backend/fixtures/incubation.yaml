@@ -10,8 +10,6 @@ incubation_batches:
   - id: 84111111-1111-1111-1111-111111111101
     organization_id: 11111111-1111-1111-1111-111111111111
     department_id: 152db9b5-3cd7-44cf-a1c3-79b9fe3e91df
-    source_client_id: e1111111-0000-0000-0000-000000000006
-    production_id: 81111111-1111-1111-1111-111111111101
     batch_code: INC-2026-0301
     eggs_arrived: 12000
     arrived_on: now-35d
@@ -23,21 +21,17 @@ incubation_batches:
   - id: 84111111-1111-1111-1111-111111111102
     organization_id: 11111111-1111-1111-1111-111111111111
     department_id: 152db9b5-3cd7-44cf-a1c3-79b9fe3e91df
-    source_client_id: null
     batch_code: INC-2026-0302
     eggs_arrived: 10000
     arrived_on: now-28d
     expected_hatch_on: now-7d
     note: Ichki tuxumchilik majmuasi tuxumlari
-    production_id: 81111111-1111-1111-1111-111111111102
     is_active: true
     warehouse_id: b0a92633-6363-596b-ad7b-22326d7adfbb
 
   - id: 84111111-1111-1111-1111-111111111103
     organization_id: 11111111-1111-1111-1111-111111111111
     department_id: 152db9b5-3cd7-44cf-a1c3-79b9fe3e91df
-    source_client_id: e1111111-0000-0000-0000-000000000006
-    production_id: 81111111-1111-1111-1111-111111111103
     batch_code: INC-2026-0303
     eggs_arrived: 11000
     arrived_on: now-14d
@@ -50,7 +44,6 @@ incubation_batches:
   - id: 84222222-2222-2222-2222-222222222201
     organization_id: 22222222-2222-2222-2222-222222222222
     department_id: 66666666-6666-6666-6666-666666666666
-    source_client_id: null
     batch_code: INC-OQS-2026-01
     eggs_arrived: 15000
     arrived_on: now-21d
@@ -167,7 +160,6 @@ chick_arrivals:
     organization_id: 11111111-1111-1111-1111-111111111111
     department_id: 55555555-5555-5555-5555-555555555555
     poultry_type_id: b0000000-0000-0000-0000-000000000001
-    source_client_id: null
     arrived_on: now-13d
     chicks_count: 3900
     unit_price: 12000
@@ -180,7 +172,6 @@ chick_arrivals:
     organization_id: 11111111-1111-1111-1111-111111111111
     department_id: 55551111-1111-1111-1111-111111111111
     poultry_type_id: b0000000-0000-0000-0000-000000000001
-    source_client_id: null
     arrived_on: now-6d
     chicks_count: 3400
     unit_price: 12200

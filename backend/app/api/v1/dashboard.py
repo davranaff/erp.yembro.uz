@@ -920,24 +920,14 @@ async def _build_egg_farm_section(
             FROM egg_shipments es
             WHERE {_date_condition('es.shipped_on')} AND {_department_condition('es.department_id')}
             GROUP BY es.shipped_on
-        ),
-        incubation AS (
-            SELECT
-                TO_CHAR(ib.arrived_on, 'YYYY-MM-DD') AS label,
-                SUM(ib.eggs_arrived) AS incubation_transfers
-            FROM incubation_batches ib
-            INNER JOIN egg_production ep ON ep.id = ib.production_id
-            WHERE {_date_condition('ib.arrived_on')} AND {_department_condition('ep.department_id')}
-            GROUP BY ib.arrived_on
         )
         SELECT
-            COALESCE(produced.label, shipped.label, incubation.label) AS label,
+            COALESCE(produced.label, shipped.label) AS label,
             COALESCE(produced.net_output, 0) AS net_output,
             COALESCE(shipped.client_shipments, 0) AS client_shipments,
-            COALESCE(incubation.incubation_transfers, 0) AS incubation_transfers
+            0 AS incubation_transfers
         FROM produced
         FULL OUTER JOIN shipped ON shipped.label = produced.label
-        FULL OUTER JOIN incubation ON incubation.label = COALESCE(produced.label, shipped.label)
         ORDER BY label
         """,
         start_date,
@@ -1311,40 +1301,19 @@ async def _build_incubation_section(
         end_date,
         department_ids,
     )
-    source_client_rows = await db.fetch(
-        f"""
-        SELECT
-            c.id::text AS key,
-            {_client_label_sql('c')} AS label,
-            SUM(ib.eggs_arrived) AS value
-        FROM incubation_batches ib
-        INNER JOIN departments d ON d.id = ib.department_id
-        INNER JOIN clients c ON c.id = ib.source_client_id
-        WHERE d.module_key = 'incubation' AND {_date_condition('ib.arrived_on')} AND {_department_condition('ib.department_id')}
-        GROUP BY c.id, c.company_name, c.first_name, c.last_name, c.client_code
-        ORDER BY value DESC, label
-        LIMIT 6
-        """,
-        start_date,
-        end_date,
-        department_ids,
-    )
+    # Source-client-of-eggs tracking was dropped from incubation_batches
+    # (operators no longer record where the eggs came from), so the
+    # "top egg suppliers" breakdown is no longer populated here.
+    source_client_rows: list[dict[str, Any]] = []
     client_base_count = await db.fetchrow(
         f"""
-        SELECT COUNT(DISTINCT client_id) AS value
-        FROM (
-            SELECT ib.source_client_id AS client_id
-            FROM incubation_batches ib
-            INNER JOIN departments d ON d.id = ib.department_id
-            WHERE d.module_key = 'incubation' AND ib.source_client_id IS NOT NULL AND {_date_condition('ib.arrived_on')} AND {_department_condition('ib.department_id')}
-
-            UNION
-
-            SELECT cs.client_id AS client_id
-            FROM chick_shipments cs
-            INNER JOIN departments d ON d.id = cs.department_id
-            WHERE d.module_key = 'incubation' AND cs.client_id IS NOT NULL AND {_date_condition('cs.shipped_on')} AND {_department_condition('cs.department_id')}
-        ) AS incubation_clients
+        SELECT COUNT(DISTINCT cs.client_id) AS value
+        FROM chick_shipments cs
+        INNER JOIN departments d ON d.id = cs.department_id
+        WHERE d.module_key = 'incubation'
+          AND cs.client_id IS NOT NULL
+          AND {_date_condition('cs.shipped_on')}
+          AND {_department_condition('cs.department_id')}
         """,
         start_date,
         end_date,
@@ -2989,22 +2958,6 @@ async def _build_incubation_dashboard_module(
     client_registry_rows = await db.fetch(
         f"""
         WITH active_clients AS (
-            SELECT
-                ib.source_client_id AS client_id,
-                COUNT(*) AS source_batches,
-                SUM(ib.eggs_arrived) AS eggs_arrived,
-                0 AS shipments_count,
-                0 AS chicks_shipped
-            FROM incubation_batches ib
-            INNER JOIN departments d ON d.id = ib.department_id
-            WHERE d.module_key = 'incubation'
-              AND ib.source_client_id IS NOT NULL
-              AND {_date_condition('ib.arrived_on')}
-              AND {_department_condition('ib.department_id')}
-            GROUP BY ib.source_client_id
-
-            UNION ALL
-
             SELECT
                 cs.client_id AS client_id,
                 0 AS source_batches,

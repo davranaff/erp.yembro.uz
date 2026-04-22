@@ -28,16 +28,6 @@ class IncubationBatch(Base, IDMixin, TimestampMixin):
         nullable=True,
         index=True,
     )
-    source_client_id: Mapped[UUID | None] = mapped_column(
-        ForeignKey("clients.id", ondelete="SET NULL"),
-        nullable=True,
-        index=True,
-    )
-    production_id: Mapped[UUID | None] = mapped_column(
-        ForeignKey("egg_production.id", ondelete="SET NULL"),
-        nullable=True,
-        index=True,
-    )
     batch_code: Mapped[str] = mapped_column(String(120), nullable=False, index=True)
     eggs_arrived: Mapped[int] = mapped_column(Integer, nullable=False)
     arrived_on: Mapped[date] = mapped_column(Date, nullable=False, index=True)
@@ -48,8 +38,6 @@ class IncubationBatch(Base, IDMixin, TimestampMixin):
     organization: Mapped["Organization"] = relationship("Organization", back_populates="incubation_batches")
     department: Mapped["Department"] = relationship("Department", back_populates="incubation_batches")
     warehouse: Mapped["Warehouse | None"] = relationship("Warehouse")
-    source_client: Mapped["Client | None"] = relationship("Client", back_populates="incubation_source_batches")
-    production: Mapped["EggProduction | None"] = relationship("EggProduction")
     runs: Mapped[List["IncubationRun"]] = relationship(
         "IncubationRun",
         back_populates="batch",

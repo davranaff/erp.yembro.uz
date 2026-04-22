@@ -632,26 +632,6 @@ def _build_generated_stock_movements(
         if movement is not None:
             stock_rows.append(movement)
 
-    for row in rows_by_table.get("incubation_batches", []):
-        production_id = row.get("production_id")
-        if production_id is None:
-            continue
-        movement = _stock_movement_row(
-            organization_id=row["organization_id"],
-            department_id=row["department_id"],
-            item_type="egg",
-            item_key=f"egg:{production_id}",
-            movement_kind="outgoing",
-            quantity=_decimal_value(row.get("eggs_arrived")),
-            unit="pcs",
-            occurred_on=row["arrived_on"],
-            reference_table="incubation_batches",
-            reference_id=row["id"],
-            note=row.get("batch_code"),
-        )
-        if movement is not None:
-            stock_rows.append(movement)
-
     for row in rows_by_table.get("incubation_runs", []):
         movement = _stock_movement_row(
             organization_id=row["organization_id"],

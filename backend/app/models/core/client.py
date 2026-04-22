@@ -62,11 +62,6 @@ class Client(Base, IDMixin, TimestampMixin):
         lazy="selectin",
     )
 
-    incubation_source_batches: Mapped[List["IncubationBatch"]] = relationship(
-        "IncubationBatch",
-        back_populates="source_client",
-        lazy="selectin",
-    )
     chick_shipments: Mapped[List["ChickShipment"]] = relationship(
         "ChickShipment",
         back_populates="client",

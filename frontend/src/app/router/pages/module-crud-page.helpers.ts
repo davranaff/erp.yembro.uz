@@ -1212,24 +1212,12 @@ const resourceUiConfigs: Record<string, ResourceUiConfig> = {
       'arrived_on',
       'batch_code',
       'warehouse_id',
-      'source_client_id',
-      'production_id',
       'eggs_arrived',
       'expected_hatch_on',
       'note',
       'is_active',
     ],
     fieldHelpers: {
-      source_client_id: {
-        ru: 'Поставщик — если яйцо куплено извне. Для собственной яйцепродукции оставьте пустым.',
-        uz: 'Yetkazib beruvchi — tuxum tashqaridan sotib olingan bo‘lsa. O‘z tuxum ishlab chiqarishi uchun bo‘sh qoldiring.',
-        en: 'Supplier — when eggs are purchased externally. Leave empty for your own egg production.',
-      },
-      production_id: {
-        ru: 'Ссылка на собственное производство яйца. Заполняется, если источник — внутренний цех.',
-        uz: 'O‘z tuxum ishlab chiqarishiga havola. Manba ichki tsex bo‘lganda to‘ldiriladi.',
-        en: 'Reference to our own egg production. Fill in when the source is an internal workshop.',
-      },
       eggs_arrived: {
         ru: 'Количество яиц при закладке. Оплодотворённость и вывод рассчитываются на этапе «Инкубации».',
         uz: 'Yuklash paytidagi tuxumlar soni. Urug‘lanish va chiqish «Inkubatsiya» bosqichida hisoblanadi.',
@@ -1244,7 +1232,7 @@ const resourceUiConfigs: Record<string, ResourceUiConfig> = {
     formSections: [
       {
         title: { ru: 'Партия', uz: 'Partiya', en: 'Batch' },
-        fields: ['arrived_on', 'batch_code', 'warehouse_id', 'source_client_id', 'production_id'],
+        fields: ['arrived_on', 'batch_code', 'warehouse_id'],
       },
       {
         title: { ru: 'Закладка', uz: 'Yuklash', en: 'Setting' },
