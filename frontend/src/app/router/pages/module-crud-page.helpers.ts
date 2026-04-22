@@ -1049,7 +1049,6 @@ const resourceUiConfigs: Record<string, ResourceUiConfig> = {
       'semi_product_id',
       'warehouse_id',
       'client_id',
-      'destination_department_id',
       'quantity',
       'unit',
       'unit_price',
@@ -1065,13 +1064,6 @@ const resourceUiConfigs: Record<string, ResourceUiConfig> = {
       'acknowledged_by',
       'created_by',
     ],
-    fieldHelpers: {
-      destination_department_id: {
-        ru: 'Только для внутренней передачи между отделами. Для продажи клиенту оставьте пустым.',
-        uz: 'Faqat bo‘limlar orasida ichki uzatish uchun. Mijozga sotish uchun bo‘sh qoldiring.',
-        en: 'Only for internal inter-department transfers. Leave empty when selling to a client.',
-      },
-    },
     fieldEnums: {
       status: enumOptions(['sent', 'received', 'discrepancy']),
     },
