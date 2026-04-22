@@ -65,14 +65,16 @@ async def test_workspace_modules_metadata_endpoint_returns_seeded_modules(api_cl
         str(resource.get("key") or "").strip().lower(): resource
         for resource in module_map["egg"]["resources"]
     }
-    assert "warehouses" in egg_resources
-    assert str(egg_resources["warehouses"].get("api_module_key") or "").strip().lower() == "core"
-    assert str(egg_resources["warehouses"].get("permission_prefix") or "").strip().lower() == "warehouse"
+    # After the catalog-consolidation migration, shared catalogs
+    # (warehouses, clients, employees, expense-categories, cash-accounts)
+    # live only in their owning module menu — not duplicated per module.
+    assert "warehouses" not in egg_resources
+    assert "clients" not in egg_resources
     feed_resource_keys = {
         str(resource.get("key") or "").strip().lower()
         for resource in module_map["feed"]["resources"]
     }
-    assert "warehouses" in feed_resource_keys
+    assert "warehouses" not in feed_resource_keys
     core_resource_keys = {
         str(resource.get("key") or "").strip().lower()
         for resource in module_map["core"]["resources"]

@@ -275,7 +275,7 @@ workspace_resources:
   api_module_key: "core"
   sort_order: 56
   is_head_visible: true
-  is_active: true
+  is_active: false
 - id: "32000000-0000-0000-0000-000000000071"
   module_key: "egg"
   key: "stock-movements"
@@ -297,7 +297,7 @@ workspace_resources:
   api_module_key: "core"
   sort_order: 60
   is_head_visible: true
-  is_active: true
+  is_active: false
 - id: "32000000-0000-0000-0000-000000000902"
   module_key: "egg"
   key: "client-debts"
@@ -319,7 +319,7 @@ workspace_resources:
   api_module_key: "hr"
   sort_order: 70
   is_head_visible: true
-  is_active: true
+  is_active: false
 - id: "32000000-0000-0000-0000-000000000908"
   module_key: "egg"
   key: "expense-categories"
@@ -330,7 +330,7 @@ workspace_resources:
   api_module_key: "finance"
   sort_order: 79
   is_head_visible: true
-  is_active: true
+  is_active: false
 - id: "32000000-0000-0000-0000-000000000014"
   module_key: "egg"
   key: "expenses"
@@ -352,7 +352,7 @@ workspace_resources:
   api_module_key: "finance"
   sort_order: 90
   is_head_visible: true
-  is_active: true
+  is_active: false
 - id: "32000000-0000-0000-0000-000000000016"
   module_key: "egg"
   key: "cash-transactions"
@@ -424,7 +424,7 @@ workspace_resources:
   api_module_key: "core"
   sort_order: 38
   is_head_visible: true
-  is_active: true
+  is_active: false
 - id: "32000000-0000-0000-0000-000000000074"
   module_key: "incubation"
   key: "stock-movements"
@@ -446,7 +446,7 @@ workspace_resources:
   api_module_key: "core"
   sort_order: 40
   is_head_visible: true
-  is_active: true
+  is_active: false
 - id: "32000000-0000-0000-0000-000000000903"
   module_key: "incubation"
   key: "client-debts"
@@ -468,7 +468,7 @@ workspace_resources:
   api_module_key: "hr"
   sort_order: 50
   is_head_visible: true
-  is_active: true
+  is_active: false
 - id: "32000000-0000-0000-0000-000000000909"
   module_key: "incubation"
   key: "expense-categories"
@@ -479,7 +479,7 @@ workspace_resources:
   api_module_key: "finance"
   sort_order: 59
   is_head_visible: true
-  is_active: true
+  is_active: false
 - id: "32000000-0000-0000-0000-000000000022"
   module_key: "incubation"
   key: "expenses"
@@ -501,7 +501,7 @@ workspace_resources:
   api_module_key: "finance"
   sort_order: 70
   is_head_visible: true
-  is_active: true
+  is_active: false
 - id: "32000000-0000-0000-0000-000000000024"
   module_key: "incubation"
   key: "cash-transactions"
@@ -611,7 +611,7 @@ workspace_resources:
   api_module_key: "core"
   sort_order: 36
   is_head_visible: true
-  is_active: true
+  is_active: false
 - id: "32000000-0000-0000-0000-000000000028"
   module_key: "factory"
   key: "clients"
@@ -622,7 +622,7 @@ workspace_resources:
   api_module_key: "core"
   sort_order: 40
   is_head_visible: true
-  is_active: true
+  is_active: false
 - id: "32000000-0000-0000-0000-000000000904"
   module_key: "factory"
   key: "client-debts"
@@ -644,7 +644,7 @@ workspace_resources:
   api_module_key: "hr"
   sort_order: 50
   is_head_visible: true
-  is_active: true
+  is_active: false
 - id: "32000000-0000-0000-0000-000000000910"
   module_key: "factory"
   key: "expense-categories"
@@ -655,7 +655,7 @@ workspace_resources:
   api_module_key: "finance"
   sort_order: 59
   is_head_visible: true
-  is_active: true
+  is_active: false
 - id: "32000000-0000-0000-0000-000000000030"
   module_key: "factory"
   key: "expenses"
@@ -677,7 +677,7 @@ workspace_resources:
   api_module_key: "finance"
   sort_order: 70
   is_head_visible: true
-  is_active: true
+  is_active: false
 - id: "32000000-0000-0000-0000-000000000032"
   module_key: "factory"
   key: "cash-transactions"
@@ -810,7 +810,7 @@ workspace_resources:
   api_module_key: "core"
   sort_order: 76
   is_head_visible: true
-  is_active: true
+  is_active: false
 - id: "32000000-0000-0000-0000-000000000040"
   module_key: "feed"
   key: "clients"
@@ -821,7 +821,7 @@ workspace_resources:
   api_module_key: "core"
   sort_order: 80
   is_head_visible: true
-  is_active: true
+  is_active: false
 - id: "32000000-0000-0000-0000-000000000905"
   module_key: "feed"
   key: "client-debts"
@@ -843,7 +843,7 @@ workspace_resources:
   api_module_key: "hr"
   sort_order: 90
   is_head_visible: true
-  is_active: true
+  is_active: false
 - id: "32000000-0000-0000-0000-000000000911"
   module_key: "feed"
   key: "expense-categories"
@@ -854,7 +854,7 @@ workspace_resources:
   api_module_key: "finance"
   sort_order: 99
   is_head_visible: true
-  is_active: true
+  is_active: false
 - id: "32000000-0000-0000-0000-000000000042"
   module_key: "feed"
   key: "expenses"
@@ -876,7 +876,7 @@ workspace_resources:
   api_module_key: "finance"
   sort_order: 110
   is_head_visible: true
-  is_active: true
+  is_active: false
 - id: "32000000-0000-0000-0000-000000000044"
   module_key: "feed"
   key: "cash-transactions"
@@ -898,7 +898,7 @@ workspace_resources:
   api_module_key: "core"
   sort_order: 30
   is_head_visible: true
-  is_active: true
+  is_active: false
 - id: "32000000-0000-0000-0000-000000000906"
   module_key: "medicine"
   key: "client-debts"
@@ -951,7 +951,7 @@ workspace_resources:
   api_module_key: "core"
   sort_order: 56
   is_head_visible: true
-  is_active: true
+  is_active: false
 - id: "32000000-0000-0000-0000-000000000050"
   module_key: "medicine"
   key: "employees"
@@ -962,7 +962,7 @@ workspace_resources:
   api_module_key: "hr"
   sort_order: 60
   is_head_visible: true
-  is_active: true
+  is_active: false
 - id: "32000000-0000-0000-0000-000000000912"
   module_key: "medicine"
   key: "expense-categories"
@@ -973,7 +973,7 @@ workspace_resources:
   api_module_key: "finance"
   sort_order: 69
   is_head_visible: true
-  is_active: true
+  is_active: false
 - id: "32000000-0000-0000-0000-000000000051"
   module_key: "medicine"
   key: "expenses"
@@ -995,7 +995,7 @@ workspace_resources:
   api_module_key: "finance"
   sort_order: 80
   is_head_visible: true
-  is_active: true
+  is_active: false
 - id: "32000000-0000-0000-0000-000000000053"
   module_key: "medicine"
   key: "cash-transactions"
@@ -1089,7 +1089,7 @@ workspace_resources:
   api_module_key: "core"
   sort_order: 46
   is_head_visible: true
-  is_active: true
+  is_active: false
 - id: "32000000-0000-0000-0000-000000000058"
   module_key: "slaughter"
   key: "clients"
@@ -1100,7 +1100,7 @@ workspace_resources:
   api_module_key: "core"
   sort_order: 50
   is_head_visible: true
-  is_active: true
+  is_active: false
 - id: "32000000-0000-0000-0000-000000000907"
   module_key: "slaughter"
   key: "client-debts"
@@ -1122,7 +1122,7 @@ workspace_resources:
   api_module_key: "hr"
   sort_order: 60
   is_head_visible: true
-  is_active: true
+  is_active: false
 - id: "32000000-0000-0000-0000-000000000913"
   module_key: "slaughter"
   key: "expense-categories"
@@ -1133,7 +1133,7 @@ workspace_resources:
   api_module_key: "finance"
   sort_order: 69
   is_head_visible: true
-  is_active: true
+  is_active: false
 - id: "32000000-0000-0000-0000-000000000060"
   module_key: "slaughter"
   key: "expenses"
@@ -1155,7 +1155,7 @@ workspace_resources:
   api_module_key: "finance"
   sort_order: 80
   is_head_visible: true
-  is_active: true
+  is_active: false
 - id: "32000000-0000-0000-0000-000000000062"
   module_key: "slaughter"
   key: "cash-transactions"

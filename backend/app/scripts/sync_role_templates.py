@@ -124,6 +124,11 @@ async def _fetch_department_modules(db: Database) -> list[dict[str, Any]]:
 
 
 async def _fetch_workspace_resources(db: Database) -> dict[str, list[dict[str, Any]]]:
+    # Role templates depend on the full set of configured resources, not
+    # on which ones currently surface in the menu. `is_active = false`
+    # just hides a resource from the dropdown (e.g. the consolidated
+    # shared catalogs live only in core's menu but each module manager
+    # still needs warehouse/client/employee access).
     rows = await db.fetch(
         """
         SELECT
@@ -132,7 +137,6 @@ async def _fetch_workspace_resources(db: Database) -> dict[str, list[dict[str, A
             name,
             permission_prefix
         FROM workspace_resources
-        WHERE is_active = true
         ORDER BY module_key, sort_order, name, key, id
         """
     )
