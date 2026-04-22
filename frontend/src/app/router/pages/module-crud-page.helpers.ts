@@ -265,9 +265,9 @@ const resourceUiConfigs: Record<string, ResourceUiConfig> = {
     formOrder: [
       'first_name',
       'last_name',
-      'organization_key',
-      'email',
       'phone',
+      'email',
+      'organization_key',
       'password',
       'department_id',
       'position_id',
@@ -284,6 +284,27 @@ const resourceUiConfigs: Record<string, ResourceUiConfig> = {
       'email',
       'department_id',
       'position_id',
+    ],
+    formSections: [
+      {
+        title: { ru: 'Личные данные', uz: 'Shaxsiy ma’lumotlar', en: 'Personal details' },
+        fields: ['first_name', 'last_name', 'phone', 'email'],
+      },
+      {
+        title: { ru: 'Учётная запись', uz: 'Hisob', en: 'Account' },
+        fields: ['organization_key', 'password'],
+      },
+      {
+        title: { ru: 'Работа', uz: 'Ish', en: 'Employment' },
+        fields: [
+          'department_id',
+          'position_id',
+          'salary',
+          'work_start_time',
+          'work_end_time',
+          'role_ids',
+        ],
+      },
     ],
     hideDepartmentFieldWhenScoped: true,
     hideOrganizationFieldWhenScoped: true,
@@ -327,6 +348,28 @@ const resourceUiConfigs: Record<string, ResourceUiConfig> = {
   'core:warehouses': {
     formOrder: ['department_id', 'name', 'code', 'is_default', 'is_active', 'description'],
     tableOrder: ['name', 'department_id', 'code', 'is_default', 'is_active'],
+    hideDepartmentFieldWhenScoped: true,
+    hideOrganizationFieldWhenScoped: true,
+  },
+  'core:clients': {
+    formOrder: ['first_name', 'last_name', 'email', 'phone', 'company_name', 'address'],
+    tableOrder: ['first_name', 'last_name', 'phone', 'email', 'company_name'],
+    // Legacy free-form fields: `category` is unused (superseded by
+    // client_categories + client_categories links), `client_code` is
+    // operator-generated and confusing, `telegram_chat_id` should be
+    // bound via a one-link invite (backend has the endpoint; the UI
+    // will surface a "Пригласить в Telegram" button later).
+    formHiddenFields: ['category', 'client_code', 'telegram_chat_id'],
+    formSections: [
+      {
+        title: { ru: 'Контакт', uz: 'Aloqa', en: 'Contact' },
+        fields: ['first_name', 'last_name', 'email', 'phone'],
+      },
+      {
+        title: { ru: 'Дополнительно', uz: 'Qo‘shimcha', en: 'Extras' },
+        fields: ['company_name', 'address'],
+      },
+    ],
     hideDepartmentFieldWhenScoped: true,
     hideOrganizationFieldWhenScoped: true,
   },
@@ -659,9 +702,12 @@ const resourceUiConfigs: Record<string, ResourceUiConfig> = {
     hideOrganizationFieldWhenScoped: true,
   },
   'finance:expense-categories': {
-    formOrder: ['name', 'code', 'description', 'is_active'],
-    tableOrder: ['name', 'code', 'department_id', 'is_active'],
+    formOrder: ['name', 'code', 'flow_type', 'description', 'is_active'],
+    tableOrder: ['name', 'code', 'flow_type', 'department_id', 'is_active'],
     hiddenFields: ['is_global'],
+    // parent_id (parent category) is handled by bulk import / seeding —
+    // operators don't build the tree by hand.
+    formHiddenFields: ['parent_id'],
     fieldEnums: {
       flow_type: enumOptions(['income', 'expense']),
     },
@@ -670,6 +716,7 @@ const resourceUiConfigs: Record<string, ResourceUiConfig> = {
   },
   'finance:expenses': {
     formOrder: [
+      'expense_date',
       'category_id',
       'title',
       'item',
@@ -678,18 +725,34 @@ const resourceUiConfigs: Record<string, ResourceUiConfig> = {
       'unit_price',
       'amount',
       'currency',
-      'expense_date',
       'note',
-      'is_active',
     ],
-    tableOrder: [
-      'expense_date',
-      'category_id',
-      'title',
-      'amount',
-      'currency',
-      'department_id',
-      'is_active',
+    tableOrder: ['expense_date', 'category_id', 'title', 'amount', 'currency', 'department_id'],
+    fieldHelpers: {
+      category_id: {
+        ru: 'Выберите статью из дерева категорий расхода вашего отдела.',
+        uz: 'Bo‘lim xarajat toifalari daraxtidan moddani tanlang.',
+        en: 'Pick the expense category from your department’s tree.',
+      },
+      item: {
+        ru: 'Конкретная позиция (что именно купили / за что заплатили).',
+        uz: 'Aniq pozitsiya (aynan nima sotib olingan / nima uchun to‘langan).',
+        en: 'Specific item — what was purchased or what the payment covers.',
+      },
+    },
+    formSections: [
+      {
+        title: { ru: 'Статья и позиция', uz: 'Modda va pozitsiya', en: 'Category & item' },
+        fields: ['expense_date', 'category_id', 'title', 'item'],
+      },
+      {
+        title: { ru: 'Количество и сумма', uz: 'Miqdor va summa', en: 'Quantity & amount' },
+        fields: ['quantity', 'unit', 'unit_price', 'amount', 'currency'],
+      },
+      {
+        title: { ru: 'Дополнительно', uz: 'Qo‘shimcha', en: 'Extras' },
+        fields: ['note'],
+      },
     ],
     hideDepartmentFieldWhenScoped: true,
     hideOrganizationFieldWhenScoped: true,
@@ -702,6 +765,7 @@ const resourceUiConfigs: Record<string, ResourceUiConfig> = {
   },
   'finance:cash-transactions': {
     formOrder: [
+      'transaction_date',
       'title',
       'transaction_type',
       'cash_account_id',
@@ -709,8 +773,6 @@ const resourceUiConfigs: Record<string, ResourceUiConfig> = {
       'counterparty_client_id',
       'amount',
       'currency',
-      'transaction_date',
-      'reference_no',
       'note',
     ],
     tableOrder: [
@@ -722,9 +784,20 @@ const resourceUiConfigs: Record<string, ResourceUiConfig> = {
       'expense_category_id',
       'amount',
       'currency',
-      'reference_no',
     ],
     hiddenFields: ['expense_id'],
+    // reference_no + counterparty_type/id + operation_date + item_key etc.
+    // are system-side structured fields we don't ask operators to fill.
+    formHiddenFields: [
+      'reference_no',
+      'counterparty_type',
+      'counterparty_id',
+      'operation_date',
+      'item_type',
+      'item_key',
+      'amount_in_base',
+      'exchange_rate_to_base',
+    ],
     fieldHelpers: {
       transaction_type: {
         ru: 'income — поступление (приход), expense — списание (расход). Определяет знак движения по кассе.',
@@ -751,16 +824,17 @@ const resourceUiConfigs: Record<string, ResourceUiConfig> = {
         uz: 'Kassa valyutasidagi summa. Valyuta hisob valyutasiga mos kelishini tekshiring.',
         en: 'Amount in the cash-account currency. Check that the currency matches the account.',
       },
-      reference_no: {
-        ru: 'Номер чека/платёжного поручения или ссылка на внешний документ.',
-        uz: 'Chek/to‘lov topshiriqnomasi raqami yoki tashqi hujjatga havola.',
-        en: 'Check or payment-order number, or a link to an external document.',
-      },
     },
     formSections: [
       {
         title: { ru: 'Операция', uz: 'Operatsiya', en: 'Operation' },
-        fields: ['title', 'transaction_type', 'cash_account_id', 'expense_category_id'],
+        fields: [
+          'transaction_date',
+          'title',
+          'transaction_type',
+          'cash_account_id',
+          'expense_category_id',
+        ],
       },
       {
         title: {
@@ -768,11 +842,7 @@ const resourceUiConfigs: Record<string, ResourceUiConfig> = {
           uz: 'Kontragent va summa',
           en: 'Counterparty and amount',
         },
-        fields: ['counterparty_client_id', 'amount', 'currency'],
-      },
-      {
-        title: { ru: 'Документ', uz: 'Hujjat', en: 'Document' },
-        fields: ['transaction_date', 'reference_no', 'note'],
+        fields: ['counterparty_client_id', 'amount', 'currency', 'note'],
       },
     ],
     fieldEnums: {
@@ -1116,14 +1186,10 @@ const resourceUiConfigs: Record<string, ResourceUiConfig> = {
     hiddenFields: ['counterparty_department_id', 'reference_table', 'reference_id'],
     fieldEnums: {
       item_type: enumOptions(['egg', 'chick', 'feed', 'feed_raw', 'medicine', 'semi_product']),
-      movement_kind: enumOptions([
-        'incoming',
-        'outgoing',
-        'transfer_in',
-        'transfer_out',
-        'adjustment_in',
-        'adjustment_out',
-      ]),
+      // Operators can only book incoming/outgoing manually. Transfers are
+      // created via the inventory-transfer flow, and adjustments come from
+      // stock-takes — we don't expose them as a free-form choice.
+      movement_kind: enumOptions(['incoming', 'outgoing']),
     },
     hideDepartmentFieldWhenScoped: true,
     hideOrganizationFieldWhenScoped: true,
