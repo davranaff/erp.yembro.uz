@@ -2967,6 +2967,7 @@ export function ModuleCrudPage() {
                                   resourceModuleKey,
                                   resourcePath: activeResource!.path,
                                   fieldHelpers: resourceUiConfig?.fieldHelpers,
+                                  fieldEnums: resourceUiConfig?.fieldEnums,
                                   language,
                                   onInputChange: handleInputChange,
                                 }}

@@ -20,6 +20,71 @@ export function resolveLocalizedText(value: string | LocalizedText, language: La
   }
   return value[language] || value.ru;
 }
+
+export type EnumOption = { value: string; label: string | LocalizedText };
+
+/**
+ * Shared labels for enum values that appear across multiple resources
+ * (status codes, quality grades, transaction types, etc.). Exposed so
+ * each resource's `fieldEnums` entry can reuse the same translations.
+ */
+export const ENUM_LABELS = {
+  pending: { ru: 'Ожидает проверки', uz: 'Tekshiruv kutilmoqda', en: 'Pending' },
+  passed: { ru: 'Прошёл', uz: 'O‘tdi', en: 'Passed' },
+  failed: { ru: 'Не прошёл', uz: 'O‘tmadi', en: 'Failed' },
+  open: { ru: 'Открыт', uz: 'Ochiq', en: 'Open' },
+  partially_paid: { ru: 'Частично оплачен', uz: 'Qisman to‘langan', en: 'Partially paid' },
+  closed: { ru: 'Закрыт', uz: 'Yopilgan', en: 'Closed' },
+  cancelled: { ru: 'Отменён', uz: 'Bekor qilingan', en: 'Cancelled' },
+  draft: { ru: 'Черновик', uz: 'Qoralama', en: 'Draft' },
+  posted: { ru: 'Проведён', uz: 'O‘tkazilgan', en: 'Posted' },
+  reversed: { ru: 'Сторнирован', uz: 'Storno qilingan', en: 'Reversed' },
+  finalized: { ru: 'Завершён', uz: 'Yakunlangan', en: 'Finalized' },
+  reconciled: { ru: 'Закрыт (сверено)', uz: 'Yopilgan', en: 'Reconciled' },
+  active: { ru: 'Активен', uz: 'Faol', en: 'Active' },
+  completed: { ru: 'Завершён', uz: 'Tugatilgan', en: 'Completed' },
+  sent: { ru: 'Отправлено', uz: 'Jo‘natilgan', en: 'Sent' },
+  received: { ru: 'Принято', uz: 'Qabul qilindi', en: 'Received' },
+  discrepancy: { ru: 'Расхождение', uz: 'Nomuvofiqlik', en: 'Discrepancy' },
+  factory: { ru: 'Из фабрики', uz: 'Fabrikadan', en: 'From factory' },
+  external: { ru: 'Внешний поставщик', uz: 'Tashqi yetkazib beruvchi', en: 'External supplier' },
+  first: { ru: '1 сорт', uz: '1-nav', en: '1st grade' },
+  second: { ru: '2 сорт', uz: '2-nav', en: '2nd grade' },
+  mixed: { ru: 'Смешанный', uz: 'Aralash', en: 'Mixed' },
+  byproduct: { ru: 'Субпродукт', uz: 'Yon mahsulot', en: 'By-product' },
+  premium: { ru: 'Премиум', uz: 'Premium', en: 'Premium' },
+  rejected: { ru: 'Отбраковано', uz: 'Brak', en: 'Rejected' },
+  large: { ru: 'Крупные', uz: 'Yirik', en: 'Large' },
+  medium: { ru: 'Средние', uz: 'O‘rta', en: 'Medium' },
+  small: { ru: 'Мелкие', uz: 'Mayda', en: 'Small' },
+  defective: { ru: 'Брак', uz: 'Brak', en: 'Defective' },
+  income: { ru: 'Приход', uz: 'Kirim', en: 'Income' },
+  expense: { ru: 'Расход', uz: 'Chiqim', en: 'Expense' },
+  transfer_in: { ru: 'Входящий перевод', uz: 'Kiruvchi ko‘chirish', en: 'Transfer in' },
+  transfer_out: { ru: 'Исходящий перевод', uz: 'Chiquvchi ko‘chirish', en: 'Transfer out' },
+  adjustment: { ru: 'Корректировка', uz: 'Tuzatish', en: 'Adjustment' },
+  egg: { ru: 'Яйца', uz: 'Tuxumlar', en: 'Eggs' },
+  chick: { ru: 'Птенцы', uz: 'Jo‘jalar', en: 'Chicks' },
+  feed: { ru: 'Корм', uz: 'Em', en: 'Feed' },
+  feed_raw: { ru: 'Сырьё для корма', uz: 'Em xomashyosi', en: 'Feed raw material' },
+  medicine: { ru: 'Лекарства', uz: 'Dorilar', en: 'Medicine' },
+  semi_product: { ru: 'Полуфабрикаты', uz: 'Yarim tayyor mahsulotlar', en: 'Semi-products' },
+  incoming: { ru: 'Приход', uz: 'Kirim', en: 'Incoming' },
+  outgoing: { ru: 'Расход', uz: 'Chiqim', en: 'Outgoing' },
+  adjustment_in: { ru: 'Корректировка +', uz: 'Tuzatish +', en: 'Adjustment in' },
+  adjustment_out: { ru: 'Корректировка -', uz: 'Tuzatish -', en: 'Adjustment out' },
+  cash: { ru: 'Наличные', uz: 'Naqd', en: 'Cash' },
+  bank: { ru: 'Банк', uz: 'Bank', en: 'Bank' },
+  card: { ru: 'Карта', uz: 'Karta', en: 'Card' },
+  transfer: { ru: 'Перевод', uz: 'Ko‘chirish', en: 'Transfer' },
+  offset: { ru: 'Взаимозачёт', uz: 'O‘zaro hisob', en: 'Offset' },
+  other: { ru: 'Другое', uz: 'Boshqa', en: 'Other' },
+} as const satisfies Record<string, LocalizedText>;
+
+export function enumOptions(values: readonly (keyof typeof ENUM_LABELS)[]): EnumOption[] {
+  return values.map((value) => ({ value, label: ENUM_LABELS[value] }));
+}
+
 export type SubmitMode = 'create' | 'update';
 export type ModuleViewMode = 'records' | 'stats';
 export type ResourceCategoryGroupId =
@@ -49,6 +114,14 @@ export type ResourceUiConfig = {
    * LocalizedText object with ru/uz/en variants.
    */
   fieldHelpers?: Record<string, string | LocalizedText>;
+  /**
+   * Enum-style fields that should render as a select instead of a free
+   * text input. Keys are field names; values are the allowed options
+   * (value is sent to the backend, label is shown to the user). Use the
+   * `enumOptions([...])` helper with keys from `ENUM_LABELS` to keep
+   * labels consistent across resources.
+   */
+  fieldEnums?: Record<string, EnumOption[]>;
   /**
    * Groups form fields under section headers. Fields not listed in any
    * section are rendered as a tail group without a title. Titles accept
@@ -324,6 +397,10 @@ const resourceUiConfigs: Record<string, ResourceUiConfig> = {
         fields: ['note', 'is_active'],
       },
     ],
+    fieldEnums: {
+      status: enumOptions(['open', 'partially_paid', 'closed', 'cancelled']),
+      posting_status: enumOptions(['draft', 'posted', 'reversed']),
+    },
     crossFieldValidator: (values) => {
       const errors: Record<string, LocalizedText> = {};
       const issuedOn = typeof values.issued_on === 'string' ? values.issued_on : '';
@@ -431,6 +508,10 @@ const resourceUiConfigs: Record<string, ResourceUiConfig> = {
         fields: ['note', 'is_active'],
       },
     ],
+    fieldEnums: {
+      status: enumOptions(['open', 'partially_paid', 'closed', 'cancelled']),
+      posting_status: enumOptions(['draft', 'posted', 'reversed']),
+    },
     crossFieldValidator: (values) => {
       const errors: Record<string, LocalizedText> = {};
       const issuedOn = typeof values.issued_on === 'string' ? values.issued_on : '';
@@ -504,6 +585,9 @@ const resourceUiConfigs: Record<string, ResourceUiConfig> = {
         fields: ['note'],
       },
     ],
+    fieldEnums: {
+      status: enumOptions(['open', 'reconciled', 'cancelled']),
+    },
     crossFieldValidator: (values) => {
       const errors: Record<string, LocalizedText> = {};
       const issuedOn = typeof values.issued_on === 'string' ? values.issued_on : '';
@@ -552,6 +636,10 @@ const resourceUiConfigs: Record<string, ResourceUiConfig> = {
       'reference_no',
       'cash_account_id',
     ],
+    fieldEnums: {
+      direction: enumOptions(['incoming', 'outgoing']),
+      method: enumOptions(['cash', 'bank', 'card', 'transfer', 'offset', 'other']),
+    },
     hideDepartmentFieldWhenScoped: true,
     hideOrganizationFieldWhenScoped: true,
   },
@@ -559,6 +647,9 @@ const resourceUiConfigs: Record<string, ResourceUiConfig> = {
     formOrder: ['name', 'code', 'description', 'is_active'],
     tableOrder: ['name', 'code', 'department_id', 'is_active'],
     hiddenFields: ['is_global'],
+    fieldEnums: {
+      flow_type: enumOptions(['income', 'expense']),
+    },
     hideDepartmentFieldWhenScoped: true,
     hideOrganizationFieldWhenScoped: true,
   },
@@ -669,6 +760,15 @@ const resourceUiConfigs: Record<string, ResourceUiConfig> = {
         fields: ['transaction_date', 'reference_no', 'note'],
       },
     ],
+    fieldEnums: {
+      transaction_type: enumOptions([
+        'income',
+        'expense',
+        'transfer_in',
+        'transfer_out',
+        'adjustment',
+      ]),
+    },
     crossFieldValidator: (values) => {
       const errors: Record<string, LocalizedText> = {};
       const type =
@@ -719,9 +819,9 @@ const resourceUiConfigs: Record<string, ResourceUiConfig> = {
     ],
     fieldHelpers: {
       source_type: {
-        ru: 'Откуда пришла партия: «factory» — внутренняя отгрузка из фабрики, «supplier» — внешний поставщик.',
-        uz: 'Partiya qayerdan kelgan: «factory» — fabrikadan ichki jo‘natma, «supplier» — tashqi yetkazib beruvchi.',
-        en: 'Where the batch came from: "factory" — internal shipment from the factory, "supplier" — external supplier.',
+        ru: 'Откуда пришла партия: «Из фабрики» — внутренняя отгрузка, «Внешний поставщик» — закупка у внешнего клиента.',
+        uz: 'Partiya qayerdan kelgan: «Fabrikadan» — ichki jo‘natma, «Tashqi yetkazib beruvchi» — tashqi mijozdan xarid.',
+        en: 'Where the batch came from: "From factory" — internal shipment, "External supplier" — purchase from an external client.',
       },
       factory_shipment_id: {
         ru: 'Указывайте, если партия пришла из фабрики по отгрузке. Для внешних поставщиков оставьте пустым.',
@@ -764,6 +864,9 @@ const resourceUiConfigs: Record<string, ResourceUiConfig> = {
         fields: ['arrival_invoice_no', 'note'],
       },
     ],
+    fieldEnums: {
+      source_type: enumOptions(['factory', 'external']),
+    },
     crossFieldValidator: (values) => {
       const errors: Record<string, LocalizedText> = {};
       const sourceType =
@@ -774,16 +877,16 @@ const resourceUiConfigs: Record<string, ResourceUiConfig> = {
         typeof values.supplier_client_id === 'string' ? values.supplier_client_id.trim() : '';
       if (sourceType === 'factory' && !factoryShipmentId) {
         errors.factory_shipment_id = {
-          ru: 'Для источника «factory» укажите отгрузку из фабрики.',
-          uz: '«factory» manbasi uchun fabrikadan jo‘natmani ko‘rsating.',
-          en: 'For source "factory", specify the factory shipment.',
+          ru: 'Для источника «Из фабрики» укажите отгрузку из фабрики.',
+          uz: '«Fabrikadan» manbasi uchun fabrikadan jo‘natmani ko‘rsating.',
+          en: 'For source "From factory", specify the factory shipment.',
         };
       }
-      if (sourceType === 'supplier' && !supplierClientId) {
+      if (sourceType === 'external' && !supplierClientId) {
         errors.supplier_client_id = {
-          ru: 'Для источника «supplier» укажите клиента-поставщика.',
-          uz: '«supplier» manbasi uchun yetkazib beruvchi mijozni ko‘rsating.',
-          en: 'For source "supplier", specify the supplier client.',
+          ru: 'Для внешнего поставщика укажите клиента-поставщика.',
+          uz: 'Tashqi yetkazib beruvchi uchun mijozni ko‘rsating.',
+          en: 'For an external supplier, specify the supplier client.',
         };
       }
       const birds = Number(values.birds_received);
@@ -920,6 +1023,9 @@ const resourceUiConfigs: Record<string, ResourceUiConfig> = {
       'note',
     ],
     tableOrder: ['produced_on', 'part_name', 'quality', 'quantity', 'unit'],
+    fieldEnums: {
+      quality: enumOptions(['first', 'second', 'mixed', 'byproduct']),
+    },
     hideDepartmentFieldWhenScoped: true,
     hideOrganizationFieldWhenScoped: true,
   },
@@ -947,6 +1053,10 @@ const resourceUiConfigs: Record<string, ResourceUiConfig> = {
   'slaughter:slaughter-quality-checks': {
     formOrder: ['checked_on', 'semi_product_id', 'status', 'grade', 'inspector_id', 'notes'],
     tableOrder: ['checked_on', 'semi_product_id', 'status', 'grade', 'inspector_id'],
+    fieldEnums: {
+      status: enumOptions(['pending', 'passed', 'failed']),
+      grade: enumOptions(['first', 'second', 'mixed', 'byproduct']),
+    },
     hideDepartmentFieldWhenScoped: true,
     hideOrganizationFieldWhenScoped: true,
   },
@@ -975,6 +1085,17 @@ const resourceUiConfigs: Record<string, ResourceUiConfig> = {
       'note',
     ],
     hiddenFields: ['counterparty_department_id', 'reference_table', 'reference_id'],
+    fieldEnums: {
+      item_type: enumOptions(['egg', 'chick', 'feed', 'feed_raw', 'medicine', 'semi_product']),
+      movement_kind: enumOptions([
+        'incoming',
+        'outgoing',
+        'transfer_in',
+        'transfer_out',
+        'adjustment_in',
+        'adjustment_out',
+      ]),
+    },
     hideDepartmentFieldWhenScoped: true,
     hideOrganizationFieldWhenScoped: true,
   },
@@ -1008,12 +1129,19 @@ const resourceUiConfigs: Record<string, ResourceUiConfig> = {
       'note',
     ],
     hiddenFields: ['invoice_no'],
+    fieldEnums: {
+      status: enumOptions(['sent', 'received', 'discrepancy']),
+    },
     hideDepartmentFieldWhenScoped: true,
     hideOrganizationFieldWhenScoped: true,
   },
   'egg:egg-quality-checks': {
     formOrder: ['checked_on', 'production_id', 'status', 'grade', 'inspector_id', 'notes'],
     tableOrder: ['checked_on', 'production_id', 'status', 'grade', 'inspector_id'],
+    fieldEnums: {
+      status: enumOptions(['pending', 'passed', 'failed']),
+      grade: enumOptions(['large', 'medium', 'small', 'defective', 'mixed']),
+    },
     hideDepartmentFieldWhenScoped: true,
     hideOrganizationFieldWhenScoped: true,
   },
@@ -1113,6 +1241,9 @@ const resourceUiConfigs: Record<string, ResourceUiConfig> = {
       'note',
     ],
     hiddenFields: ['invoice_no'],
+    fieldEnums: {
+      status: enumOptions(['sent', 'received', 'discrepancy']),
+    },
     hideDepartmentFieldWhenScoped: true,
     hideOrganizationFieldWhenScoped: true,
   },
@@ -1157,6 +1288,10 @@ const resourceUiConfigs: Record<string, ResourceUiConfig> = {
   'feed:quality-checks': {
     formOrder: ['checked_on', 'production_batch_id', 'status', 'grade', 'inspector_id', 'notes'],
     tableOrder: ['checked_on', 'production_batch_id', 'status', 'grade', 'inspector_id'],
+    fieldEnums: {
+      status: enumOptions(['pending', 'passed', 'failed']),
+      grade: enumOptions(['first', 'second', 'mixed', 'premium', 'rejected']),
+    },
     hideDepartmentFieldWhenScoped: true,
     hideOrganizationFieldWhenScoped: true,
   },
@@ -1412,6 +1547,9 @@ const resourceUiConfigs: Record<string, ResourceUiConfig> = {
       'status',
       'poultry_type_id',
     ],
+    fieldEnums: {
+      status: enumOptions(['active', 'completed', 'cancelled']),
+    },
     hideDepartmentFieldWhenScoped: true,
     hideOrganizationFieldWhenScoped: true,
     detailPanelKey: 'flock_kpi',
@@ -1497,9 +1635,9 @@ const resourceUiConfigs: Record<string, ResourceUiConfig> = {
         en: 'Price per 1 kg. Total = price × weight.',
       },
       status: {
-        ru: 'draft → sent → received. «received» выставляется получателем при подтверждении.',
-        uz: 'draft → sent → received. «received» qabul qiluvchi tasdiqlaganda qo‘yiladi.',
-        en: 'draft → sent → received. "received" is set by the receiver upon confirmation.',
+        ru: 'Отправлено → Принято (получатель подтверждает приёмку) → Расхождение (если фактическое количество отличается).',
+        uz: 'Jo‘natilgan → Qabul qilindi (qabul qiluvchi tasdiqlaydi) → Nomuvofiqlik (haqiqiy miqdor farq qilsa).',
+        en: 'Sent → Received (receiver confirms) → Discrepancy (if the actual quantity differs).',
       },
     },
     formSections: [
@@ -1530,6 +1668,9 @@ const resourceUiConfigs: Record<string, ResourceUiConfig> = {
         fields: ['note'],
       },
     ],
+    fieldEnums: {
+      status: enumOptions(['sent', 'received', 'discrepancy']),
+    },
     crossFieldValidator: (values) => {
       const errors: Record<string, LocalizedText> = {};
       const clientId = typeof values.client_id === 'string' ? values.client_id.trim() : '';

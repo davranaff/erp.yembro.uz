@@ -21,6 +21,7 @@ import {
   inputBaseClassName,
   isMultiReferenceField,
   resolveLocalizedText,
+  type EnumOption,
   type FormValues,
   type LocalizedText,
 } from '../module-crud-page.helpers';
@@ -69,6 +70,7 @@ export interface CrudFormFieldRowContext {
   resourceModuleKey: string;
   resourcePath: string;
   fieldHelpers?: Record<string, string | LocalizedText>;
+  fieldEnums?: Record<string, EnumOption[]>;
   language: Language;
   onInputChange: (field: CrudFieldMeta, value: string | boolean | string[]) => void;
 }
@@ -104,6 +106,7 @@ export function CrudFormFieldRow({ field, value, fieldError, context }: CrudForm
     resourceModuleKey,
     resourcePath,
     fieldHelpers,
+    fieldEnums,
     language,
     onInputChange,
   } = context;
@@ -111,6 +114,11 @@ export function CrudFormFieldRow({ field, value, fieldError, context }: CrudForm
   const fieldHelperText = rawFieldHelper
     ? resolveLocalizedText(rawFieldHelper, language)
     : undefined;
+  const enumOptionsForField = fieldEnums?.[field.name];
+  const resolvedEnumOptions = enumOptionsForField?.map((option) => ({
+    value: option.value,
+    label: resolveLocalizedText(option.label, language),
+  }));
 
   const fieldInputKind = getFieldInputKind(field);
   const isDepartmentReferenceField = supportsDepartmentFilter && field.name === 'department_id';
@@ -260,6 +268,16 @@ export function CrudFormFieldRow({ field, value, fieldError, context }: CrudForm
           />
           <span className="text-sm text-foreground">{`${yesLabel} / ${noLabel}`}</span>
         </label>
+      ) : resolvedEnumOptions ? (
+        <CustomSelect
+          value={typeof value === 'string' ? value : EMPTY_TEXT}
+          onChange={(nextValue) => onInputChange(field, nextValue)}
+          options={resolvedEnumOptions}
+          disabled={isFormReadOnly || pendingAction}
+          className={inputBaseClassName}
+          placeholder={t('common.chooseValue')}
+          searchable={resolvedEnumOptions.length > 6}
+        />
       ) : field.name === 'category_id' || field.name === 'expense_category_id' ? (
         <HierarchicalCategorySelect
           value={typeof value === 'string' ? value : EMPTY_TEXT}
