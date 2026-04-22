@@ -847,12 +847,7 @@ const resourceUiConfigs: Record<string, ResourceUiConfig> = {
       'arrival_currency_id',
       'note',
     ],
-    tableOrder: [
-      'arrived_on',
-      'birds_received',
-      'arrival_total_weight_kg',
-      'arrival_unit_price',
-    ],
+    tableOrder: ['arrived_on', 'birds_received', 'arrival_total_weight_kg', 'arrival_unit_price'],
     fieldHelpers: {
       birds_received: {
         ru: 'Фактическое количество птицы на приёмке. Может отличаться от отгрузки — расхождение фиксируется через акт.',
@@ -1270,13 +1265,7 @@ const resourceUiConfigs: Record<string, ResourceUiConfig> = {
       'currency_id',
       'note',
     ],
-    tableOrder: [
-      'arrived_on',
-      'ingredient_id',
-      'quantity',
-      'unit_price',
-      'currency_id',
-    ],
+    tableOrder: ['arrived_on', 'ingredient_id', 'quantity', 'unit_price', 'currency_id'],
     hideDepartmentFieldWhenScoped: true,
     hideOrganizationFieldWhenScoped: true,
   },
