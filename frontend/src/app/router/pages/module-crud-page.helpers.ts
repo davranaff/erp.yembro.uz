@@ -839,41 +839,21 @@ const resourceUiConfigs: Record<string, ResourceUiConfig> = {
   },
   'slaughter:arrivals': {
     formOrder: [
-      'source_type',
-      'factory_shipment_id',
-      'supplier_client_id',
       'poultry_type_id',
       'arrived_on',
       'birds_received',
       'arrival_total_weight_kg',
       'arrival_unit_price',
       'arrival_currency_id',
-      'arrival_invoice_no',
       'note',
     ],
     tableOrder: [
       'arrived_on',
-      'source_type',
       'birds_received',
       'arrival_total_weight_kg',
       'arrival_unit_price',
     ],
     fieldHelpers: {
-      source_type: {
-        ru: 'Откуда пришла партия: «Из фабрики» — внутренняя отгрузка, «Внешний поставщик» — закупка у внешнего клиента.',
-        uz: 'Partiya qayerdan kelgan: «Fabrikadan» — ichki jo‘natma, «Tashqi yetkazib beruvchi» — tashqi mijozdan xarid.',
-        en: 'Where the batch came from: "From factory" — internal shipment, "External supplier" — purchase from an external client.',
-      },
-      factory_shipment_id: {
-        ru: 'Указывайте, если партия пришла из фабрики по отгрузке. Для внешних поставщиков оставьте пустым.',
-        uz: 'Fabrikadan jo‘natma bilan kelganda to‘ldiring. Tashqi yetkazib beruvchilar uchun bo‘sh qoldiring.',
-        en: 'Fill in if the batch arrived via a factory shipment. Leave empty for external suppliers.',
-      },
-      supplier_client_id: {
-        ru: 'Клиент-поставщик для внешнего прихода. Для фабричных партий оставьте пустым.',
-        uz: 'Tashqi kirim uchun mijoz-yetkazib beruvchi. Fabrika partiyalari uchun bo‘sh qoldiring.',
-        en: 'Supplier client for an external receipt. Leave empty for factory batches.',
-      },
       birds_received: {
         ru: 'Фактическое количество птицы на приёмке. Может отличаться от отгрузки — расхождение фиксируется через акт.',
         uz: 'Qabul qilingan haqiqiy parranda soni. Jo‘natmadan farq qilishi mumkin — farq dalolatnoma orqali qayd etiladi.',
@@ -887,13 +867,12 @@ const resourceUiConfigs: Record<string, ResourceUiConfig> = {
     },
     formSections: [
       {
-        title: { ru: 'Источник', uz: 'Manba', en: 'Source' },
-        fields: ['source_type', 'factory_shipment_id', 'supplier_client_id', 'poultry_type_id'],
+        title: { ru: 'Партия', uz: 'Partiya', en: 'Batch' },
+        fields: ['poultry_type_id', 'arrived_on'],
       },
       {
         title: { ru: 'Количество и стоимость', uz: 'Miqdor va qiymat', en: 'Quantity and cost' },
         fields: [
-          'arrived_on',
           'birds_received',
           'arrival_total_weight_kg',
           'arrival_unit_price',
@@ -901,35 +880,12 @@ const resourceUiConfigs: Record<string, ResourceUiConfig> = {
         ],
       },
       {
-        title: { ru: 'Документ', uz: 'Hujjat', en: 'Document' },
-        fields: ['arrival_invoice_no', 'note'],
+        title: { ru: 'Дополнительно', uz: 'Qo‘shimcha', en: 'Extras' },
+        fields: ['note'],
       },
     ],
-    fieldEnums: {
-      source_type: enumOptions(['factory', 'external']),
-    },
     crossFieldValidator: (values) => {
       const errors: Record<string, LocalizedText> = {};
-      const sourceType =
-        typeof values.source_type === 'string' ? values.source_type.trim().toLowerCase() : '';
-      const factoryShipmentId =
-        typeof values.factory_shipment_id === 'string' ? values.factory_shipment_id.trim() : '';
-      const supplierClientId =
-        typeof values.supplier_client_id === 'string' ? values.supplier_client_id.trim() : '';
-      if (sourceType === 'factory' && !factoryShipmentId) {
-        errors.factory_shipment_id = {
-          ru: 'Для источника «Из фабрики» укажите отгрузку из фабрики.',
-          uz: '«Fabrikadan» manbasi uchun fabrikadan jo‘natmani ko‘rsating.',
-          en: 'For source "From factory", specify the factory shipment.',
-        };
-      }
-      if (sourceType === 'external' && !supplierClientId) {
-        errors.supplier_client_id = {
-          ru: 'Для внешнего поставщика укажите клиента-поставщика.',
-          uz: 'Tashqi yetkazib beruvchi uchun mijozni ko‘rsating.',
-          en: 'For an external supplier, specify the supplier client.',
-        };
-      }
       const birds = Number(values.birds_received);
       const weight = Number(values.arrival_total_weight_kg);
       if (Number.isFinite(birds) && birds > 0 && Number.isFinite(weight) && weight > 0) {
@@ -1308,18 +1264,15 @@ const resourceUiConfigs: Record<string, ResourceUiConfig> = {
       'arrived_on',
       'ingredient_id',
       'warehouse_id',
-      'supplier_client_id',
       'quantity',
       'unit',
       'unit_price',
       'currency_id',
-      'invoice_no',
       'note',
     ],
     tableOrder: [
       'arrived_on',
       'ingredient_id',
-      'supplier_client_id',
       'quantity',
       'unit_price',
       'currency_id',
@@ -1444,7 +1397,6 @@ const resourceUiConfigs: Record<string, ResourceUiConfig> = {
       'warehouse_id',
       'production_batch_id',
       'client_id',
-      'destination_department_id',
       'quantity',
       'unit',
       'unit_price',
@@ -1453,13 +1405,6 @@ const resourceUiConfigs: Record<string, ResourceUiConfig> = {
     ],
     hiddenFields: ['invoice_no'],
     formHiddenFields: ['received_quantity', 'status', 'acknowledged_at', 'acknowledged_by'],
-    fieldHelpers: {
-      destination_department_id: {
-        ru: 'Только для внутренней передачи между отделами. Для продажи клиенту оставьте пустым.',
-        uz: 'Faqat bo‘limlar orasida ichki uzatish uchun. Mijozga sotish uchun bo‘sh qoldiring.',
-        en: 'Only for internal inter-department transfers. Leave empty when selling to a client.',
-      },
-    },
     fieldEnums: {
       status: enumOptions(['sent', 'received', 'discrepancy']),
     },
@@ -1488,7 +1433,6 @@ const resourceUiConfigs: Record<string, ResourceUiConfig> = {
       'flock_code',
       'warehouse_id',
       'poultry_type_id',
-      'source_client_id',
       'initial_count',
       'current_count',
       'status',
@@ -1497,11 +1441,6 @@ const resourceUiConfigs: Record<string, ResourceUiConfig> = {
     ],
     hiddenFields: ['chick_arrival_id'],
     fieldHelpers: {
-      source_client_id: {
-        ru: 'Если птенцы куплены у внешнего поставщика — укажите клиента. Для собственного инкубатора оставьте пустым.',
-        uz: 'Jo‘jalar tashqi yetkazib beruvchidan sotib olingan bo‘lsa — mijozni ko‘rsating. O‘z inkubatoringiz uchun bo‘sh qoldiring.',
-        en: 'If the chicks were bought from an external supplier — pick the client. Leave empty for your own incubator.',
-      },
       initial_count: {
         ru: 'Количество птенцов при постановке партии. Меняется только через корректировку.',
         uz: 'Partiya boshlanganidagi jo‘jalar soni. Faqat tuzatish orqali o‘zgartiriladi.',
@@ -1516,7 +1455,7 @@ const resourceUiConfigs: Record<string, ResourceUiConfig> = {
     formSections: [
       {
         title: { ru: 'Партия', uz: 'Partiya', en: 'Batch' },
-        fields: ['arrived_on', 'flock_code', 'warehouse_id', 'poultry_type_id', 'source_client_id'],
+        fields: ['arrived_on', 'flock_code', 'warehouse_id', 'poultry_type_id'],
       },
       {
         title: { ru: 'Поголовье', uz: 'Bosh soni', en: 'Livestock' },
@@ -1594,7 +1533,6 @@ const resourceUiConfigs: Record<string, ResourceUiConfig> = {
       'flock_id',
       'warehouse_id',
       'client_id',
-      'destination_department_id',
       'birds_count',
       'total_weight_kg',
       'unit_price',
@@ -1615,14 +1553,9 @@ const resourceUiConfigs: Record<string, ResourceUiConfig> = {
     formHiddenFields: ['received_quantity', 'status', 'acknowledged_at', 'acknowledged_by'],
     fieldHelpers: {
       client_id: {
-        ru: 'Внешний покупатель — для продажи. Для внутренней передачи между отделами оставьте пустым и заполните «Отдел-получатель».',
-        uz: 'Tashqi xaridor — sotuv uchun. Bo‘limlar o‘rtasida ichki uzatish uchun bo‘sh qoldiring va «Qabul qiluvchi bo‘lim»ni to‘ldiring.',
-        en: 'External buyer — for sales. For internal inter-department transfers leave empty and fill "Destination department".',
-      },
-      destination_department_id: {
-        ru: 'Отдел-получатель — для внутренней передачи (например, на убой). После отгрузки получатель подтверждает приёмку.',
-        uz: 'Qabul qiluvchi bo‘lim — ichki uzatish uchun (masalan, so‘yishga). Jo‘natmadan so‘ng qabul qiluvchi qabulni tasdiqlaydi.',
-        en: 'Destination department — for internal transfers (e.g. to slaughter). After shipment the receiver confirms the hand-off.',
+        ru: 'Внешний покупатель отгрузки.',
+        uz: 'Jo‘natma tashqi xaridori.',
+        en: 'External buyer for the shipment.',
       },
       birds_count: {
         ru: 'Количество голов в отгрузке. Спишется из остатка партии после сохранения.',
@@ -1647,18 +1580,8 @@ const resourceUiConfigs: Record<string, ResourceUiConfig> = {
     },
     formSections: [
       {
-        title: {
-          ru: 'Источник и получатель',
-          uz: 'Manba va qabul qiluvchi',
-          en: 'Source and receiver',
-        },
-        fields: [
-          'shipped_on',
-          'flock_id',
-          'warehouse_id',
-          'client_id',
-          'destination_department_id',
-        ],
+        title: { ru: 'Отгрузка', uz: 'Jo‘natma', en: 'Shipment' },
+        fields: ['shipped_on', 'flock_id', 'warehouse_id', 'client_id'],
       },
       {
         title: { ru: 'Количество и цена', uz: 'Miqdor va narx', en: 'Quantity and price' },
@@ -1674,18 +1597,6 @@ const resourceUiConfigs: Record<string, ResourceUiConfig> = {
     },
     crossFieldValidator: (values) => {
       const errors: Record<string, LocalizedText> = {};
-      const clientId = typeof values.client_id === 'string' ? values.client_id.trim() : '';
-      const destDept =
-        typeof values.destination_department_id === 'string'
-          ? values.destination_department_id.trim()
-          : '';
-      if (clientId && destDept) {
-        errors.destination_department_id = {
-          ru: 'Укажите либо внешнего клиента, либо отдел-получатель — но не оба.',
-          uz: 'Tashqi mijozni yoki qabul qiluvchi bo‘limni ko‘rsating — ikkalasini emas.',
-          en: 'Specify either an external client or a destination department — not both.',
-        };
-      }
       const birds = Number(values.birds_count);
       const weight = Number(values.total_weight_kg);
       if (Number.isFinite(birds) && birds > 0 && Number.isFinite(weight) && weight > 0) {
@@ -1757,7 +1668,6 @@ const resourceUiConfigs: Record<string, ResourceUiConfig> = {
       'expiry_date',
       'medicine_type_id',
       'warehouse_id',
-      'supplier_client_id',
       'batch_code',
       'barcode',
       'received_quantity',
@@ -1775,7 +1685,6 @@ const resourceUiConfigs: Record<string, ResourceUiConfig> = {
       'remaining_quantity',
       'unit',
       'expiry_date',
-      'supplier_client_id',
     ],
     hiddenFields: [
       'arrival_id',

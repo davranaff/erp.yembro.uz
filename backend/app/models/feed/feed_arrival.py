@@ -33,11 +33,6 @@ class FeedArrival(Base, IDMixin, TimestampMixin):
         nullable=False,
         index=True,
     )
-    supplier_client_id: Mapped[UUID | None] = mapped_column(
-        ForeignKey("clients.id", ondelete="SET NULL"),
-        nullable=True,
-        index=True,
-    )
     arrived_on: Mapped[date] = mapped_column(Date, nullable=False, index=True)
     quantity: Mapped[Decimal] = mapped_column(Numeric(16, 3), nullable=False, default=0)
     unit: Mapped[str] = mapped_column(String(20), nullable=False, default="kg", server_default="kg")
@@ -52,17 +47,9 @@ class FeedArrival(Base, IDMixin, TimestampMixin):
         nullable=False,
         index=True,
     )
-    invoice_no: Mapped[str | None] = mapped_column(String(120), nullable=True)
     note: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     __table_args__ = (
-        UniqueConstraint(
-            "organization_id",
-            "arrived_on",
-            "supplier_client_id",
-            "invoice_no",
-            name="uq_feed_arrival_invoice",
-        ),
         CheckConstraint("quantity >= 0", name="ck_feed_arrival_quantity_non_negative"),
         CheckConstraint(
             "unit_price IS NULL OR unit_price >= 0",

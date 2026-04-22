@@ -106,17 +106,6 @@ def _build_public_batch_payload(
     *,
     token: str,
 ) -> dict[str, Any]:
-    supplier_name = (
-        str(row.get("supplier_company_name") or "").strip()
-        or " ".join(
-            [
-                str(row.get("supplier_first_name") or "").strip(),
-                str(row.get("supplier_last_name") or "").strip(),
-            ]
-        ).strip()
-        or None
-    )
-
     attachment_key = str(row.get("attachment_key") or "").strip()
     attachment_payload = None
     if attachment_key:
@@ -155,12 +144,6 @@ def _build_public_batch_payload(
             "id": str(row["organization_id"]),
             "name": row.get("organization_name"),
             "legal_name": row.get("organization_legal_name"),
-        },
-        "supplier": {
-            "id": str(row["supplier_client_id"]) if row.get("supplier_client_id") is not None else None,
-            "name": supplier_name,
-            "email": row.get("supplier_email"),
-            "phone": row.get("supplier_phone"),
         },
         "attachment": attachment_payload,
     }
@@ -241,17 +224,11 @@ async def _get_public_batch_row(
             d.code AS department_code,
             o.name AS organization_name,
             o.legal_name AS organization_legal_name,
-            c.first_name AS supplier_first_name,
-            c.last_name AS supplier_last_name,
-            c.company_name AS supplier_company_name,
-            c.email AS supplier_email,
-            c.phone AS supplier_phone,
             cur.code AS currency
         FROM medicine_batches AS mb
         LEFT JOIN medicine_types AS mt ON mt.id = mb.medicine_type_id
         LEFT JOIN departments AS d ON d.id = mb.department_id
         LEFT JOIN organizations AS o ON o.id = mb.organization_id
-        LEFT JOIN clients AS c ON c.id = mb.supplier_client_id
         LEFT JOIN currencies AS cur ON cur.id = mb.currency_id
         WHERE mb.id = $1
           AND mb.organization_id = $2

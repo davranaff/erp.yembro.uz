@@ -358,14 +358,11 @@ feed_raw_arrivals:
     organization_id: 11111111-1111-1111-1111-111111111111
     department_id: 77771111-1111-1111-1111-111111111111
     ingredient_id: 73111111-1111-1111-1111-111111111101
-    supplier_client_id: e1111111-0000-0000-0000-000000000006
     arrived_on: now-30d
-    lot_no: CORN-2026-03-A
     quantity: 18000
     unit: kg
     unit_price: 3100
     currency: UZS
-    invoice_no: YUSUP-INV-0021
     note: Makkajo'xori asosiy partiya
     warehouse_id: 5fe5f27e-e501-536f-ab8b-c98ed5a8234e
     created_by: 70111111-1111-1111-1111-111111111105
@@ -374,14 +371,11 @@ feed_raw_arrivals:
     organization_id: 11111111-1111-1111-1111-111111111111
     department_id: 77771111-1111-1111-1111-111111111111
     ingredient_id: 73111111-1111-1111-1111-111111111102
-    supplier_client_id: e1111111-0000-0000-0000-000000000006
     arrived_on: now-28d
-    lot_no: SOY-2026-03-A
     quantity: 9000
     unit: kg
     unit_price: 7800
     currency: UZS
-    invoice_no: YUSUP-INV-0022
     note: Soya kunjarasi
     warehouse_id: 5fe5f27e-e501-536f-ab8b-c98ed5a8234e
     created_by: 70111111-1111-1111-1111-111111111105
@@ -390,14 +384,11 @@ feed_raw_arrivals:
     organization_id: 11111111-1111-1111-1111-111111111111
     department_id: 77771111-1111-1111-1111-111111111111
     ingredient_id: 73111111-1111-1111-1111-111111111106
-    supplier_client_id: e1111111-0000-0000-0000-000000000003
     arrived_on: now-26d
-    lot_no: LIME-2026-03
     quantity: 4000
     unit: kg
     unit_price: 980
     currency: UZS
-    invoice_no: QODIR-INV-0010
     note: Kalsiy karbonat
     warehouse_id: 5fe5f27e-e501-536f-ab8b-c98ed5a8234e
     created_by: 70111111-1111-1111-1111-111111111105
@@ -406,14 +397,11 @@ feed_raw_arrivals:
     organization_id: 11111111-1111-1111-1111-111111111111
     department_id: 77771111-1111-1111-1111-111111111111
     ingredient_id: 73111111-1111-1111-1111-111111111108
-    supplier_client_id: null
     arrived_on: now-22d
-    lot_no: VITMIX-2026-03
     quantity: 800
     unit: kg
     unit_price: 24000
     currency: UZS
-    invoice_no: VITEX-INV-0044
     note: Premiks qo'shimcha
     warehouse_id: 5fe5f27e-e501-536f-ab8b-c98ed5a8234e
     created_by: 70111111-1111-1111-1111-111111111105
@@ -422,14 +410,11 @@ feed_raw_arrivals:
     organization_id: 11111111-1111-1111-1111-111111111111
     department_id: 77771111-1111-1111-1111-111111111111
     ingredient_id: 73111111-1111-1111-1111-111111111105
-    supplier_client_id: null
     arrived_on: now-20d
-    lot_no: FISH-2026-03
     quantity: 1200
     unit: kg
     unit_price: 18500
     currency: UZS
-    invoice_no: FISHCO-INV-0008
     note: Baliq uni
     warehouse_id: 5fe5f27e-e501-536f-ab8b-c98ed5a8234e
     created_by: 70111111-1111-1111-1111-111111111105
@@ -439,14 +424,11 @@ feed_raw_arrivals:
     organization_id: 11111111-1111-1111-1111-111111111111
     department_id: 77771111-1111-1111-1111-111111111111
     ingredient_id: 06171717-1717-1717-1717-171717171717
-    supplier_client_id: null
     arrived_on: now-19d
-    lot_no: TST-DEL-2026-A
     quantity: 100
     unit: kg
     unit_price: 1000
     currency: UZS
-    invoice_no: TST-DEL-INV-0001
     note: Test ingredient arrival 1
     warehouse_id: 5fe5f27e-e501-536f-ab8b-c98ed5a8234e
     created_by: 70111111-1111-1111-1111-111111111105
@@ -455,14 +437,11 @@ feed_raw_arrivals:
     organization_id: 11111111-1111-1111-1111-111111111111
     department_id: 77771111-1111-1111-1111-111111111111
     ingredient_id: 06171717-1717-1717-1717-171717171717
-    supplier_client_id: null
     arrived_on: now-17d
-    lot_no: TST-DEL-2026-B
     quantity: 80
     unit: kg
     unit_price: 1100
     currency: UZS
-    invoice_no: TST-DEL-INV-0002
     note: Test ingredient arrival 2
     warehouse_id: 5fe5f27e-e501-536f-ab8b-c98ed5a8234e
     created_by: 70111111-1111-1111-1111-111111111105

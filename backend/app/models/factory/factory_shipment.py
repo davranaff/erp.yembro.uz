@@ -52,11 +52,6 @@ class FactoryShipment(Base, IDMixin, TimestampMixin):
     )
     invoice_no: Mapped[str | None] = mapped_column(String(120), nullable=True)
     note: Mapped[str | None] = mapped_column(Text, nullable=True)
-    destination_department_id: Mapped[UUID | None] = mapped_column(
-        ForeignKey("departments.id", ondelete="RESTRICT"),
-        nullable=True,
-        index=True,
-    )
     acknowledged_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )

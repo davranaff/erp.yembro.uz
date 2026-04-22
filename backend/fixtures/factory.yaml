@@ -14,7 +14,6 @@ factory_flocks:
     organization_id: 11111111-1111-1111-1111-111111111111
     department_id: 55555555-5555-5555-5555-555555555555
     poultry_type_id: b0000000-0000-0000-0000-000000000001
-    source_client_id: null
     chick_arrival_id: 87111111-1111-1111-1111-111111111101
     flock_code: FLK-2026-0301
     arrived_on: now-13d
@@ -29,7 +28,6 @@ factory_flocks:
     organization_id: 11111111-1111-1111-1111-111111111111
     department_id: 55551111-1111-1111-1111-111111111111
     poultry_type_id: b0000000-0000-0000-0000-000000000001
-    source_client_id: null
     chick_arrival_id: 87111111-1111-1111-1111-111111111102
     flock_code: FLK-2026-0302
     arrived_on: now-6d
@@ -44,7 +42,6 @@ factory_flocks:
     organization_id: 11111111-1111-1111-1111-111111111111
     department_id: 55555555-5555-5555-5555-555555555555
     poultry_type_id: b0000000-0000-0000-0000-000000000001
-    source_client_id: null
     chick_arrival_id: null
     flock_code: FLK-2026-0201
     arrived_on: now-55d

@@ -34,11 +34,6 @@ class MedicineBatch(Base, IDMixin, TimestampMixin):
         nullable=False,
         index=True,
     )
-    supplier_client_id: Mapped[UUID | None] = mapped_column(
-        ForeignKey("clients.id", ondelete="SET NULL"),
-        nullable=True,
-        index=True,
-    )
     batch_code: Mapped[str] = mapped_column(String(120), nullable=False, index=True)
     barcode: Mapped[str | None] = mapped_column(String(120), nullable=True, index=True)
     expiry_date: Mapped[date | None] = mapped_column(Date, nullable=True, index=True)
@@ -72,7 +67,6 @@ class MedicineBatch(Base, IDMixin, TimestampMixin):
     organization: Mapped["Organization"] = relationship("Organization", back_populates="medicine_batches")
     department: Mapped["Department"] = relationship("Department", back_populates="medicine_batches")
     medicine_type: Mapped["MedicineType"] = relationship("MedicineType", back_populates="medicine_batches")
-    supplier_client: Mapped["Client | None"] = relationship("Client", back_populates="medicine_batches")
     warehouse: Mapped["Warehouse | None"] = relationship("Warehouse")
 
     __table_args__ = (

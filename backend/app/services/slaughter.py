@@ -111,7 +111,7 @@ def _normalize_currency(raw_value: object) -> str | None:
 
 
 class SlaughterArrivalService(CreatedByActorMixin, BaseService):
-    """Incoming batch of live birds: either from a factory shipment or external supplier."""
+    """Incoming batch of live birds to the slaughterhouse."""
 
     read_schema = SlaughterArrivalReadSchema
 
@@ -127,74 +127,12 @@ class SlaughterArrivalService(CreatedByActorMixin, BaseService):
         merged: dict[str, Any] = dict(existing) if existing is not None else {}
         merged.update({k: v for k, v in data.items() if k in data})
 
-        source_type = merged.get("source_type")
-        if source_type is None or str(source_type).strip() == "":
-            raise ValidationError("source_type is required")
-        source_type = str(source_type).strip().lower()
-        if source_type not in SLAUGHTER_SOURCE_TYPES:
-            raise ValidationError(
-                f"source_type must be one of: {', '.join(SLAUGHTER_SOURCE_TYPES)}",
-            )
-
-        organization_id = str(merged["organization_id"])
         out: dict[str, Any] = dict(data)
-        out["source_type"] = source_type
 
-        factory_shipment_id = merged.get("factory_shipment_id")
-        supplier_client_id = merged.get("supplier_client_id")
-
-        if source_type == "factory":
-            if not factory_shipment_id:
-                raise ValidationError("factory_shipment_id is required for factory source")
-            if supplier_client_id:
-                raise ValidationError("supplier_client_id must be empty for factory source")
-
-            shipment_repo = FactoryShipmentRepository(self.repository.db)
-            shipment = await shipment_repo.get_by_id_optional(str(factory_shipment_id))
-            if shipment is None:
-                raise ValidationError("factory_shipment_id not found")
-            if str(shipment.get("organization_id")) != organization_id:
-                raise AccessDeniedError("factory shipment belongs to another organization")
-
-            out["factory_shipment_id"] = str(factory_shipment_id)
-            out["supplier_client_id"] = None
-
-            if "arrived_on" not in out or out.get("arrived_on") in (None, ""):
-                out["arrived_on"] = shipment.get("shipped_on")
-            if "birds_received" not in out or out.get("birds_received") in (None, ""):
-                out["birds_received"] = int(shipment.get("birds_count") or 0)
-            if "arrival_total_weight_kg" not in out or out.get("arrival_total_weight_kg") in (None, ""):
-                out["arrival_total_weight_kg"] = shipment.get("total_weight_kg")
-            if "arrival_unit_price" not in out or out.get("arrival_unit_price") in (None, ""):
-                out["arrival_unit_price"] = shipment.get("unit_price")
-            if (
-                "arrival_currency_id" not in out
-                or out.get("arrival_currency_id") in (None, "")
-            ):
-                out["arrival_currency_id"] = shipment.get("currency_id")
-            if "arrival_invoice_no" not in out or out.get("arrival_invoice_no") in (None, ""):
-                out["arrival_invoice_no"] = shipment.get("invoice_no")
-
-        else:  # external
-            if not supplier_client_id:
-                raise ValidationError("supplier_client_id is required for external source")
-            if factory_shipment_id:
-                raise ValidationError("factory_shipment_id must be empty for external source")
-
-            client_repo = ClientRepository(self.repository.db)
-            client = await client_repo.get_by_id_optional(str(supplier_client_id))
-            if client is None:
-                raise ValidationError("supplier_client_id not found")
-            if str(client.get("organization_id")) != organization_id:
-                raise AccessDeniedError("supplier belongs to another organization")
-
-            out["supplier_client_id"] = str(supplier_client_id)
-            out["factory_shipment_id"] = None
-
-            if "arrival_total_weight_kg" in out:
-                out["arrival_total_weight_kg"] = _optional_decimal(out.get("arrival_total_weight_kg"))
-            if "arrival_unit_price" in out:
-                out["arrival_unit_price"] = _optional_decimal(out.get("arrival_unit_price"), quantize="0.01")
+        if "arrival_total_weight_kg" in out:
+            out["arrival_total_weight_kg"] = _optional_decimal(out.get("arrival_total_weight_kg"))
+        if "arrival_unit_price" in out:
+            out["arrival_unit_price"] = _optional_decimal(out.get("arrival_unit_price"), quantize="0.01")
 
         birds_received = merged.get("birds_received")
         if birds_received is None:
@@ -225,101 +163,6 @@ class SlaughterArrivalService(CreatedByActorMixin, BaseService):
             raise ValidationError("department_id cannot be changed")
         return await self._resolve_fields(data, existing=existing)
 
-    async def _find_auto_ap_debt(self, arrival_id: str) -> dict[str, Any] | None:
-        marker = _build_auto_ap_marker(arrival_id)
-        row = await self.repository.db.fetchrow(
-            """
-            SELECT *
-            FROM supplier_debts
-            WHERE note LIKE $1
-            ORDER BY created_at DESC
-            LIMIT 1
-            """,
-            f"%{marker}%",
-        )
-        return dict(row) if row is not None else None
-
-    async def _sync_auto_ap(self, entity: Mapping[str, Any]) -> None:
-        arrival_id = str(entity["id"])
-        debt_repo = SupplierDebtRepository(self.repository.db)
-        existing_debt = await self._find_auto_ap_debt(arrival_id)
-
-        source_type = str(entity.get("source_type") or "").strip().lower()
-        supplier_client_id = entity.get("supplier_client_id")
-        weight_raw = entity.get("arrival_total_weight_kg")
-        price_raw = entity.get("arrival_unit_price")
-        arrival_currency_id_raw = entity.get("arrival_currency_id")
-        arrival_currency_id = (
-            str(arrival_currency_id_raw) if arrival_currency_id_raw else None
-        )
-
-        has_full_data = (
-            source_type == "external"
-            and supplier_client_id
-            and weight_raw is not None
-            and price_raw is not None
-            and arrival_currency_id
-        )
-
-        if not has_full_data:
-            if existing_debt is not None:
-                await debt_repo.delete_by_id(str(existing_debt["id"]))
-            return
-
-        weight = Decimal(str(weight_raw)).quantize(Decimal("0.001"))
-        unit_price = Decimal(str(price_raw)).quantize(Decimal("0.01"))
-        if weight <= 0 or unit_price <= 0:
-            if existing_debt is not None:
-                await debt_repo.delete_by_id(str(existing_debt["id"]))
-            return
-
-        amount_total = (unit_price * weight).quantize(Decimal("0.01"))
-        amount_paid = Decimal(str((existing_debt or {}).get("amount_paid") or 0)).quantize(Decimal("0.01"))
-        if amount_paid > amount_total:
-            raise ValidationError(
-                "Cannot reduce arrival total below already recorded debt payments",
-            )
-
-        marker = _build_auto_ap_marker(arrival_id)
-        note = _compose_auto_debt_note(
-            marker,
-            (existing_debt or {}).get("note") if existing_debt else None,
-        )
-        status = _resolve_auto_debt_status(amount_total, amount_paid)
-        issued_on = _as_date(entity["arrived_on"])
-
-        measurement_unit_id = await _resolve_measurement_unit_id(
-            self.repository.db, str(entity["organization_id"]), "kg",
-        )
-        payload: dict[str, Any] = {
-            "organization_id": str(entity["organization_id"]),
-            "department_id": str(entity["department_id"]),
-            "client_id": str(supplier_client_id),
-            "item_type": "chick",
-            "item_key": f"slaughter_arrival:{arrival_id}",
-            "quantity": str(weight),
-            "unit": "kg",
-            "measurement_unit_id": measurement_unit_id,
-            "amount_total": str(amount_total),
-            "amount_paid": str(amount_paid),
-            "currency_id": arrival_currency_id,
-            "issued_on": issued_on,
-            "status": status,
-            "note": note,
-            "is_active": True,
-        }
-
-        if existing_debt is None:
-            await debt_repo.create({"id": str(uuid4()), **payload})
-        else:
-            await debt_repo.update_by_id(str(existing_debt["id"]), payload)
-
-    async def _delete_auto_ap(self, arrival_id: str) -> None:
-        existing_debt = await self._find_auto_ap_debt(arrival_id)
-        if existing_debt is None:
-            return
-        await SupplierDebtRepository(self.repository.db).delete_by_id(str(existing_debt["id"]))
-
     async def _sync_stock(self, entity: Mapping[str, Any]) -> None:
         """Incoming `chick` at slaughter warehouse when live birds arrive."""
         birds_received = int(entity.get("birds_received") or 0)
@@ -337,7 +180,7 @@ class SlaughterArrivalService(CreatedByActorMixin, BaseService):
                     occurred_on=_as_date(entity["arrived_on"]),
                     reference_table="slaughter_arrivals",
                     reference_id=str(entity["id"]),
-                    note=str(entity.get("arrival_invoice_no") or "") or None,
+                    note=None,
                 )
             )
         ledger = StockLedgerService(StockMovementRepository(self.repository.db))
@@ -349,11 +192,9 @@ class SlaughterArrivalService(CreatedByActorMixin, BaseService):
 
     async def _after_create(self, entity: Mapping[str, Any], *, actor=None) -> None:
         await self._sync_stock(entity)
-        await self._sync_auto_ap(entity)
 
     async def _after_update(self, *, before: Mapping[str, Any], after: Mapping[str, Any], actor=None) -> None:
         await self._sync_stock(after)
-        await self._sync_auto_ap(after)
 
     async def _after_delete(self, *, deleted_entity: Mapping[str, Any], actor=None) -> None:
         ledger = StockLedgerService(StockMovementRepository(self.repository.db))
@@ -361,7 +202,6 @@ class SlaughterArrivalService(CreatedByActorMixin, BaseService):
             reference_table="slaughter_arrivals",
             reference_id=str(deleted_entity["id"]),
         )
-        await self._delete_auto_ap(str(deleted_entity["id"]))
 
 
 def _slaughter_arrival_chick_key(arrival_id: str) -> str:

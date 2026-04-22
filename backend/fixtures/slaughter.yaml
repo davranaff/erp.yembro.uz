@@ -19,48 +19,36 @@ slaughter_arrivals:
   - id: c0aa1111-1111-1111-1111-111111111101
     organization_id: 11111111-1111-1111-1111-111111111111
     department_id: 99991111-1111-1111-1111-111111111111
-    source_type: factory
-    factory_shipment_id: a2111111-1111-1111-1111-111111111101
-    supplier_client_id: null
     poultry_type_id: b0000000-0000-0000-0000-000000000001
     arrived_on: now-12d
     birds_received: 2200
     arrival_total_weight_kg: 5060
     arrival_unit_price: 38000
     arrival_currency: UZS
-    arrival_invoice_no: BRO-SHIP-0201
     note: Birinchi partiya prixodi
 
   # Internal source — second factory shipment
   - id: c0aa1111-1111-1111-1111-111111111102
     organization_id: 11111111-1111-1111-1111-111111111111
     department_id: 99991111-1111-1111-1111-111111111111
-    source_type: factory
-    factory_shipment_id: a2111111-1111-1111-1111-111111111102
-    supplier_client_id: null
     poultry_type_id: b0000000-0000-0000-0000-000000000001
     arrived_on: now-8d
     birds_received: 2000
     arrival_total_weight_kg: 4640
     arrival_unit_price: 38500
     arrival_currency: UZS
-    arrival_invoice_no: BRO-SHIP-0202
     note: Ikkinchi partiya prixodi
 
   # External source — Yusupov Agro tirik qush yetkazib berdi
   - id: c0aa1111-1111-1111-1111-111111111103
     organization_id: 11111111-1111-1111-1111-111111111111
     department_id: 99991111-1111-1111-1111-111111111111
-    source_type: external
-    factory_shipment_id: null
-    supplier_client_id: e1111111-0000-0000-0000-000000000006
     poultry_type_id: b0000000-0000-0000-0000-000000000001
     arrived_on: now-3d
     birds_received: 1500
     arrival_total_weight_kg: 3525
     arrival_unit_price: 36000
     arrival_currency: UZS
-    arrival_invoice_no: EXT-YUS-0301
     note: Yusupov Agro tashqi yetkazma
 
 

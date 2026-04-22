@@ -1764,27 +1764,13 @@ async def _build_feed_mill_section(
     )
     client_base_count = await db.fetchrow(
         f"""
-        WITH active_clients AS (
-            SELECT fra.supplier_client_id AS client_id
-            FROM feed_raw_arrivals fra
-            INNER JOIN departments d ON d.id = fra.department_id
-            WHERE d.module_key = 'feed'
-              AND fra.supplier_client_id IS NOT NULL
-              AND {_date_condition('fra.arrived_on')}
-              AND {_department_condition('fra.department_id')}
-
-            UNION
-
-            SELECT fps.client_id AS client_id
-            FROM feed_product_shipments fps
-            INNER JOIN departments d ON d.id = fps.department_id
-            WHERE d.module_key = 'feed'
-              AND fps.client_id IS NOT NULL
-              AND {_date_condition('fps.shipped_on')}
-              AND {_department_condition('fps.department_id')}
-        )
-        SELECT COUNT(*) AS value
-        FROM active_clients
+        SELECT COUNT(DISTINCT fps.client_id) AS value
+        FROM feed_product_shipments fps
+        INNER JOIN departments d ON d.id = fps.department_id
+        WHERE d.module_key = 'feed'
+          AND fps.client_id IS NOT NULL
+          AND {_date_condition('fps.shipped_on')}
+          AND {_department_condition('fps.department_id')}
         """,
         start_date,
         end_date,
@@ -2007,56 +1993,24 @@ async def _build_vet_pharmacy_section(
     )
     supplier_rows = await db.fetch(
         f"""
-        WITH active_clients AS (
-            SELECT
-                ma.supplier_client_id AS client_id,
-                SUM(ma.quantity) AS arrivals_qty,
-                0::numeric AS consumptions_qty
-            FROM medicine_arrivals ma
-            INNER JOIN departments d ON d.id = ma.department_id
-            WHERE d.module_key = 'medicine'
-              AND ma.supplier_client_id IS NOT NULL
-              AND {_date_condition('ma.arrived_on')}
-              AND {_department_condition('ma.department_id')}
-            GROUP BY ma.supplier_client_id
-
-            UNION ALL
-
-            SELECT
-                mc.client_id AS client_id,
-                0::numeric AS arrivals_qty,
-                SUM(mc.quantity) AS consumptions_qty
-            FROM medicine_consumptions mc
-            INNER JOIN departments d ON d.id = mc.department_id
-            WHERE d.module_key = 'medicine'
-              AND mc.client_id IS NOT NULL
-              AND {_date_condition('mc.consumed_on')}
-              AND {_department_condition('mc.department_id')}
-            GROUP BY mc.client_id
-        )
         SELECT
             c.id::text AS key,
             {_client_label_sql('c')} AS label,
-            SUM(active_clients.arrivals_qty + active_clients.consumptions_qty) AS value,
+            SUM(mc.quantity) AS value,
             'ед.' AS unit,
             CONCAT(
                 COALESCE(NULLIF(c.phone, ''), 'без телефона'),
-                ' • роль: ',
-                CASE
-                    WHEN SUM(active_clients.arrivals_qty) > 0 AND SUM(active_clients.consumptions_qty) > 0
-                    THEN 'поставщик и получатель'
-                    WHEN SUM(active_clients.arrivals_qty) > 0
-                    THEN 'поставщик'
-                    ELSE 'получатель'
-                END,
-                ' • приход: ',
-                ROUND(SUM(active_clients.arrivals_qty), 3)::text,
-                ' ед. • расход: ',
-                ROUND(SUM(active_clients.consumptions_qty), 3)::text,
+                ' • расход: ',
+                ROUND(SUM(mc.quantity), 3)::text,
                 ' ед.'
             ) AS caption
-        FROM active_clients
-        INNER JOIN clients c ON c.id = active_clients.client_id
+        FROM medicine_consumptions mc
+        INNER JOIN departments d ON d.id = mc.department_id
+        INNER JOIN clients c ON c.id = mc.client_id
+        WHERE d.module_key = 'medicine'
+          AND mc.client_id IS NOT NULL
+          AND {_date_condition('mc.consumed_on')}
+          AND {_department_condition('mc.department_id')}
         GROUP BY c.id, c.company_name, c.first_name, c.last_name, c.client_code, c.phone
         ORDER BY value DESC, label
         LIMIT 6
@@ -2067,27 +2021,13 @@ async def _build_vet_pharmacy_section(
     )
     client_base_count = await db.fetchrow(
         f"""
-        WITH active_clients AS (
-            SELECT ma.supplier_client_id AS client_id
-            FROM medicine_arrivals ma
-            INNER JOIN departments d ON d.id = ma.department_id
-            WHERE d.module_key = 'medicine'
-              AND ma.supplier_client_id IS NOT NULL
-              AND {_date_condition('ma.arrived_on')}
-              AND {_department_condition('ma.department_id')}
-
-            UNION
-
-            SELECT mc.client_id AS client_id
-            FROM medicine_consumptions mc
-            INNER JOIN departments d ON d.id = mc.department_id
-            WHERE d.module_key = 'medicine'
-              AND mc.client_id IS NOT NULL
-              AND {_date_condition('mc.consumed_on')}
-              AND {_department_condition('mc.department_id')}
-        )
-        SELECT COUNT(*) AS value
-        FROM active_clients
+        SELECT COUNT(DISTINCT mc.client_id) AS value
+        FROM medicine_consumptions mc
+        INNER JOIN departments d ON d.id = mc.department_id
+        WHERE d.module_key = 'medicine'
+          AND mc.client_id IS NOT NULL
+          AND {_date_condition('mc.consumed_on')}
+          AND {_department_condition('mc.department_id')}
         """,
         start_date,
         end_date,
@@ -2323,16 +2263,6 @@ async def _build_slaughterhouse_section(
     client_base_count = await db.fetchrow(
         f"""
         WITH active_clients AS (
-            SELECT ar.supplier_client_id AS client_id
-            FROM slaughter_arrivals ar
-            INNER JOIN departments d ON d.id = ar.department_id
-            WHERE d.module_key = 'slaughter'
-              AND ar.supplier_client_id IS NOT NULL
-              AND {_date_condition('ar.arrived_on')}
-              AND {_department_condition('ar.department_id')}
-
-            UNION
-
             SELECT ss.client_id AS client_id
             FROM slaughter_semi_product_shipments ss
             INNER JOIN departments d ON d.id = ss.department_id
@@ -3538,60 +3468,24 @@ async def _build_feed_mill_dashboard_module(
     )
     client_registry_rows = await db.fetch(
         f"""
-        WITH active_clients AS (
-            SELECT
-                fra.supplier_client_id AS client_id,
-                COUNT(*) AS raw_arrivals_count,
-                SUM(fra.quantity) AS raw_arrivals_qty,
-                0::bigint AS shipments_count,
-                0::numeric AS shipped_qty
-            FROM feed_raw_arrivals fra
-            INNER JOIN departments d ON d.id = fra.department_id
-            WHERE d.module_key = 'feed'
-              AND fra.supplier_client_id IS NOT NULL
-              AND {_date_condition('fra.arrived_on')}
-              AND {_department_condition('fra.department_id')}
-            GROUP BY fra.supplier_client_id
-
-            UNION ALL
-
-            SELECT
-                fps.client_id AS client_id,
-                0::bigint AS raw_arrivals_count,
-                0::numeric AS raw_arrivals_qty,
-                COUNT(*) AS shipments_count,
-                SUM(fps.quantity) AS shipped_qty
-            FROM feed_product_shipments fps
-            INNER JOIN departments d ON d.id = fps.department_id
-            WHERE d.module_key = 'feed'
-              AND fps.client_id IS NOT NULL
-              AND {_date_condition('fps.shipped_on')}
-              AND {_department_condition('fps.department_id')}
-            GROUP BY fps.client_id
-        )
         SELECT
             c.id::text AS key,
             {_client_label_sql('c')} AS label,
-            SUM(active_clients.raw_arrivals_count + active_clients.shipments_count) AS value,
-            'операций' AS unit,
+            COUNT(*) AS value,
+            'отгрузок' AS unit,
             CONCAT(
                 COALESCE(NULLIF(c.phone, ''), 'без телефона'),
-                ' • роль: ',
-                CASE
-                    WHEN SUM(active_clients.raw_arrivals_qty) > 0 AND SUM(active_clients.shipped_qty) > 0
-                    THEN 'поставщик и покупатель'
-                    WHEN SUM(active_clients.raw_arrivals_qty) > 0
-                    THEN 'поставщик сырья'
-                    ELSE 'покупатель продукта'
-                END,
-                ' • сырьё: ',
-                ROUND(SUM(active_clients.raw_arrivals_qty), 3)::text,
-                ' кг • продукт: ',
-                ROUND(SUM(active_clients.shipped_qty), 3)::text,
+                ' • продукт: ',
+                ROUND(SUM(fps.quantity), 3)::text,
                 ' кг'
             ) AS caption
-        FROM active_clients
-        INNER JOIN clients c ON c.id = active_clients.client_id
+        FROM feed_product_shipments fps
+        INNER JOIN departments d ON d.id = fps.department_id
+        INNER JOIN clients c ON c.id = fps.client_id
+        WHERE d.module_key = 'feed'
+          AND fps.client_id IS NOT NULL
+          AND {_date_condition('fps.shipped_on')}
+          AND {_department_condition('fps.department_id')}
         GROUP BY c.id, c.company_name, c.first_name, c.last_name, c.client_code, c.phone
         ORDER BY value DESC, label
         LIMIT 8
@@ -3912,60 +3806,24 @@ async def _build_vet_pharmacy_dashboard_module(
     )
     client_registry_rows = await db.fetch(
         f"""
-        WITH active_clients AS (
-            SELECT
-                ma.supplier_client_id AS client_id,
-                COUNT(*) AS arrivals_count,
-                SUM(ma.quantity) AS arrivals_qty,
-                0::bigint AS consumptions_count,
-                0::numeric AS consumptions_qty
-            FROM medicine_arrivals ma
-            INNER JOIN departments d ON d.id = ma.department_id
-            WHERE d.module_key = 'medicine'
-              AND ma.supplier_client_id IS NOT NULL
-              AND {_date_condition('ma.arrived_on')}
-              AND {_department_condition('ma.department_id')}
-            GROUP BY ma.supplier_client_id
-
-            UNION ALL
-
-            SELECT
-                mc.client_id AS client_id,
-                0::bigint AS arrivals_count,
-                0::numeric AS arrivals_qty,
-                COUNT(*) AS consumptions_count,
-                SUM(mc.quantity) AS consumptions_qty
-            FROM medicine_consumptions mc
-            INNER JOIN departments d ON d.id = mc.department_id
-            WHERE d.module_key = 'medicine'
-              AND mc.client_id IS NOT NULL
-              AND {_date_condition('mc.consumed_on')}
-              AND {_department_condition('mc.department_id')}
-            GROUP BY mc.client_id
-        )
         SELECT
             c.id::text AS key,
             {_client_label_sql('c')} AS label,
-            SUM(active_clients.arrivals_count + active_clients.consumptions_count) AS value,
+            COUNT(*) AS value,
             'операций' AS unit,
             CONCAT(
                 COALESCE(NULLIF(c.phone, ''), 'без телефона'),
-                ' • роль: ',
-                CASE
-                    WHEN SUM(active_clients.arrivals_qty) > 0 AND SUM(active_clients.consumptions_qty) > 0
-                    THEN 'поставщик и получатель'
-                    WHEN SUM(active_clients.arrivals_qty) > 0
-                    THEN 'поставщик'
-                    ELSE 'получатель'
-                END,
-                ' • приход: ',
-                ROUND(SUM(active_clients.arrivals_qty), 3)::text,
-                ' ед. • расход: ',
-                ROUND(SUM(active_clients.consumptions_qty), 3)::text,
+                ' • расход: ',
+                ROUND(SUM(mc.quantity), 3)::text,
                 ' ед.'
             ) AS caption
-        FROM active_clients
-        INNER JOIN clients c ON c.id = active_clients.client_id
+        FROM medicine_consumptions mc
+        INNER JOIN departments d ON d.id = mc.department_id
+        INNER JOIN clients c ON c.id = mc.client_id
+        WHERE d.module_key = 'medicine'
+          AND mc.client_id IS NOT NULL
+          AND {_date_condition('mc.consumed_on')}
+          AND {_department_condition('mc.department_id')}
         GROUP BY c.id, c.company_name, c.first_name, c.last_name, c.client_code, c.phone
         ORDER BY value DESC, label
         LIMIT 8
@@ -4189,60 +4047,24 @@ async def _build_slaughterhouse_dashboard_module(
     )
     client_registry_rows = await db.fetch(
         f"""
-        WITH active_clients AS (
-            SELECT
-                ar.supplier_client_id AS client_id,
-                COUNT(*) AS arrivals_count,
-                SUM(ar.birds_received) AS birds_arrived,
-                0::bigint AS shipments_count,
-                0::numeric AS semi_shipped
-            FROM slaughter_arrivals ar
-            INNER JOIN departments d ON d.id = ar.department_id
-            WHERE d.module_key = 'slaughter'
-              AND ar.supplier_client_id IS NOT NULL
-              AND {_date_condition('ar.arrived_on')}
-              AND {_department_condition('ar.department_id')}
-            GROUP BY ar.supplier_client_id
-
-            UNION ALL
-
-            SELECT
-                ss.client_id AS client_id,
-                0::bigint AS arrivals_count,
-                0::numeric AS birds_arrived,
-                COUNT(*) AS shipments_count,
-                SUM(ss.quantity) AS semi_shipped
-            FROM slaughter_semi_product_shipments ss
-            INNER JOIN departments d ON d.id = ss.department_id
-            WHERE d.module_key = 'slaughter'
-              AND ss.client_id IS NOT NULL
-              AND {_date_condition('ss.shipped_on')}
-              AND {_department_condition('ss.department_id')}
-            GROUP BY ss.client_id
-        )
         SELECT
             c.id::text AS key,
             {_client_label_sql('c')} AS label,
-            SUM(active_clients.arrivals_count + active_clients.shipments_count) AS value,
-            'операций' AS unit,
+            COUNT(*) AS value,
+            'отгрузок' AS unit,
             CONCAT(
                 COALESCE(NULLIF(c.phone, ''), 'без телефона'),
-                ' • роль: ',
-                CASE
-                    WHEN SUM(active_clients.birds_arrived) > 0 AND SUM(active_clients.semi_shipped) > 0
-                    THEN 'поставщик и покупатель'
-                    WHEN SUM(active_clients.birds_arrived) > 0
-                    THEN 'поставщик птицы'
-                    ELSE 'покупатель полуфабриката'
-                END,
-                ' • птица: ',
-                ROUND(SUM(active_clients.birds_arrived), 3)::text,
-                ' шт • полуфабрикат: ',
-                ROUND(SUM(active_clients.semi_shipped), 3)::text,
+                ' • полуфабрикат: ',
+                ROUND(SUM(ss.quantity), 3)::text,
                 ' кг'
             ) AS caption
-        FROM active_clients
-        INNER JOIN clients c ON c.id = active_clients.client_id
+        FROM slaughter_semi_product_shipments ss
+        INNER JOIN departments d ON d.id = ss.department_id
+        INNER JOIN clients c ON c.id = ss.client_id
+        WHERE d.module_key = 'slaughter'
+          AND ss.client_id IS NOT NULL
+          AND {_date_condition('ss.shipped_on')}
+          AND {_department_condition('ss.department_id')}
         GROUP BY c.id, c.company_name, c.first_name, c.last_name, c.client_code, c.phone
         ORDER BY value DESC, label
         LIMIT 8
@@ -4255,14 +4077,7 @@ async def _build_slaughterhouse_dashboard_module(
         f"""
         SELECT
             ar.id::text AS key,
-            CONCAT(
-                TO_CHAR(ar.arrived_on, 'YYYY-MM-DD'),
-                ' • ',
-                CASE
-                    WHEN ar.source_type = 'factory' THEN 'собственная фабрика'
-                    ELSE COALESCE(NULLIF({_client_label_sql('c')}, 'Клиент'), 'внешний поставщик')
-                END
-            ) AS label,
+            TO_CHAR(ar.arrived_on, 'YYYY-MM-DD') AS label,
             ar.birds_received AS value,
             CONCAT(
                 'Средний вес: ',
@@ -4275,7 +4090,6 @@ async def _build_slaughterhouse_dashboard_module(
             ) AS caption
         FROM slaughter_arrivals ar
         INNER JOIN departments d ON d.id = ar.department_id
-        LEFT JOIN clients c ON c.id = ar.supplier_client_id
         WHERE d.module_key = 'slaughter'
           AND {_date_condition('ar.arrived_on')}
           AND {_department_condition('ar.department_id')}

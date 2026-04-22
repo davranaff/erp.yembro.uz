@@ -136,90 +136,6 @@ class MedicineBatchService(BaseService):
             movements=movement_rows,
         )
 
-    async def _find_auto_ap_debt(self, batch_id: str) -> dict[str, Any] | None:
-        marker = _build_auto_ap_marker(batch_id)
-        row = await self.repository.db.fetchrow(
-            """
-            SELECT *
-            FROM supplier_debts
-            WHERE note LIKE $1
-            ORDER BY created_at DESC
-            LIMIT 1
-            """,
-            f"%{marker}%",
-        )
-        return dict(row) if row is not None else None
-
-    async def _sync_auto_ap(self, entity: Mapping[str, Any]) -> None:
-        batch_id = str(entity["id"])
-        debt_repo = SupplierDebtRepository(self.repository.db)
-        existing_debt = await self._find_auto_ap_debt(batch_id)
-
-        supplier_client_id = entity.get("supplier_client_id")
-        received_quantity = _as_decimal(entity.get("received_quantity"))
-        unit_cost_raw = entity.get("unit_cost")
-        currency_id_raw = entity.get("currency_id")
-        currency_id = str(currency_id_raw) if currency_id_raw else None
-
-        if (
-            not supplier_client_id
-            or unit_cost_raw is None
-            or Decimal(str(unit_cost_raw or 0)) <= 0
-            or received_quantity <= 0
-            or not currency_id
-        ):
-            if existing_debt is not None:
-                await debt_repo.delete_by_id(str(existing_debt["id"]))
-            return
-
-        unit_cost = Decimal(str(unit_cost_raw)).quantize(Decimal("0.01"))
-        amount_total = (unit_cost * received_quantity).quantize(Decimal("0.01"))
-        amount_paid = Decimal(str((existing_debt or {}).get("amount_paid") or 0)).quantize(Decimal("0.01"))
-        if amount_paid > amount_total:
-            raise ValidationError(
-                "Cannot reduce medicine batch total below already recorded debt payments",
-            )
-
-        marker = _build_auto_ap_marker(batch_id)
-        note = _compose_auto_debt_note(
-            marker,
-            (existing_debt or {}).get("note") if existing_debt else None,
-        )
-        status = _resolve_auto_debt_status(amount_total, amount_paid)
-        issued_on = _as_date(entity["arrived_on"])
-        measurement_unit_id = await resolve_measurement_unit_id(
-            self.repository.db, str(entity["organization_id"]), str(entity.get("unit") or "pcs"),
-        )
-
-        payload: dict[str, Any] = {
-            "organization_id": str(entity["organization_id"]),
-            "department_id": str(entity["department_id"]),
-            "client_id": str(supplier_client_id),
-            "item_type": "medicine",
-            "item_key": f"medicine_batch:{batch_id}",
-            "quantity": str(received_quantity),
-            "unit": str(entity.get("unit") or "pcs"),
-            "measurement_unit_id": measurement_unit_id,
-            "amount_total": str(amount_total),
-            "amount_paid": str(amount_paid),
-            "currency_id": currency_id,
-            "issued_on": issued_on,
-            "status": status,
-            "note": note,
-            "is_active": True,
-        }
-
-        if existing_debt is None:
-            await debt_repo.create({"id": str(uuid4()), **payload})
-        else:
-            await debt_repo.update_by_id(str(existing_debt["id"]), payload)
-
-    async def _delete_auto_ap(self, batch_id: str) -> None:
-        existing_debt = await self._find_auto_ap_debt(batch_id)
-        if existing_debt is None:
-            return
-        await SupplierDebtRepository(self.repository.db).delete_by_id(str(existing_debt["id"]))
-
     async def _after_create(
         self,
         entity: Mapping[str, Any],
@@ -227,7 +143,6 @@ class MedicineBatchService(BaseService):
         actor=None,
     ) -> None:
         await self._sync_stock(entity)
-        await self._sync_auto_ap(entity)
 
     async def _after_update(
         self,
@@ -237,7 +152,6 @@ class MedicineBatchService(BaseService):
         actor=None,
     ) -> None:
         await self._sync_stock(after)
-        await self._sync_auto_ap(after)
 
     async def _after_delete(
         self,
@@ -250,7 +164,6 @@ class MedicineBatchService(BaseService):
             reference_table="medicine_batches",
             reference_id=str(deleted_entity["id"]),
         )
-        await self._delete_auto_ap(str(deleted_entity["id"]))
 
 
 class MedicineTypeService(BaseService):

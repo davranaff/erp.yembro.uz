@@ -51,11 +51,6 @@ class Client(Base, IDMixin, TimestampMixin):
         back_populates="client",
         lazy="selectin",
     )
-    medicine_batches: Mapped[List["MedicineBatch"]] = relationship(
-        "MedicineBatch",
-        back_populates="supplier_client",
-        lazy="selectin",
-    )
     slaughter_semi_product_shipments: Mapped[List["SlaughterSemiProductShipment"]] = relationship(
         "SlaughterSemiProductShipment",
         back_populates="client",
@@ -65,11 +60,6 @@ class Client(Base, IDMixin, TimestampMixin):
     chick_shipments: Mapped[List["ChickShipment"]] = relationship(
         "ChickShipment",
         back_populates="client",
-        lazy="selectin",
-    )
-    factory_source_flocks: Mapped[List["FactoryFlock"]] = relationship(
-        "FactoryFlock",
-        back_populates="source_client",
         lazy="selectin",
     )
     factory_shipments: Mapped[List["FactoryShipment"]] = relationship(
