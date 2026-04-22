@@ -834,6 +834,7 @@ def build_crud_router(
         limit: int = Query(default=25, ge=1, le=100),
         department_id: list[str] | None = Query(default=None),
         item_type: str | None = Query(default=None),
+        category_id: str | None = Query(default=None),
         current_actor: CurrentActor = Depends(get_current_actor),
         db: Database = Depends(db_dependency),
     ) -> dict[str, Any]:
@@ -870,6 +871,7 @@ def build_crud_router(
             extra_params={
                 "department_id": custom_department_id,
                 "item_type": item_type,
+                "category_id": category_id,
             },
         )
 
