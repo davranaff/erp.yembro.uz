@@ -264,7 +264,7 @@ workspace_resources:
   permission_prefix: "egg_monthly_analytics"
   sort_order: 30
   is_head_visible: false
-  is_active: true
+  is_active: false
 - id: "32000000-0000-0000-0000-000000000181"
   module_key: "egg"
   key: "warehouses"
@@ -403,7 +403,7 @@ workspace_resources:
   permission_prefix: "incubation_monthly_analytics"
   sort_order: 35
   is_head_visible: true
-  is_active: true
+  is_active: false
 - id: "32000000-0000-0000-0000-000000000073"
   module_key: "incubation"
   key: "factory-monthly-analytics"
@@ -413,7 +413,7 @@ workspace_resources:
   permission_prefix: "factory_monthly_analytics"
   sort_order: 36
   is_head_visible: true
-  is_active: true
+  is_active: false
 - id: "32000000-0000-0000-0000-000000000182"
   module_key: "incubation"
   key: "warehouses"
@@ -578,7 +578,7 @@ workspace_resources:
   api_module_key: "incubation"
   sort_order: 34
   is_head_visible: true
-  is_active: true
+  is_active: false
 - id: "32000000-0000-0000-0000-000000000207"
   module_key: "factory"
   key: "feed-consumptions"
@@ -788,7 +788,7 @@ workspace_resources:
   permission_prefix: "feed_monthly_analytics"
   sort_order: 72
   is_head_visible: true
-  is_active: true
+  is_active: false
 - id: "32000000-0000-0000-0000-000000000077"
   module_key: "feed"
   key: "stock-movements"
@@ -1067,7 +1067,7 @@ workspace_resources:
   permission_prefix: "slaughter_monthly_analytics"
   sort_order: 36
   is_head_visible: true
-  is_active: true
+  is_active: false
 - id: "32000000-0000-0000-0000-000000000079"
   module_key: "slaughter"
   key: "stock-movements"
