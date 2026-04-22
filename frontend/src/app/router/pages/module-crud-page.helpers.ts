@@ -160,7 +160,14 @@ export type ResourceCategoryCandidate = {
 
 export const EMPTY_TEXT = '';
 export const MASKED_PASSWORD_VALUE = '********';
-export const FORM_HIDDEN_FIELDS = new Set(['is_active']);
+export const FORM_HIDDEN_FIELDS = new Set([
+  'is_active',
+  // measurement_unit_id is the FK mirror of the `unit` string column —
+  // a Postgres trigger keeps them in sync. Exposing both in the form
+  // would force operators to pick the unit twice; we only render the
+  // `unit` field (which uses the MeasurementUnitSelect dropdown).
+  'measurement_unit_id',
+]);
 const MODULE_DEFAULT_INVENTORY_ITEM_TYPES: Record<string, InventoryItemType> = {
   egg: 'egg',
   incubation: 'chick',
