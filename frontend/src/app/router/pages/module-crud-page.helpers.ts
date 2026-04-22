@@ -719,7 +719,6 @@ const resourceUiConfigs: Record<string, ResourceUiConfig> = {
       'expense_date',
       'category_id',
       'title',
-      'item',
       'quantity',
       'unit',
       'unit_price',
@@ -728,22 +727,26 @@ const resourceUiConfigs: Record<string, ResourceUiConfig> = {
       'note',
     ],
     tableOrder: ['expense_date', 'category_id', 'title', 'amount', 'currency', 'department_id'],
+    // `item` and `title` were two string columns describing the same
+    // thing ("что купили"). Collapsed to `title` only — `item` stays in
+    // the schema for historical rows but is no longer operator-facing.
+    formHiddenFields: ['item'],
     fieldHelpers: {
       category_id: {
         ru: 'Выберите статью из дерева категорий расхода вашего отдела.',
         uz: 'Bo‘lim xarajat toifalari daraxtidan moddani tanlang.',
         en: 'Pick the expense category from your department’s tree.',
       },
-      item: {
-        ru: 'Конкретная позиция (что именно купили / за что заплатили).',
-        uz: 'Aniq pozitsiya (aynan nima sotib olingan / nima uchun to‘langan).',
-        en: 'Specific item — what was purchased or what the payment covers.',
+      title: {
+        ru: 'Что купили / за что заплатили. Например: «Корм Starter 25 кг», «Аренда склада за апрель».',
+        uz: 'Nima sotib olingan / nima uchun to‘langan. Masalan: «Starter em 25 kg», «Aprel uchun ombor ijarasi».',
+        en: 'What was purchased or what the payment covers. E.g. "Starter feed 25 kg", "Warehouse rent for April".',
       },
     },
     formSections: [
       {
-        title: { ru: 'Статья и позиция', uz: 'Modda va pozitsiya', en: 'Category & item' },
-        fields: ['expense_date', 'category_id', 'title', 'item'],
+        title: { ru: 'Статья и описание', uz: 'Modda va tavsif', en: 'Category & description' },
+        fields: ['expense_date', 'category_id', 'title'],
       },
       {
         title: { ru: 'Количество и сумма', uz: 'Miqdor va summa', en: 'Quantity & amount' },
