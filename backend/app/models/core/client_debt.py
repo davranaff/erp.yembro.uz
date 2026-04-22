@@ -49,7 +49,11 @@ class ClientDebt(Base, IDMixin, TimestampMixin):
     )
     amount_total: Mapped[Decimal] = mapped_column(Numeric(16, 2), nullable=False, default=0)
     amount_paid: Mapped[Decimal] = mapped_column(Numeric(16, 2), nullable=False, default=0, server_default="0")
-    currency: Mapped[str] = mapped_column(String(8), nullable=False)
+    currency_id: Mapped[UUID] = mapped_column(
+        ForeignKey("currencies.id", ondelete="RESTRICT"),
+        nullable=False,
+        index=True,
+    )
     issued_on: Mapped[date] = mapped_column(Date, nullable=False, index=True)
     due_on: Mapped[date | None] = mapped_column(Date, nullable=True, index=True)
     status: Mapped[str] = mapped_column(String(24), nullable=False, default="open", server_default="open", index=True)

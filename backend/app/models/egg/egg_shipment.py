@@ -49,7 +49,11 @@ class EggShipment(Base, IDMixin, TimestampMixin):
         index=True,
     )
     unit_price: Mapped[Decimal | None] = mapped_column(Numeric(14, 2), nullable=True)
-    currency: Mapped[str] = mapped_column(String(8), nullable=False)
+    currency_id: Mapped[UUID] = mapped_column(
+        ForeignKey("currencies.id", ondelete="RESTRICT"),
+        nullable=False,
+        index=True,
+    )
     invoice_no: Mapped[str | None] = mapped_column(String(120), nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default="true")
     note: Mapped[str | None] = mapped_column(Text, nullable=True)

@@ -287,14 +287,15 @@ class FeedRawArrivalService(CreatedByActorMixin, BaseService):
         supplier_client_id = entity.get("supplier_client_id")
         unit_price = entity.get("unit_price")
         quantity = _as_decimal(entity.get("quantity"))
-        currency = _normalize_currency(entity.get("currency"))
+        currency_id_raw = entity.get("currency_id")
+        currency_id = str(currency_id_raw) if currency_id_raw else None
 
         if (
             not supplier_client_id
             or unit_price is None
             or Decimal(str(unit_price or 0)) <= 0
             or quantity <= 0
-            or not currency
+            or not currency_id
         ):
             if existing_debt is not None:
                 await debt_repo.delete_by_id(str(existing_debt["id"]))
@@ -332,7 +333,7 @@ class FeedRawArrivalService(CreatedByActorMixin, BaseService):
             "measurement_unit_id": measurement_unit_id,
             "amount_total": str(amount_total),
             "amount_paid": str(amount_paid),
-            "currency": currency,
+            "currency_id": currency_id,
             "issued_on": issued_on,
             "status": status,
             "note": note,
@@ -349,25 +350,6 @@ class FeedRawArrivalService(CreatedByActorMixin, BaseService):
         if existing_debt is None:
             return
         await SupplierDebtRepository(self.repository.db).delete_by_id(str(existing_debt["id"]))
-
-    async def _before_create(self, data: dict[str, Any], *, actor=None) -> dict[str, Any]:
-        out = dict(data)
-        if "currency" in out:
-            out["currency"] = _normalize_currency(out.get("currency")) or "UZS"
-        return out
-
-    async def _before_update(
-        self,
-        entity_id,
-        data: dict[str, Any],
-        *,
-        existing: Mapping[str, Any],
-        actor=None,
-    ) -> dict[str, Any]:
-        out = dict(data)
-        if "currency" in out:
-            out["currency"] = _normalize_currency(out.get("currency")) or str(existing.get("currency") or "UZS")
-        return out
 
     async def _after_create(self, entity: Mapping[str, Any], *, actor=None) -> None:
         await self._sync_stock(entity)
@@ -527,8 +509,6 @@ class FeedProductShipmentService(CreatedByActorMixin, BaseService):
 
     async def _before_create(self, data: dict[str, Any], *, actor=None) -> dict[str, Any]:
         out = dict(data)
-        if "currency" in out:
-            out["currency"] = _normalize_currency(out.get("currency")) or "UZS"
         production_batch_id = out.get("production_batch_id")
         if production_batch_id:
             await self._ensure_quality_passed(str(production_batch_id))
@@ -543,8 +523,6 @@ class FeedProductShipmentService(CreatedByActorMixin, BaseService):
         actor=None,
     ) -> dict[str, Any]:
         out = dict(data)
-        if "currency" in out:
-            out["currency"] = _normalize_currency(out.get("currency")) or str(existing.get("currency") or "UZS")
         production_batch_id = out.get("production_batch_id") or existing.get("production_batch_id")
         if production_batch_id and (
             "production_batch_id" in out or "quantity" in out
@@ -648,7 +626,7 @@ class FeedProductShipmentService(CreatedByActorMixin, BaseService):
             "measurement_unit_id": measurement_unit_id,
             "amount_total": str(amount_total),
             "amount_paid": str(amount_paid),
-            "currency": str(entity.get("currency") or ""),
+            "currency_id": str(entity["currency_id"]),
             "issued_on": issued_on,
             "status": status,
             "note": note,

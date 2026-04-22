@@ -19,6 +19,9 @@ if TYPE_CHECKING:
     from app.api.deps import CurrentActor
 
 
+_MISSING: Any = object()
+
+
 class BaseService(ABC):
     """Base async CRUD service that wraps repository calls with result objects."""
 
@@ -148,27 +151,6 @@ class BaseService(ABC):
 
     async def get_additional_meta_fields(self, db) -> list[dict[str, Any]]:
         fields: list[dict[str, Any]] = []
-        if self.repository.has_column("currency"):
-            fields.append(
-                {
-                    "name": "currency",
-                    "label": "Currency",
-                    "type": "string",
-                    "database_type": "character varying",
-                    "nullable": False,
-                    "required": True,
-                    "readonly": False,
-                    "has_default": True,
-                    "is_primary_key": False,
-                    "is_foreign_key": False,
-                    "reference": {
-                        "table": "currencies",
-                        "column": "code",
-                        "label_column": "name",
-                        "multiple": False,
-                    },
-                }
-            )
         if self.repository.has_column("unit"):
             fields.append(
                 {
@@ -207,6 +189,74 @@ class BaseService(ABC):
         extra_params: Mapping[str, Any] | None = None,
     ) -> list[dict[str, str]] | None:
         return None
+
+    async def _finalize_read_rows(
+        self,
+        rows: list[dict[str, Any]] | Sequence[Mapping[str, Any]],
+    ) -> list[dict[str, Any]]:
+        """Post-process rows returned to the API.
+
+        Default behaviour: resolve ``currency_id`` / ``arrival_currency_id``
+        into the legacy text alias (``currency`` / ``arrival_currency``) so
+        downstream clients that still read the code keep working.
+        """
+        materialized = [dict(row) for row in rows]
+        if not materialized:
+            return materialized
+        if self.repository.has_column("currency_id"):
+            materialized = await self._attach_currency_code(
+                materialized, id_column="currency_id", output_key="currency"
+            )
+        if self.repository.has_column("arrival_currency_id"):
+            materialized = await self._attach_currency_code(
+                materialized,
+                id_column="arrival_currency_id",
+                output_key="arrival_currency",
+            )
+        return materialized
+
+    async def _attach_currency_code(
+        self,
+        rows: list[dict[str, Any]] | Sequence[Mapping[str, Any]],
+        *,
+        id_column: str = "currency_id",
+        output_key: str = "currency",
+    ) -> list[dict[str, Any]]:
+        """Resolve currency_id → code on read responses.
+
+        Legacy clients expected a 3-letter ``currency`` field on every
+        row. After the FK migration, only ``currency_id`` lives on the
+        row itself — this helper looks up the matching catalog row once
+        per unique id and attaches the code back as ``currency`` so
+        downstream renderers keep working unchanged.
+        """
+        if not rows:
+            return [dict(row) for row in rows]
+
+        ids = {
+            str(row.get(id_column))
+            for row in rows
+            if row.get(id_column) is not None
+        }
+        code_by_id: dict[str, str] = {}
+        if ids:
+            currency_repository = CurrencyRepository(self.repository.db)
+            catalog_rows = await currency_repository.get_by_ids(list(ids))
+            code_by_id = {
+                str(catalog_row["id"]): str(catalog_row.get("code") or "").upper()
+                for catalog_row in catalog_rows
+                if catalog_row.get("id") is not None
+            }
+
+        enriched: list[dict[str, Any]] = []
+        for row in rows:
+            next_row = dict(row)
+            currency_id = next_row.get(id_column)
+            next_row[output_key] = (
+                code_by_id.get(str(currency_id)) if currency_id is not None else None
+            )
+            enriched.append(next_row)
+        return enriched
 
     def get_searchable_columns(self) -> tuple[str, ...]:
         return self.repository.get_searchable_columns()
@@ -547,18 +597,42 @@ class BaseService(ABC):
         next_payload = self._normalize_uuid_payload_fields(next_payload, is_create=False)
         return next_payload
 
-    async def _get_default_organization_currency_code(self, organization_id: str) -> str | None:
+    async def _get_default_organization_currency(
+        self, organization_id: str
+    ) -> Mapping[str, Any] | None:
         currency_repository = CurrencyRepository(self.repository.db)
-        row = await currency_repository.get_optional_by(
+        return await currency_repository.get_optional_by(
             filters={
                 "organization_id": organization_id,
                 "is_active": True,
             },
             order_by=("is_default desc", "sort_order", "name", "code", "id"),
         )
-        if row is None:
-            return None
-        return str(row["code"]).strip().upper()
+
+    async def _resolve_currency_for_organization(
+        self,
+        *,
+        organization_id: str,
+        currency_id: Any = None,
+        currency_code: Any = None,
+    ) -> Mapping[str, Any]:
+        currency_repository = CurrencyRepository(self.repository.db)
+        if currency_id is not None and str(currency_id).strip():
+            row = await currency_repository.get_by_id_optional(str(currency_id))
+            if row is None or str(row.get("organization_id") or "") != organization_id:
+                raise ValidationError("currency is invalid")
+            if row.get("is_active") is False:
+                raise ValidationError("currency is invalid")
+            return row
+        if currency_code is not None and str(currency_code).strip():
+            normalized = str(currency_code).strip().upper()
+            row = await currency_repository.get_optional_by(
+                filters={"organization_id": organization_id, "code": normalized}
+            )
+            if row is None or row.get("is_active") is False:
+                raise ValidationError("currency is invalid")
+            return row
+        raise ValidationError("currency is required")
 
     async def _validate_catalog_fields(
         self,
@@ -568,7 +642,8 @@ class BaseService(ABC):
         existing: Mapping[str, Any] | None = None,
         is_create: bool,
     ) -> dict[str, Any]:
-        if not self.repository.has_column("currency"):
+        currency_column = self._detect_currency_id_column()
+        if currency_column is None:
             return payload
 
         organization_id = (
@@ -584,35 +659,56 @@ class BaseService(ABC):
             return payload
 
         next_payload = dict(payload)
-        raw_currency = next_payload.get("currency")
-        has_explicit_currency = "currency" in next_payload
+        explicit_id = next_payload.pop(currency_column, _MISSING)
+        # The form historically sent the ISO code in a plain text field
+        # (``currency`` or ``arrival_currency``) — accept that as a fallback
+        # so older clients keep working.
+        code_key = (
+            "arrival_currency"
+            if currency_column == "arrival_currency_id"
+            else "currency"
+        )
+        explicit_code = next_payload.pop(code_key, _MISSING)
 
-        if raw_currency is None or str(raw_currency).strip() == "":
-            if not is_create and not has_explicit_currency:
+        has_explicit = explicit_id is not _MISSING or explicit_code is not _MISSING
+        resolved_id = explicit_id if explicit_id is not _MISSING else None
+        resolved_code = explicit_code if explicit_code is not _MISSING else None
+
+        # An explicit currency code from the caller always wins over a
+        # potentially stale ``currency_id`` copied from a template row.
+        if resolved_code is not None and str(resolved_code).strip():
+            resolved_id = None
+
+        # Empty values are treated as "not provided" — fall back to the
+        # organization's default currency when creating.
+        if (
+            (resolved_id is None or not str(resolved_id).strip())
+            and (resolved_code is None or not str(resolved_code).strip())
+        ):
+            if not is_create and not has_explicit:
                 return next_payload
-
-            default_currency_code = await self._get_default_organization_currency_code(organization_id)
-            if default_currency_code is None:
-                raise ValidationError("currency is required and organization has no active default currency")
-            next_payload["currency"] = default_currency_code
+            default_currency = await self._get_default_organization_currency(organization_id)
+            if default_currency is None:
+                raise ValidationError(
+                    "currency is required and organization has no active default currency"
+                )
+            next_payload[currency_column] = str(default_currency["id"])
             return next_payload
 
-        normalized_currency = str(raw_currency).strip().upper()
-        if not normalized_currency:
-            raise ValidationError("currency is required")
-
-        currency_repository = CurrencyRepository(self.repository.db)
-        currency = await currency_repository.get_optional_by(
-            filters={
-                "organization_id": organization_id,
-                "code": normalized_currency,
-            }
+        resolved = await self._resolve_currency_for_organization(
+            organization_id=organization_id,
+            currency_id=resolved_id,
+            currency_code=resolved_code,
         )
-        if currency is None or currency.get("is_active") is False:
-            raise ValidationError("currency is invalid")
-
-        next_payload["currency"] = normalized_currency
+        next_payload[currency_column] = str(resolved["id"])
         return next_payload
+
+    def _detect_currency_id_column(self) -> str | None:
+        if self.repository.has_column("currency_id"):
+            return "currency_id"
+        if self.repository.has_column("arrival_currency_id"):
+            return "arrival_currency_id"
+        return None
 
     @staticmethod
     def _actor_bypasses_organization_scope(actor: CurrentActor | None) -> bool:
@@ -920,17 +1016,20 @@ class BaseService(ABC):
     async def get_by_id(self, entity_id: Any, *, actor: CurrentActor | None = None) -> Result[Any]:
         entity = await self.repository.get_by_id(entity_id)
         self._ensure_actor_can_access_entity(entity, actor=actor)
-        return Result.ok_result(self._map_read(entity))
+        finalized = (await self._finalize_read_rows([entity]))[0]
+        return Result.ok_result(self._map_read(finalized))
 
     async def get_by_id_or_none(self, entity_id: Any, *, actor: CurrentActor | None = None) -> Result[Any | None]:
         entity = await self.repository.get_by_id_optional(entity_id)
         if entity is None:
             return Result.ok_result(None)
-        return Result.ok_result(self._map_read(entity))
+        finalized = (await self._finalize_read_rows([entity]))[0]
+        return Result.ok_result(self._map_read(finalized))
 
     async def get_one_by(self, filters: dict[str, Any], order_by: str | None = None) -> Result[Any]:
         entity = await self.repository.get_one_by(filters=filters, order_by=order_by)
-        return Result.ok_result(self._map_read(entity))
+        finalized = (await self._finalize_read_rows([entity]))[0]
+        return Result.ok_result(self._map_read(finalized))
 
     async def get_one_by_or_none(
         self,
@@ -940,10 +1039,12 @@ class BaseService(ABC):
         entity = await self.repository.get_optional_by(filters=filters, order_by=order_by)
         if entity is None:
             return Result.ok_result(None)
-        return Result.ok_result(self._map_read(entity))
+        finalized = (await self._finalize_read_rows([entity]))[0]
+        return Result.ok_result(self._map_read(finalized))
 
     async def list(self, *args: Any, **kwargs: Any) -> Result[list[Any]]:
         rows = await self.repository.list(*args, **kwargs)
+        rows = await self._finalize_read_rows(rows)
         return Result.ok_result([self._map_read(row) for row in rows])
 
     async def get_scalar(
@@ -1011,6 +1112,7 @@ class BaseService(ABC):
             search=search,
             search_columns=search_columns,
         )
+        items = await self._finalize_read_rows(items)
         return Result.ok_result(
             {
                 "items": [self._map_read(item) for item in items],
@@ -1061,7 +1163,8 @@ class BaseService(ABC):
                 before_data=None,
                 after_data=after_snapshot,
             )
-        return Result.ok_result(self._map_read(entity))
+        finalized = (await self._finalize_read_rows([entity]))[0]
+        return Result.ok_result(self._map_read(finalized))
 
     async def create_many_safe(self, payloads: list[Any]) -> Result[list[Any]]:
         try:
@@ -1142,7 +1245,8 @@ class BaseService(ABC):
                 after_data=after_snapshot,
                 actor=actor,
             )
-        return Result.ok_result(self._map_read(entity))
+        finalized = (await self._finalize_read_rows([entity]))[0]
+        return Result.ok_result(self._map_read(finalized))
 
     async def acknowledge_shipment(
         self,

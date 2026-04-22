@@ -236,13 +236,14 @@ async def fetch_client_notification_context(
     debt_summary_row = await db.fetchrow(
         f"""
         SELECT
-            COALESCE(SUM(CASE WHEN status IN ('open', 'partially_paid') AND is_active = true THEN 1 ELSE 0 END), 0) AS open_count,
-            COALESCE(SUM(CASE WHEN status IN ('open', 'partially_paid') AND is_active = true THEN amount_total ELSE 0 END), 0) AS total_amount,
-            COALESCE(SUM(CASE WHEN status IN ('open', 'partially_paid') AND is_active = true THEN amount_paid ELSE 0 END), 0) AS paid_amount,
-            COALESCE(MAX(currency), 'UZS') AS currency
-        FROM client_debts
-        WHERE organization_id = $1
-          AND client_id = $2
+            COALESCE(SUM(CASE WHEN cd.status IN ('open', 'partially_paid') AND cd.is_active = true THEN 1 ELSE 0 END), 0) AS open_count,
+            COALESCE(SUM(CASE WHEN cd.status IN ('open', 'partially_paid') AND cd.is_active = true THEN cd.amount_total ELSE 0 END), 0) AS total_amount,
+            COALESCE(SUM(CASE WHEN cd.status IN ('open', 'partially_paid') AND cd.is_active = true THEN cd.amount_paid ELSE 0 END), 0) AS paid_amount,
+            COALESCE(MAX(cur.code), 'UZS') AS currency
+        FROM client_debts AS cd
+        LEFT JOIN currencies AS cur ON cur.id = cd.currency_id
+        WHERE cd.organization_id = $1
+          AND cd.client_id = $2
           {department_clause}
         """,
         *params,
@@ -262,13 +263,17 @@ async def fetch_client_notification_context(
     debt_params.append(max(1, recent_limit))
     recent_debts_rows = await db.fetch(
         f"""
-        SELECT id, item_type, item_key, quantity, unit, amount_total, amount_paid, currency, issued_on, due_on, status
-        FROM client_debts
-        WHERE organization_id = $1
-          AND client_id = $2
-          {department_clause}
-          AND is_active = true
-        ORDER BY COALESCE(due_on, issued_on) ASC, created_at DESC
+        SELECT
+            cd.id, cd.item_type, cd.item_key, cd.quantity, cd.unit,
+            cd.amount_total, cd.amount_paid, cur.code AS currency,
+            cd.issued_on, cd.due_on, cd.status
+        FROM client_debts AS cd
+        LEFT JOIN currencies AS cur ON cur.id = cd.currency_id
+        WHERE cd.organization_id = $1
+          AND cd.client_id = $2
+          {department_clause.replace('department_id', 'cd.department_id')}
+          AND cd.is_active = true
+        ORDER BY COALESCE(cd.due_on, cd.issued_on) ASC, cd.created_at DESC
         LIMIT ${len(debt_params)}
         """,
         *debt_params,
@@ -300,10 +305,11 @@ async def fetch_client_notification_context(
                 es.eggs_count AS quantity,
                 es.unit AS unit,
                 (COALESCE(es.unit_price, 0) * COALESCE(es.eggs_count, 0)) AS amount,
-                es.currency AS currency,
+                cur_es.code AS currency,
                 es.invoice_no AS reference_no
             FROM egg_shipments AS es
             LEFT JOIN egg_production AS ep ON ep.id = es.production_id
+            LEFT JOIN currencies AS cur_es ON cur_es.id = es.currency_id
             WHERE es.organization_id = $1
               AND es.client_id = $2
               {purchase_department_clause_egg}
@@ -317,10 +323,11 @@ async def fetch_client_notification_context(
                 fps.quantity AS quantity,
                 fps.unit AS unit,
                 (COALESCE(fps.unit_price, 0) * COALESCE(fps.quantity, 0)) AS amount,
-                fps.currency AS currency,
+                cur_fps.code AS currency,
                 fps.invoice_no AS reference_no
             FROM feed_product_shipments AS fps
             LEFT JOIN feed_types AS ft ON ft.id = fps.feed_type_id
+            LEFT JOIN currencies AS cur_fps ON cur_fps.id = fps.currency_id
             WHERE fps.organization_id = $1
               AND fps.client_id = $2
               {purchase_department_clause_feed}
@@ -334,11 +341,12 @@ async def fetch_client_notification_context(
                 cs.chicks_count AS quantity,
                 'pcs' AS unit,
                 (COALESCE(cs.unit_price, 0) * COALESCE(cs.chicks_count, 0)) AS amount,
-                cs.currency AS currency,
+                cur_cs.code AS currency,
                 cs.invoice_no AS reference_no
             FROM chick_shipments AS cs
             LEFT JOIN incubation_runs AS ir ON ir.id = cs.run_id
             LEFT JOIN incubation_batches AS ib ON ib.id = ir.batch_id
+            LEFT JOIN currencies AS cur_cs ON cur_cs.id = cs.currency_id
             WHERE cs.organization_id = $1
               AND cs.client_id = $2
               {purchase_department_clause_chick}
@@ -352,10 +360,11 @@ async def fetch_client_notification_context(
                 ss.quantity AS quantity,
                 ss.unit AS unit,
                 (COALESCE(ss.unit_price, 0) * COALESCE(ss.quantity, 0)) AS amount,
-                ss.currency AS currency,
+                cur_ss.code AS currency,
                 ss.invoice_no AS reference_no
             FROM slaughter_semi_product_shipments AS ss
             LEFT JOIN slaughter_semi_products AS sp ON sp.id = ss.semi_product_id
+            LEFT JOIN currencies AS cur_ss ON cur_ss.id = ss.currency_id
             WHERE ss.organization_id = $1
               AND ss.client_id = $2
               {purchase_department_clause_slaughter}

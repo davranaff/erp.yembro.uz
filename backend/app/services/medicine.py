@@ -158,15 +158,15 @@ class MedicineBatchService(BaseService):
         supplier_client_id = entity.get("supplier_client_id")
         received_quantity = _as_decimal(entity.get("received_quantity"))
         unit_cost_raw = entity.get("unit_cost")
-        currency_raw = entity.get("currency")
-        currency = str(currency_raw).strip().upper() if currency_raw else None
+        currency_id_raw = entity.get("currency_id")
+        currency_id = str(currency_id_raw) if currency_id_raw else None
 
         if (
             not supplier_client_id
             or unit_cost_raw is None
             or Decimal(str(unit_cost_raw or 0)) <= 0
             or received_quantity <= 0
-            or not currency
+            or not currency_id
         ):
             if existing_debt is not None:
                 await debt_repo.delete_by_id(str(existing_debt["id"]))
@@ -202,7 +202,7 @@ class MedicineBatchService(BaseService):
             "measurement_unit_id": measurement_unit_id,
             "amount_total": str(amount_total),
             "amount_paid": str(amount_paid),
-            "currency": currency,
+            "currency_id": currency_id,
             "issued_on": issued_on,
             "status": status,
             "note": note,

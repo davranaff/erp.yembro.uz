@@ -353,6 +353,7 @@ class CashTransactionService(CreatedByActorMixin, BaseService):
 
             enriched_rows.append(enriched)
 
+        enriched_rows = await self._attach_currency_code(enriched_rows)
         return enriched_rows
 
     async def get_additional_meta_fields(self, db) -> list[dict[str, Any]]:
@@ -491,15 +492,6 @@ class CashTransactionService(CreatedByActorMixin, BaseService):
         amount = Decimal(str(data.get("amount") or 0))
         data["exchange_rate_to_base"] = str(rate)
         data["amount_in_base"] = str((amount * rate).quantize(Decimal("0.01")))
-
-        if not data.get("currency_id") and data.get("currency") and data.get("organization_id"):
-            row = await self.repository.db.fetchrow(
-                "SELECT id FROM currencies WHERE organization_id = $1 AND code = $2 LIMIT 1",
-                data["organization_id"],
-                data["currency"],
-            )
-            if row is not None:
-                data["currency_id"] = str(row["id"])
 
         category_id = data.get("category_id")
         if category_id:
@@ -1113,7 +1105,9 @@ class DebtPaymentService(CreatedByActorMixin, BaseService):
             ),
             "transaction_type": transaction_type,
             "amount": str(payment_row.get("amount")),
-            "currency": str(payment_row.get("currency") or debt_row.get("currency") or ""),
+            "currency_id": str(
+                payment_row.get("currency_id") or debt_row.get("currency_id") or ""
+            ),
             "transaction_date": payment_row.get("paid_on"),
             "reference_no": payment_row.get("reference_no"),
             "note": self._compose_note(
@@ -1210,15 +1204,15 @@ class DebtPaymentService(CreatedByActorMixin, BaseService):
         if paid_on is None:
             raise ValidationError("paid_on is required")
 
-        currency = str(
-            next_payload.get("currency")
-            or (existing.get("currency") if existing else None)
-            or debt_row.get("currency")
+        currency_id = str(
+            next_payload.get("currency_id")
+            or (existing.get("currency_id") if existing else None)
+            or debt_row.get("currency_id")
             or ""
         ).strip()
-        if not currency:
-            raise ValidationError("currency is required")
-        if currency != str(debt_row.get("currency") or "").strip():
+        if not currency_id:
+            raise ValidationError("currency_id is required")
+        if currency_id != str(debt_row.get("currency_id") or "").strip():
             raise ValidationError("currency must match the parent debt currency")
 
         cash_account_id = _normalize_optional_uuid(
@@ -1256,7 +1250,7 @@ class DebtPaymentService(CreatedByActorMixin, BaseService):
         next_payload["direction"] = direction
         next_payload["method"] = method
         next_payload["amount"] = str(amount)
-        next_payload["currency"] = currency
+        next_payload["currency_id"] = currency_id
         next_payload["paid_on"] = paid_on
         next_payload["cash_account_id"] = cash_account_id
         next_payload["is_active"] = next_payload.get("is_active", existing.get("is_active") if existing else True)
@@ -1438,6 +1432,7 @@ class EmployeeAdvanceService(CreatedByActorMixin, BaseService):
 
     async def compute_balance(self, advance_id: str) -> dict[str, Decimal]:
         advance = await self.repository.get_by_id(advance_id)
+        advance = (await self._finalize_read_rows([advance]))[0]
         totals_row = await self.repository.db.fetchrow(
             """
             SELECT

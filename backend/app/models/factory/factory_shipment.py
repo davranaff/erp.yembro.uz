@@ -45,7 +45,11 @@ class FactoryShipment(Base, IDMixin, TimestampMixin):
     birds_count: Mapped[int] = mapped_column(Integer, nullable=False)
     total_weight_kg: Mapped[Decimal] = mapped_column(Numeric(16, 3), nullable=False)
     unit_price: Mapped[Decimal | None] = mapped_column(Numeric(14, 2), nullable=True)
-    currency: Mapped[str] = mapped_column(String(8), nullable=False)
+    currency_id: Mapped[UUID] = mapped_column(
+        ForeignKey("currencies.id", ondelete="RESTRICT"),
+        nullable=False,
+        index=True,
+    )
     invoice_no: Mapped[str | None] = mapped_column(String(120), nullable=True)
     note: Mapped[str | None] = mapped_column(Text, nullable=True)
     destination_department_id: Mapped[UUID | None] = mapped_column(

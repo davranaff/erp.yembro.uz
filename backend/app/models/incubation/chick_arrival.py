@@ -46,7 +46,11 @@ class ChickArrival(Base, IDMixin, TimestampMixin):
     arrived_on: Mapped[date] = mapped_column(Date, nullable=False, index=True)
     chicks_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
     unit_price: Mapped[Decimal | None] = mapped_column(Numeric(14, 2), nullable=True)
-    currency: Mapped[str] = mapped_column(String(8), nullable=False)
+    currency_id: Mapped[UUID] = mapped_column(
+        ForeignKey("currencies.id", ondelete="RESTRICT"),
+        nullable=False,
+        index=True,
+    )
     note: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     __table_args__ = (

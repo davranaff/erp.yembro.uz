@@ -796,8 +796,65 @@ def _load_fixture_rows(fixtures_dir: Path) -> dict[str, list[dict[str, object]]]
     prepared_rows["stock_movements"] = _build_generated_stock_movements(prepared_rows)
     prepared_rows["stock_movements"] = _apply_default_warehouses_to_stock_movements(prepared_rows)
     _resolve_measurement_unit_ids(prepared_rows)
+    _resolve_currency_ids(prepared_rows)
     _backfill_cash_transaction_structure(prepared_rows)
     return prepared_rows
+
+
+CURRENCY_FK_TABLES: dict[str, tuple[str, str]] = {
+    "egg_shipments": ("currency", "currency_id"),
+    "feed_arrivals": ("currency", "currency_id"),
+    "feed_raw_arrivals": ("currency", "currency_id"),
+    "feed_product_shipments": ("currency", "currency_id"),
+    "medicine_arrivals": ("currency", "currency_id"),
+    "medicine_batches": ("currency", "currency_id"),
+    "slaughter_arrivals": ("arrival_currency", "arrival_currency_id"),
+    "slaughter_semi_product_shipments": ("currency", "currency_id"),
+    "chick_arrivals": ("currency", "currency_id"),
+    "chick_shipments": ("currency", "currency_id"),
+    "factory_shipments": ("currency", "currency_id"),
+    "client_debts": ("currency", "currency_id"),
+    "supplier_debts": ("currency", "currency_id"),
+    "debt_payments": ("currency", "currency_id"),
+    "cash_accounts": ("currency", "currency_id"),
+    "cash_transactions": ("currency", "currency_id"),
+    "employee_advances": ("currency", "currency_id"),
+}
+
+
+def _resolve_currency_ids(rows_by_table: dict[str, list[dict[str, object]]]) -> None:
+    """Translate legacy ``currency`` text codes in fixture rows to ``currency_id`` FKs.
+
+    Lets fixture YAML stay human-readable (``currency: UZS``) while the
+    database schema expects a hard FK to the ``currencies`` catalog.
+    Looks up ``(organization_id, UPPER(code))`` against the catalog rows
+    and strips the text column after the FK is attached.
+    """
+    currency_index: dict[tuple[str, str], str] = {}
+    for row in rows_by_table.get("currencies", []):
+        org_id = str(row.get("organization_id") or "")
+        code = str(row.get("code") or "").strip().upper()
+        if org_id and code:
+            currency_index[(org_id, code)] = str(row["id"])
+
+    for table_name, (text_col, fk_col) in CURRENCY_FK_TABLES.items():
+        for row in rows_by_table.get(table_name, []):
+            if row.get(fk_col):
+                row.pop(text_col, None)
+                continue
+            org_id = str(row.get("organization_id") or "")
+            code = str(row.get(text_col) or "").strip().upper()
+            if not org_id or not code:
+                row.pop(text_col, None)
+                continue
+            resolved = currency_index.get((org_id, code))
+            if resolved is None:
+                raise ValueError(
+                    f"Fixture row on {table_name} references unknown currency "
+                    f"{code!r} for organization {org_id!r}"
+                )
+            row[fk_col] = resolved
+            row.pop(text_col, None)
 
 
 def _backfill_cash_transaction_structure(
@@ -816,10 +873,6 @@ def _backfill_cash_transaction_structure(
         for row in rows_by_table.get("cash_accounts", [])
         if row.get("department_id") is not None
     }
-
-    currency_index: dict[tuple[str, str], str] = {}
-    for row in rows_by_table.get("currencies", []):
-        currency_index[(str(row["organization_id"]), str(row["code"]).upper())] = str(row["id"])
 
     for row in rows_by_table.get("cash_transactions", []):
         if not row.get("department_id"):
@@ -841,14 +894,6 @@ def _backfill_cash_transaction_structure(
 
         if row.get("status") is None:
             row["status"] = "posted"
-
-        if not row.get("currency_id"):
-            org = str(row.get("organization_id") or "")
-            code = str(row.get("currency") or "").upper()
-            if org and code:
-                cid = currency_index.get((org, code))
-                if cid is not None:
-                    row["currency_id"] = cid
 
 
 UNIT_FK_TABLES: dict[str, str] = {

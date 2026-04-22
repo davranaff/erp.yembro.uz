@@ -167,8 +167,11 @@ class SlaughterArrivalService(CreatedByActorMixin, BaseService):
                 out["arrival_total_weight_kg"] = shipment.get("total_weight_kg")
             if "arrival_unit_price" not in out or out.get("arrival_unit_price") in (None, ""):
                 out["arrival_unit_price"] = shipment.get("unit_price")
-            if "arrival_currency" not in out or out.get("arrival_currency") in (None, ""):
-                out["arrival_currency"] = shipment.get("currency")
+            if (
+                "arrival_currency_id" not in out
+                or out.get("arrival_currency_id") in (None, "")
+            ):
+                out["arrival_currency_id"] = shipment.get("currency_id")
             if "arrival_invoice_no" not in out or out.get("arrival_invoice_no") in (None, ""):
                 out["arrival_invoice_no"] = shipment.get("invoice_no")
 
@@ -188,8 +191,6 @@ class SlaughterArrivalService(CreatedByActorMixin, BaseService):
             out["supplier_client_id"] = str(supplier_client_id)
             out["factory_shipment_id"] = None
 
-            if "arrival_currency" in out:
-                out["arrival_currency"] = _normalize_currency(out.get("arrival_currency"))
             if "arrival_total_weight_kg" in out:
                 out["arrival_total_weight_kg"] = _optional_decimal(out.get("arrival_total_weight_kg"))
             if "arrival_unit_price" in out:
@@ -247,14 +248,17 @@ class SlaughterArrivalService(CreatedByActorMixin, BaseService):
         supplier_client_id = entity.get("supplier_client_id")
         weight_raw = entity.get("arrival_total_weight_kg")
         price_raw = entity.get("arrival_unit_price")
-        currency = _normalize_currency(entity.get("arrival_currency"))
+        arrival_currency_id_raw = entity.get("arrival_currency_id")
+        arrival_currency_id = (
+            str(arrival_currency_id_raw) if arrival_currency_id_raw else None
+        )
 
         has_full_data = (
             source_type == "external"
             and supplier_client_id
             and weight_raw is not None
             and price_raw is not None
-            and currency
+            and arrival_currency_id
         )
 
         if not has_full_data:
@@ -298,7 +302,7 @@ class SlaughterArrivalService(CreatedByActorMixin, BaseService):
             "measurement_unit_id": measurement_unit_id,
             "amount_total": str(amount_total),
             "amount_paid": str(amount_paid),
-            "currency": currency,
+            "currency_id": arrival_currency_id,
             "issued_on": issued_on,
             "status": status,
             "note": note,
@@ -803,12 +807,6 @@ class SlaughterSemiProductShipmentService(CreatedByActorMixin, BaseService):
         if existing is None or "unit_price" in data:
             out["unit_price"] = _optional_decimal(merged.get("unit_price"), quantize="0.01")
 
-        if existing is None or "currency" in data:
-            currency = _normalize_currency(merged.get("currency"))
-            if not currency:
-                raise ValidationError("currency is required")
-            out["currency"] = currency
-
         unit_raw = merged.get("unit")
         if unit_raw is not None:
             unit = str(unit_raw).strip().lower()
@@ -935,7 +933,7 @@ class SlaughterSemiProductShipmentService(CreatedByActorMixin, BaseService):
             "measurement_unit_id": measurement_unit_id,
             "amount_total": str(amount_total),
             "amount_paid": str(amount_paid),
-            "currency": str(entity.get("currency") or ""),
+            "currency_id": str(entity["currency_id"]),
             "issued_on": issued_on,
             "status": status,
             "note": note,

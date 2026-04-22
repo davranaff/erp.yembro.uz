@@ -125,19 +125,20 @@ async def test_currency_reference_options_are_scoped_to_actor_organization(api_c
         "/api/v1/finance/cash-transactions/meta/reference-options",
         headers=make_admin_headers(),
         params={
-            "field": "currency",
+            "field": "currency_id",
             "limit": 20,
         },
     )
     assert response.status_code == 200, response.text
 
     payload = extract_data(response)
-    option_values = {option["value"] for option in payload["options"]}
+    option_labels = {str(option.get("label") or "").lower() for option in payload["options"]}
 
-    assert payload["field"] == "currency"
-    assert "UZS" in option_values
-    assert "USD" in option_values
-    assert "EUR" not in option_values
+    assert payload["field"] == "currency_id"
+    assert payload["options"], "Expected at least one currency option"
+    assert any("so'm" in label or "som" in label for label in option_labels)
+    assert any("dollar" in label for label in option_labels)
+    assert not any("evro" in label or "euro" in label for label in option_labels)
 
 
 @pytest.mark.asyncio
@@ -286,6 +287,7 @@ async def test_currency_defaults_are_applied_from_org_catalog(api_client) -> Non
 
     payload = await build_create_payload(api_client, "/api/v1/finance/cash-transactions")
     payload.pop("currency", None)
+    payload.pop("currency_id", None)
 
     create_response = await api_client.post(
         "/api/v1/finance/cash-transactions",

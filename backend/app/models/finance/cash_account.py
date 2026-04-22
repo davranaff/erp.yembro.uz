@@ -24,7 +24,11 @@ class CashAccount(Base, IDMixin, TimestampMixin):
     )
     name: Mapped[str] = mapped_column(String(140), nullable=False)
     code: Mapped[str] = mapped_column(String(80), nullable=False, index=True)
-    currency: Mapped[str] = mapped_column(String(8), nullable=False)
+    currency_id: Mapped[UUID] = mapped_column(
+        ForeignKey("currencies.id", ondelete="RESTRICT"),
+        nullable=False,
+        index=True,
+    )
     opening_balance: Mapped[Decimal] = mapped_column(
         Numeric(16, 2),
         nullable=False,

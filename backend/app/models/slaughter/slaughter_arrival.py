@@ -43,7 +43,11 @@ class SlaughterArrival(Base, IDMixin, TimestampMixin):
     birds_received: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
     arrival_total_weight_kg: Mapped[Decimal | None] = mapped_column(Numeric(16, 3), nullable=True)
     arrival_unit_price: Mapped[Decimal | None] = mapped_column(Numeric(14, 2), nullable=True)
-    arrival_currency: Mapped[str | None] = mapped_column(String(8), nullable=True)
+    arrival_currency_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("currencies.id", ondelete="RESTRICT"),
+        nullable=True,
+        index=True,
+    )
     arrival_invoice_no: Mapped[str | None] = mapped_column(String(120), nullable=True)
     note: Mapped[str | None] = mapped_column(Text, nullable=True)
 

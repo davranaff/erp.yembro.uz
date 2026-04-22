@@ -29,10 +29,10 @@ class EmployeeAdvance(Base, IDMixin, TimestampMixin):
         index=True,
     )
     amount_issued: Mapped[Decimal] = mapped_column(Numeric(16, 2), nullable=False)
-    currency: Mapped[str] = mapped_column(String(8), nullable=False)
-    currency_id: Mapped[UUID | None] = mapped_column(
+    currency_id: Mapped[UUID] = mapped_column(
         ForeignKey("currencies.id", ondelete="RESTRICT"),
-        nullable=True,
+        nullable=False,
+        index=True,
     )
     issued_on: Mapped[date] = mapped_column(Date, nullable=False, index=True)
     due_on: Mapped[date | None] = mapped_column(Date, nullable=True)

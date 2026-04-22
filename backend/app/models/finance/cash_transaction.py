@@ -53,10 +53,10 @@ class CashTransaction(Base, IDMixin, TimestampMixin):
     title: Mapped[str] = mapped_column(String(255), nullable=False)
     transaction_type: Mapped[str] = mapped_column(String(32), nullable=False, index=True)
     amount: Mapped[Decimal] = mapped_column(Numeric(16, 2), nullable=False)
-    currency: Mapped[str] = mapped_column(String(8), nullable=False)
-    currency_id: Mapped[UUID | None] = mapped_column(
+    currency_id: Mapped[UUID] = mapped_column(
         ForeignKey("currencies.id", ondelete="RESTRICT"),
-        nullable=True,
+        nullable=False,
+        index=True,
     )
     exchange_rate_to_base: Mapped[Decimal] = mapped_column(
         Numeric(10, 6), nullable=False, default=Decimal("1.0"), server_default="1.0"

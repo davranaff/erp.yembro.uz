@@ -53,7 +53,11 @@ class DebtPayment(Base, IDMixin, TimestampMixin):
     )
     direction: Mapped[str] = mapped_column(String(16), nullable=False, index=True)
     amount: Mapped[Decimal] = mapped_column(Numeric(16, 2), nullable=False)
-    currency: Mapped[str] = mapped_column(String(8), nullable=False)
+    currency_id: Mapped[UUID] = mapped_column(
+        ForeignKey("currencies.id", ondelete="RESTRICT"),
+        nullable=False,
+        index=True,
+    )
     paid_on: Mapped[date] = mapped_column(Date, nullable=False, index=True)
     method: Mapped[str] = mapped_column(
         String(24), nullable=False, default="cash", server_default="cash", index=True,

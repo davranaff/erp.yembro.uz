@@ -282,7 +282,7 @@ class EggShipmentService(BaseService):
             "measurement_unit_id": measurement_unit_id,
             "amount_total": str(amount_total),
             "amount_paid": str(amount_paid),
-            "currency": str(entity.get("currency") or ""),
+            "currency_id": str(entity["currency_id"]),
             "issued_on": issued_on,
             "status": status,
             "note": note,

@@ -245,12 +245,14 @@ async def _get_public_batch_row(
             c.last_name AS supplier_last_name,
             c.company_name AS supplier_company_name,
             c.email AS supplier_email,
-            c.phone AS supplier_phone
+            c.phone AS supplier_phone,
+            cur.code AS currency
         FROM medicine_batches AS mb
         LEFT JOIN medicine_types AS mt ON mt.id = mb.medicine_type_id
         LEFT JOIN departments AS d ON d.id = mb.department_id
         LEFT JOIN organizations AS o ON o.id = mb.organization_id
         LEFT JOIN clients AS c ON c.id = mb.supplier_client_id
+        LEFT JOIN currencies AS cur ON cur.id = mb.currency_id
         WHERE mb.id = $1
           AND mb.organization_id = $2
           AND mb.qr_public_token = $3
@@ -598,14 +600,15 @@ async def public_sell_medicine_batch(
     batch_currency = str(row.get("currency") or "").strip().upper() or "UZS"
     cash_account = await db.fetchrow(
         """
-        SELECT id, currency
-        FROM cash_accounts
-        WHERE organization_id = $1
-          AND department_id = $2
-          AND is_active = true
+        SELECT ca.id, cur.code AS currency
+        FROM cash_accounts AS ca
+        LEFT JOIN currencies AS cur ON cur.id = ca.currency_id
+        WHERE ca.organization_id = $1
+          AND ca.department_id = $2
+          AND ca.is_active = true
         ORDER BY
-          CASE WHEN upper(currency) = upper($3) THEN 0 ELSE 1 END,
-          created_at ASC
+          CASE WHEN upper(cur.code) = upper($3) THEN 0 ELSE 1 END,
+          ca.created_at ASC
         LIMIT 1
         """,
         organization_id,
