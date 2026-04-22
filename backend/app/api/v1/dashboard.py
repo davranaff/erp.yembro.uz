@@ -483,22 +483,28 @@ async def _fetch_module_expense_rows(
     end_date: date | None,
     department_ids: list[UUID] | None,
 ):
+    """Expense rows are now sourced from `cash_transactions` with
+    `transaction_type='expense'` — the dedicated `expenses` table was
+    dropped. The legacy fetch name is kept to avoid rippling renames
+    through every dashboard caller.
+    """
     return await db.fetch(
         f"""
         SELECT
-            e.id::text AS key,
-            e.expense_date AS event_date,
-            TO_CHAR(e.expense_date, 'YYYY-MM-DD') AS label,
-            COALESCE(NULLIF(e.title, ''), NULLIF(e.item, ''), 'Расход') AS expense_label,
+            ct.id::text AS key,
+            ct.transaction_date AS event_date,
+            TO_CHAR(ct.transaction_date, 'YYYY-MM-DD') AS label,
+            COALESCE(NULLIF(ct.title, ''), 'Расход') AS expense_label,
             COALESCE(NULLIF(c.name, ''), NULLIF(c.code, ''), 'Категория') AS category_label,
-            COALESCE(e.amount, COALESCE(e.quantity, 0) * COALESCE(e.unit_price, 0), 0) AS amount
-        FROM expenses e
-        INNER JOIN departments d ON d.id = e.department_id
-        LEFT JOIN expense_categories c ON c.id = e.category_id
-        WHERE {_date_condition('e.expense_date')}
-          AND {_department_condition('e.department_id')}
+            COALESCE(ct.amount, 0) AS amount
+        FROM cash_transactions ct
+        INNER JOIN departments d ON d.id = ct.department_id
+        LEFT JOIN expense_categories c ON c.id = ct.category_id
+        WHERE ct.transaction_type = 'expense'
+          AND {_date_condition('ct.transaction_date')}
+          AND {_department_condition('ct.department_id')}
           AND d.module_key = $4
-        ORDER BY e.expense_date DESC, e.created_at DESC
+        ORDER BY ct.transaction_date DESC, ct.created_at DESC
         """,
         start_date,
         end_date,
@@ -4683,14 +4689,15 @@ async def _build_finance_section(
         SELECT
             COALESCE(c.id::text, 'uncategorized') AS key,
             COALESCE(NULLIF(c.name, ''), NULLIF(c.code, ''), 'Без категории') AS label,
-            COALESCE(SUM(e.amount), 0) AS value,
+            COALESCE(SUM(ct.amount), 0) AS value,
             'UZS' AS unit
-        FROM expenses e
-        LEFT JOIN expense_categories c ON c.id = e.category_id
-        WHERE {_date_condition('e.expense_date')}
-          AND {_department_condition('e.department_id')}
-          AND e.is_active = true
-          AND e.organization_id = $4::uuid
+        FROM cash_transactions ct
+        LEFT JOIN expense_categories c ON c.id = ct.category_id
+        WHERE ct.transaction_type = 'expense'
+          AND {_date_condition('ct.transaction_date')}
+          AND {_department_condition('ct.department_id')}
+          AND ct.is_active = true
+          AND ct.organization_id = $4::uuid
         GROUP BY c.id, c.name, c.code
         ORDER BY value DESC
         LIMIT 8

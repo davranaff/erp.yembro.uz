@@ -714,52 +714,6 @@ const resourceUiConfigs: Record<string, ResourceUiConfig> = {
     hideDepartmentFieldWhenScoped: true,
     hideOrganizationFieldWhenScoped: true,
   },
-  'finance:expenses': {
-    formOrder: [
-      'expense_date',
-      'category_id',
-      'title',
-      'quantity',
-      'unit',
-      'unit_price',
-      'amount',
-      'currency',
-      'note',
-    ],
-    tableOrder: ['expense_date', 'category_id', 'title', 'amount', 'currency', 'department_id'],
-    // `item` and `title` were two string columns describing the same
-    // thing ("что купили"). Collapsed to `title` only — `item` stays in
-    // the schema for historical rows but is no longer operator-facing.
-    formHiddenFields: ['item'],
-    fieldHelpers: {
-      category_id: {
-        ru: 'Выберите статью из дерева категорий расхода вашего отдела.',
-        uz: 'Bo‘lim xarajat toifalari daraxtidan moddani tanlang.',
-        en: 'Pick the expense category from your department’s tree.',
-      },
-      title: {
-        ru: 'Что купили / за что заплатили. Например: «Корм Starter 25 кг», «Аренда склада за апрель».',
-        uz: 'Nima sotib olingan / nima uchun to‘langan. Masalan: «Starter em 25 kg», «Aprel uchun ombor ijarasi».',
-        en: 'What was purchased or what the payment covers. E.g. "Starter feed 25 kg", "Warehouse rent for April".',
-      },
-    },
-    formSections: [
-      {
-        title: { ru: 'Статья и описание', uz: 'Modda va tavsif', en: 'Category & description' },
-        fields: ['expense_date', 'category_id', 'title'],
-      },
-      {
-        title: { ru: 'Количество и сумма', uz: 'Miqdor va summa', en: 'Quantity & amount' },
-        fields: ['quantity', 'unit', 'unit_price', 'amount', 'currency'],
-      },
-      {
-        title: { ru: 'Дополнительно', uz: 'Qo‘shimcha', en: 'Extras' },
-        fields: ['note'],
-      },
-    ],
-    hideDepartmentFieldWhenScoped: true,
-    hideOrganizationFieldWhenScoped: true,
-  },
   'finance:cash-accounts': {
     formOrder: ['name', 'code', 'currency', 'opening_balance', 'note', 'is_active'],
     tableOrder: ['name', 'code', 'currency', 'opening_balance', 'department_id', 'is_active'],
@@ -788,7 +742,6 @@ const resourceUiConfigs: Record<string, ResourceUiConfig> = {
       'amount',
       'currency',
     ],
-    hiddenFields: ['expense_id'],
     // reference_no + counterparty_type/id + operation_date + item_key etc.
     // are system-side structured fields we don't ask operators to fill.
     formHiddenFields: [

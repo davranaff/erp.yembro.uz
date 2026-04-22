@@ -30,26 +30,6 @@ class ExpenseCategoryListResponse(CRUDListResponse[ExpenseCategoryReadSchema]):
     """Paginated expense category response."""
 
 
-class ExpenseCreateSchema(OpenSchema, BaseCreateSchema):
-    """Input payload to create expense."""
-
-
-class ExpenseUpdateSchema(OpenSchema, BaseUpdateSchema):
-    """Input payload to update expense."""
-
-
-class ExpenseReadSchema(OpenSchema, BaseReadSchema):
-    """Readable expense response."""
-
-
-class ExpenseListParams(CRUDBaseParams):
-    """Pagination + query params for expense list."""
-
-
-class ExpenseListResponse(CRUDListResponse[ExpenseReadSchema]):
-    """Paginated expense response."""
-
-
 class CashAccountCreateSchema(OpenSchema, BaseCreateSchema):
     """Input payload to create cash account."""
 
@@ -156,11 +136,6 @@ __all__ = [
     "ExpenseCategoryReadSchema",
     "ExpenseCategoryListParams",
     "ExpenseCategoryListResponse",
-    "ExpenseCreateSchema",
-    "ExpenseUpdateSchema",
-    "ExpenseReadSchema",
-    "ExpenseListParams",
-    "ExpenseListResponse",
     "CashAccountCreateSchema",
     "CashAccountUpdateSchema",
     "CashAccountReadSchema",

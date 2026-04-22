@@ -13,7 +13,6 @@ from app.repositories.finance import (
     CashTransactionRepository,
     DebtPaymentRepository,
     ExpenseCategoryRepository,
-    ExpenseRepository,
     SupplierDebtRepository,
 )
 from app.repositories.feed import (
@@ -54,7 +53,6 @@ __all__ = [
     "EggProductionRepository",
     "EggShipmentRepository",
     "ExpenseCategoryRepository",
-    "ExpenseRepository",
     "CashAccountRepository",
     "CashTransactionRepository",
     "SupplierDebtRepository",

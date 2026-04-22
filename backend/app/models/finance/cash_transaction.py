@@ -28,11 +28,6 @@ class CashTransaction(Base, IDMixin, TimestampMixin):
         nullable=False,
         index=True,
     )
-    expense_id: Mapped[UUID | None] = mapped_column(
-        ForeignKey("expenses.id", ondelete="SET NULL"),
-        nullable=True,
-        index=True,
-    )
     category_id: Mapped[UUID | None] = mapped_column(
         ForeignKey("expense_categories.id", ondelete="RESTRICT"),
         nullable=True,
@@ -74,7 +69,6 @@ class CashTransaction(Base, IDMixin, TimestampMixin):
 
     organization: Mapped["Organization"] = relationship("Organization", back_populates="cash_transactions")
     cash_account: Mapped["CashAccount"] = relationship("CashAccount", back_populates="transactions")
-    expense: Mapped["Expense | None"] = relationship("Expense", back_populates="cash_transactions", lazy="selectin")
     counterparty_client: Mapped["Client | None"] = relationship("Client", lazy="selectin")
     created_by_employee: Mapped["Employee | None"] = relationship("Employee", lazy="selectin")
 

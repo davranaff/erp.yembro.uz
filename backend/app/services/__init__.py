@@ -12,7 +12,6 @@ from app.services.finance import (
     CashTransactionService,
     DebtPaymentService,
     ExpenseCategoryService,
-    ExpenseService,
     SupplierDebtService,
 )
 from app.services.feed import (
@@ -52,7 +51,6 @@ __all__ = [
     "EggProductionService",
     "EggShipmentService",
     "ExpenseCategoryService",
-    "ExpenseService",
     "CashAccountService",
     "CashTransactionService",
     "SupplierDebtService",

@@ -133,223 +133,6 @@ expense_categories:
     is_global: false
 
 
-expenses:
-  # Egg dept — feed + vet
-  - id: 61111111-1111-1111-1111-111111111101
-    organization_id: 11111111-1111-1111-1111-111111111111
-    department_id: 44444444-4444-4444-4444-444444444444
-    category_id: 60111111-1111-1111-1111-111111111101
-    title: Senyem-1 yem partiyasi mart
-    item: Senyem-1
-    quantity: 3500
-    unit: kg
-    unit_price: 5800
-    amount: 20300000
-    currency: UZS
-    expense_date: now-22d
-    created_by: 70444444-4444-4444-4444-444444444444
-    note: Mart oyi boshlang'ich yem xaridi
-    is_active: true
-
-  - id: 61111111-1111-1111-1111-111111111102
-    organization_id: 11111111-1111-1111-1111-111111111111
-    department_id: 44444444-4444-4444-4444-444444444444
-    category_id: 60111111-1111-1111-1111-111111111102
-    title: Veterinariya vaksinasi ND-IB
-    item: ND-IB vaksina
-    quantity: 50
-    unit: dona
-    unit_price: 45000
-    amount: 2250000
-    currency: UZS
-    expense_date: now-15d
-    created_by: 70111111-1111-1111-1111-111111111108
-    note: Asosiy tovuqxona uchun vaksinatsiya
-    is_active: true
-
-  - id: 61111111-1111-1111-1111-111111111103
-    organization_id: 11111111-1111-1111-1111-111111111111
-    department_id: 44444444-4444-4444-4444-444444444444
-    category_id: 60111111-1111-1111-1111-111111111103
-    title: Elektr energiyasi mart
-    item: Elektr
-    quantity: 12500
-    unit: kVt
-    unit_price: 450
-    amount: 5625000
-    currency: UZS
-    expense_date: now-8d
-    created_by: 70444444-4444-4444-4444-444444444444
-    note: Tuxumchilik sexi mart oyi elektr to'lovi
-    is_active: true
-
-  # Factory dept — feed, chicks, utilities
-  - id: 61111111-1111-1111-1111-111111111104
-    organization_id: 11111111-1111-1111-1111-111111111111
-    department_id: 55555555-5555-5555-5555-555555555555
-    category_id: 60111111-1111-1111-1111-111111111104
-    title: Broyler starter yem 10t
-    item: Starter yem
-    quantity: 10000
-    unit: kg
-    unit_price: 6200
-    amount: 62000000
-    currency: UZS
-    expense_date: now-20d
-    created_by: 70555555-5555-5555-5555-555555555555
-    note: 22000 boshlik partiya uchun
-    is_active: true
-
-  - id: 61111111-1111-1111-1111-111111111105
-    organization_id: 11111111-1111-1111-1111-111111111111
-    department_id: 55555555-5555-5555-5555-555555555555
-    category_id: 60111111-1111-1111-1111-111111111105
-    title: Jo'ja partiyasi 22000 bosh
-    item: Ross-308 jo'jalari
-    quantity: 22000
-    unit: bosh
-    unit_price: 12500
-    amount: 275000000
-    currency: UZS
-    expense_date: now-25d
-    created_by: 70444444-4444-4444-4444-444444444444
-    note: Oqsaroy inkubatsiya markazidan yetkazib berilgan
-    is_active: true
-
-  - id: 61111111-1111-1111-1111-111111111106
-    organization_id: 11111111-1111-1111-1111-111111111111
-    department_id: 55555555-5555-5555-5555-555555555555
-    category_id: 60111111-1111-1111-1111-111111111106
-    title: Gaz to'lovi mart
-    item: Tabiiy gaz
-    quantity: 8500
-    unit: m3
-    unit_price: 880
-    amount: 7480000
-    currency: UZS
-    expense_date: now-10d
-    created_by: 70555555-5555-5555-5555-555555555555
-    note: Isitish tizimi uchun
-    is_active: true
-
-  # Feed factory
-  - id: 61111111-1111-1111-1111-111111111107
-    organization_id: 11111111-1111-1111-1111-111111111111
-    department_id: 77771111-1111-1111-1111-111111111111
-    category_id: 60111111-1111-1111-1111-111111111107
-    title: Jo'xori xom ashyo 20t
-    item: Jo'xori
-    quantity: 20000
-    unit: kg
-    unit_price: 2900
-    amount: 58000000
-    currency: UZS
-    expense_date: now-30d
-    created_by: 70111111-1111-1111-1111-111111111105
-    note: Yem zavodi uchun oylik zaxira
-    is_active: true
-
-  - id: 61111111-1111-1111-1111-111111111108
-    organization_id: 11111111-1111-1111-1111-111111111111
-    department_id: 77771111-1111-1111-1111-111111111111
-    category_id: 60111111-1111-1111-1111-111111111108
-    title: Aralashtirgich ta'mirlash
-    item: Zapchast va ishchi kuchi
-    quantity: 1
-    unit: dona
-    unit_price: 4200000
-    amount: 4200000
-    currency: UZS
-    expense_date: now-5d
-    created_by: 70111111-1111-1111-1111-111111111105
-    note: Shikastlangan podshipnik almashtirildi
-    is_active: true
-
-  # Incubation
-  - id: 61111111-1111-1111-1111-111111111109
-    organization_id: 11111111-1111-1111-1111-111111111111
-    department_id: 152db9b5-3cd7-44cf-a1c3-79b9fe3e91df
-    category_id: 60111111-1111-1111-1111-111111111109
-    title: Inkubatsion tuxum sotib olish
-    item: Inkubatsion tuxum
-    quantity: 8000
-    unit: dona
-    unit_price: 3800
-    amount: 30400000
-    currency: UZS
-    expense_date: now-18d
-    created_by: 70111111-1111-1111-1111-111111111107
-    note: Yangi partiya uchun
-    is_active: true
-
-  # Medicine
-  - id: 61111111-1111-1111-1111-111111111110
-    organization_id: 11111111-1111-1111-1111-111111111111
-    department_id: 88881111-1111-1111-1111-111111111111
-    category_id: 60111111-1111-1111-1111-111111111110
-    title: Enrofloksatsin 10% 20l
-    item: Antibiotik
-    quantity: 20
-    unit: l
-    unit_price: 325000
-    amount: 6500000
-    currency: UZS
-    expense_date: now-12d
-    created_by: 70111111-1111-1111-1111-111111111108
-    note: Dorixona zaxirasini to'ldirish
-    is_active: true
-
-  # Slaughter
-  - id: 61111111-1111-1111-1111-111111111111
-    organization_id: 11111111-1111-1111-1111-111111111111
-    department_id: 99991111-1111-1111-1111-111111111111
-    category_id: 60111111-1111-1111-1111-111111111111
-    title: Qadoqlash plyonkasi
-    item: PE qadoqlash plyonka
-    quantity: 500
-    unit: kg
-    unit_price: 28000
-    amount: 14000000
-    currency: UZS
-    expense_date: now-7d
-    created_by: 70111111-1111-1111-1111-111111111110
-    note: Yarim tayyor mahsulot qadoqlash uchun
-    is_active: true
-
-  - id: 61111111-1111-1111-1111-111111111112
-    organization_id: 11111111-1111-1111-1111-111111111111
-    department_id: 99991111-1111-1111-1111-111111111111
-    category_id: 60111111-1111-1111-1111-111111111112
-    title: Transport xizmatlari hafta-14
-    item: Refrijerator xizmati
-    quantity: 1
-    unit: dona
-    unit_price: 8500000
-    amount: 8500000
-    currency: UZS
-    expense_date: now-3d
-    created_by: 70111111-1111-1111-1111-111111111110
-    note: Toshkent yetkazib berish
-    is_active: true
-
-  # Org2
-  - id: 61222222-2222-2222-2222-222222222201
-    organization_id: 22222222-2222-2222-2222-222222222222
-    department_id: 66666666-6666-6666-6666-666666666666
-    category_id: 60222222-2222-2222-2222-222222222201
-    title: Inkubatsion tuxum xaridi
-    item: Inkubatsion tuxum
-    quantity: 12000
-    unit: dona
-    unit_price: 3700
-    amount: 44400000
-    currency: UZS
-    expense_date: now-14d
-    created_by: 70222222-2222-2222-2222-222222222201
-    note: Asosiy xarid
-    is_active: true
-
-
 cash_accounts:
   # Primary org
   - id: 62111111-1111-1111-1111-111111111101
@@ -449,7 +232,6 @@ cash_transactions:
   - id: 63111111-1111-1111-1111-111111111101
     organization_id: 11111111-1111-1111-1111-111111111111
     cash_account_id: 62111111-1111-1111-1111-111111111102
-    expense_id: null
     counterparty_client_id: e1111111-0000-0000-0000-000000000002
     created_by: 70444444-4444-4444-4444-444444444444
     title: Tuxum sotuvi — Toshkent do'koni
@@ -464,7 +246,6 @@ cash_transactions:
   - id: 63111111-1111-1111-1111-111111111102
     organization_id: 11111111-1111-1111-1111-111111111111
     cash_account_id: 62111111-1111-1111-1111-111111111104
-    expense_id: null
     counterparty_client_id: e1111111-0000-0000-0000-000000000005
     created_by: 70444444-4444-4444-4444-444444444444
     title: Broyler go'shti sotuvi
@@ -480,7 +261,6 @@ cash_transactions:
   - id: 63111111-1111-1111-1111-111111111103
     organization_id: 11111111-1111-1111-1111-111111111111
     cash_account_id: 62111111-1111-1111-1111-111111111101
-    expense_id: 61111111-1111-1111-1111-111111111101
     counterparty_client_id: null
     created_by: 70444444-4444-4444-4444-444444444444
     title: Senyem-1 yem partiyasi to'lovi
@@ -495,7 +275,6 @@ cash_transactions:
   - id: 63111111-1111-1111-1111-111111111104
     organization_id: 11111111-1111-1111-1111-111111111111
     cash_account_id: 62111111-1111-1111-1111-111111111104
-    expense_id: 61111111-1111-1111-1111-111111111105
     counterparty_client_id: null
     created_by: 70444444-4444-4444-4444-444444444444
     title: Jo'ja partiyasi to'lovi
@@ -510,7 +289,6 @@ cash_transactions:
   - id: 63111111-1111-1111-1111-111111111105
     organization_id: 11111111-1111-1111-1111-111111111111
     cash_account_id: 62111111-1111-1111-1111-111111111105
-    expense_id: 61111111-1111-1111-1111-111111111107
     counterparty_client_id: null
     created_by: 70111111-1111-1111-1111-111111111105
     title: Jo'xori xom ashyo to'lovi
@@ -525,7 +303,6 @@ cash_transactions:
   - id: 63111111-1111-1111-1111-111111111106
     organization_id: 11111111-1111-1111-1111-111111111111
     cash_account_id: 62111111-1111-1111-1111-111111111106
-    expense_id: 61111111-1111-1111-1111-111111111110
     counterparty_client_id: null
     created_by: 70111111-1111-1111-1111-111111111108
     title: Enrofloksatsin xaridi to'lovi
@@ -540,7 +317,6 @@ cash_transactions:
   - id: 63111111-1111-1111-1111-111111111107
     organization_id: 11111111-1111-1111-1111-111111111111
     cash_account_id: 62111111-1111-1111-1111-111111111107
-    expense_id: 61111111-1111-1111-1111-111111111112
     counterparty_client_id: null
     created_by: 70111111-1111-1111-1111-111111111110
     title: Transport xizmati to'lovi
@@ -556,7 +332,6 @@ cash_transactions:
   - id: 63111111-1111-1111-1111-111111111108
     organization_id: 11111111-1111-1111-1111-111111111111
     cash_account_id: 62111111-1111-1111-1111-111111111101
-    expense_id: null
     counterparty_client_id: null
     created_by: 70444444-4444-4444-4444-444444444444
     title: Kassadan bankka o'tkazma
@@ -571,7 +346,6 @@ cash_transactions:
   - id: 63111111-1111-1111-1111-111111111109
     organization_id: 11111111-1111-1111-1111-111111111111
     cash_account_id: 62111111-1111-1111-1111-111111111102
-    expense_id: null
     counterparty_client_id: null
     created_by: 70444444-4444-4444-4444-444444444444
     title: Kassadan bank hisobiga kirim
@@ -587,7 +361,6 @@ cash_transactions:
   - id: 63222222-2222-2222-2222-222222222201
     organization_id: 22222222-2222-2222-2222-222222222222
     cash_account_id: 62222222-2222-2222-2222-222222222201
-    expense_id: 61222222-2222-2222-2222-222222222201
     counterparty_client_id: null
     created_by: 70222222-2222-2222-2222-222222222201
     title: Inkubatsion tuxum xaridi to'lovi

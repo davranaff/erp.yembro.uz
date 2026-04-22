@@ -101,7 +101,7 @@ department_modules:
   is_department_assignable: false
   analytics_section_key: "finance"
   implicit_read_permissions: '[]'
-  analytics_read_permissions: '["expense.read", "cash_account.read", "cash_transaction.read", "client_debt.read", "supplier_debt.read", "debt_payment.read"]'
+  analytics_read_permissions: '["cash_account.read", "cash_transaction.read", "client_debt.read", "supplier_debt.read", "debt_payment.read"]'
   is_active: true
 - id: "31000000-0000-0000-0000-000000000003"
   key: "hr"
@@ -321,17 +321,6 @@ workspace_resources:
   sort_order: 79
   is_head_visible: true
   is_active: false
-- id: "32000000-0000-0000-0000-000000000014"
-  module_key: "egg"
-  key: "expenses"
-  name: "Расходы"
-  path: "expenses"
-  description: "Расходы выбранного департамента"
-  permission_prefix: "expense"
-  api_module_key: "finance"
-  sort_order: 80
-  is_head_visible: true
-  is_active: false
 - id: "32000000-0000-0000-0000-000000000015"
   module_key: "egg"
   key: "cash-accounts"
@@ -448,17 +437,6 @@ workspace_resources:
   permission_prefix: "expense_category"
   api_module_key: "finance"
   sort_order: 59
-  is_head_visible: true
-  is_active: false
-- id: "32000000-0000-0000-0000-000000000022"
-  module_key: "incubation"
-  key: "expenses"
-  name: "Расходы"
-  path: "expenses"
-  description: "Расходы выбранного департамента"
-  permission_prefix: "expense"
-  api_module_key: "finance"
-  sort_order: 60
   is_head_visible: true
   is_active: false
 - id: "32000000-0000-0000-0000-000000000023"
@@ -613,17 +591,6 @@ workspace_resources:
   permission_prefix: "expense_category"
   api_module_key: "finance"
   sort_order: 59
-  is_head_visible: true
-  is_active: false
-- id: "32000000-0000-0000-0000-000000000030"
-  module_key: "factory"
-  key: "expenses"
-  name: "Расходы"
-  path: "expenses"
-  description: "Расходы выбранного департамента"
-  permission_prefix: "expense"
-  api_module_key: "finance"
-  sort_order: 60
   is_head_visible: true
   is_active: false
 - id: "32000000-0000-0000-0000-000000000031"
@@ -804,17 +771,6 @@ workspace_resources:
   sort_order: 99
   is_head_visible: true
   is_active: false
-- id: "32000000-0000-0000-0000-000000000042"
-  module_key: "feed"
-  key: "expenses"
-  name: "Расходы"
-  path: "expenses"
-  description: "Расходы выбранного департамента"
-  permission_prefix: "expense"
-  api_module_key: "finance"
-  sort_order: 100
-  is_head_visible: true
-  is_active: false
 - id: "32000000-0000-0000-0000-000000000043"
   module_key: "feed"
   key: "cash-accounts"
@@ -921,17 +877,6 @@ workspace_resources:
   permission_prefix: "expense_category"
   api_module_key: "finance"
   sort_order: 69
-  is_head_visible: true
-  is_active: false
-- id: "32000000-0000-0000-0000-000000000051"
-  module_key: "medicine"
-  key: "expenses"
-  name: "Расходы"
-  path: "expenses"
-  description: "Расходы выбранного департамента"
-  permission_prefix: "expense"
-  api_module_key: "finance"
-  sort_order: 70
   is_head_visible: true
   is_active: false
 - id: "32000000-0000-0000-0000-000000000052"
@@ -1073,17 +1018,6 @@ workspace_resources:
   sort_order: 69
   is_head_visible: true
   is_active: false
-- id: "32000000-0000-0000-0000-000000000060"
-  module_key: "slaughter"
-  key: "expenses"
-  name: "Расходы"
-  path: "expenses"
-  description: "Расходы выбранного департамента"
-  permission_prefix: "expense"
-  api_module_key: "finance"
-  sort_order: 70
-  is_head_visible: true
-  is_active: false
 - id: "32000000-0000-0000-0000-000000000061"
   module_key: "slaughter"
   key: "cash-accounts"
@@ -1116,16 +1050,6 @@ workspace_resources:
   sort_order: 10
   is_head_visible: false
   is_active: true
-- id: "32000000-0000-0000-0000-000000000064"
-  module_key: "finance"
-  key: "expenses"
-  name: "Расходы"
-  path: "expenses"
-  description: "Финансовые операции и затраты"
-  permission_prefix: "expense"
-  sort_order: 20
-  is_head_visible: false
-  is_active: false
 - id: "32000000-0000-0000-0000-000000000065"
   module_key: "finance"
   key: "cash-accounts"

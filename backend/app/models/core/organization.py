@@ -64,12 +64,6 @@ class Organization(Base, IDMixin, TimestampMixin):
         cascade="all, delete-orphan",
         lazy="selectin",
     )
-    expenses: Mapped[List["Expense"]] = relationship(
-        "Expense",
-        back_populates="organization",
-        cascade="all, delete-orphan",
-        lazy="selectin",
-    )
     cash_accounts: Mapped[List["CashAccount"]] = relationship(
         "CashAccount",
         back_populates="organization",

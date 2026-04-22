@@ -15,7 +15,6 @@ from app.repositories.finance import (
     DebtPaymentRepository,
     EmployeeAdvanceRepository,
     ExpenseCategoryRepository,
-    ExpenseRepository,
     SupplierDebtRepository,
 )
 from app.services.finance import (
@@ -24,7 +23,6 @@ from app.services.finance import (
     DebtPaymentService,
     EmployeeAdvanceService,
     ExpenseCategoryService,
-    ExpenseService,
     SupplierDebtService,
 )
 
@@ -114,15 +112,6 @@ router.include_router(
 
 router.include_router(
     build_crud_router(
-        prefix="expenses",
-        service_factory=lambda db: ExpenseService(ExpenseRepository(db)),
-        permission_prefix="expense",
-        tags=["expense"],
-    )
-)
-
-router.include_router(
-    build_crud_router(
         prefix="cash-accounts",
         service_factory=lambda db: CashAccountService(CashAccountRepository(db)),
         permission_prefix="cash_account",
@@ -189,7 +178,6 @@ register_module_stats_route(
     label="Finance",
     tables=(
         ModuleStatsTable(key="expense_categories", label="Expense Categories", table="expense_categories"),
-        ModuleStatsTable(key="expenses", label="Expenses", table="expenses"),
         ModuleStatsTable(key="cash_accounts", label="Cash Accounts", table="cash_accounts"),
         ModuleStatsTable(key="cash_transactions", label="Cash Transactions", table="cash_transactions"),
         ModuleStatsTable(key="supplier_debts", label="Supplier Debts", table="supplier_debts"),

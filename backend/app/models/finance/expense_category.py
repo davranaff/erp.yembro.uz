@@ -42,11 +42,6 @@ class ExpenseCategory(Base, IDMixin, TimestampMixin):
 
     organization: Mapped["Organization"] = relationship("Organization", back_populates="expense_categories")
     department: Mapped["Department"] = relationship("Department", back_populates="expense_categories")
-    expenses: Mapped[List["Expense"]] = relationship(
-        "Expense",
-        back_populates="category",
-        lazy="selectin",
-    )
 
     __table_args__ = (
         UniqueConstraint(

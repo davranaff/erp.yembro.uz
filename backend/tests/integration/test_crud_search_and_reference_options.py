@@ -122,7 +122,7 @@ async def test_department_module_reference_options_hide_non_assignable_modules(a
 @pytest.mark.asyncio
 async def test_currency_reference_options_are_scoped_to_actor_organization(api_client) -> None:
     response = await api_client.get(
-        "/api/v1/finance/expenses/meta/reference-options",
+        "/api/v1/finance/cash-transactions/meta/reference-options",
         headers=make_admin_headers(),
         params={
             "field": "currency",
@@ -213,7 +213,7 @@ async def test_expense_category_reference_options_are_filtered_by_department(api
     assert expected_values, "Expected at least one expense category for the target department"
 
     response = await api_client.get(
-        "/api/v1/finance/expenses/meta/reference-options",
+        "/api/v1/finance/cash-transactions/meta/reference-options",
         headers=make_admin_headers(),
         params={
             "field": "category_id",
@@ -275,7 +275,7 @@ async def test_inventory_item_key_reference_options_include_cross_department_sto
 @pytest.mark.asyncio
 async def test_currency_defaults_are_applied_from_org_catalog(api_client) -> None:
     currency_headers = make_auth_headers("currency")
-    expense_headers = make_auth_headers("expense")
+    cash_headers = make_auth_headers("cash_transaction")
 
     update_default_response = await api_client.put(
         "/api/v1/core/currencies/32122222-2222-2222-2222-222222222222",
@@ -284,13 +284,13 @@ async def test_currency_defaults_are_applied_from_org_catalog(api_client) -> Non
     )
     assert update_default_response.status_code == 200, update_default_response.text
 
-    payload = await build_create_payload(api_client, "/api/v1/finance/expenses")
+    payload = await build_create_payload(api_client, "/api/v1/finance/cash-transactions")
     payload.pop("currency", None)
 
     create_response = await api_client.post(
-        "/api/v1/finance/expenses",
+        "/api/v1/finance/cash-transactions",
         json=payload,
-        headers=expense_headers,
+        headers=cash_headers,
     )
     assert create_response.status_code == 201, create_response.text
 
@@ -300,14 +300,14 @@ async def test_currency_defaults_are_applied_from_org_catalog(api_client) -> Non
 
 @pytest.mark.asyncio
 async def test_currency_must_exist_inside_actor_organization(api_client) -> None:
-    expense_headers = make_auth_headers("expense")
-    payload = await build_create_payload(api_client, "/api/v1/finance/expenses")
+    cash_headers = make_auth_headers("cash_transaction")
+    payload = await build_create_payload(api_client, "/api/v1/finance/cash-transactions")
     payload["currency"] = "EUR"
 
     response = await api_client.post(
-        "/api/v1/finance/expenses",
+        "/api/v1/finance/cash-transactions",
         json=payload,
-        headers=expense_headers,
+        headers=cash_headers,
     )
     assert response.status_code == 400, response.text
     assert response.json()["error"]["message"] == "currency is invalid"

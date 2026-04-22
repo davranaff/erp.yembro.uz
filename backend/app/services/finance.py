@@ -13,7 +13,6 @@ from app.repositories.finance import (
     DebtPaymentRepository,
     EmployeeAdvanceRepository,
     ExpenseCategoryRepository,
-    ExpenseRepository,
     SupplierDebtRepository,
 )
 from app.schemas.finance import (
@@ -22,7 +21,6 @@ from app.schemas.finance import (
     DebtPaymentReadSchema,
     EmployeeAdvanceReadSchema,
     ExpenseCategoryReadSchema,
-    ExpenseReadSchema,
     SupplierDebtReadSchema,
 )
 from app.services.base import BaseService, CreatedByActorMixin
@@ -77,10 +75,6 @@ CASH_TRANSACTION_TYPE_ALIASES = {
     "adjust": "adjustment",
     "manual_adjustment": "adjustment",
 }
-AUTO_EXPENSE_MARKER_PREFIX = "[auto-linked-cash-transaction:"
-AUTO_EXPENSE_CATEGORY_NAME = "Automatic cash expenses"
-AUTO_EXPENSE_CATEGORY_DESCRIPTION = "Auto-created category for cash transaction expenses."
-AUTO_EXPENSE_CATEGORY_CODE_PREFIX = "AUTO-CASH"
 VIRTUAL_EXPENSE_CATEGORY_FIELD = "expense_category_id"
 VIRTUAL_DEPARTMENT_FIELD = "department_id"
 
@@ -166,7 +160,7 @@ async def _get_expense_category_row(
     return row
 
 
-async def _count_linked_expenses(
+async def _count_linked_cash_transactions(
     db,
     *,
     category_id: str,
@@ -174,7 +168,7 @@ async def _count_linked_expenses(
     row = await db.fetchrow(
         """
         SELECT COUNT(*) AS total
-        FROM expenses
+        FROM cash_transactions
         WHERE category_id = $1
         """,
         category_id,
@@ -252,87 +246,19 @@ class ExpenseCategoryService(BaseService):
 
         existing_department_id = str(existing.get("department_id") or "").strip()
         if existing_department_id and department_id != existing_department_id:
-            linked_expenses = await _count_linked_expenses(
+            linked_transactions = await _count_linked_cash_transactions(
                 self.repository.db,
                 category_id=str(existing.get("id") or entity_id),
             )
-            if linked_expenses > 0:
-                raise ValidationError("department_id cannot be changed for a category with expenses")
+            if linked_transactions > 0:
+                raise ValidationError(
+                    "department_id cannot be changed for a category with cash transactions"
+                )
 
         next_data["department_id"] = department_id
         next_data["is_global"] = False
         return next_data
 
-
-class ExpenseService(CreatedByActorMixin, BaseService):
-    read_schema = ExpenseReadSchema
-
-    def __init__(self, repository: ExpenseRepository) -> None:
-        super().__init__(repository=repository)
-
-    async def _validate_expense_scope(self, payload: dict[str, Any]) -> dict[str, str]:
-        organization_id = str(payload.get("organization_id") or "").strip()
-        if not organization_id:
-            raise ValidationError("organization_id is required")
-
-        department_id = _normalize_optional_uuid(
-            payload.get("department_id"),
-            field_name="department_id",
-        )
-        if department_id is None:
-            raise ValidationError("department_id is required")
-
-        category_id = _normalize_optional_uuid(
-            payload.get("category_id"),
-            field_name="category_id",
-        )
-        if category_id is None:
-            raise ValidationError("category_id is required")
-
-        await _get_department_row(
-            self.repository.db,
-            organization_id=organization_id,
-            department_id=department_id,
-        )
-        await _get_expense_category_row(
-            self.repository.db,
-            organization_id=organization_id,
-            department_id=department_id,
-            category_id=category_id,
-            field_name="category_id",
-            require_active=True,
-        )
-
-        return {
-            "department_id": department_id,
-            "category_id": category_id,
-        }
-
-    async def _before_create(
-        self,
-        data: dict[str, Any],
-        *,
-        actor: CurrentActor | None = None,
-    ) -> dict[str, Any]:
-        next_data = dict(data)
-        next_data.update(await self._validate_expense_scope(next_data))
-        return next_data
-
-    async def _before_update(
-        self,
-        entity_id: Any,
-        data: dict[str, Any],
-        *,
-        existing: dict[str, Any],
-        actor: CurrentActor | None = None,
-    ) -> dict[str, Any]:
-        next_data = dict(data)
-        normalized_scope = await self._validate_expense_scope({**existing, **next_data})
-        if "department_id" in next_data:
-            next_data["department_id"] = normalized_scope["department_id"]
-        if "category_id" in next_data:
-            next_data["category_id"] = normalized_scope["category_id"]
-        return next_data
 
 class CashAccountService(BaseService):
     read_schema = CashAccountReadSchema
@@ -361,44 +287,6 @@ class CashTransactionService(CreatedByActorMixin, BaseService):
 
         return normalized, True
 
-    @staticmethod
-    def _build_auto_expense_marker(transaction_id: str) -> str:
-        return f"{AUTO_EXPENSE_MARKER_PREFIX}{transaction_id}]"
-
-    @classmethod
-    def _build_expense_note(
-        cls,
-        *,
-        transaction_id: str,
-        transaction_note: Any,
-    ) -> str:
-        marker = cls._build_auto_expense_marker(transaction_id)
-        note_text = str(transaction_note).strip() if transaction_note is not None else ""
-        if not note_text:
-            return marker
-        if marker in note_text:
-            return note_text
-        return f"{note_text}\n{marker}"
-
-    @classmethod
-    def _is_auto_linked_expense(
-        cls,
-        expense_row: dict[str, Any] | None,
-        *,
-        transaction_id: str,
-    ) -> bool:
-        if not expense_row:
-            return False
-        note_text = str(expense_row.get("note") or "")
-        return cls._build_auto_expense_marker(transaction_id) in note_text
-
-    @staticmethod
-    def _compose_expense_title(title: Any, *, transaction_id: str) -> str:
-        base_title = str(title or "").strip() or "Cash expense"
-        suffix = f" [{transaction_id[:8]}]"
-        max_base_length = max(1, 255 - len(suffix))
-        return _truncate_text(base_title, max_base_length) + suffix
-
     async def _get_cash_account_for_transaction(
         self,
         *,
@@ -420,187 +308,6 @@ class CashTransactionService(CreatedByActorMixin, BaseService):
 
         return account
 
-    async def _resolve_expense_category_id(
-        self,
-        *,
-        organization_id: str,
-        department_id: str,
-        explicit_category_id: str | None,
-    ) -> str:
-        category_repository = ExpenseCategoryRepository(self.repository.db)
-        if explicit_category_id:
-            category = await _get_expense_category_row(
-                self.repository.db,
-                organization_id=organization_id,
-                department_id=department_id,
-                category_id=explicit_category_id,
-                field_name=VIRTUAL_EXPENSE_CATEGORY_FIELD,
-                require_active=True,
-            )
-            return str(category["id"])
-
-        categories = await category_repository.list(
-            filters={
-                "organization_id": organization_id,
-                "department_id": department_id,
-                "is_active": True,
-            },
-            order_by=("name", "code", "id"),
-            limit=1,
-        )
-        if categories:
-            return str(categories[0]["id"])
-
-        created_category = await category_repository.create(
-            {
-                "id": str(uuid4()),
-                "organization_id": organization_id,
-                "department_id": department_id,
-                "name": AUTO_EXPENSE_CATEGORY_NAME,
-                "code": f"{AUTO_EXPENSE_CATEGORY_CODE_PREFIX}-{uuid4().hex[:6].upper()}",
-                "description": AUTO_EXPENSE_CATEGORY_DESCRIPTION,
-                "is_active": True,
-                "is_global": False,
-            }
-        )
-        return str(created_category["id"])
-
-    async def _sync_expense_for_transaction(
-        self,
-        *,
-        transaction_payload: dict[str, Any],
-        explicit_expense_id: str | None,
-        explicit_category_id: str | None,
-        actor: CurrentActor | None,
-    ) -> str:
-        transaction_id = str(transaction_payload.get("id") or "").strip()
-        if not transaction_id:
-            raise ValidationError("id is required")
-
-        organization_id = str(transaction_payload.get("organization_id") or "").strip()
-        if not organization_id:
-            raise ValidationError("organization_id is required")
-
-        cash_account_id = str(transaction_payload.get("cash_account_id") or "").strip()
-        if not cash_account_id:
-            raise ValidationError("cash_account_id is required")
-
-        cash_account = await self._get_cash_account_for_transaction(
-            cash_account_id=cash_account_id,
-            organization_id=organization_id,
-        )
-        department_id = str(cash_account.get("department_id"))
-
-        expense_repository = ExpenseRepository(self.repository.db)
-        linked_expense = None
-        if explicit_expense_id:
-            linked_expense = await expense_repository.get_by_id_optional(explicit_expense_id)
-            if linked_expense is None:
-                raise ValidationError('Field "expense_id" has an invalid value.')
-
-            if str(linked_expense.get("organization_id") or "").strip() != organization_id:
-                raise ValidationError('Field "expense_id" has an invalid value.')
-
-        if explicit_category_id:
-            category_id = await self._resolve_expense_category_id(
-                organization_id=organization_id,
-                department_id=department_id,
-                explicit_category_id=explicit_category_id,
-            )
-        elif linked_expense is not None and linked_expense.get("category_id") is not None:
-            category_id = await self._resolve_expense_category_id(
-                organization_id=organization_id,
-                department_id=department_id,
-                explicit_category_id=str(linked_expense["category_id"]),
-            )
-        else:
-            category_id = await self._resolve_expense_category_id(
-                organization_id=organization_id,
-                department_id=department_id,
-                explicit_category_id=None,
-            )
-
-        created_by = _normalize_optional_uuid(
-            transaction_payload.get("created_by")
-            if transaction_payload.get("created_by") is not None
-            else actor.employee_id if actor is not None else None,
-            field_name="created_by",
-        )
-
-        expense_payload: dict[str, Any] = {
-            "organization_id": organization_id,
-            "department_id": department_id,
-            "category_id": category_id,
-            "title": self._compose_expense_title(
-                transaction_payload.get("title"),
-                transaction_id=transaction_id,
-            ),
-            # `item` column on expenses is deprecated — form no longer
-            # fills it and `title` is the single description field.
-            "item": None,
-            "amount": transaction_payload.get("amount"),
-            "currency": transaction_payload.get("currency"),
-            "expense_date": transaction_payload.get("transaction_date"),
-            "created_by": created_by,
-            "note": self._build_expense_note(
-                transaction_id=transaction_id,
-                transaction_note=transaction_payload.get("note"),
-            ),
-        }
-
-        if linked_expense is None:
-            created_expense = await expense_repository.create(
-                {
-                    "id": str(uuid4()),
-                    "quantity": None,
-                    "unit": None,
-                    "unit_price": None,
-                    "is_active": True,
-                    **expense_payload,
-                }
-            )
-            return str(created_expense["id"])
-
-        update_payload = dict(expense_payload)
-        if linked_expense.get("is_active") is False:
-            update_payload["is_active"] = True
-
-        updated_expense = await expense_repository.update_by_id(str(linked_expense["id"]), update_payload)
-        return str(updated_expense["id"])
-
-    async def _delete_auto_expense_if_detached(
-        self,
-        *,
-        expense_id: str | None,
-        transaction_id: str,
-    ) -> None:
-        if not expense_id:
-            return
-
-        expense_repository = ExpenseRepository(self.repository.db)
-        linked_expense = await expense_repository.get_by_id_optional(expense_id)
-        if linked_expense is None:
-            return
-
-        if not self._is_auto_linked_expense(linked_expense, transaction_id=transaction_id):
-            return
-
-        linked_rows_total = await self.repository.db.fetchrow(
-            """
-            SELECT COUNT(*) AS total
-            FROM cash_transactions
-            WHERE expense_id = $1
-              AND id <> $2
-            """,
-            expense_id,
-            transaction_id,
-        )
-        linked_rows = int(linked_rows_total["total"]) if linked_rows_total is not None else 0
-        if linked_rows > 0:
-            return
-
-        await expense_repository.delete_by_id(expense_id)
-
     async def _enrich_transaction_rows(self, rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
         if not rows:
             return rows
@@ -609,11 +316,6 @@ class CashTransactionService(CreatedByActorMixin, BaseService):
             str(row["cash_account_id"])
             for row in rows
             if row.get("cash_account_id") is not None
-        }
-        expense_ids = {
-            str(row["expense_id"])
-            for row in rows
-            if row.get("expense_id") is not None
         }
 
         cash_account_map: dict[str, dict[str, Any]] = {}
@@ -624,15 +326,6 @@ class CashTransactionService(CreatedByActorMixin, BaseService):
             cash_account_map = {
                 str(row["id"]): row
                 for row in cash_account_rows
-                if row.get("id") is not None
-            }
-
-        expense_map: dict[str, dict[str, Any]] = {}
-        if expense_ids:
-            expense_rows = await ExpenseRepository(self.repository.db).get_by_ids(list(expense_ids))
-            expense_map = {
-                str(row["id"]): row
-                for row in expense_rows
                 if row.get("id") is not None
             }
 
@@ -651,14 +344,12 @@ class CashTransactionService(CreatedByActorMixin, BaseService):
             elif VIRTUAL_DEPARTMENT_FIELD not in enriched:
                 enriched[VIRTUAL_DEPARTMENT_FIELD] = None
 
-            expense_id = str(enriched["expense_id"]) if enriched.get("expense_id") is not None else ""
-            if expense_id and expense_id in expense_map:
-                category_id = expense_map[expense_id].get("category_id")
-                enriched[VIRTUAL_EXPENSE_CATEGORY_FIELD] = (
-                    str(category_id) if category_id is not None else None
-                )
-            elif VIRTUAL_EXPENSE_CATEGORY_FIELD not in enriched:
-                enriched[VIRTUAL_EXPENSE_CATEGORY_FIELD] = None
+            # Mirror the direct `category_id` FK onto the virtual
+            # `expense_category_id` alias the UI uses.
+            category_id = enriched.get("category_id")
+            enriched[VIRTUAL_EXPENSE_CATEGORY_FIELD] = (
+                str(category_id) if category_id is not None else None
+            )
 
             enriched_rows.append(enriched)
 
@@ -810,7 +501,23 @@ class CashTransactionService(CreatedByActorMixin, BaseService):
             if row is not None:
                 data["currency_id"] = str(row["id"])
 
-        await self._enforce_leaf_category(data.get("category_id"))
+        category_id = data.get("category_id")
+        if category_id:
+            organization_id = str(data.get("organization_id") or "").strip()
+            if not organization_id and actor is not None:
+                organization_id = actor.organization_id
+            department_id = str(data.get("department_id") or "").strip()
+            if organization_id and department_id:
+                await _get_expense_category_row(
+                    self.repository.db,
+                    organization_id=organization_id,
+                    department_id=department_id,
+                    category_id=str(category_id),
+                    field_name="category_id",
+                    require_active=True,
+                )
+
+        await self._enforce_leaf_category(category_id)
 
     def _prepare_update_payload(
         self,
@@ -865,26 +572,18 @@ class CashTransactionService(CreatedByActorMixin, BaseService):
 
     async def create(self, payload: Any, *, actor: CurrentActor | None = None) -> Result[Any]:
         data = self._payload_to_dict(payload)
-        explicit_category_id, _ = self._pop_optional_uuid_field(data, VIRTUAL_EXPENSE_CATEGORY_FIELD)
         data.pop(VIRTUAL_DEPARTMENT_FIELD, None)
+        # UI sends `expense_category_id` as an alias for the direct FK
+        # `cash_transactions.category_id` → expense_categories.
+        virtual_category_id = data.pop(VIRTUAL_EXPENSE_CATEGORY_FIELD, None)
+        if virtual_category_id is not None and not data.get("category_id"):
+            data["category_id"] = virtual_category_id
 
         data = self._prepare_create_payload(data, actor=actor)
         data = self._apply_actor_organization_on_create(data, actor=actor)
         data = await self._validate_catalog_fields(data, actor=actor, existing=None, is_create=True)
 
         async with self.repository.db.transaction():
-            transaction_type = str(data.get("transaction_type") or "").strip().lower()
-            explicit_expense_id = _normalize_optional_uuid(data.get("expense_id"), field_name="expense_id")
-            if transaction_type == "expense":
-                data["expense_id"] = await self._sync_expense_for_transaction(
-                    transaction_payload=data,
-                    explicit_expense_id=explicit_expense_id,
-                    explicit_category_id=explicit_category_id,
-                    actor=actor,
-                )
-            else:
-                data["expense_id"] = None
-
             await self._fill_transaction_structured_fields(data, actor=actor)
 
             entity = await self.repository.create(data)
@@ -911,8 +610,10 @@ class CashTransactionService(CreatedByActorMixin, BaseService):
         actor: CurrentActor | None = None,
     ) -> Result[Any]:
         data = self._payload_to_dict(payload)
-        explicit_category_id, _ = self._pop_optional_uuid_field(data, VIRTUAL_EXPENSE_CATEGORY_FIELD)
         data.pop(VIRTUAL_DEPARTMENT_FIELD, None)
+        virtual_category_id = data.pop(VIRTUAL_EXPENSE_CATEGORY_FIELD, None)
+        if virtual_category_id is not None:
+            data["category_id"] = virtual_category_id
 
         data = self._prepare_update_payload(data, actor=actor)
 
@@ -933,32 +634,6 @@ class CashTransactionService(CreatedByActorMixin, BaseService):
                 existing=existing,
                 is_create=False,
             )
-
-            merged_payload = {**existing, **data}
-            merged_payload["id"] = str(existing.get("id") or entity_id)
-            transaction_type = str(merged_payload.get("transaction_type") or "").strip().lower()
-            existing_expense_id = _normalize_optional_uuid(
-                existing.get("expense_id"),
-                field_name="expense_id",
-            )
-            explicit_expense_id = _normalize_optional_uuid(
-                data.get("expense_id") if "expense_id" in data else existing.get("expense_id"),
-                field_name="expense_id",
-            )
-
-            if transaction_type == "expense":
-                data["expense_id"] = await self._sync_expense_for_transaction(
-                    transaction_payload=merged_payload,
-                    explicit_expense_id=explicit_expense_id,
-                    explicit_category_id=explicit_category_id,
-                    actor=actor,
-                )
-            else:
-                data["expense_id"] = None
-                await self._delete_auto_expense_if_detached(
-                    expense_id=existing_expense_id,
-                    transaction_id=str(existing.get("id") or entity_id),
-                )
 
             entity = await self.repository.update_by_id(entity_id, data)
             enriched_entity = (await self._enrich_transaction_rows([entity]))[0]
@@ -985,15 +660,6 @@ class CashTransactionService(CreatedByActorMixin, BaseService):
                 entity_id,
                 entity=enriched_existing,
                 actor=actor,
-            )
-
-            existing_expense_id = _normalize_optional_uuid(
-                existing.get("expense_id"),
-                field_name="expense_id",
-            )
-            await self._delete_auto_expense_if_detached(
-                expense_id=existing_expense_id,
-                transaction_id=str(existing.get("id") or entity_id),
             )
 
             deleted = await self.repository.delete_by_id(entity_id)
@@ -1439,7 +1105,6 @@ class DebtPaymentService(CreatedByActorMixin, BaseService):
         tx_payload: dict[str, Any] = {
             "organization_id": organization_id,
             "cash_account_id": cash_account_id,
-            "expense_id": None,
             "counterparty_client_id": counterparty_client_id or None,
             "created_by": actor.employee_id if actor is not None else None,
             "title": self._compose_title(
@@ -1800,7 +1465,6 @@ class EmployeeAdvanceService(CreatedByActorMixin, BaseService):
 
 __all__ = [
     "ExpenseCategoryService",
-    "ExpenseService",
     "CashAccountService",
     "CashTransactionService",
     "SupplierDebtService",

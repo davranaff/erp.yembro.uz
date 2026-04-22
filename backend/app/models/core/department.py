@@ -80,11 +80,6 @@ class Department(Base, IDMixin, TimestampMixin):
         back_populates="department",
         lazy="selectin",
     )
-    expenses: Mapped[List["Expense"]] = relationship(
-        "Expense",
-        back_populates="department",
-        lazy="selectin",
-    )
     expense_categories: Mapped[List["ExpenseCategory"]] = relationship(
         "ExpenseCategory",
         back_populates="department",

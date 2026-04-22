@@ -46,7 +46,6 @@ FIXTURE_LOAD_ORDER = [
     "egg_production",
     "egg_shipments",
     "expense_categories",
-    "expenses",
     "cash_accounts",
     "employee_advances",
     "cash_transactions",
@@ -831,10 +830,6 @@ def _backfill_cash_transaction_structure(
         if not row.get("counterparty_type") and row.get("counterparty_client_id"):
             row["counterparty_type"] = "client"
             row["counterparty_id"] = row["counterparty_client_id"]
-
-        if row.get("expense_id") and not row.get("source_type"):
-            row["source_type"] = "expense"
-            row["source_id"] = row["expense_id"]
 
         if row.get("amount_in_base") is None:
             amount = Decimal(str(row.get("amount") or 0))

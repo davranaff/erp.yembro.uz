@@ -436,15 +436,17 @@ async def _fetch_expense_rows(
     return await db.fetch(
         f"""
         SELECT
-            e.expense_date AS event_date,
-            e.department_id,
-            COALESCE(e.amount, COALESCE(e.quantity, 0) * COALESCE(e.unit_price, 0), 0) AS amount,
+            ct.transaction_date AS event_date,
+            ca.department_id,
+            COALESCE(ct.amount, 0) AS amount,
             COALESCE(NULLIF(c.name, ''), NULLIF(c.code, ''), 'Категория') AS category_label
-        FROM expenses e
-        LEFT JOIN expense_categories c ON c.id = e.category_id
-        WHERE e.organization_id = $1
-          AND {_date_condition('e.expense_date', 2, 3)}
-        ORDER BY e.expense_date
+        FROM cash_transactions ct
+        INNER JOIN cash_accounts ca ON ca.id = ct.cash_account_id
+        LEFT JOIN expense_categories c ON c.id = ct.category_id
+        WHERE ct.organization_id = $1
+          AND ct.transaction_type = 'expense'
+          AND {_date_condition('ct.transaction_date', 2, 3)}
+        ORDER BY ct.transaction_date
         """,
         organization_id,
         start_date,

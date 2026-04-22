@@ -180,10 +180,6 @@ export function CrudFormFieldRow({ field, value, fieldError, context }: CrudForm
     typeof formValues.department_id === 'string' ? formValues.department_id.trim() : '';
   const defaultFormScopeDepartmentId =
     formDepartmentId || selectedDepartmentId || fallbackDepartmentId || '';
-  const expenseItemCategoryId =
-    typeof formValues.category_id === 'string' ? formValues.category_id.trim() : '';
-  const isExpenseItemField =
-    resourceModuleKey === 'finance' && resourcePath === 'expenses' && field.name === 'item';
   const referenceQueryParams =
     field.name === 'warehouse_id' && isInventoryMovementsResource
       ? { department_id: movementDepartmentId || undefined }
@@ -199,18 +195,13 @@ export function CrudFormFieldRow({ field, value, fieldError, context }: CrudForm
                 ? formValues.item_type.trim() || undefined
                 : undefined,
           }
-        : isExpenseItemField
-          ? {
-              department_id: financeDepartmentId || undefined,
-              category_id: expenseItemCategoryId || undefined,
-            }
-          : isFinanceDepartmentScopedReferenceField
-            ? { department_id: financeDepartmentId || undefined }
-            : field.reference &&
-                !DEPARTMENT_META_FIELDS.has(field.name) &&
-                defaultFormScopeDepartmentId
-              ? { department_id: defaultFormScopeDepartmentId }
-              : undefined;
+        : isFinanceDepartmentScopedReferenceField
+          ? { department_id: financeDepartmentId || undefined }
+          : field.reference &&
+              !DEPARTMENT_META_FIELDS.has(field.name) &&
+              defaultFormScopeDepartmentId
+            ? { department_id: defaultFormScopeDepartmentId }
+            : undefined;
   const hasReferenceOptions =
     isDepartmentReferenceField ||
     isMovementWarehouseField ||

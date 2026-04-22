@@ -14,7 +14,6 @@ ALL_RESOURCES = [
     ("/api/v1/egg/production", "egg_production"),
     ("/api/v1/egg/shipments", "egg_shipment"),
     ("/api/v1/finance/expense-categories", "expense_category"),
-    ("/api/v1/finance/expenses", "expense"),
     ("/api/v1/feed/types", "feed_type"),
     ("/api/v1/feed/ingredients", "feed_ingredient"),
     ("/api/v1/feed/formulas", "feed_formula"),

@@ -17,7 +17,6 @@ from app.models.finance import (
     CashAccount,
     CashTransaction,
     DebtPayment,
-    Expense,
     ExpenseCategory,
     SupplierDebt,
 )
@@ -69,7 +68,6 @@ __all__ = [
     "EggProduction",
     "EggShipment",
     "ExpenseCategory",
-    "Expense",
     "CashAccount",
     "CashTransaction",
     "SupplierDebt",
