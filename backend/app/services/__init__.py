@@ -6,7 +6,7 @@ from app.services.core import (
     PoultryTypeService,
     WarehouseService,
 )
-from app.services.egg import EggMonthlyAnalyticsService, EggProductionService, EggShipmentService
+from app.services.egg import EggProductionService, EggShipmentService
 from app.services.finance import (
     CashAccountService,
     CashTransactionService,
@@ -27,9 +27,7 @@ from app.services.hr import EmployeeService, PermissionService, PositionService,
 from app.services.inventory import StockMovementService
 from app.services.incubation import (
     ChickShipmentService,
-    FactoryMonthlyAnalyticsService,
     IncubationBatchService,
-    IncubationMonthlyAnalyticsService,
     IncubationRunService,
 )
 from app.services.medicine import (
@@ -37,7 +35,6 @@ from app.services.medicine import (
     MedicineTypeService,
 )
 from app.services.slaughter import (
-    SlaughterMonthlyAnalyticsService,
     SlaughterProcessingService,
     SlaughterQualityCheckService,
     SlaughterSemiProductShipmentService,
@@ -52,7 +49,6 @@ __all__ = [
     "OrganizationService",
     "PoultryTypeService",
     "WarehouseService",
-    "EggMonthlyAnalyticsService",
     "EggProductionService",
     "EggShipmentService",
     "ExpenseCategoryService",
@@ -73,13 +69,10 @@ __all__ = [
     "RoleService",
     "StockMovementService",
     "ChickShipmentService",
-    "FactoryMonthlyAnalyticsService",
     "IncubationBatchService",
-    "IncubationMonthlyAnalyticsService",
     "IncubationRunService",
     "MedicineBatchService",
     "MedicineTypeService",
-    "SlaughterMonthlyAnalyticsService",
     "SlaughterProcessingService",
     "SlaughterQualityCheckService",
     "SlaughterSemiProductShipmentService",

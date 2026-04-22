@@ -210,24 +210,9 @@ class FeedProductionQualityCheckListResponse(CRUDListResponse[FeedProductionQual
     """Paginated feed production quality check response."""
 
 
-class FeedMonthlyAnalyticsCreateSchema(OpenSchema, BaseCreateSchema):
-    """Input payload to create feed monthly analytics row."""
 
 
-class FeedMonthlyAnalyticsUpdateSchema(OpenSchema, BaseUpdateSchema):
-    """Input payload to update feed monthly analytics row."""
 
-
-class FeedMonthlyAnalyticsReadSchema(OpenSchema, BaseReadSchema):
-    """Readable feed monthly analytics response."""
-
-
-class FeedMonthlyAnalyticsListParams(CRUDBaseParams):
-    """Pagination + query params for feed monthly analytics list."""
-
-
-class FeedMonthlyAnalyticsListResponse(CRUDListResponse[FeedMonthlyAnalyticsReadSchema]):
-    """Paginated feed monthly analytics response."""
 
 
 __all__ = [
@@ -281,9 +266,4 @@ __all__ = [
     "FeedProductionQualityCheckReadSchema",
     "FeedProductionQualityCheckListParams",
     "FeedProductionQualityCheckListResponse",
-    "FeedMonthlyAnalyticsCreateSchema",
-    "FeedMonthlyAnalyticsUpdateSchema",
-    "FeedMonthlyAnalyticsReadSchema",
-    "FeedMonthlyAnalyticsListParams",
-    "FeedMonthlyAnalyticsListResponse",
 ]

@@ -12,7 +12,7 @@ from app.models.core import (
     Warehouse,
     WorkspaceResource,
 )
-from app.models.egg import EggMonthlyAnalytics, EggProduction, EggShipment
+from app.models.egg import EggProduction, EggShipment
 from app.models.finance import (
     CashAccount,
     CashTransaction,
@@ -25,16 +25,13 @@ from app.models.hr import Employee, Permission, Position, Role, employee_roles, 
 from app.models.inventory import StockMovement, StockReorderLevel, StockTake, StockTakeLine
 from app.models.incubation import (
     ChickShipment,
-    FactoryMonthlyAnalytics,
     IncubationBatch,
-    IncubationMonthlyAnalytics,
     IncubationRun,
 )
 from app.models.feed import (
     FeedIngredient,
     FeedFormula,
     FeedFormulaIngredient,
-    FeedMonthlyAnalytics,
     FeedProductionBatch,
     FeedProductionQualityCheck,
     FeedProductShipment,
@@ -51,7 +48,6 @@ from app.models.factory import (
 )
 from app.models.medicine import MedicineBatch, MedicineType
 from app.models.slaughter import (
-    SlaughterMonthlyAnalytics,
     SlaughterProcessing,
     SlaughterQualityCheck,
     SlaughterSemiProduct,
@@ -72,7 +68,6 @@ __all__ = [
     "Warehouse",
     "EggProduction",
     "EggShipment",
-    "EggMonthlyAnalytics",
     "ExpenseCategory",
     "Expense",
     "CashAccount",
@@ -91,20 +86,16 @@ __all__ = [
     "IncubationBatch",
     "IncubationRun",
     "ChickShipment",
-    "IncubationMonthlyAnalytics",
-    "FactoryMonthlyAnalytics",
     "PoultryType",
     "FeedType",
     "FeedIngredient",
     "FeedFormula",
     "FeedFormulaIngredient",
-    "FeedMonthlyAnalytics",
     "FeedProductionBatch",
     "FeedProductionQualityCheck",
     "FeedProductShipment",
     "FeedRawArrival",
     "FeedRawConsumption",
-    "SlaughterMonthlyAnalytics",
     "SlaughterProcessing",
     "SlaughterQualityCheck",
     "SlaughterSemiProduct",

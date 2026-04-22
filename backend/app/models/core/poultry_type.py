@@ -38,16 +38,6 @@ class PoultryType(Base, IDMixin, TimestampMixin):
         back_populates="poultry_type",
         lazy="selectin",
     )
-    factory_monthly_analytics: Mapped[list["FactoryMonthlyAnalytics"]] = relationship(
-        "FactoryMonthlyAnalytics",
-        back_populates="poultry_type",
-        lazy="selectin",
-    )
-    slaughter_monthly_analytics: Mapped[list["SlaughterMonthlyAnalytics"]] = relationship(
-        "SlaughterMonthlyAnalytics",
-        back_populates="poultry_type",
-        lazy="selectin",
-    )
 
     __table_args__ = (
         UniqueConstraint("organization_id", "name", name="uq_poultry_type_org_name"),

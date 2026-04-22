@@ -14,7 +14,6 @@ from app.repositories.inventory import StockMovementRepository
 from app.repositories.hr import EmployeeRepository
 from app.repositories.slaughter import (
     SlaughterArrivalRepository,
-    SlaughterMonthlyAnalyticsRepository,
     SlaughterProcessingRepository,
     SlaughterQualityCheckRepository,
     SlaughterSemiProductRepository,
@@ -22,7 +21,6 @@ from app.repositories.slaughter import (
 )
 from app.schemas.slaughter import (
     SlaughterArrivalReadSchema,
-    SlaughterMonthlyAnalyticsReadSchema,
     SlaughterProcessingReadSchema,
     SlaughterQualityCheckReadSchema,
     SlaughterSemiProductReadSchema,
@@ -1068,18 +1066,10 @@ class SlaughterQualityCheckService(BaseService):
         return await self._resolve_fields(data, existing=existing)
 
 
-class SlaughterMonthlyAnalyticsService(BaseService):
-    read_schema = SlaughterMonthlyAnalyticsReadSchema
-
-    def __init__(self, repository: SlaughterMonthlyAnalyticsRepository) -> None:
-        super().__init__(repository=repository)
-
-
 __all__ = [
     "SlaughterArrivalService",
     "SlaughterProcessingService",
     "SlaughterSemiProductService",
     "SlaughterSemiProductShipmentService",
     "SlaughterQualityCheckService",
-    "SlaughterMonthlyAnalyticsService",
 ]

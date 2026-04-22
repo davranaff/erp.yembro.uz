@@ -23,15 +23,10 @@ class SlaughterQualityCheckRepository(BaseRepository[dict[str, object]]):
     table = "slaughter_quality_checks"
 
 
-class SlaughterMonthlyAnalyticsRepository(BaseRepository[dict[str, object]]):
-    table = "slaughter_monthly_analytics"
-
-
 __all__ = [
     "SlaughterArrivalRepository",
     "SlaughterProcessingRepository",
     "SlaughterSemiProductRepository",
     "SlaughterSemiProductShipmentRepository",
     "SlaughterQualityCheckRepository",
-    "SlaughterMonthlyAnalyticsRepository",
 ]

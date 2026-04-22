@@ -112,8 +112,8 @@ export type ResourceUiConfig = {
   detailPanelKey?: ResourceDetailPanelKey;
   /**
    * When true, the resource is treated as system-generated: "New record",
-   * Edit and Delete are suppressed in the UI. Useful for monthly-analytics
-   * rows that are upserted by Taskiq jobs and must not be hand-edited.
+   * Edit and Delete are suppressed in the UI. Useful for read-only
+   * tables that are upserted by Taskiq jobs and must not be hand-edited.
    */
   readOnly?: boolean;
   /**
@@ -1496,65 +1496,6 @@ const resourceUiConfigs: Record<string, ResourceUiConfig> = {
     hideDepartmentFieldWhenScoped: true,
     hideOrganizationFieldWhenScoped: true,
   },
-  'feed:monthly-analytics': {
-    formOrder: [
-      'month_start',
-      'feed_type_id',
-      'raw_arrivals_kg',
-      'raw_consumptions_kg',
-      'produced_kg',
-      'shipped_kg',
-      'shipped_amount',
-      'purchased_amount',
-      'quality_passed_count',
-      'quality_failed_count',
-      'quality_pending_count',
-      'currency',
-      'note',
-    ],
-    tableOrder: [
-      'month_start',
-      'feed_type_id',
-      'produced_kg',
-      'shipped_kg',
-      'shipped_amount',
-      'quality_passed_count',
-      'quality_failed_count',
-    ],
-    hideDepartmentFieldWhenScoped: true,
-    hideOrganizationFieldWhenScoped: true,
-    readOnly: true,
-  },
-  'egg:monthly-analytics': {
-    readOnly: true,
-    hideDepartmentFieldWhenScoped: true,
-    hideOrganizationFieldWhenScoped: true,
-  },
-  'incubation:monthly-analytics': {
-    readOnly: true,
-    hideDepartmentFieldWhenScoped: true,
-    hideOrganizationFieldWhenScoped: true,
-  },
-  'incubation:factory-monthly-analytics': {
-    readOnly: true,
-    hideDepartmentFieldWhenScoped: true,
-    hideOrganizationFieldWhenScoped: true,
-  },
-  'factory:monthly-analytics': {
-    readOnly: true,
-    hideDepartmentFieldWhenScoped: true,
-    hideOrganizationFieldWhenScoped: true,
-  },
-  'slaughter:slaughter-monthly-analytics': {
-    readOnly: true,
-    hideDepartmentFieldWhenScoped: true,
-    hideOrganizationFieldWhenScoped: true,
-  },
-  'medicine:medicine-monthly-analytics': {
-    readOnly: true,
-    hideDepartmentFieldWhenScoped: true,
-    hideOrganizationFieldWhenScoped: true,
-  },
   'feed:product-shipments': {
     formOrder: [
       'shipped_on',
@@ -2355,8 +2296,6 @@ const RESOURCE_ICON_KEY_MAP: Record<string, string> = {
   'client-categories': 'Tags',
   roles: 'ShieldCheck',
   permissions: 'KeyRound',
-  'monthly-analytics': 'CalendarDays',
-  'factory-monthly-analytics': 'CalendarDays',
   runs: 'IterationCcw',
   formulas: 'FlaskConical',
   ingredients: 'Leaf',

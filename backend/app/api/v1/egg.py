@@ -5,13 +5,11 @@ from fastapi import APIRouter
 from app.api.crud import build_crud_router
 from app.api.module_stats import ModuleStatsTable, register_module_stats_route
 from app.repositories.egg import (
-    EggMonthlyAnalyticsRepository,
     EggProductionRepository,
     EggQualityCheckRepository,
     EggShipmentRepository,
 )
 from app.services.egg import (
-    EggMonthlyAnalyticsService,
     EggProductionService,
     EggQualityCheckService,
     EggShipmentService,
@@ -47,15 +45,6 @@ router.include_router(
     )
 )
 
-router.include_router(
-    build_crud_router(
-        prefix="monthly-analytics",
-        service_factory=lambda db: EggMonthlyAnalyticsService(EggMonthlyAnalyticsRepository(db)),
-        permission_prefix="egg_monthly_analytics",
-        tags=["egg-monthly-analytics"],
-    )
-)
-
 register_module_stats_route(
     router,
     module="egg",
@@ -64,7 +53,6 @@ register_module_stats_route(
         ModuleStatsTable(key="production", label="Production", table="egg_production"),
         ModuleStatsTable(key="shipments", label="Shipments", table="egg_shipments"),
         ModuleStatsTable(key="quality_checks", label="Quality Checks", table="egg_quality_checks"),
-        ModuleStatsTable(key="monthly_analytics", label="Monthly Analytics", table="egg_monthly_analytics"),
     ),
 )
 

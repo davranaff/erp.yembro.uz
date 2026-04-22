@@ -9,17 +9,13 @@ from app.core.exceptions import ValidationError
 from app.repositories.core import ClientDebtRepository
 from app.repositories.incubation import (
     ChickShipmentRepository,
-    FactoryMonthlyAnalyticsRepository,
     IncubationBatchRepository,
-    IncubationMonthlyAnalyticsRepository,
     IncubationRunRepository,
 )
 from app.repositories.inventory import StockMovementRepository
 from app.schemas.incubation import (
     ChickShipmentReadSchema,
-    FactoryMonthlyAnalyticsReadSchema,
     IncubationBatchReadSchema,
-    IncubationMonthlyAnalyticsReadSchema,
     IncubationRunReadSchema,
 )
 from app.services.base import BaseService
@@ -379,24 +375,8 @@ class IncubationRunService(BaseService):
         )
 
 
-class IncubationMonthlyAnalyticsService(BaseService):
-    read_schema = IncubationMonthlyAnalyticsReadSchema
-
-    def __init__(self, repository: IncubationMonthlyAnalyticsRepository) -> None:
-        super().__init__(repository=repository)
-
-
-class FactoryMonthlyAnalyticsService(BaseService):
-    read_schema = FactoryMonthlyAnalyticsReadSchema
-
-    def __init__(self, repository: FactoryMonthlyAnalyticsRepository) -> None:
-        super().__init__(repository=repository)
-
-
 __all__ = [
     "ChickShipmentService",
     "IncubationBatchService",
     "IncubationRunService",
-    "IncubationMonthlyAnalyticsService",
-    "FactoryMonthlyAnalyticsService",
 ]

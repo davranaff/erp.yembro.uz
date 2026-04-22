@@ -15,13 +15,8 @@ class EggQualityCheckRepository(BaseRepository[dict[str, object]]):
     table = "egg_quality_checks"
 
 
-class EggMonthlyAnalyticsRepository(BaseRepository[dict[str, object]]):
-    table = "egg_monthly_analytics"
-
-
 __all__ = [
     "EggProductionRepository",
     "EggShipmentRepository",
     "EggQualityCheckRepository",
-    "EggMonthlyAnalyticsRepository",
 ]

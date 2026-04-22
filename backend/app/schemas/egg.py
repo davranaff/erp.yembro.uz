@@ -70,24 +70,9 @@ class EggQualityCheckListResponse(CRUDListResponse[EggQualityCheckReadSchema]):
     """Paginated egg quality check response."""
 
 
-class EggMonthlyAnalyticsCreateSchema(OpenSchema, BaseCreateSchema):
-    """Input payload to create egg monthly analytics."""
 
 
-class EggMonthlyAnalyticsUpdateSchema(OpenSchema, BaseUpdateSchema):
-    """Input payload to update egg monthly analytics."""
 
-
-class EggMonthlyAnalyticsReadSchema(OpenSchema, BaseReadSchema):
-    """Readable egg monthly analytics response."""
-
-
-class EggMonthlyAnalyticsListParams(CRUDBaseParams):
-    """Pagination + query params for egg monthly analytics list."""
-
-
-class EggMonthlyAnalyticsListResponse(CRUDListResponse[EggMonthlyAnalyticsReadSchema]):
-    """Paginated egg monthly analytics response."""
 
 
 __all__ = [
@@ -106,9 +91,4 @@ __all__ = [
     "EggQualityCheckReadSchema",
     "EggQualityCheckListParams",
     "EggQualityCheckListResponse",
-    "EggMonthlyAnalyticsCreateSchema",
-    "EggMonthlyAnalyticsUpdateSchema",
-    "EggMonthlyAnalyticsReadSchema",
-    "EggMonthlyAnalyticsListParams",
-    "EggMonthlyAnalyticsListResponse",
 ]

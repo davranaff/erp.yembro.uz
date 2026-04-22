@@ -70,44 +70,14 @@ class IncubationRunListResponse(CRUDListResponse[IncubationRunReadSchema]):
     """Paginated incubation run response."""
 
 
-class IncubationMonthlyAnalyticsCreateSchema(OpenSchema, BaseCreateSchema):
-    """Input payload to create incubation monthly analytics."""
 
 
-class IncubationMonthlyAnalyticsUpdateSchema(OpenSchema, BaseUpdateSchema):
-    """Input payload to update incubation monthly analytics."""
 
 
-class IncubationMonthlyAnalyticsReadSchema(OpenSchema, BaseReadSchema):
-    """Readable incubation monthly analytics response."""
 
 
-class IncubationMonthlyAnalyticsListParams(CRUDBaseParams):
-    """Pagination + query params for incubation monthly analytics list."""
 
 
-class IncubationMonthlyAnalyticsListResponse(CRUDListResponse[IncubationMonthlyAnalyticsReadSchema]):
-    """Paginated incubation monthly analytics response."""
-
-
-class FactoryMonthlyAnalyticsCreateSchema(OpenSchema, BaseCreateSchema):
-    """Input payload to create factory monthly analytics."""
-
-
-class FactoryMonthlyAnalyticsUpdateSchema(OpenSchema, BaseUpdateSchema):
-    """Input payload to update factory monthly analytics."""
-
-
-class FactoryMonthlyAnalyticsReadSchema(OpenSchema, BaseReadSchema):
-    """Readable factory monthly analytics response."""
-
-
-class FactoryMonthlyAnalyticsListParams(CRUDBaseParams):
-    """Pagination + query params for factory monthly analytics list."""
-
-
-class FactoryMonthlyAnalyticsListResponse(CRUDListResponse[FactoryMonthlyAnalyticsReadSchema]):
-    """Paginated factory monthly analytics response."""
 
 
 __all__ = [
@@ -126,14 +96,4 @@ __all__ = [
     "IncubationRunReadSchema",
     "IncubationRunListParams",
     "IncubationRunListResponse",
-    "IncubationMonthlyAnalyticsCreateSchema",
-    "IncubationMonthlyAnalyticsUpdateSchema",
-    "IncubationMonthlyAnalyticsReadSchema",
-    "IncubationMonthlyAnalyticsListParams",
-    "IncubationMonthlyAnalyticsListResponse",
-    "FactoryMonthlyAnalyticsCreateSchema",
-    "FactoryMonthlyAnalyticsUpdateSchema",
-    "FactoryMonthlyAnalyticsReadSchema",
-    "FactoryMonthlyAnalyticsListParams",
-    "FactoryMonthlyAnalyticsListResponse",
 ]

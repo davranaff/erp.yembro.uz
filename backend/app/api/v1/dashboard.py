@@ -4408,27 +4408,54 @@ async def _build_slaughterhouse_dashboard_module(
         end_date,
         department_ids,
     )
+    # slaughter_monthly_analytics rollup table was removed; compute the
+    # monthly trend live from the source operational tables instead.
     monthly_trend_rows = await db.fetch(
         f"""
+        WITH processed AS (
+          SELECT
+            DATE_TRUNC('month', sp.processed_on)::date AS month_start,
+            SUM(sp.birds_processed) AS birds_processed,
+            SUM(sp.first_sort_count) AS first_sort_count,
+            SUM(sp.first_sort_count + sp.second_sort_count + sp.bad_count) AS total_sorted
+          FROM slaughter_processings sp
+          INNER JOIN departments d ON d.id = sp.department_id
+          WHERE d.module_key = 'slaughter'
+            AND {_date_condition('sp.processed_on')}
+            AND {_department_condition('sp.department_id')}
+          GROUP BY DATE_TRUNC('month', sp.processed_on)
+        ),
+        shipments AS (
+          SELECT
+            DATE_TRUNC('month', sps.shipped_on)::date AS month_start,
+            SUM(sps.quantity) AS shipped_quantity,
+            SUM(COALESCE(sps.quantity, 0) * COALESCE(sps.unit_price, 0)) AS shipped_amount
+          FROM slaughter_semi_product_shipments sps
+          INNER JOIN departments d ON d.id = sps.department_id
+          WHERE d.module_key = 'slaughter'
+            AND {_date_condition('sps.shipped_on')}
+            AND {_department_condition('sps.department_id')}
+          GROUP BY DATE_TRUNC('month', sps.shipped_on)
+        )
         SELECT
-            TO_CHAR(ma.month_start, 'YYYY-MM') AS label,
-            SUM(ma.birds_processed) AS birds_processed,
-            SUM(ma.shipped_quantity_kg) AS shipped_quantity,
-            SUM(ma.shipped_amount) AS shipped_amount,
-            SUM(ma.first_sort_count) AS first_sort_count,
-            SUM(ma.first_sort_count + ma.second_sort_count + ma.bad_count) AS total_sorted
-        FROM slaughter_monthly_analytics ma
-        WHERE ma.organization_id IN (
-              SELECT organization_id FROM departments
-              WHERE ($3::uuid[] IS NULL OR id = ANY($3::uuid[]))
-          )
-          AND ($3::uuid[] IS NULL
-               OR ma.department_id IS NULL
-               OR ma.department_id = ANY($3::uuid[]))
-          AND ($1::date IS NULL OR ma.month_start >= DATE_TRUNC('month', $1::date))
-          AND ($2::date IS NULL OR ma.month_start <= DATE_TRUNC('month', $2::date))
-        GROUP BY ma.month_start
-        ORDER BY ma.month_start
+          TO_CHAR(month_start, 'YYYY-MM') AS label,
+          COALESCE(SUM(birds_processed), 0) AS birds_processed,
+          COALESCE(SUM(shipped_quantity), 0) AS shipped_quantity,
+          COALESCE(SUM(shipped_amount), 0) AS shipped_amount,
+          COALESCE(SUM(first_sort_count), 0) AS first_sort_count,
+          COALESCE(SUM(total_sorted), 0) AS total_sorted
+        FROM (
+          SELECT month_start, birds_processed, NULL::numeric AS shipped_quantity,
+                 NULL::numeric AS shipped_amount, first_sort_count, total_sorted
+          FROM processed
+          UNION ALL
+          SELECT month_start, NULL::numeric AS birds_processed, shipped_quantity,
+                 shipped_amount, NULL::numeric AS first_sort_count,
+                 NULL::numeric AS total_sorted
+          FROM shipments
+        ) combined
+        GROUP BY month_start
+        ORDER BY month_start
         """,
         start_date,
         end_date,

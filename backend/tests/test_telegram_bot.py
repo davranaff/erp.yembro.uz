@@ -79,17 +79,6 @@ def test_operational_alert_event_filters_non_operational_actions_and_tables() ->
         )
         is None
     )
-    assert (
-        build_operational_alert_event(
-            action="create",
-            entity_table="egg_monthly_analytics",
-            entity_id="record-3",
-            actor_username="EMP-ADM-00",
-            before_data=None,
-            after_data={"organization_id": ORG_ID},
-        )
-        is None
-    )
 
 
 @pytest.mark.asyncio

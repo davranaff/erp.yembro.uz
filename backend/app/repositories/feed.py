@@ -43,10 +43,6 @@ class FeedProductionQualityCheckRepository(BaseRepository[dict[str, object]]):
     table = "feed_production_quality_checks"
 
 
-class FeedMonthlyAnalyticsRepository(BaseRepository[dict[str, object]]):
-    table = "feed_monthly_analytics"
-
-
 __all__ = [
     "FeedTypeRepository",
     "FeedIngredientRepository",
@@ -58,5 +54,4 @@ __all__ = [
     "FeedRawConsumptionRepository",
     "FeedConsumptionRepository",
     "FeedProductionQualityCheckRepository",
-    "FeedMonthlyAnalyticsRepository",
 ]

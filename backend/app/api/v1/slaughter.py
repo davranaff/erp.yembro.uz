@@ -6,7 +6,6 @@ from app.api.crud import build_crud_router
 from app.api.module_stats import ModuleStatsTable, register_module_stats_route
 from app.repositories.slaughter import (
     SlaughterArrivalRepository,
-    SlaughterMonthlyAnalyticsRepository,
     SlaughterProcessingRepository,
     SlaughterQualityCheckRepository,
     SlaughterSemiProductRepository,
@@ -14,7 +13,6 @@ from app.repositories.slaughter import (
 )
 from app.services.slaughter import (
     SlaughterArrivalService,
-    SlaughterMonthlyAnalyticsService,
     SlaughterProcessingService,
     SlaughterQualityCheckService,
     SlaughterSemiProductShipmentService,
@@ -73,17 +71,6 @@ router.include_router(
     )
 )
 
-router.include_router(
-    build_crud_router(
-        prefix="monthly-analytics",
-        service_factory=lambda db: SlaughterMonthlyAnalyticsService(
-            SlaughterMonthlyAnalyticsRepository(db),
-        ),
-        permission_prefix="slaughter_monthly_analytics",
-        tags=["slaughter-monthly-analytics"],
-    )
-)
-
 register_module_stats_route(
     router,
     module="slaughter",
@@ -101,11 +88,6 @@ register_module_stats_route(
             key="quality_checks",
             label="Quality Checks",
             table="slaughter_quality_checks",
-        ),
-        ModuleStatsTable(
-            key="monthly_analytics",
-            label="Monthly Analytics",
-            table="slaughter_monthly_analytics",
         ),
     ),
 )

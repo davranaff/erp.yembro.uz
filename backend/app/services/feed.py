@@ -16,7 +16,6 @@ from app.repositories.feed import (
     FeedFormulaIngredientRepository,
     FeedFormulaRepository,
     FeedIngredientRepository,
-    FeedMonthlyAnalyticsRepository,
     FeedProductionBatchRepository,
     FeedProductionQualityCheckRepository,
     FeedProductShipmentRepository,
@@ -32,7 +31,6 @@ from app.schemas.feed import (
     FeedFormulaIngredientReadSchema,
     FeedFormulaReadSchema,
     FeedIngredientReadSchema,
-    FeedMonthlyAnalyticsReadSchema,
     FeedProductionBatchReadSchema,
     FeedProductionQualityCheckReadSchema,
     FeedProductShipmentReadSchema,
@@ -784,13 +782,6 @@ class FeedProductionQualityCheckService(BaseService):
         return await self._resolve_fields(data, existing=existing)
 
 
-class FeedMonthlyAnalyticsService(BaseService):
-    read_schema = FeedMonthlyAnalyticsReadSchema
-
-    def __init__(self, repository: FeedMonthlyAnalyticsRepository) -> None:
-        super().__init__(repository=repository)
-
-
 __all__ = [
     "FeedTypeService",
     "FeedIngredientService",
@@ -801,5 +792,4 @@ __all__ = [
     "FeedRawArrivalService",
     "FeedRawConsumptionService",
     "FeedProductionQualityCheckService",
-    "FeedMonthlyAnalyticsService",
 ]

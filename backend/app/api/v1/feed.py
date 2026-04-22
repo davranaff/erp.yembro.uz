@@ -8,7 +8,6 @@ from app.repositories.feed import (
     FeedFormulaIngredientRepository,
     FeedFormulaRepository,
     FeedIngredientRepository,
-    FeedMonthlyAnalyticsRepository,
     FeedProductionBatchRepository,
     FeedProductionQualityCheckRepository,
     FeedProductShipmentRepository,
@@ -20,7 +19,6 @@ from app.services.feed import (
     FeedFormulaIngredientService,
     FeedFormulaService,
     FeedIngredientService,
-    FeedMonthlyAnalyticsService,
     FeedProductShipmentService,
     FeedProductionBatchService,
     FeedProductionQualityCheckService,
@@ -115,15 +113,6 @@ router.include_router(
     )
 )
 
-router.include_router(
-    build_crud_router(
-        prefix="monthly-analytics",
-        service_factory=lambda db: FeedMonthlyAnalyticsService(FeedMonthlyAnalyticsRepository(db)),
-        permission_prefix="feed_monthly_analytics",
-        tags=["feed-monthly-analytics"],
-    )
-)
-
 register_module_stats_route(
     router,
     module="feed",
@@ -161,11 +150,6 @@ register_module_stats_route(
             key="product_shipments",
             label="Product Shipments",
             table="feed_product_shipments",
-        ),
-        ModuleStatsTable(
-            key="monthly_analytics",
-            label="Monthly Analytics",
-            table="feed_monthly_analytics",
         ),
     ),
 )

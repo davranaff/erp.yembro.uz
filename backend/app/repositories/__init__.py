@@ -7,7 +7,7 @@ from app.repositories.core import (
     PoultryTypeRepository,
     WarehouseRepository,
 )
-from app.repositories.egg import EggMonthlyAnalyticsRepository, EggProductionRepository, EggShipmentRepository
+from app.repositories.egg import EggProductionRepository, EggShipmentRepository
 from app.repositories.finance import (
     CashAccountRepository,
     CashTransactionRepository,
@@ -28,9 +28,7 @@ from app.repositories.hr import EmployeeRepository, PermissionRepository, Positi
 from app.repositories.inventory import StockMovementRepository
 from app.repositories.incubation import (
     ChickShipmentRepository,
-    FactoryMonthlyAnalyticsRepository,
     IncubationBatchRepository,
-    IncubationMonthlyAnalyticsRepository,
     IncubationRunRepository,
 )
 from app.repositories.medicine import (
@@ -38,7 +36,6 @@ from app.repositories.medicine import (
     MedicineTypeRepository,
 )
 from app.repositories.slaughter import (
-    SlaughterMonthlyAnalyticsRepository,
     SlaughterProcessingRepository,
     SlaughterQualityCheckRepository,
     SlaughterSemiProductRepository,
@@ -56,7 +53,6 @@ __all__ = [
     "PoultryTypeRepository",
     "EggProductionRepository",
     "EggShipmentRepository",
-    "EggMonthlyAnalyticsRepository",
     "ExpenseCategoryRepository",
     "ExpenseRepository",
     "CashAccountRepository",
@@ -77,11 +73,8 @@ __all__ = [
     "ChickShipmentRepository",
     "IncubationBatchRepository",
     "IncubationRunRepository",
-    "IncubationMonthlyAnalyticsRepository",
-    "FactoryMonthlyAnalyticsRepository",
     "MedicineBatchRepository",
     "MedicineTypeRepository",
-    "SlaughterMonthlyAnalyticsRepository",
     "SlaughterProcessingRepository",
     "SlaughterQualityCheckRepository",
     "SlaughterSemiProductRepository",

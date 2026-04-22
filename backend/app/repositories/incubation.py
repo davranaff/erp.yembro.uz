@@ -15,18 +15,8 @@ class IncubationRunRepository(BaseRepository[dict[str, object]]):
     table = "incubation_runs"
 
 
-class IncubationMonthlyAnalyticsRepository(BaseRepository[dict[str, object]]):
-    table = "incubation_monthly_analytics"
-
-
-class FactoryMonthlyAnalyticsRepository(BaseRepository[dict[str, object]]):
-    table = "factory_monthly_analytics"
-
-
 __all__ = [
     "ChickShipmentRepository",
     "IncubationBatchRepository",
     "IncubationRunRepository",
-    "IncubationMonthlyAnalyticsRepository",
-    "FactoryMonthlyAnalyticsRepository",
 ]

@@ -6,16 +6,12 @@ from app.api.crud import build_crud_router
 from app.api.module_stats import ModuleStatsTable, register_module_stats_route
 from app.repositories.incubation import (
     ChickShipmentRepository,
-    FactoryMonthlyAnalyticsRepository,
     IncubationBatchRepository,
-    IncubationMonthlyAnalyticsRepository,
     IncubationRunRepository,
 )
 from app.services.incubation import (
     ChickShipmentService,
-    FactoryMonthlyAnalyticsService,
     IncubationBatchService,
-    IncubationMonthlyAnalyticsService,
     IncubationRunService,
 )
 
@@ -49,24 +45,6 @@ router.include_router(
     )
 )
 
-router.include_router(
-    build_crud_router(
-        prefix="monthly-analytics",
-        service_factory=lambda db: IncubationMonthlyAnalyticsService(IncubationMonthlyAnalyticsRepository(db)),
-        permission_prefix="incubation_monthly_analytics",
-        tags=["incubation-monthly-analytics"],
-    )
-)
-
-router.include_router(
-    build_crud_router(
-        prefix="factory-monthly-analytics",
-        service_factory=lambda db: FactoryMonthlyAnalyticsService(FactoryMonthlyAnalyticsRepository(db)),
-        permission_prefix="factory_monthly_analytics",
-        tags=["factory-monthly-analytics"],
-    )
-)
-
 register_module_stats_route(
     router,
     module="incubation",
@@ -75,16 +53,6 @@ register_module_stats_route(
         ModuleStatsTable(key="chick_shipments", label="Chick Shipments", table="chick_shipments"),
         ModuleStatsTable(key="batches", label="Batches", table="incubation_batches"),
         ModuleStatsTable(key="runs", label="Runs", table="incubation_runs"),
-        ModuleStatsTable(
-            key="monthly_analytics",
-            label="Monthly Analytics",
-            table="incubation_monthly_analytics",
-        ),
-        ModuleStatsTable(
-            key="factory_monthly_analytics",
-            label="Factory Monthly Analytics",
-            table="factory_monthly_analytics",
-        ),
     ),
 )
 

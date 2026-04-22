@@ -18,12 +18,7 @@ describe('department implicit read access', () => {
         sort_order: 10,
         is_department_assignable: true,
         analytics_section_key: 'egg_farm',
-        implicit_read_permissions: [
-          'egg_production.read',
-          'egg_shipment.read',
-          'egg_monthly_analytics.read',
-          'warehouse.read',
-        ],
+        implicit_read_permissions: ['egg_production.read', 'egg_shipment.read', 'warehouse.read'],
         analytics_read_permissions: ['egg_production.read', 'egg_shipment.read'],
         resources: [
           {

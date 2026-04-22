@@ -45,7 +45,6 @@ FIXTURE_LOAD_ORDER = [
     "role_permissions",
     "egg_production",
     "egg_shipments",
-    "egg_monthly_analytics",
     "expense_categories",
     "expenses",
     "cash_accounts",
@@ -65,8 +64,6 @@ FIXTURE_LOAD_ORDER = [
     "incubation_runs",
     "chick_shipments",
     "chick_arrivals",
-    "incubation_monthly_analytics",
-    "factory_monthly_analytics",
     "factory_flocks",
     "factory_daily_logs",
     "factory_shipments",
@@ -81,11 +78,7 @@ FIXTURE_LOAD_ORDER = [
     "slaughter_semi_product_shipments",
     "stock_movements",
 ]
-ROLLING_DATE_ACTIVITY_TABLE_EXCLUSIONS = {
-    "egg_monthly_analytics",
-    "incubation_monthly_analytics",
-    "factory_monthly_analytics",
-}
+ROLLING_DATE_ACTIVITY_TABLE_EXCLUSIONS: set[str] = set()
 ROLLING_DATE_ACTIVITY_COLUMN_EXCLUSIONS = {"created_at", "updated_at", "changed_at", "expiry_date"}
 ROLLING_DATE_FALSE_VALUES = {"0", "false", "off", "no"}
 DEFAULT_ROLLING_LAG_DAYS = 2
@@ -884,7 +877,6 @@ UNIT_FK_TABLES: dict[str, str] = {
     "supplier_debts": "unit",
     "slaughter_semi_product_shipments": "unit",
     "slaughter_semi_products": "unit",
-    "factory_monthly_analytics": "feed_quantity_unit",
 }
 
 UNIT_ALIASES: dict[str, str] = {

@@ -8,7 +8,6 @@ from uuid import uuid4
 from app.core.exceptions import AccessDeniedError, ValidationError
 from app.repositories.core import ClientDebtRepository
 from app.repositories.egg import (
-    EggMonthlyAnalyticsRepository,
     EggProductionRepository,
     EggQualityCheckRepository,
     EggShipmentRepository,
@@ -16,7 +15,6 @@ from app.repositories.egg import (
 from app.repositories.hr import EmployeeRepository
 from app.repositories.inventory import StockMovementRepository
 from app.schemas.egg import (
-    EggMonthlyAnalyticsReadSchema,
     EggProductionReadSchema,
     EggQualityCheckReadSchema,
     EggShipmentReadSchema,
@@ -434,16 +432,8 @@ class EggQualityCheckService(BaseService):
         return await self._resolve_fields(data, existing=existing)
 
 
-class EggMonthlyAnalyticsService(BaseService):
-    read_schema = EggMonthlyAnalyticsReadSchema
-
-    def __init__(self, repository: EggMonthlyAnalyticsRepository) -> None:
-        super().__init__(repository=repository)
-
-
 __all__ = [
     "EggProductionService",
     "EggShipmentService",
     "EggQualityCheckService",
-    "EggMonthlyAnalyticsService",
 ]

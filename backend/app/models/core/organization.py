@@ -94,12 +94,6 @@ class Organization(Base, IDMixin, TimestampMixin):
         cascade="all, delete-orphan",
         lazy="selectin",
     )
-    egg_monthly_analytics: Mapped[List["EggMonthlyAnalytics"]] = relationship(
-        "EggMonthlyAnalytics",
-        back_populates="organization",
-        cascade="all, delete-orphan",
-        lazy="selectin",
-    )
     incubation_batches: Mapped[List["IncubationBatch"]] = relationship(
         "IncubationBatch",
         back_populates="organization",
@@ -114,12 +108,6 @@ class Organization(Base, IDMixin, TimestampMixin):
     )
     chick_shipments: Mapped[List["ChickShipment"]] = relationship(
         "ChickShipment",
-        back_populates="organization",
-        cascade="all, delete-orphan",
-        lazy="selectin",
-    )
-    incubation_monthly_analytics: Mapped[List["IncubationMonthlyAnalytics"]] = relationship(
-        "IncubationMonthlyAnalytics",
         back_populates="organization",
         cascade="all, delete-orphan",
         lazy="selectin",
@@ -202,12 +190,6 @@ class Organization(Base, IDMixin, TimestampMixin):
         cascade="all, delete-orphan",
         lazy="selectin",
     )
-    slaughter_monthly_analytics: Mapped[List["SlaughterMonthlyAnalytics"]] = relationship(
-        "SlaughterMonthlyAnalytics",
-        back_populates="organization",
-        cascade="all, delete-orphan",
-        lazy="selectin",
-    )
     medicine_batches: Mapped[List["MedicineBatch"]] = relationship(
         "MedicineBatch",
         back_populates="organization",
@@ -222,12 +204,6 @@ class Organization(Base, IDMixin, TimestampMixin):
     )
     feed_product_shipments: Mapped[List["FeedProductShipment"]] = relationship(
         "FeedProductShipment",
-        back_populates="organization",
-        cascade="all, delete-orphan",
-        lazy="selectin",
-    )
-    factory_monthly_analytics: Mapped[List["FactoryMonthlyAnalytics"]] = relationship(
-        "FactoryMonthlyAnalytics",
         back_populates="organization",
         cascade="all, delete-orphan",
         lazy="selectin",

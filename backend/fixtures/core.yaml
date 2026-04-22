@@ -34,7 +34,7 @@ department_modules:
   sort_order: 20
   is_department_assignable: true
   analytics_section_key: "egg_farm"
-  implicit_read_permissions: '["egg_production.read", "egg_shipment.read", "egg_quality_check.read", "egg_monthly_analytics.read", "stock_movement.read", "warehouse.read"]'
+  implicit_read_permissions: '["egg_production.read", "egg_shipment.read", "egg_quality_check.read", "stock_movement.read", "warehouse.read"]'
   analytics_read_permissions: '["egg_production.read", "egg_shipment.read"]'
   is_active: true
 - id: "31222222-2222-2222-2222-222222222222"
@@ -45,7 +45,7 @@ department_modules:
   sort_order: 30
   is_department_assignable: true
   analytics_section_key: "incubation"
-  implicit_read_permissions: '["incubation_batch.read", "incubation_run.read", "chick_shipment.read", "incubation_monthly_analytics.read", "factory_monthly_analytics.read", "stock_movement.read", "warehouse.read"]'
+  implicit_read_permissions: '["incubation_batch.read", "incubation_run.read", "chick_shipment.read", "stock_movement.read", "warehouse.read"]'
   analytics_read_permissions: '["incubation_batch.read", "incubation_run.read", "chick_shipment.read"]'
   is_active: true
 - id: "31333333-3333-3333-3333-333333333333"
@@ -56,7 +56,7 @@ department_modules:
   sort_order: 40
   is_department_assignable: true
   analytics_section_key: "factory"
-  implicit_read_permissions: '["factory_flock.read", "factory_daily_log.read", "factory_shipment.read", "factory_medicine_usage.read", "factory_vaccination_plan.read", "factory_monthly_analytics.read", "feed_consumption.read", "stock_movement.read", "warehouse.read"]'
+  implicit_read_permissions: '["factory_flock.read", "factory_daily_log.read", "factory_shipment.read", "factory_medicine_usage.read", "factory_vaccination_plan.read", "feed_consumption.read", "stock_movement.read", "warehouse.read"]'
   analytics_read_permissions: '["factory_flock.read", "factory_shipment.read"]'
   is_active: true
 - id: "31444444-4444-4444-4444-444444444444"
@@ -67,8 +67,8 @@ department_modules:
   sort_order: 50
   is_department_assignable: true
   analytics_section_key: "feed_mill"
-  implicit_read_permissions: '["feed_type.read", "feed_ingredient.read", "feed_formula.read", "feed_formula_ingredient.read", "feed_raw_arrival.read", "feed_raw_consumption.read", "feed_production_batch.read", "feed_production_quality_check.read", "feed_product_shipment.read", "feed_monthly_analytics.read", "stock_movement.read", "warehouse.read"]'
-  analytics_read_permissions: '["feed_ingredient.read", "feed_formula.read", "feed_formula_ingredient.read", "feed_raw_arrival.read", "feed_raw_consumption.read", "feed_production_batch.read", "feed_production_quality_check.read", "feed_product_shipment.read", "feed_monthly_analytics.read"]'
+  implicit_read_permissions: '["feed_type.read", "feed_ingredient.read", "feed_formula.read", "feed_formula_ingredient.read", "feed_raw_arrival.read", "feed_raw_consumption.read", "feed_production_batch.read", "feed_production_quality_check.read", "feed_product_shipment.read", "stock_movement.read", "warehouse.read"]'
+  analytics_read_permissions: '["feed_ingredient.read", "feed_formula.read", "feed_formula_ingredient.read", "feed_raw_arrival.read", "feed_raw_consumption.read", "feed_production_batch.read", "feed_production_quality_check.read", "feed_product_shipment.read"]'
   is_active: true
 - id: "31555555-5555-5555-5555-555555555555"
   key: "medicine"
@@ -255,16 +255,6 @@ workspace_resources:
   sort_order: 25
   is_head_visible: true
   is_active: true
-- id: "32000000-0000-0000-0000-000000000009"
-  module_key: "egg"
-  key: "monthly-analytics"
-  name: "Месячная аналитика"
-  path: "monthly-analytics"
-  description: "Сводные месячные показатели"
-  permission_prefix: "egg_monthly_analytics"
-  sort_order: 30
-  is_head_visible: false
-  is_active: false
 - id: "32000000-0000-0000-0000-000000000181"
   module_key: "egg"
   key: "warehouses"
@@ -394,26 +384,6 @@ workspace_resources:
   sort_order: 30
   is_head_visible: false
   is_active: true
-- id: "32000000-0000-0000-0000-000000000072"
-  module_key: "incubation"
-  key: "monthly-analytics"
-  name: "Месячная аналитика"
-  path: "monthly-analytics"
-  description: "Помесячные показатели инкубации"
-  permission_prefix: "incubation_monthly_analytics"
-  sort_order: 35
-  is_head_visible: true
-  is_active: false
-- id: "32000000-0000-0000-0000-000000000073"
-  module_key: "incubation"
-  key: "factory-monthly-analytics"
-  name: "Аналитика фабрики"
-  path: "factory-monthly-analytics"
-  description: "Помесячные показатели фабрики"
-  permission_prefix: "factory_monthly_analytics"
-  sort_order: 36
-  is_head_visible: true
-  is_active: false
 - id: "32000000-0000-0000-0000-000000000182"
   module_key: "incubation"
   key: "warehouses"
@@ -568,17 +538,6 @@ workspace_resources:
   sort_order: 28
   is_head_visible: true
   is_active: true
-- id: "32000000-0000-0000-0000-000000000206"
-  module_key: "factory"
-  key: "monthly-analytics"
-  name: "Месячная аналитика"
-  path: "factory-monthly-analytics"
-  description: "Помесячные показатели фабрики"
-  permission_prefix: "factory_monthly_analytics"
-  api_module_key: "incubation"
-  sort_order: 34
-  is_head_visible: true
-  is_active: false
 - id: "32000000-0000-0000-0000-000000000207"
   module_key: "factory"
   key: "feed-consumptions"
@@ -779,16 +738,6 @@ workspace_resources:
   sort_order: 70
   is_head_visible: true
   is_active: true
-- id: "32000000-0000-0000-0000-000000000191"
-  module_key: "feed"
-  key: "monthly-analytics"
-  name: "Помесячная аналитика"
-  path: "monthly-analytics"
-  description: "Помесячная аналитика корма"
-  permission_prefix: "feed_monthly_analytics"
-  sort_order: 72
-  is_head_visible: true
-  is_active: false
 - id: "32000000-0000-0000-0000-000000000077"
   module_key: "feed"
   key: "stock-movements"
@@ -1058,16 +1007,6 @@ workspace_resources:
   sort_order: 35
   is_head_visible: true
   is_active: true
-- id: "32000000-0000-0000-0000-000000000188"
-  module_key: "slaughter"
-  key: "slaughter-monthly-analytics"
-  name: "Помесячная аналитика"
-  path: "monthly-analytics"
-  description: "Показатели убоя по месяцам"
-  permission_prefix: "slaughter_monthly_analytics"
-  sort_order: 36
-  is_head_visible: true
-  is_active: false
 - id: "32000000-0000-0000-0000-000000000079"
   module_key: "slaughter"
   key: "stock-movements"

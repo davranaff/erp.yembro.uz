@@ -9,8 +9,6 @@ INCUBATION_RESOURCES = [
     ("/api/v1/incubation/chick-shipments", "chick_shipment"),
     ("/api/v1/incubation/batches", "incubation_batch"),
     ("/api/v1/incubation/runs", "incubation_run"),
-    ("/api/v1/incubation/monthly-analytics", "incubation_monthly_analytics"),
-    ("/api/v1/incubation/factory-monthly-analytics", "factory_monthly_analytics"),
 ]
 
 

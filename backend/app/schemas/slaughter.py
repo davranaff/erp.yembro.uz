@@ -110,26 +110,8 @@ class SlaughterQualityCheckListResponse(CRUDListResponse[SlaughterQualityCheckRe
     """Paginated slaughter quality check response."""
 
 
-class SlaughterMonthlyAnalyticsCreateSchema(OpenSchema, BaseCreateSchema):
-    """Input payload to create slaughter monthly analytics."""
 
 
-class SlaughterMonthlyAnalyticsUpdateSchema(OpenSchema, BaseUpdateSchema):
-    """Input payload to update slaughter monthly analytics."""
-
-
-class SlaughterMonthlyAnalyticsReadSchema(OpenSchema, BaseReadSchema):
-    """Readable slaughter monthly analytics response."""
-
-
-class SlaughterMonthlyAnalyticsListParams(CRUDBaseParams):
-    """Pagination + query params for slaughter monthly analytics list."""
-
-
-class SlaughterMonthlyAnalyticsListResponse(
-    CRUDListResponse[SlaughterMonthlyAnalyticsReadSchema]
-):
-    """Paginated slaughter monthly analytics response."""
 
 
 __all__ = [
@@ -158,9 +140,4 @@ __all__ = [
     "SlaughterQualityCheckReadSchema",
     "SlaughterQualityCheckListParams",
     "SlaughterQualityCheckListResponse",
-    "SlaughterMonthlyAnalyticsCreateSchema",
-    "SlaughterMonthlyAnalyticsUpdateSchema",
-    "SlaughterMonthlyAnalyticsReadSchema",
-    "SlaughterMonthlyAnalyticsListParams",
-    "SlaughterMonthlyAnalyticsListResponse",
 ]

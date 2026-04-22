@@ -80,11 +80,6 @@ class Department(Base, IDMixin, TimestampMixin):
         back_populates="department",
         lazy="selectin",
     )
-    egg_monthly_analytics: Mapped[List["EggMonthlyAnalytics"]] = relationship(
-        "EggMonthlyAnalytics",
-        back_populates="department",
-        lazy="selectin",
-    )
     expenses: Mapped[List["Expense"]] = relationship(
         "Expense",
         back_populates="department",
@@ -135,18 +130,8 @@ class Department(Base, IDMixin, TimestampMixin):
         back_populates="department",
         lazy="selectin",
     )
-    slaughter_monthly_analytics: Mapped[List["SlaughterMonthlyAnalytics"]] = relationship(
-        "SlaughterMonthlyAnalytics",
-        back_populates="department",
-        lazy="selectin",
-    )
     medicine_batches: Mapped[List["MedicineBatch"]] = relationship(
         "MedicineBatch",
-        back_populates="department",
-        lazy="selectin",
-    )
-    factory_monthly_analytics: Mapped[List["FactoryMonthlyAnalytics"]] = relationship(
-        "FactoryMonthlyAnalytics",
         back_populates="department",
         lazy="selectin",
     )
@@ -162,11 +147,6 @@ class Department(Base, IDMixin, TimestampMixin):
     )
     chick_shipments: Mapped[List["ChickShipment"]] = relationship(
         "ChickShipment",
-        back_populates="department",
-        lazy="selectin",
-    )
-    incubation_monthly_analytics: Mapped[List["IncubationMonthlyAnalytics"]] = relationship(
-        "IncubationMonthlyAnalytics",
         back_populates="department",
         lazy="selectin",
     )

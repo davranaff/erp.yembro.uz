@@ -8,7 +8,6 @@ from tests.helpers import run_crud_flow
 EGG_RESOURCES = [
     ("/api/v1/egg/production", "egg_production"),
     ("/api/v1/egg/shipments", "egg_shipment"),
-    ("/api/v1/egg/monthly-analytics", "egg_monthly_analytics"),
 ]
 
 

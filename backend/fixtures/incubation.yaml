@@ -188,27 +188,3 @@ chick_arrivals:
     note: Broyler maydoni 1 — ikkinchi partiya
     run_id: 85111111-1111-1111-1111-111111111102
     chick_shipment_id: null
-
-
-incubation_monthly_analytics:
-  - id: 88111111-1111-1111-1111-111111111101
-    organization_id: 11111111-1111-1111-1111-111111111111
-    department_id: 152db9b5-3cd7-44cf-a1c3-79b9fe3e91df
-    month_start: 2026-03-01
-    eggs_arrived: 33000
-    grade1_count: 28000
-    grade2_count: 3300
-    bad_eggs_count: 1700
-    chicks_hatched: 26500
-    chicks_shipped: 24000
-
-  - id: 88111111-1111-1111-1111-111111111102
-    organization_id: 11111111-1111-1111-1111-111111111111
-    department_id: 152db9b5-3cd7-44cf-a1c3-79b9fe3e91df
-    month_start: 2026-02-01
-    eggs_arrived: 28000
-    grade1_count: 23800
-    grade2_count: 2800
-    bad_eggs_count: 1400
-    chicks_hatched: 22500
-    chicks_shipped: 21000
