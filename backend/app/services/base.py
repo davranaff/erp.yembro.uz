@@ -278,10 +278,16 @@ class BaseService(ABC):
             or (before_data or {}).get("organization_id")
             or (actor.organization_id if actor is not None else None)
         )
+        actor_id = None
+        if actor is not None:
+            employee_id = (actor.employee_id or "").strip()
+            # Synthetic actors (e.g. public QR sell flow) have no backing
+            # employee row — fall through to NULL so the audit FK is valid.
+            actor_id = employee_id or None
         payload = {
             "id": str(uuid4()),
             "organization_id": organization_id,
-            "actor_id": actor.employee_id if actor is not None else None,
+            "actor_id": actor_id,
             "entity_table": self.repository.table,
             "entity_id": str(entity_id),
             "action": action,
@@ -1346,5 +1352,9 @@ class CreatedByActorMixin:
     ) -> dict[str, Any]:
         next_payload = dict(payload)
         if actor is not None:
-            next_payload[self.created_by_field] = actor.employee_id
+            employee_id = (actor.employee_id or "").strip()
+            # Synthetic actors (e.g. the public medicine QR endpoint) have
+            # no backing employee row — fall through to NULL so the
+            # created_by FK stays nullable rather than pointing at ''.
+            next_payload[self.created_by_field] = employee_id or None
         return super()._prepare_create_payload(next_payload, actor=actor)

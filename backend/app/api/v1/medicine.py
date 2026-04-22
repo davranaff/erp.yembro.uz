@@ -16,12 +16,15 @@ from app.api.deps import CurrentActor, db_dependency, get_current_actor, require
 from app.api.module_stats import ModuleStatsTable, register_module_stats_route
 from app.core.config import get_settings
 from app.core.exceptions import ValidationError
+from app.core.scope import UserScope
 from app.db.pool import Database
+from app.repositories.finance import CashTransactionRepository
 from app.repositories.medicine import (
     MedicineBatchRepository,
     MedicineConsumptionRepository,
     MedicineTypeRepository,
 )
+from app.services.finance import CashTransactionService
 from app.services.medicine import (
     MedicineBatchService,
     MedicineConsumptionService,
@@ -481,6 +484,197 @@ async def download_public_batch_attachment(
         media_type=(stored_attachment.content_type or "application/octet-stream"),
         headers={"Content-Disposition": content_disposition},
     )
+
+
+class PublicMedicineSellRequest(BaseModel):
+    quantity: Decimal = Field(gt=0)
+    amount: Decimal = Field(gt=0)
+    note: str | None = None
+    sold_on: date | None = None
+
+
+def _build_public_sell_actor(*, organization_id: str, department_id: str) -> CurrentActor:
+    """Synthetic actor used by the public sell endpoint. The QR token
+    already pins the operation to one specific batch in one specific
+    organization/department, so we grant just the minimum scope that
+    MedicineConsumptionService + CashTransactionService need to write.
+    """
+    return CurrentActor(
+        employee_id="",
+        organization_id=organization_id,
+        department_id=department_id,
+        department_module_key="medicine",
+        username="public_medicine_qr",
+        roles=frozenset({"manager"}),
+        permissions=frozenset(
+            {
+                "medicine_consumption.create",
+                "cash_transaction.create",
+                "cash_transaction.read",
+            }
+        ),
+        implicit_read_permissions=frozenset(),
+        scope=UserScope.unbounded(),
+    )
+
+
+@router.post(
+    "/public/batches/{token}/sell",
+    status_code=status.HTTP_201_CREATED,
+)
+async def public_sell_medicine_batch(
+    token: str,
+    payload: PublicMedicineSellRequest,
+    db: Database = Depends(db_dependency),
+) -> dict[str, Any]:
+    """Record a sale from the public QR page.
+
+    The QR token pins the operation to a specific batch — the caller
+    never passes batch_id, department_id or cash_account. We:
+
+    1. Validate the token and load the batch row.
+    2. Check there's enough remaining stock.
+    3. Pick the default cash account for the batch's department (first
+       active account with a currency matching the batch, or any active
+       account if none match).
+    4. Write a MedicineConsumption row (purpose='sale') — that updates
+       the batch's remaining_quantity via the service's stock sync.
+    5. Write a CashTransaction with transaction_type='income', linked
+       to the same cash account, for the amount the buyer paid. The
+       title embeds the medicine type name and batch code so the
+       transaction is easy to reconcile later.
+    """
+    settings = get_settings()
+    try:
+        claims = decode_signed_token(
+            token,
+            secret_key=settings.auth_secret_key,
+            expected_type=PUBLIC_MEDICINE_TOKEN_TYPE,
+        )
+        organization_id, batch_id = _parse_public_subject(str(claims["sub"]))
+    except TokenError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Public medicine page not found"
+        ) from exc
+
+    row = await _get_public_batch_row(
+        db=db, organization_id=organization_id, batch_id=batch_id, token=token
+    )
+    if row is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Public medicine page not found"
+        )
+
+    batch_remaining = Decimal(str(row.get("remaining_quantity") or "0"))
+    quantity = payload.quantity.quantize(Decimal("0.001"))
+    if quantity <= 0:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="quantity must be > 0")
+    if quantity > batch_remaining:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=(
+                f"Insufficient stock: requested {quantity}, available {batch_remaining}"
+            ),
+        )
+
+    amount = payload.amount.quantize(Decimal("0.01"))
+    if amount <= 0:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="amount must be > 0")
+
+    department_id = str(row.get("department_id") or "").strip()
+    if not department_id:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Batch has no department — cannot route sale to a cash account",
+        )
+
+    medicine_type_id = str(row.get("medicine_type_id") or "").strip()
+    if not medicine_type_id:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Batch has no medicine_type — cannot describe the sale",
+        )
+
+    batch_currency = str(row.get("currency") or "").strip().upper() or "UZS"
+    cash_account = await db.fetchrow(
+        """
+        SELECT id, currency
+        FROM cash_accounts
+        WHERE organization_id = $1
+          AND department_id = $2
+          AND is_active = true
+        ORDER BY
+          CASE WHEN upper(currency) = upper($3) THEN 0 ELSE 1 END,
+          created_at ASC
+        LIMIT 1
+        """,
+        organization_id,
+        department_id,
+        batch_currency,
+    )
+    if cash_account is None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                "No active cash account for the batch's department — "
+                "please create one before selling"
+            ),
+        )
+
+    cash_account_id = str(cash_account["id"])
+    resolved_currency = str(cash_account["currency"] or batch_currency or "UZS").strip().upper()
+
+    sold_on = payload.sold_on or date.today()
+    medicine_type_name = str(row.get("medicine_type_name") or "Препарат").strip() or "Препарат"
+    batch_code = str(row.get("batch_code") or "").strip()
+    sale_title = f"Продажа: {medicine_type_name}" + (f" ({batch_code})" if batch_code else "")
+    note = (payload.note or "").strip() or None
+
+    actor = _build_public_sell_actor(
+        organization_id=organization_id, department_id=department_id
+    )
+
+    async with db.transaction():
+        consumption_service = MedicineConsumptionService(MedicineConsumptionRepository(db))
+        consumption_payload: dict[str, Any] = {
+            "batch_id": batch_id,
+            "organization_id": organization_id,
+            "department_id": department_id,
+            "quantity": str(quantity),
+            "consumed_on": sold_on,
+            "unit": row.get("unit"),
+            "purpose": "sale",
+        }
+        consumption_result = await consumption_service.create(
+            consumption_payload, actor=actor
+        )
+        if not consumption_result.ok:
+            raise ValidationError(
+                consumption_result.error or "Failed to record consumption"
+            )
+
+        cash_service = CashTransactionService(CashTransactionRepository(db))
+        cash_payload: dict[str, Any] = {
+            "organization_id": organization_id,
+            "department_id": department_id,
+            "cash_account_id": cash_account_id,
+            "transaction_type": "income",
+            "title": sale_title,
+            "amount": str(amount),
+            "currency": resolved_currency,
+            "transaction_date": sold_on,
+            "note": note,
+        }
+        cash_result = await cash_service.create(cash_payload, actor=actor)
+        if not cash_result.ok:
+            raise ValidationError(
+                cash_result.error or "Failed to record cash transaction"
+            )
+
+    updated_row = await _get_public_batch_row(
+        db=db, organization_id=organization_id, batch_id=batch_id, token=token
+    )
+    return _build_public_batch_payload(updated_row or row, token=token)
 
 
 class MedicineConsumeRequest(BaseModel):

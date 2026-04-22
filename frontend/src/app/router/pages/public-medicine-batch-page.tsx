@@ -1,11 +1,13 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useParams } from 'react-router-dom';
 
+import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { ErrorNotice } from '@/components/ui/error-notice';
-import { getPublicMedicineBatch } from '@/shared/api/medicine';
+import { Input } from '@/components/ui/input';
+import { getPublicMedicineBatch, sellPublicMedicineBatch } from '@/shared/api/medicine';
 import { toQueryKey } from '@/shared/api/query-keys';
-import { useApiQuery } from '@/shared/api/react-query';
+import { useApiMutation, useApiQuery } from '@/shared/api/react-query';
 import { useI18n } from '@/shared/i18n';
 
 type DetailRow = {
@@ -36,6 +38,33 @@ export function PublicMedicineBatchPage() {
     queryKey: toQueryKey('medicine', 'public-batch', normalizedToken || 'empty'),
     queryFn: () => getPublicMedicineBatch(normalizedToken),
     enabled: normalizedToken.length > 0,
+  });
+
+  const [sellOpen, setSellOpen] = useState(false);
+  const [sellQuantity, setSellQuantity] = useState('');
+  const [sellAmount, setSellAmount] = useState('');
+  const [sellNote, setSellNote] = useState('');
+  const [sellSuccess, setSellSuccess] = useState(false);
+
+  const sellMutation = useApiMutation({
+    mutationKey: toQueryKey('medicine', 'public-sell', normalizedToken || 'empty'),
+    mutationFn: async () => {
+      const quantity = sellQuantity.replace(',', '.').trim();
+      const amount = sellAmount.replace(',', '.').trim();
+      return sellPublicMedicineBatch(normalizedToken, {
+        quantity,
+        amount,
+        note: sellNote.trim() || undefined,
+      });
+    },
+    onSuccess: () => {
+      void publicBatchQuery.refetch();
+      setSellSuccess(true);
+      setSellQuantity('');
+      setSellAmount('');
+      setSellNote('');
+      setSellOpen(false);
+    },
   });
 
   const detailRows = useMemo<DetailRow[]>(() => {
@@ -191,6 +220,114 @@ export function PublicMedicineBatchPage() {
             {t('publicMedicine.downloadAttachment', undefined, 'Скачать вложение')}
           </a>
         ) : null}
+
+        <div className="space-y-3 rounded-2xl border border-border/70 bg-card p-4">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <h3 className="text-sm font-semibold text-foreground">
+                {t('publicMedicine.sellTitle', undefined, 'Быстрая продажа')}
+              </h3>
+              <p className="text-xs text-muted-foreground">
+                {t(
+                  'publicMedicine.sellDescription',
+                  undefined,
+                  'Фиксирует расход препарата со склада и приход в кассу отдела.',
+                )}
+              </p>
+            </div>
+            {!sellOpen ? (
+              <Button
+                type="button"
+                size="sm"
+                onClick={() => {
+                  setSellOpen(true);
+                  setSellSuccess(false);
+                  sellMutation.reset();
+                }}
+              >
+                {t('publicMedicine.sellButton', undefined, 'Продать')}
+              </Button>
+            ) : null}
+          </div>
+
+          {sellSuccess ? (
+            <p className="text-sm text-emerald-700">
+              {t('publicMedicine.sellSuccess', undefined, 'Продажа зафиксирована.')}
+            </p>
+          ) : null}
+
+          {sellOpen ? (
+            <form
+              className="grid gap-3 md:grid-cols-2"
+              onSubmit={(event) => {
+                event.preventDefault();
+                sellMutation.mutate();
+              }}
+            >
+              <label className="flex flex-col gap-1 text-sm">
+                <span className="font-medium text-foreground">
+                  {t('publicMedicine.sellQuantity', undefined, 'Количество')}
+                  <span className="ml-1 text-destructive">*</span>
+                </span>
+                <Input
+                  type="text"
+                  inputMode="decimal"
+                  placeholder={String(batch.remaining_quantity ?? '')}
+                  value={sellQuantity}
+                  onChange={(event) => setSellQuantity(event.target.value)}
+                  required
+                />
+              </label>
+              <label className="flex flex-col gap-1 text-sm">
+                <span className="font-medium text-foreground">
+                  {t('publicMedicine.sellAmount', undefined, 'Сумма')}
+                  <span className="ml-1 text-destructive">*</span>
+                </span>
+                <Input
+                  type="text"
+                  inputMode="decimal"
+                  placeholder={String(batch.unit_cost ?? '')}
+                  value={sellAmount}
+                  onChange={(event) => setSellAmount(event.target.value)}
+                  required
+                />
+              </label>
+              <label className="flex flex-col gap-1 text-sm md:col-span-2">
+                <span className="font-medium text-foreground">
+                  {t('publicMedicine.sellNote', undefined, 'Примечание')}
+                </span>
+                <Input
+                  type="text"
+                  value={sellNote}
+                  onChange={(event) => setSellNote(event.target.value)}
+                />
+              </label>
+              {sellMutation.error ? (
+                <div className="md:col-span-2">
+                  <ErrorNotice error={sellMutation.error} />
+                </div>
+              ) : null}
+              <div className="flex items-center gap-2 md:col-span-2">
+                <Button type="submit" size="sm" disabled={sellMutation.isPending}>
+                  {sellMutation.isPending
+                    ? t('publicMedicine.sellSubmitting', undefined, 'Сохраняем...')
+                    : t('publicMedicine.sellConfirm', undefined, 'Подтвердить продажу')}
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={() => {
+                    setSellOpen(false);
+                    sellMutation.reset();
+                  }}
+                >
+                  {t('common.cancel', undefined, 'Отмена')}
+                </Button>
+              </div>
+            </form>
+          ) : null}
+        </div>
       </CardContent>
     </Card>
   );

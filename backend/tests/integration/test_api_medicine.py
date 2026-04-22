@@ -59,6 +59,86 @@ async def test_medicine_batch_qr_generation_is_scoped_to_actor_organization(api_
 
 
 @pytest.mark.asyncio
+async def test_public_medicine_sell_records_consumption_and_cash_transaction(api_client) -> None:
+    """QR-page sell flow: selling through the public token should drop
+    stock on the batch AND produce an income cash_transaction in the
+    department's active cash account.
+    """
+    qr_response = await api_client.post(
+        f"/api/v1/medicine/batches/{HOME_BATCH_ID}/qr",
+        headers=make_auth_headers("medicine_batch"),
+    )
+    assert qr_response.status_code == 201, qr_response.text
+    token = str(extract_data(qr_response)["token"])
+
+    sell_quantity = 25.0
+    sell_amount = 180000.0
+    sell_response = await api_client.post(
+        f"/api/v1/medicine/public/batches/{token}/sell",
+        json={"quantity": sell_quantity, "amount": sell_amount, "note": "QR sale"},
+    )
+    assert sell_response.status_code == 201, sell_response.text
+
+    # Consumption row landed for the batch.
+    consumption_list = await api_client.get(
+        f"/api/v1/medicine/consumptions?batch_id={HOME_BATCH_ID}&limit=10",
+        headers=make_auth_headers("medicine_consumption"),
+    )
+    assert consumption_list.status_code == 200, consumption_list.text
+    consumption_items = extract_data(consumption_list)["items"]
+    matching_consumption = [
+        row
+        for row in consumption_items
+        if str(row.get("purpose") or "").strip().lower() == "sale"
+    ]
+    assert matching_consumption, consumption_items
+    assert float(matching_consumption[0]["quantity"]) == pytest.approx(
+        sell_quantity, abs=1e-3
+    )
+
+    # Cash transaction landed with type=income, department=batch's dept.
+    cash_list = await api_client.get(
+        "/api/v1/finance/cash-transactions?limit=10",
+        headers=make_auth_headers("cash_transaction"),
+    )
+    assert cash_list.status_code == 200, cash_list.text
+    items = extract_data(cash_list)["items"]
+    matching = [
+        row
+        for row in items
+        if str(row.get("note") or "").strip() == "QR sale"
+        and str(row.get("transaction_type") or "").strip().lower() == "income"
+    ]
+    assert matching, items
+    assert float(matching[0]["amount"]) == pytest.approx(sell_amount, abs=1e-2)
+
+
+@pytest.mark.asyncio
+async def test_public_medicine_sell_rejects_more_than_remaining(api_client) -> None:
+    qr_response = await api_client.post(
+        f"/api/v1/medicine/batches/{HOME_BATCH_ID}/qr",
+        headers=make_auth_headers("medicine_batch"),
+    )
+    assert qr_response.status_code == 201, qr_response.text
+    token = str(extract_data(qr_response)["token"])
+
+    response = await api_client.post(
+        f"/api/v1/medicine/public/batches/{token}/sell",
+        json={"quantity": 999999999, "amount": 1},
+    )
+    assert response.status_code == 400, response.text
+
+
+@pytest.mark.asyncio
+async def test_public_medicine_sell_rejects_invalid_token(api_client) -> None:
+    response = await api_client.post(
+        "/api/v1/medicine/public/batches/bogus-token/sell",
+        json={"quantity": 1, "amount": 1},
+    )
+    assert response.status_code == 404, response.text
+
+
+@pytest.mark.asyncio
 async def test_medicine_batch_attachment_is_downloadable_via_public_token(api_client) -> None:
     qr_response = await api_client.post(
         f"/api/v1/medicine/batches/{HOME_BATCH_ID}/qr",

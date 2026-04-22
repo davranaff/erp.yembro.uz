@@ -99,6 +99,23 @@ export const getPublicMedicineBatch = (token: string) =>
     },
   );
 
+export type PublicMedicineSellPayload = {
+  quantity: number | string;
+  amount: number | string;
+  note?: string;
+  sold_on?: string;
+};
+
+export const sellPublicMedicineBatch = (token: string, payload: PublicMedicineSellPayload) =>
+  apiClient.post<PublicMedicineBatch, PublicMedicineSellPayload>(
+    `/medicine/public/batches/${token}/sell`,
+    payload,
+    publicMedicineBatchSchema,
+    {
+      skipAuth: true,
+    },
+  );
+
 export const medicineConsumeRequestSchema = z.object({
   medicine_type_id: z.string().trim().min(1),
   quantity: z.union([z.number(), z.string()]),
