@@ -41,7 +41,7 @@ class EggShipment(Base, IDMixin, TimestampMixin):
     )
     shipped_on: Mapped[date] = mapped_column(Date, nullable=False, index=True)
     eggs_count: Mapped[int] = mapped_column(Integer, nullable=False)
-    eggs_broken: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    eggs_broken: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
     unit: Mapped[str] = mapped_column(String(20), nullable=False, default="pcs", server_default="pcs")
     measurement_unit_id: Mapped[UUID] = mapped_column(
         ForeignKey("measurement_units.id", ondelete="RESTRICT"),

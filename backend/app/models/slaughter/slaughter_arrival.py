@@ -40,7 +40,7 @@ class SlaughterArrival(Base, IDMixin, TimestampMixin):
         index=True,
     )
     arrived_on: Mapped[date] = mapped_column(Date, nullable=False, index=True)
-    birds_received: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    birds_received: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
     arrival_total_weight_kg: Mapped[Decimal | None] = mapped_column(Numeric(16, 3), nullable=True)
     arrival_unit_price: Mapped[Decimal | None] = mapped_column(Numeric(14, 2), nullable=True)
     arrival_currency: Mapped[str | None] = mapped_column(String(8), nullable=True)

@@ -23,12 +23,12 @@ class IncubationMonthlyAnalytics(Base, IDMixin, TimestampMixin):
         index=True,
     )
     month_start: Mapped[date] = mapped_column(Date, nullable=False, index=True)
-    eggs_arrived: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
-    grade1_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
-    grade2_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
-    bad_eggs_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
-    chicks_hatched: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
-    chicks_shipped: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    eggs_arrived: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
+    grade1_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
+    grade2_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
+    bad_eggs_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
+    chicks_hatched: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
+    chicks_shipped: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
 
     organization: Mapped["Organization"] = relationship("Organization", back_populates="incubation_monthly_analytics")
     department: Mapped["Department | None"] = relationship("Department", back_populates="incubation_monthly_analytics")

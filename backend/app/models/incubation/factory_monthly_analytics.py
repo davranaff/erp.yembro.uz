@@ -29,7 +29,7 @@ class FactoryMonthlyAnalytics(Base, IDMixin, TimestampMixin):
         index=True,
     )
     month_start: Mapped[date] = mapped_column(Date, nullable=False, index=True)
-    chicks_arrived: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    chicks_arrived: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
     feed_quantity: Mapped[Decimal] = mapped_column(Numeric(16, 3), nullable=False, default=0)
     feed_quantity_unit: Mapped[str] = mapped_column(String(16), nullable=False, default="kg", server_default="kg")
     measurement_unit_id: Mapped[UUID] = mapped_column(

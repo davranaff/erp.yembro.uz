@@ -32,9 +32,9 @@ class FactoryDailyLog(Base, IDMixin, TimestampMixin):
         index=True,
     )
     log_date: Mapped[date] = mapped_column(Date, nullable=False, index=True)
-    mortality_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
-    sick_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
-    healthy_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    mortality_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
+    sick_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
+    healthy_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
     feed_type_id: Mapped[Optional[UUID]] = mapped_column(
         ForeignKey("feed_types.id", ondelete="SET NULL"),
         nullable=True,
