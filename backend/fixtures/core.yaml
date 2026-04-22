@@ -341,7 +341,7 @@ workspace_resources:
   api_module_key: "finance"
   sort_order: 80
   is_head_visible: true
-  is_active: true
+  is_active: false
 - id: "32000000-0000-0000-0000-000000000015"
   module_key: "egg"
   key: "cash-accounts"
@@ -490,7 +490,7 @@ workspace_resources:
   api_module_key: "finance"
   sort_order: 60
   is_head_visible: true
-  is_active: true
+  is_active: false
 - id: "32000000-0000-0000-0000-000000000023"
   module_key: "incubation"
   key: "cash-accounts"
@@ -666,7 +666,7 @@ workspace_resources:
   api_module_key: "finance"
   sort_order: 60
   is_head_visible: true
-  is_active: true
+  is_active: false
 - id: "32000000-0000-0000-0000-000000000031"
   module_key: "factory"
   key: "cash-accounts"
@@ -865,7 +865,7 @@ workspace_resources:
   api_module_key: "finance"
   sort_order: 100
   is_head_visible: true
-  is_active: true
+  is_active: false
 - id: "32000000-0000-0000-0000-000000000043"
   module_key: "feed"
   key: "cash-accounts"
@@ -984,7 +984,7 @@ workspace_resources:
   api_module_key: "finance"
   sort_order: 70
   is_head_visible: true
-  is_active: true
+  is_active: false
 - id: "32000000-0000-0000-0000-000000000052"
   module_key: "medicine"
   key: "cash-accounts"
@@ -1144,7 +1144,7 @@ workspace_resources:
   api_module_key: "finance"
   sort_order: 70
   is_head_visible: true
-  is_active: true
+  is_active: false
 - id: "32000000-0000-0000-0000-000000000061"
   module_key: "slaughter"
   key: "cash-accounts"
@@ -1186,7 +1186,7 @@ workspace_resources:
   permission_prefix: "expense"
   sort_order: 20
   is_head_visible: false
-  is_active: true
+  is_active: false
 - id: "32000000-0000-0000-0000-000000000065"
   module_key: "finance"
   key: "cash-accounts"
