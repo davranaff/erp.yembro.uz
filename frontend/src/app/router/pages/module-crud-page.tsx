@@ -891,8 +891,12 @@ export function ModuleCrudPage() {
       nextHiddenFields.add(fieldName);
     });
 
+    (resourceUiConfig?.formHiddenFields ?? []).forEach((fieldName) => {
+      nextHiddenFields.add(fieldName);
+    });
+
     return nextHiddenFields;
-  }, [autoManagedFieldNames, hiddenFieldNames]);
+  }, [autoManagedFieldNames, hiddenFieldNames, resourceUiConfig?.formHiddenFields]);
   const orderedFields = useMemo(
     () => sortFieldsByPreferredOrder(fields, resourceUiConfig?.formOrder),
     [fields, resourceUiConfig?.formOrder],

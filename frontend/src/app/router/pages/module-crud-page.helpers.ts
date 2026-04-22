@@ -99,6 +99,14 @@ export type ResourceUiConfig = {
   formOrder?: string[];
   tableOrder?: string[];
   hiddenFields?: string[];
+  /**
+   * Fields hidden from the create/edit form but still shown in the
+   * records table. Use for data that's owned by downstream events —
+   * e.g. receipt acknowledgement on shipments: `received_quantity`,
+   * `acknowledged_at`, `acknowledged_by`, `status` are set by the
+   * acknowledge dialog and have no meaning at shipment creation.
+   */
+  formHiddenFields?: string[];
   hideDepartmentFieldWhenScoped?: boolean;
   hideOrganizationFieldWhenScoped?: boolean;
   detailPanelKey?: ResourceDetailPanelKey;
@@ -1035,18 +1043,32 @@ const resourceUiConfigs: Record<string, ResourceUiConfig> = {
       'semi_product_id',
       'warehouse_id',
       'client_id',
+      'destination_department_id',
       'quantity',
       'unit',
       'unit_price',
       'currency',
-      'created_by',
       'note',
-      'destination_department_id',
-      'received_quantity',
-      'status',
     ],
     tableOrder: ['shipped_on', 'semi_product_id', 'client_id', 'quantity', 'status'],
     hiddenFields: ['invoice_no'],
+    formHiddenFields: [
+      'received_quantity',
+      'status',
+      'acknowledged_at',
+      'acknowledged_by',
+      'created_by',
+    ],
+    fieldHelpers: {
+      destination_department_id: {
+        ru: 'Только для внутренней передачи между отделами. Для продажи клиенту оставьте пустым.',
+        uz: 'Faqat bo‘limlar orasida ichki uzatish uchun. Mijozga sotish uchun bo‘sh qoldiring.',
+        en: 'Only for internal inter-department transfers. Leave empty when selling to a client.',
+      },
+    },
+    fieldEnums: {
+      status: enumOptions(['sent', 'received', 'discrepancy']),
+    },
     hideDepartmentFieldWhenScoped: true,
     hideOrganizationFieldWhenScoped: true,
   },
@@ -1120,15 +1142,26 @@ const resourceUiConfigs: Record<string, ResourceUiConfig> = {
       'client_id',
       'destination_department_id',
       'eggs_count',
-      'eggs_broken',
       'unit',
       'unit_price',
       'currency',
-      'received_quantity',
-      'status',
       'note',
     ],
     hiddenFields: ['invoice_no'],
+    formHiddenFields: [
+      'eggs_broken',
+      'received_quantity',
+      'status',
+      'acknowledged_at',
+      'acknowledged_by',
+    ],
+    fieldHelpers: {
+      destination_department_id: {
+        ru: 'Только для внутренней передачи между отделами. Для продажи клиенту оставьте пустым.',
+        uz: 'Faqat bo‘limlar orasida ichki uzatish uchun. Mijozga sotish uchun bo‘sh qoldiring.',
+        en: 'Only for internal inter-department transfers. Leave empty when selling to a client.',
+      },
+    },
     fieldEnums: {
       status: enumOptions(['sent', 'received', 'discrepancy']),
     },
@@ -1236,11 +1269,17 @@ const resourceUiConfigs: Record<string, ResourceUiConfig> = {
       'chicks_count',
       'unit_price',
       'currency',
-      'received_quantity',
-      'status',
       'note',
     ],
     hiddenFields: ['invoice_no'],
+    formHiddenFields: ['received_quantity', 'status', 'acknowledged_at', 'acknowledged_by'],
+    fieldHelpers: {
+      destination_department_id: {
+        ru: 'Только для внутренней передачи между отделами. Для продажи клиенту оставьте пустым.',
+        uz: 'Faqat bo‘limlar orasida ichki uzatish uchun. Mijozga sotish uchun bo‘sh qoldiring.',
+        en: 'Only for internal inter-department transfers. Leave empty when selling to a client.',
+      },
+    },
     fieldEnums: {
       status: enumOptions(['sent', 'received', 'discrepancy']),
     },
@@ -1452,11 +1491,20 @@ const resourceUiConfigs: Record<string, ResourceUiConfig> = {
       'unit',
       'unit_price',
       'currency',
-      'received_quantity',
-      'status',
       'note',
     ],
     hiddenFields: ['invoice_no'],
+    formHiddenFields: ['received_quantity', 'status', 'acknowledged_at', 'acknowledged_by'],
+    fieldHelpers: {
+      destination_department_id: {
+        ru: 'Только для внутренней передачи между отделами. Для продажи клиенту оставьте пустым.',
+        uz: 'Faqat bo‘limlar orasida ichki uzatish uchun. Mijozga sotish uchun bo‘sh qoldiring.',
+        en: 'Only for internal inter-department transfers. Leave empty when selling to a client.',
+      },
+    },
+    fieldEnums: {
+      status: enumOptions(['sent', 'received', 'discrepancy']),
+    },
     hideDepartmentFieldWhenScoped: true,
     hideOrganizationFieldWhenScoped: true,
   },
@@ -1588,14 +1636,12 @@ const resourceUiConfigs: Record<string, ResourceUiConfig> = {
       'flock_id',
       'warehouse_id',
       'client_id',
+      'destination_department_id',
       'birds_count',
       'total_weight_kg',
       'unit_price',
       'currency',
       'note',
-      'destination_department_id',
-      'received_quantity',
-      'status',
     ],
     tableOrder: [
       'shipped_on',
@@ -1608,6 +1654,7 @@ const resourceUiConfigs: Record<string, ResourceUiConfig> = {
       'status',
     ],
     hiddenFields: ['invoice_no'],
+    formHiddenFields: ['received_quantity', 'status', 'acknowledged_at', 'acknowledged_by'],
     fieldHelpers: {
       client_id: {
         ru: 'Внешний покупатель — для продажи. Для внутренней передачи между отделами оставьте пустым и заполните «Отдел-получатель».',
@@ -1658,10 +1705,6 @@ const resourceUiConfigs: Record<string, ResourceUiConfig> = {
       {
         title: { ru: 'Количество и цена', uz: 'Miqdor va narx', en: 'Quantity and price' },
         fields: ['birds_count', 'total_weight_kg', 'unit_price', 'currency'],
-      },
-      {
-        title: { ru: 'Приёмка', uz: 'Qabul qilish', en: 'Acceptance' },
-        fields: ['received_quantity', 'status'],
       },
       {
         title: { ru: 'Дополнительно', uz: 'Qo‘shimcha', en: 'Extras' },
