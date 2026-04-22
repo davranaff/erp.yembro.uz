@@ -334,126 +334,6 @@ class ExpenseService(CreatedByActorMixin, BaseService):
             next_data["category_id"] = normalized_scope["category_id"]
         return next_data
 
-    async def get_additional_meta_fields(self, db) -> list[dict[str, Any]]:
-        """Expose `item` as a searchable reference backed by the
-        operator's own expense history. Returning distinct previous
-        values scoped by department gives operators autocomplete
-        instead of forcing them to remember exact spelling.
-        """
-        fields = await super().get_additional_meta_fields(db)
-        fields.append(
-            {
-                "name": "item",
-                "reference": {
-                    "table": "__expense_item_history__",
-                    "column": "value",
-                    "label_column": "label",
-                    "multiple": False,
-                    "options": [],
-                },
-            }
-        )
-        return fields
-
-    async def get_reference_options(
-        self,
-        field_name: str,
-        *,
-        db,
-        actor: CurrentActor | None = None,
-        search: str | None = None,
-        values: list[str] | None = None,
-        limit: int = 25,
-        extra_params: dict[str, Any] | None = None,
-    ) -> list[dict[str, str]] | None:
-        if field_name != "item":
-            return None
-
-        organization_id = str(
-            (actor.organization_id if actor is not None else None)
-            or (extra_params or {}).get("organization_id")
-            or ""
-        ).strip()
-        if not organization_id:
-            return []
-
-        department_id = str((extra_params or {}).get("department_id") or "").strip()
-        category_id = str((extra_params or {}).get("category_id") or "").strip()
-
-        where_clauses = [
-            "organization_id = $1",
-            "COALESCE(item, '') <> ''",
-        ]
-        params: list[Any] = [organization_id]
-        next_param = 2
-
-        if department_id:
-            where_clauses.append(f"department_id = ${next_param}")
-            params.append(department_id)
-            next_param += 1
-
-        if category_id:
-            where_clauses.append(f"category_id = ${next_param}")
-            params.append(category_id)
-            next_param += 1
-
-        normalized_values = [str(value).strip() for value in (values or []) if str(value).strip()]
-        normalized_search = (search or "").strip()
-
-        # Branch 1: explicit requested values — return them as-is so the
-        # form can render the current value even if it's no longer in
-        # the fresh suggestion list.
-        union_rows: list[dict[str, str]] = []
-        if normalized_values:
-            placeholders = ", ".join(
-                f"${next_param + idx}" for idx in range(len(normalized_values))
-            )
-            params.extend(normalized_values)
-            next_param += len(normalized_values)
-            rows = await db.fetch(
-                f"""
-                SELECT DISTINCT item AS value
-                FROM expenses
-                WHERE {' AND '.join(where_clauses)}
-                  AND item IN ({placeholders})
-                LIMIT {limit}
-                """,
-                *params,
-            )
-            union_rows.extend({"value": str(row["value"]), "label": str(row["value"])} for row in rows)
-            # Reset params for the main search query below.
-            params = params[: -len(normalized_values)]
-            next_param -= len(normalized_values)
-
-        if normalized_search:
-            where_clauses.append(f"item ILIKE ${next_param}")
-            params.append(f"%{normalized_search}%")
-            next_param += 1
-
-        search_rows = await db.fetch(
-            f"""
-            SELECT DISTINCT item AS value, MAX(expense_date) AS last_used_on
-            FROM expenses
-            WHERE {' AND '.join(where_clauses)}
-            GROUP BY item
-            ORDER BY MAX(expense_date) DESC, item ASC
-            LIMIT {limit}
-            """,
-            *params,
-        )
-        seen = {row["value"] for row in union_rows}
-        for row in search_rows:
-            value = str(row["value"])
-            if value in seen:
-                continue
-            union_rows.append({"value": value, "label": value})
-            seen.add(value)
-            if len(union_rows) >= limit:
-                break
-
-        return union_rows
-
-
 class CashAccountService(BaseService):
     read_schema = CashAccountReadSchema
 
@@ -655,7 +535,9 @@ class CashTransactionService(CreatedByActorMixin, BaseService):
                 transaction_payload.get("title"),
                 transaction_id=transaction_id,
             ),
-            "item": _truncate_text(str(transaction_payload.get("title") or "").strip(), 255) or None,
+            # `item` column on expenses is deprecated — form no longer
+            # fills it and `title` is the single description field.
+            "item": None,
             "amount": transaction_payload.get("amount"),
             "currency": transaction_payload.get("currency"),
             "expense_date": transaction_payload.get("transaction_date"),
