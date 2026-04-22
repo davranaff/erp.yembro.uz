@@ -487,8 +487,34 @@ class CashTransactionService(CreatedByActorMixin, BaseService):
             data["counterparty_type"] = "client"
             data["counterparty_id"] = data.get("counterparty_client_id")
 
+        # Resolve exchange_rate_to_base from the CBU history table when
+        # the caller did not provide an explicit value. The transaction
+        # date is used as the lookup key so the snapshot reflects the
+        # rate that was in effect when the money actually moved, not
+        # when the row was created.
         rate_raw = data.get("exchange_rate_to_base")
-        rate = Decimal(str(rate_raw)) if rate_raw is not None else Decimal("1.0")
+        if rate_raw is None or str(rate_raw).strip() == "":
+            from app.services.exchange_rate import resolve_exchange_rate
+
+            organization_id = str(data.get("organization_id") or "").strip()
+            if not organization_id and actor is not None:
+                organization_id = actor.organization_id
+            currency_id = str(data.get("currency_id") or "").strip()
+            tx_date = data.get("transaction_date") or date.today()
+            if isinstance(tx_date, str):
+                tx_date = datetime.strptime(tx_date, "%Y-%m-%d").date()
+            if organization_id and currency_id:
+                resolved = await resolve_exchange_rate(
+                    self.repository.db,
+                    organization_id=organization_id,
+                    currency_id=currency_id,
+                    on_date=tx_date,
+                )
+                rate = resolved.rate
+            else:
+                rate = Decimal("1.0")
+        else:
+            rate = Decimal(str(rate_raw))
         amount = Decimal(str(data.get("amount") or 0))
         data["exchange_rate_to_base"] = str(rate)
         data["amount_in_base"] = str((amount * rate).quantize(Decimal("0.01")))

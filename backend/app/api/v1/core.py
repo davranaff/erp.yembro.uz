@@ -18,6 +18,7 @@ from app.db.pool import Database
 from app.repositories.core import (
     ClientDebtRepository,
     ClientRepository,
+    CurrencyExchangeRateRepository,
     CurrencyRepository,
     DepartmentModuleRepository,
     DepartmentRepository,
@@ -44,6 +45,10 @@ from app.services.core import (
     MeasurementUnitService,
     PoultryTypeService,
     WarehouseService,
+)
+from app.services.exchange_rate import (
+    CurrencyExchangeRateService,
+    resolve_exchange_rate as _resolve_exchange_rate,
 )
 
 
@@ -272,6 +277,132 @@ async def send_bulk_notifications(
         "failed": failed_count,
         "items": results,
     }
+
+
+# --- Currency exchange rate endpoints ---------------------------------------
+
+
+class CurrencyExchangeRateSyncPayload(BaseModel):
+    codes: list[str] | None = Field(default=None)
+
+
+@router.post(
+    "/currency-exchange-rates/sync",
+    status_code=status.HTTP_200_OK,
+    dependencies=[
+        Depends(
+            require_access(
+                "currency_exchange_rate.write",
+                roles=("admin", "manager"),
+            )
+        )
+    ],
+)
+async def sync_currency_exchange_rates(
+    payload: CurrencyExchangeRateSyncPayload | None = None,
+    current_actor: CurrentActor = Depends(get_current_actor),
+    db: Database = Depends(db_dependency),
+) -> dict[str, Any]:
+    """Pull the latest CBU.uz rates for the caller's organization."""
+
+    service = CurrencyExchangeRateService(CurrencyExchangeRateRepository(db))
+    codes = list(payload.codes) if payload and payload.codes else None
+    summary = await service.sync_from_cbu(
+        organization_id=current_actor.organization_id,
+        codes=codes,
+    )
+    return {"ok": True, **summary}
+
+
+@router.get(
+    "/currency-exchange-rates/latest",
+    status_code=status.HTTP_200_OK,
+    dependencies=[Depends(require_access("currency_exchange_rate.read"))],
+)
+async def latest_currency_exchange_rate(
+    currency_id: str = Query(..., min_length=1),
+    current_actor: CurrentActor = Depends(get_current_actor),
+    db: Database = Depends(db_dependency),
+) -> dict[str, Any]:
+    service = CurrencyExchangeRateService(CurrencyExchangeRateRepository(db))
+    row = await service.get_latest_for_currency(
+        organization_id=current_actor.organization_id,
+        currency_id=currency_id,
+    )
+    if row is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No exchange rate found for this currency",
+        )
+    return {
+        "currency_id": str(row.get("currency_id")),
+        "rate": str(row.get("rate")),
+        "rate_date": (row.get("rate_date").isoformat() if row.get("rate_date") else None),
+        "source": row.get("source"),
+        "source_ref": row.get("source_ref"),
+    }
+
+
+@router.get(
+    "/currency-exchange-rates/resolve",
+    status_code=status.HTTP_200_OK,
+    dependencies=[Depends(require_access("currency_exchange_rate.read"))],
+)
+async def resolve_currency_exchange_rate(
+    currency_id: str = Query(..., min_length=1),
+    on_date: str | None = Query(default=None),
+    current_actor: CurrentActor = Depends(get_current_actor),
+    db: Database = Depends(db_dependency),
+) -> dict[str, Any]:
+    """Return the rate that would be applied to a transaction on a given date.
+
+    Useful for the frontend to preview "сколько будет в UZS" before the
+    form is submitted.
+    """
+
+    from datetime import datetime as _datetime, date as _date
+
+    if on_date:
+        try:
+            parsed_date = _datetime.strptime(on_date, "%Y-%m-%d").date()
+        except ValueError:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="on_date must be in YYYY-MM-DD format",
+            )
+    else:
+        parsed_date = _date.today()
+
+    resolved = await _resolve_exchange_rate(
+        db,
+        organization_id=current_actor.organization_id,
+        currency_id=currency_id,
+        on_date=parsed_date,
+    )
+    return {
+        "currency_id": currency_id,
+        "currency_code": resolved.currency_code,
+        "rate": str(resolved.rate),
+        "rate_date": resolved.rate_date.isoformat() if resolved.rate_date else None,
+        "source": resolved.source,
+        "is_base": resolved.is_base,
+        "on_date": parsed_date.isoformat(),
+    }
+
+
+# CRUD router registered AFTER the custom routes so that `/latest`,
+# `/sync`, `/resolve` are matched literally (otherwise they'd be eaten
+# by the auto-generated `/{id}` routes).
+router.include_router(
+    build_crud_router(
+        prefix="currency-exchange-rates",
+        service_factory=lambda db: CurrencyExchangeRateService(
+            CurrencyExchangeRateRepository(db)
+        ),
+        permission_prefix="currency_exchange_rate",
+        tags=["currency-exchange-rate"],
+    )
+)
 
 
 router.include_router(

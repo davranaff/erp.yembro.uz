@@ -58,6 +58,27 @@ export type { FactoryFlockKpi } from './factory';
 export { debtsAgingResponseSchema, getDebtsAging } from './finance';
 export type { DebtsAgingBuckets, DebtsAgingResponse } from './finance';
 export {
+  cbuSyncResponseSchema,
+  createManualExchangeRate,
+  currencyExchangeRateListResponseSchema,
+  currencyExchangeRateSchema,
+  getLatestExchangeRate,
+  latestRateSchema,
+  listExchangeRates,
+  resolveExchangeRate,
+  resolvedRateSchema,
+  syncExchangeRatesFromCbu,
+} from './exchange-rates';
+export type {
+  CbuSyncResponse,
+  CreateManualExchangeRatePayload,
+  CurrencyExchangeRate,
+  CurrencyExchangeRateListResponse,
+  LatestRate,
+  ListExchangeRatesParams,
+  ResolvedRate,
+} from './exchange-rates';
+export {
   consumeMedicine,
   medicineConsumeRequestSchema,
   medicineConsumeResponseSchema,

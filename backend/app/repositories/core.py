@@ -35,6 +35,10 @@ class CurrencyRepository(BaseRepository[dict[str, object]]):
     table = "currencies"
 
 
+class CurrencyExchangeRateRepository(BaseRepository[dict[str, object]]):
+    table = "currency_exchange_rates"
+
+
 class PoultryTypeRepository(BaseRepository[dict[str, object]]):
     table = "poultry_types"
 
@@ -56,6 +60,7 @@ __all__ = [
     "ClientRepository",
     "ClientDebtRepository",
     "CurrencyRepository",
+    "CurrencyExchangeRateRepository",
     "PoultryTypeRepository",
     "MeasurementUnitRepository",
     "ClientCategoryRepository",

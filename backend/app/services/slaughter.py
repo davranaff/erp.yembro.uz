@@ -110,7 +110,7 @@ def _normalize_currency(raw_value: object) -> str | None:
     return text or None
 
 
-class SlaughterArrivalService(CreatedByActorMixin, BaseService):
+class SlaughterArrivalService(BaseService):
     """Incoming batch of live birds to the slaughterhouse."""
 
     read_schema = SlaughterArrivalReadSchema

@@ -162,6 +162,28 @@ class CurrencyListResponse(CRUDListResponse[CurrencyReadSchema]):
     """Paginated currency response."""
 
 
+class CurrencyExchangeRateCreateSchema(OpenSchema, BaseCreateSchema):
+    """Input payload to create / upsert a currency exchange rate row."""
+
+
+class CurrencyExchangeRateUpdateSchema(OpenSchema, BaseUpdateSchema):
+    """Input payload to update a currency exchange rate row."""
+
+
+class CurrencyExchangeRateReadSchema(OpenSchema, BaseReadSchema):
+    """Readable currency exchange rate response."""
+
+
+class CurrencyExchangeRateListParams(CRUDBaseParams):
+    """Pagination + query params for currency exchange rate list."""
+
+
+class CurrencyExchangeRateListResponse(
+    CRUDListResponse[CurrencyExchangeRateReadSchema]
+):
+    """Paginated currency exchange rate response."""
+
+
 class PoultryTypeCreateSchema(OpenSchema, BaseCreateSchema):
     """Input payload to create poultry type."""
 
@@ -261,6 +283,11 @@ __all__ = [
     "CurrencyReadSchema",
     "CurrencyListParams",
     "CurrencyListResponse",
+    "CurrencyExchangeRateCreateSchema",
+    "CurrencyExchangeRateUpdateSchema",
+    "CurrencyExchangeRateReadSchema",
+    "CurrencyExchangeRateListParams",
+    "CurrencyExchangeRateListResponse",
     "PoultryTypeCreateSchema",
     "PoultryTypeUpdateSchema",
     "PoultryTypeReadSchema",
