@@ -36,6 +36,8 @@ class SlaughterProcessing(Base, IDMixin, TimestampMixin):
     first_sort_weight_kg: Mapped[Decimal | None] = mapped_column(Numeric(16, 3), nullable=True)
     second_sort_weight_kg: Mapped[Decimal | None] = mapped_column(Numeric(16, 3), nullable=True)
     bad_weight_kg: Mapped[Decimal | None] = mapped_column(Numeric(16, 3), nullable=True)
+    waste_kg: Mapped[Decimal | None] = mapped_column(Numeric(16, 3), nullable=True)
+    net_meat_kg: Mapped[Decimal | None] = mapped_column(Numeric(16, 3), nullable=True)
     processed_by: Mapped[UUID | None] = mapped_column(
         ForeignKey("employees.id", ondelete="SET NULL"),
         nullable=True,
@@ -82,6 +84,14 @@ class SlaughterProcessing(Base, IDMixin, TimestampMixin):
         CheckConstraint(
             "bad_weight_kg IS NULL OR bad_weight_kg >= 0",
             name="ck_slaughter_processing_bad_weight_non_negative",
+        ),
+        CheckConstraint(
+            "waste_kg IS NULL OR waste_kg >= 0",
+            name="ck_slaughter_processing_waste_kg_non_negative",
+        ),
+        CheckConstraint(
+            "net_meat_kg IS NULL OR net_meat_kg >= 0",
+            name="ck_slaughter_processing_net_meat_kg_non_negative",
         ),
     )
 

@@ -911,6 +911,8 @@ const resourceUiConfigs: Record<string, ResourceUiConfig> = {
       'first_sort_weight_kg',
       'second_sort_weight_kg',
       'bad_weight_kg',
+      'net_meat_kg',
+      'waste_kg',
       'note',
     ],
     tableOrder: [
@@ -920,6 +922,8 @@ const resourceUiConfigs: Record<string, ResourceUiConfig> = {
       'first_sort_count',
       'second_sort_count',
       'bad_count',
+      'net_meat_kg',
+      'waste_kg',
     ],
     fieldHelpers: {
       arrival_id: {
@@ -947,6 +951,16 @@ const resourceUiConfigs: Record<string, ResourceUiConfig> = {
         uz: 'Brak — sotishga yaroqsiz (yo‘qotish sifatida hisobga olinadi).',
         en: 'Rejected — unfit for sale (counted as a loss).',
       },
+      net_meat_kg: {
+        ru: 'Чистое товарное мясо — итоговый выход без костей, голов, лап и потрохов.',
+        uz: 'Toza tovar go‘sht — suyak, bosh, oyoq va ichak-qorinsiz yakuniy chiqish.',
+        en: 'Net commercial meat — final yield without bones, heads, feet, and offal.',
+      },
+      waste_kg: {
+        ru: 'Отходы — перья, головы, лапы, кровь и прочие непригодные части.',
+        uz: 'Chiqindilar — pat, bosh, oyoq, qon va boshqa yaroqsiz qismlar.',
+        en: 'Waste — feathers, heads, feet, blood and other unusable parts.',
+      },
     },
     formSections: [
       {
@@ -968,6 +982,14 @@ const resourceUiConfigs: Record<string, ResourceUiConfig> = {
           en: 'Breakdown by grade (weight, kg)',
         },
         fields: ['first_sort_weight_kg', 'second_sort_weight_kg', 'bad_weight_kg'],
+      },
+      {
+        title: {
+          ru: 'Выход и отходы, кг',
+          uz: 'Chiqish va chiqindilar, kg',
+          en: 'Yield and waste, kg',
+        },
+        fields: ['net_meat_kg', 'waste_kg'],
       },
       {
         title: { ru: 'Дополнительно', uz: 'Qo‘shimcha', en: 'Extras' },
