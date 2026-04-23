@@ -3247,7 +3247,7 @@ async def _build_factory_dashboard_module(
         alerts.append(
             DashboardAlertSchema(
                 key="factory_high_mortality",
-                level="bad" if mortality_rate_val > 10 else "warning",
+                level="critical" if mortality_rate_val > 10 else "warning",
                 title="Высокий падёж",
                 message=f"Процент падежа составляет {mortality_rate_val}% — выше допустимой нормы.",
                 value=mortality_rate_val,
@@ -3258,7 +3258,7 @@ async def _build_factory_dashboard_module(
         alerts.append(
             DashboardAlertSchema(
                 key="factory_high_fcr",
-                level="bad" if fcr_val > 2.2 else "warning",
+                level="critical" if fcr_val > 2.2 else "warning",
                 title="Низкая эффективность корма (FCR)",
                 message=f"FCR={fcr_val} кг/кг — норма для бройлера 1.5–1.8. Проверьте качество корма и здоровье поголовья.",
                 value=fcr_val,
@@ -3280,7 +3280,7 @@ async def _build_factory_dashboard_module(
         alerts.append(
             DashboardAlertSchema(
                 key="factory_low_vacc_compliance",
-                level="bad" if vacc_compliance_pct < 80 else "warning",
+                level="critical" if vacc_compliance_pct < 80 else "warning",
                 title="Низкое соблюдение графика вакцинации",
                 message=f"Выполнено {vacc_compliance_pct}% запланированных вакцинаций (цель ≥ 95%).",
                 value=vacc_compliance_pct,
