@@ -215,6 +215,47 @@ class FeedProductionQualityCheckListResponse(CRUDListResponse[FeedProductionQual
 
 
 
+class FeedShrinkageProfileCreateSchema(OpenSchema, BaseCreateSchema):
+    """Input payload to create a shrinkage profile."""
+
+
+class FeedShrinkageProfileUpdateSchema(OpenSchema, BaseUpdateSchema):
+    """Input payload to update a shrinkage profile."""
+
+
+class FeedShrinkageProfileReadSchema(OpenSchema, BaseReadSchema):
+    """Readable shrinkage profile response."""
+
+
+class FeedShrinkageProfileListParams(CRUDBaseParams):
+    """Pagination + query params for shrinkage profiles."""
+
+
+class FeedShrinkageProfileListResponse(CRUDListResponse[FeedShrinkageProfileReadSchema]):
+    """Paginated shrinkage profile response."""
+
+
+class FeedLotShrinkageStateCreateSchema(OpenSchema, BaseCreateSchema):
+    """Input payload — state rows are created by the service, but the
+    schema still exists so the CRUD layer can audit reads."""
+
+
+class FeedLotShrinkageStateUpdateSchema(OpenSchema, BaseUpdateSchema):
+    """Input payload — state rows are updated by the service."""
+
+
+class FeedLotShrinkageStateReadSchema(OpenSchema, BaseReadSchema):
+    """Readable shrinkage state response."""
+
+
+class FeedLotShrinkageStateListParams(CRUDBaseParams):
+    """Pagination + query params for shrinkage state."""
+
+
+class FeedLotShrinkageStateListResponse(CRUDListResponse[FeedLotShrinkageStateReadSchema]):
+    """Paginated shrinkage state response."""
+
+
 __all__ = [
     "FeedTypeCreateSchema",
     "FeedTypeUpdateSchema",
@@ -266,4 +307,14 @@ __all__ = [
     "FeedProductionQualityCheckReadSchema",
     "FeedProductionQualityCheckListParams",
     "FeedProductionQualityCheckListResponse",
+    "FeedShrinkageProfileCreateSchema",
+    "FeedShrinkageProfileUpdateSchema",
+    "FeedShrinkageProfileReadSchema",
+    "FeedShrinkageProfileListParams",
+    "FeedShrinkageProfileListResponse",
+    "FeedLotShrinkageStateCreateSchema",
+    "FeedLotShrinkageStateUpdateSchema",
+    "FeedLotShrinkageStateReadSchema",
+    "FeedLotShrinkageStateListParams",
+    "FeedLotShrinkageStateListResponse",
 ]

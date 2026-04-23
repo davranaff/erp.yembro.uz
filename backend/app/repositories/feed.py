@@ -43,6 +43,14 @@ class FeedProductionQualityCheckRepository(BaseRepository[dict[str, object]]):
     table = "feed_production_quality_checks"
 
 
+class FeedShrinkageProfileRepository(BaseRepository[dict[str, object]]):
+    table = "feed_shrinkage_profiles"
+
+
+class FeedLotShrinkageStateRepository(BaseRepository[dict[str, object]]):
+    table = "feed_lot_shrinkage_state"
+
+
 __all__ = [
     "FeedTypeRepository",
     "FeedIngredientRepository",
@@ -54,4 +62,6 @@ __all__ = [
     "FeedRawConsumptionRepository",
     "FeedConsumptionRepository",
     "FeedProductionQualityCheckRepository",
+    "FeedShrinkageProfileRepository",
+    "FeedLotShrinkageStateRepository",
 ]

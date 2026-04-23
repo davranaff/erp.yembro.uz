@@ -71,7 +71,7 @@ class StockMovement(Base, IDMixin, TimestampMixin):
             name="ck_stock_movement_item_type_allowed",
         ),
         CheckConstraint(
-            "movement_kind IN ('incoming', 'outgoing', 'transfer_in', 'transfer_out', 'adjustment_in', 'adjustment_out')",
+            "movement_kind IN ('incoming', 'outgoing', 'transfer_in', 'transfer_out', 'adjustment_in', 'adjustment_out', 'shrinkage')",
             name="ck_stock_movement_kind_allowed",
         ),
     )
