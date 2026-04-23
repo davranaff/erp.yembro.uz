@@ -34,22 +34,8 @@ import { buildDepartmentTree, flattenDepartmentTree } from '@/shared/lib/departm
 import { isValidUuid } from '@/shared/lib/uuid';
 import { useWorkspaceStore, type BackendModuleConfig } from '@/shared/workspace';
 
-const EXECUTIVE_SUMMARY_METRIC_ORDER = [
-  'health_index',
-  'operating_profit',
-  'net_cashflow',
-  'value_chain_loss_rate',
-  'active_risks',
-];
+const EXECUTIVE_SUMMARY_METRIC_ORDER = ['operating_profit', 'net_cashflow', 'health_index'];
 
-const EXECUTIVE_OVERVIEW_CHART_KEYS = ['finance_overview', 'value_chain_trend'];
-const EXECUTIVE_DEPARTMENT_CHART_KEYS = [
-  'department_contribution',
-  'department_revenue',
-  'department_operations',
-  'department_loss_rate',
-];
-const EXECUTIVE_RISK_CHART_KEYS = ['expense_category_burn'];
 const EXECUTIVE_DEPARTMENT_BREAKDOWN_KEYS = ['departments_performance'];
 const EXECUTIVE_RISK_BREAKDOWN_KEYS = ['top_risk_summary'];
 
@@ -638,17 +624,6 @@ export function DashboardPage() {
   }).format(new Date(translatedOverview.generatedAt));
   const sections = [
     buildExecutiveSection(
-      'executive_overview',
-      t('dashboardData.sections.executive_dashboard.title', undefined, 'Главное по бизнесу'),
-      t(
-        'dashboardData.sections.executive_dashboard.description',
-        undefined,
-        'Короткая сводка: деньги, потери и проблемные зоны.',
-      ),
-      EXECUTIVE_OVERVIEW_CHART_KEYS,
-      [],
-    ),
-    buildExecutiveSection(
       'executive_departments',
       t('dashboard.executiveDepartmentsTitle', undefined, 'Отделы'),
       t(
@@ -656,7 +631,7 @@ export function DashboardPage() {
         undefined,
         'Сравнение отделов по оценке, выручке, выпуску и потерям.',
       ),
-      EXECUTIVE_DEPARTMENT_CHART_KEYS,
+      [],
       EXECUTIVE_DEPARTMENT_BREAKDOWN_KEYS,
     ),
     buildExecutiveSection(
@@ -667,7 +642,7 @@ export function DashboardPage() {
         undefined,
         'Куда уходят деньги и какие сигналы требуют реакции в первую очередь.',
       ),
-      EXECUTIVE_RISK_CHART_KEYS,
+      [],
       EXECUTIVE_RISK_BREAKDOWN_KEYS,
       executiveAlertsTable ? [executiveAlertsTable] : [],
     ),
