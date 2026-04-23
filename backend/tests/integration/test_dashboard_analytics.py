@@ -89,40 +89,22 @@ async def test_dashboard_analytics_exposes_full_incubation_operational_flow(api_
 
     kpis = {item["key"] for item in incubation_module["kpis"]}
     assert {
-        "eggs_arrived",
+        "eggs_set",
         "chicks_hatched",
         "hatch_rate",
-        "bad_eggs",
-        "client_base",
-        "grade_1_total",
-        "grade_2_total",
-        "total_expenses",
-        "financial_result",
-        "net_cashflow",
-        "cash_balance",
+        "chicks_dispatched",
     } <= kpis
 
     chart_keys = {chart["key"] for chart in incubation_module["charts"]}
     assert {
         "incubation_egg_arrivals",
-        "incubation_quality",
         "incubation_hatch",
-        "incubation_yield",
-        "incubation_revenue",
-        "incubation_finance_overview",
-        "incubation_expense_categories",
     } <= chart_keys
 
     table_keys = {table["key"] for table in incubation_module["tables"]}
     assert {
-        "incubation_clients",
-        "incubation_sources",
-        "incubation_client_registry",
         "incubation_active_batches",
-        "incubation_recent_dispatch",
-        "incubation_expense_categories_table",
-        "incubation_cash_accounts",
-        "incubation_recent_expenses",
+        "incubation_clients",
     } <= table_keys
 
 

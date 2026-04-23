@@ -2839,15 +2839,6 @@ async def _build_incubation_dashboard_module(
     base = await _build_incubation_section(db, start_date, end_date, department_ids)
     metrics = _metric_map(base)
     charts = _chart_map(base)
-    breakdowns = _breakdown_map(base)
-    finance_analytics = await _build_module_finance_analytics(
-        db,
-        module_key="incubation",
-        module_prefix="incubation",
-        start_date=start_date,
-        end_date=end_date,
-        department_ids=department_ids,
-    )
 
     eggs_set_row = await db.fetchrow(
         f"""
@@ -2892,51 +2883,6 @@ async def _build_incubation_dashboard_module(
     )
     dispatched_total = _to_float(dispatched_row["value"]) if dispatched_row is not None else 0.0
 
-    client_registry_rows = await db.fetch(
-        f"""
-        WITH active_clients AS (
-            SELECT
-                cs.client_id AS client_id,
-                0 AS source_batches,
-                0 AS eggs_arrived,
-                COUNT(*) AS shipments_count,
-                SUM(cs.chicks_count) AS chicks_shipped
-            FROM chick_shipments cs
-            INNER JOIN departments d ON d.id = cs.department_id
-            WHERE d.module_key = 'incubation'
-              AND cs.client_id IS NOT NULL
-              AND {_date_condition('cs.shipped_on')}
-              AND {_department_condition('cs.department_id')}
-            GROUP BY cs.client_id
-        )
-        SELECT
-            c.id::text AS key,
-            {_client_label_sql('c')} AS label,
-            SUM(active_clients.source_batches + active_clients.shipments_count) AS value,
-            'операций' AS unit,
-            CONCAT(
-                COALESCE(NULLIF(c.phone, ''), 'без телефона'),
-                ' • роль: ',
-                CASE
-                    WHEN SUM(active_clients.eggs_arrived) > 0 AND SUM(active_clients.chicks_shipped) > 0 THEN 'поставщик и покупатель'
-                    WHEN SUM(active_clients.eggs_arrived) > 0 THEN 'поставщик яиц'
-                    ELSE 'покупатель птенцов'
-                END,
-                ' • яйца: ',
-                SUM(active_clients.eggs_arrived)::text,
-                ' • птенцы: ',
-                SUM(active_clients.chicks_shipped)::text
-            ) AS caption
-        FROM active_clients
-        INNER JOIN clients c ON c.id = active_clients.client_id
-        GROUP BY c.id, c.company_name, c.first_name, c.last_name, c.client_code, c.phone
-        ORDER BY value DESC, label
-        LIMIT 8
-        """,
-        start_date,
-        end_date,
-        department_ids,
-    )
     active_batches_rows = await db.fetch(
         f"""
         SELECT
@@ -2965,42 +2911,28 @@ async def _build_incubation_dashboard_module(
         end_date,
         department_ids,
     )
-    recent_dispatch_rows = await db.fetch(
+
+    client_rows = await db.fetch(
         f"""
-        WITH transfers AS (
-            SELECT
-                ca.id::text AS key,
-                CONCAT(TO_CHAR(ca.arrived_on, 'YYYY-MM-DD'), ' • Передача на фабрику') AS label,
-                ca.chicks_count AS value,
-                CONCAT('run: ', COALESCE(ir.id::text, '—')) AS caption,
-                ca.arrived_on AS event_date
-            FROM chick_arrivals ca
-            INNER JOIN incubation_runs ir ON ir.id = ca.run_id
-            INNER JOIN departments d ON d.id = ir.department_id
-            WHERE d.module_key = 'incubation'
-              AND {_date_condition('ca.arrived_on')}
-              AND {_department_condition('ir.department_id')}
-        ),
-        shipments AS (
-            SELECT
-                cs.id::text AS key,
-                CONCAT(TO_CHAR(cs.shipped_on, 'YYYY-MM-DD'), ' • Отгрузка клиенту') AS label,
-                cs.chicks_count AS value,
-                CONCAT('Счёт: ', COALESCE(NULLIF(cs.invoice_no, ''), '—')) AS caption,
-                cs.shipped_on AS event_date
-            FROM chick_shipments cs
-            INNER JOIN departments d ON d.id = cs.department_id
-            WHERE d.module_key = 'incubation'
-              AND {_date_condition('cs.shipped_on')}
-              AND {_department_condition('cs.department_id')}
-        )
-        SELECT key, label, value, caption
-        FROM (
-            SELECT key, label, value, caption, event_date FROM transfers
-            UNION ALL
-            SELECT key, label, value, caption, event_date FROM shipments
-        ) flow
-        ORDER BY event_date DESC, key
+        SELECT
+            c.id::text AS key,
+            {_client_label_sql('c')} AS label,
+            SUM(cs.chicks_count) AS value,
+            'шт' AS unit,
+            CONCAT(
+                COALESCE(NULLIF(c.phone, ''), 'без телефона'),
+                ' • отгрузок: ',
+                COUNT(*)::text
+            ) AS caption
+        FROM chick_shipments cs
+        INNER JOIN departments d ON d.id = cs.department_id
+        INNER JOIN clients c ON c.id = cs.client_id
+        WHERE d.module_key = 'incubation'
+          AND cs.client_id IS NOT NULL
+          AND {_date_condition('cs.shipped_on')}
+          AND {_department_condition('cs.department_id')}
+        GROUP BY c.id, c.company_name, c.first_name, c.last_name, c.client_code, c.phone
+        ORDER BY value DESC, label
         LIMIT 8
         """,
         start_date,
@@ -3010,12 +2942,7 @@ async def _build_incubation_dashboard_module(
 
     hatch_rate = metrics.get("hatch_rate").value if metrics.get("hatch_rate") is not None else 0.0
     fertility_pct_val = metrics.get("fertility_pct").value if metrics.get("fertility_pct") is not None else 0.0
-    hof_pct_val = metrics.get("hof_pct").value if metrics.get("hof_pct") is not None else 0.0
-    saleable_yield_pct_val = (
-        metrics.get("saleable_chick_yield_pct").value
-        if metrics.get("saleable_chick_yield_pct") is not None
-        else 0.0
-    )
+
     alerts: list[DashboardAlertSchema] = []
     if hatch_rate < 70:
         alerts.append(
@@ -3023,7 +2950,7 @@ async def _build_incubation_dashboard_module(
                 key="incubation_hatch_rate_critical",
                 level="critical",
                 title="Низкая выводимость",
-                message="Hatch rate ниже целевого уровня.",
+                message="Hatch rate ниже целевого уровня (70%).",
                 value=hatch_rate,
                 unit="%",
             )
@@ -3034,7 +2961,7 @@ async def _build_incubation_dashboard_module(
                 key="incubation_hatch_rate_warning",
                 level="warning",
                 title="Снижение hatch rate",
-                message="Нужно проверить качество партии и режим инкубации.",
+                message="Hatch rate ниже нормы 82% — проверьте качество партии и режим инкубации.",
                 value=hatch_rate,
                 unit="%",
             )
@@ -3045,88 +2972,44 @@ async def _build_incubation_dashboard_module(
                 key="incubation_fertility_low",
                 level="warning",
                 title="Низкая оплодотворённость",
-                message="Доля оплодотворённых яиц ниже отраслевого ориентира 90%.",
+                message="Доля оплодотворённых яиц ниже отраслевого ориентира 88%.",
                 value=fertility_pct_val,
-                unit="%",
-            )
-        )
-    if hof_pct_val > 0 and hof_pct_val < 85:
-        alerts.append(
-            DashboardAlertSchema(
-                key="incubation_hof_low",
-                level="warning",
-                title="Низкий HOF",
-                message="Вывод от оплодотворённых ниже целевого уровня 85–90%.",
-                value=hof_pct_val,
                 unit="%",
             )
         )
 
     selected_charts = [
         _chart_copy(charts, "incubation_egg_arrivals"),
-        _chart_copy(charts, "incubation_quality"),
         _chart_copy(charts, "incubation_hatch"),
-        _chart_copy(charts, "incubation_yield"),
-        _chart_copy(charts, "incubation_revenue"),
     ]
 
-    module = DashboardModuleSchema(
+    return DashboardModuleSchema(
         key="incubation",
         title="Инкубация",
-        description="Поток партий, вывод птенцов и передача результата дальше по цепочке.",
+        description="Закладки, вывод птенцов и отгрузки клиентам.",
         kpis=[
-            _metric_from(metrics, "eggs_arrived", key="eggs_arrived", label="Яиц пришло", unit="шт"),
+            _metric_from(metrics, "grade_1_total", key="eggs_set", label="Яиц заложено", unit="шт", value=eggs_set_total),
             _metric_from(metrics, "chicks_hatched", key="chicks_hatched", label="Птенцов вывелось", unit="шт"),
             _metric_from(metrics, "hatch_rate", key="hatch_rate", label="Hatch rate", unit="%"),
-            _metric_from(metrics, "fertility_pct", key="fertility_pct", label="Оплодотворённость", unit="%"),
-            _metric_from(metrics, "hof_pct", key="hof_pct", label="HOF (вывод от оплодотворённых)", unit="%"),
-            _metric_from(metrics, "saleable_chick_yield_pct", key="saleable_chick_yield_pct", label="Товарный выход птенцов", unit="%"),
-            _metric_from(metrics, "bad_eggs_total", key="bad_eggs", label="Bad eggs", unit="шт"),
-            _metric_from(metrics, "sales_volume", key="chicks_dispatched", label="Передано/отгружено", unit="шт", value=dispatched_total),
-            _metric_from(metrics, "client_base", key="client_base", label="Клиентская база", unit="клиентов"),
-            _metric_from(metrics, "grade_1_total", key="grade_1_total", label="Сорт 1", unit="шт"),
-            _metric_from(metrics, "grade_2_total", key="grade_2_total", label="Сорт 2", unit="шт"),
-            _metric_from(metrics, "grade_1_total", key="eggs_set", label="Яиц заложено", unit="шт", value=eggs_set_total),
-            _metric_from(metrics, "sales_revenue", key="sales_revenue", label="Выручка от птенцов", unit="UZS"),
-            *finance_analytics.metrics,
+            _metric_from(metrics, "sales_volume", key="chicks_dispatched", label="Отгружено", unit="шт", value=dispatched_total),
         ],
-        charts=[chart for chart in [*selected_charts, *finance_analytics.charts] if chart is not None],
+        charts=[chart for chart in selected_charts if chart is not None],
         tables=[
-            _table_from_breakdown(
-                breakdowns.get("incubation_clients"),
-                key="incubation_clients",
-                title="Клиенты по птенцам",
-                description="Какие клиенты дают основной сбыт и выручку по выведенным птенцам.",
-            ),
-            _table_from_breakdown(
-                breakdowns.get("incubation_sources"),
-                key="incubation_sources",
-                title="Источники яиц",
-                description="Какие клиенты формируют входящий поток яиц в инкубацию.",
-            ),
-            DashboardTableSchema(
-                key="incubation_client_registry",
-                title="Активная клиентская база",
-                description="Партнёры, участвующие в поставках яиц и отгрузках птенцов за период.",
-                items=_table_items_from_rows(client_registry_rows),
-            ),
             DashboardTableSchema(
                 key="incubation_active_batches",
                 title="Активные партии",
-                description="Партии без завершённого инкубационного цикла.",
+                description="Партии без завершённого инкубационного цикла — когда ждать вывод.",
                 items=_table_items_from_rows(active_batches_rows, default_unit="шт"),
             ),
             DashboardTableSchema(
-                key="incubation_recent_dispatch",
-                title="Последние передачи / отгрузки",
-                description="Куда ушли выведенные птенцы.",
-                items=_table_items_from_rows(recent_dispatch_rows, default_unit="шт"),
+                key="incubation_clients",
+                title="Клиенты по птенцам",
+                description="Топ клиентов по отгрузкам птенцов за период.",
+                items=_table_items_from_rows(client_rows),
             ),
-            *finance_analytics.tables,
         ],
-        alerts=[*alerts, *finance_analytics.alerts],
+        alerts=alerts,
     )
-    return module
 
 
 async def _build_factory_dashboard_module(
