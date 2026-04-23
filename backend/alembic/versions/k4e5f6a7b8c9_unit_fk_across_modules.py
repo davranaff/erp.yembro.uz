@@ -71,6 +71,8 @@ ALIASES: dict[str, str] = {
     "pcs": "dona",
     "bosh": "dona",
     "l": "litr",
+    "ltr": "litr",
+    "ton": "tonna",
     "kilogram": "kg",
     "kilogramm": "kg",
 }
