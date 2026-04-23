@@ -141,17 +141,10 @@ async def test_dashboard_analytics_exposes_full_factory_operational_flow(api_cli
     kpis = {item["key"] for item in factory_module["kpis"]}
     assert {
         "total_birds",
-        "livability_pct",
+        "mortality_rate",
         "fcr",
         "avg_weight_per_bird",
-        "mortality_rate",
         "total_shipped",
-        "shipment_revenue",
-        "feed_consumed",
-        "total_expenses",
-        "financial_result",
-        "net_cashflow",
-        "cash_balance",
     } <= kpis
 
 

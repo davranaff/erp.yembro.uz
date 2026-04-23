@@ -1435,6 +1435,12 @@ async def _build_factory_section(
     department_ids: list[UUID] | None,
 ) -> DashboardSectionSchema:
     # --- Active flocks ---
+    # `total_birds` and `total_initial` describe the current herd
+    # snapshot for the department — scoping them by the report window
+    # (arrived_on) would silently exclude flocks that arrived before it
+    # and make the mortality_rate denominator inconsistent with the
+    # numerator (which aggregates daily logs that can span earlier
+    # cohorts).
     flock_summary = await db.fetchrow(
         f"""
         SELECT
@@ -1442,7 +1448,8 @@ async def _build_factory_section(
             COALESCE(SUM(ff.current_count) FILTER (WHERE ff.is_active), 0) AS total_birds,
             COALESCE(SUM(ff.initial_count) FILTER (WHERE ff.is_active), 0) AS total_initial
         FROM factory_flocks ff
-        WHERE {_date_condition('ff.arrived_on')} AND {_department_condition('ff.department_id')}
+        WHERE ($1::date IS NULL OR TRUE) AND ($2::date IS NULL OR TRUE)
+          AND {_department_condition('ff.department_id')}
         """,
         start_date,
         end_date,
@@ -3131,37 +3138,8 @@ async def _build_factory_dashboard_module(
     base = await _build_factory_section(db, start_date, end_date, department_ids)
     metrics = _metric_map(base)
     charts = _chart_map(base)
-    breakdowns = _breakdown_map(base)
-    finance_analytics = await _build_module_finance_analytics(
-        db,
-        module_key="factory",
-        module_prefix="factory",
-        start_date=start_date,
-        end_date=end_date,
-        department_ids=department_ids,
-    )
 
-    # --- Medicine usage by type ---
-    medicine_usage_rows = await db.fetch(
-        f"""
-        SELECT
-            mt.id::text AS key,
-            COALESCE(NULLIF(mt.name, ''), NULLIF(mt.code, ''), 'Лекарство') AS label,
-            SUM(mu.quantity) AS value,
-            CONCAT('Стоимость: ', COALESCE(SUM(mu.total_cost)::text, '0')) AS caption
-        FROM factory_medicine_usages mu
-        LEFT JOIN medicine_types mt ON mt.id = mu.medicine_type_id
-        WHERE {_date_condition('mu.usage_date')} AND {_department_condition('mu.department_id')}
-        GROUP BY mt.id, mt.name, mt.code
-        ORDER BY value DESC, label
-        LIMIT 8
-        """,
-        start_date,
-        end_date,
-        department_ids,
-    )
-
-    # --- Flock performance ---
+    # --- Flock performance (active flocks with mortality % in window) ---
     flock_perf_rows = await db.fetch(
         f"""
         SELECT
@@ -3189,26 +3167,7 @@ async def _build_factory_dashboard_module(
         department_ids,
     )
 
-    # --- Vaccination status ---
-    vacc_row = await db.fetchrow(
-        f"""
-        SELECT
-            COUNT(*) AS total,
-            COUNT(*) FILTER (WHERE vp.is_completed) AS done,
-            COUNT(*) FILTER (WHERE NOT vp.is_completed AND vp.planned_date <= CURRENT_DATE) AS overdue
-        FROM factory_vaccination_plans vp
-        INNER JOIN factory_flocks ff ON ff.id = vp.flock_id AND ff.is_active
-        WHERE {_date_condition('vp.planned_date')} AND {_department_condition('vp.department_id')}
-        """,
-        start_date,
-        end_date,
-        department_ids,
-    )
-    vacc_total = _to_float(vacc_row["total"]) if vacc_row else 0.0
-    vacc_done = _to_float(vacc_row["done"]) if vacc_row else 0.0
-    vacc_overdue = _to_float(vacc_row["overdue"]) if vacc_row else 0.0
-
-    # --- Shipment client details ---
+    # --- Shipment client details (volume + revenue per external buyer) ---
     shipment_client_rows = await db.fetch(
         f"""
         SELECT
@@ -3232,15 +3191,8 @@ async def _build_factory_dashboard_module(
         department_ids,
     )
 
-    total_birds = _to_float(metrics.get("total_birds", _metric(key="", label="", value=0.0)).value)
     mortality_rate_val = _to_float(metrics.get("mortality_rate", _metric(key="", label="", value=0.0)).value)
     fcr_val = _to_float(metrics.get("fcr", _metric(key="", label="", value=0.0)).value)
-    water_feed_val = _to_float(metrics.get("water_feed_ratio", _metric(key="", label="", value=0.0)).value)
-    vacc_compliance_pct = (
-        round((vacc_done / (vacc_done + vacc_overdue)) * 100, 1)
-        if (vacc_done + vacc_overdue) > 0
-        else 0.0
-    )
 
     alerts: list[DashboardAlertSchema] = []
     if mortality_rate_val > 5:
@@ -3249,7 +3201,7 @@ async def _build_factory_dashboard_module(
                 key="factory_high_mortality",
                 level="critical" if mortality_rate_val > 10 else "warning",
                 title="Высокий падёж",
-                message=f"Процент падежа составляет {mortality_rate_val}% — выше допустимой нормы.",
+                message=f"Процент падежа составляет {mortality_rate_val}% — выше допустимой нормы (≤ 5%).",
                 value=mortality_rate_val,
                 unit="%",
             )
@@ -3265,73 +3217,26 @@ async def _build_factory_dashboard_module(
                 unit="кг/кг",
             )
         )
-    if water_feed_val > 0 and (water_feed_val < 1.6 or water_feed_val > 2.2):
-        alerts.append(
-            DashboardAlertSchema(
-                key="factory_water_feed_anomaly",
-                level="warning",
-                title="Аномалия водопотребления",
-                message=f"Соотношение вода/корм = {water_feed_val} л/кг (норма 1.6–2.2). Возможный ранний признак болезни или проблем с поилками.",
-                value=water_feed_val,
-                unit="л/кг",
-            )
-        )
-    if (vacc_done + vacc_overdue) > 0 and vacc_compliance_pct < 95:
-        alerts.append(
-            DashboardAlertSchema(
-                key="factory_low_vacc_compliance",
-                level="critical" if vacc_compliance_pct < 80 else "warning",
-                title="Низкое соблюдение графика вакцинации",
-                message=f"Выполнено {vacc_compliance_pct}% запланированных вакцинаций (цель ≥ 95%).",
-                value=vacc_compliance_pct,
-                unit="%",
-            )
-        )
-    if vacc_overdue > 0:
-        alerts.append(
-            DashboardAlertSchema(
-                key="factory_overdue_vaccinations",
-                level="warning",
-                title="Просроченные вакцинации",
-                message=f"Есть {int(vacc_overdue)} просроченных вакцинаций для активных партий.",
-                value=vacc_overdue,
-                unit="шт",
-            )
-        )
 
     selected_charts = [
         _chart_copy(charts, "factory_mortality_trend"),
         _chart_copy(charts, "factory_weight_gain"),
-        _chart_copy(charts, "factory_feed_consumption"),
         _chart_copy(charts, "factory_shipments_flow"),
     ]
 
     return DashboardModuleSchema(
         key="factory",
         title="Фабрика",
-        description="Партии бройлеров: поголовье, падёж, набор веса, расход корма, отгрузки и вакцинация.",
+        description="Партии бройлеров: поголовье, падёж, набор веса и отгрузки.",
         kpis=[
             _metric_from(metrics, "total_birds", key="total_birds", label="Текущее поголовье", unit="шт"),
-            _metric_from(metrics, "livability_pct", key="livability_pct", label="Выживаемость", unit="%"),
+            _metric_from(metrics, "mortality_rate", key="mortality_rate", label="% падежа", unit="%"),
             _metric_from(metrics, "fcr", key="fcr", label="FCR (корм/привес)", unit="кг/кг"),
             _metric_from(metrics, "avg_weight_per_bird", key="avg_weight_per_bird", label="Средний вес птицы", unit="кг"),
-            _metric_from(metrics, "water_feed_ratio", key="water_feed_ratio", label="Вода / корм", unit="л/кг"),
-            _metric_from(metrics, "mortality_rate", key="mortality_rate", label="% падежа", unit="%"),
             _metric_from(metrics, "total_shipped", key="total_shipped", label="Отгружено", unit="шт"),
-            _metric_from(metrics, "shipment_revenue", key="shipment_revenue", label="Выручка", unit="UZS"),
-            _metric_from(metrics, "feed_consumed", key="feed_consumed", label="Корма", unit="кг"),
-            _metric(key="vacc_compliance_pct", label="Соблюдение графика вакцинации", value=vacc_compliance_pct, unit="%"),
-            _metric(key="vacc_overdue", label="Просрочено вакцинаций", value=vacc_overdue, unit="шт"),
-            *finance_analytics.metrics,
         ],
-        charts=[chart for chart in [*selected_charts, *finance_analytics.charts] if chart is not None],
+        charts=[chart for chart in selected_charts if chart is not None],
         tables=[
-            _table_from_breakdown(
-                breakdowns.get("factory_top_clients"),
-                key="factory_top_clients",
-                title="Выручка по клиентам",
-                description="Клиенты с наибольшей выручкой от отгрузок бройлеров.",
-            ),
             DashboardTableSchema(
                 key="factory_flock_performance",
                 title="Партии: падёж и состояние",
@@ -3339,20 +3244,13 @@ async def _build_factory_dashboard_module(
                 items=_table_items_from_rows(flock_perf_rows, default_unit="шт"),
             ),
             DashboardTableSchema(
-                key="factory_medicine_usage_by_type",
-                title="Расход лекарств по типам",
-                description="Какие лекарства расходуются на фабрике и на какую сумму.",
-                items=_table_items_from_rows(medicine_usage_rows, default_unit="ед."),
-            ),
-            DashboardTableSchema(
                 key="factory_shipment_clients",
                 title="Отгрузки по клиентам",
                 description="Объём и выручка по каждому клиенту.",
                 items=_table_items_from_rows(shipment_client_rows),
             ),
-            *finance_analytics.tables,
         ],
-        alerts=[*alerts, *finance_analytics.alerts],
+        alerts=alerts,
     )
 
 
