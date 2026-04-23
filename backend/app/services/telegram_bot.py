@@ -19,6 +19,7 @@ from app.utils.auth_tokens import TokenError, create_signed_token, decode_signed
 logger = logging.getLogger(__name__)
 
 TELEGRAM_LINK_TOKEN_TYPE = "telegram_link"
+TELEGRAM_CLIENT_LINK_TOKEN_TYPE = "telegram_client_link"
 
 
 def _now_utc() -> datetime:
@@ -103,11 +104,28 @@ class TelegramBotService:
             expires_in=timedelta(minutes=ttl_minutes),
         )
 
+    def create_client_link_token(self, *, client_id: str) -> tuple[str, datetime]:
+        ttl_minutes = max(int(self.settings.telegram_link_token_ttl_minutes or 30), 1)
+        return create_signed_token(
+            subject=client_id,
+            token_type=TELEGRAM_CLIENT_LINK_TOKEN_TYPE,
+            secret_key=self.settings.auth_secret_key,
+            expires_in=timedelta(minutes=ttl_minutes),
+        )
+
     def decode_link_token(self, token: str) -> str:
         payload = decode_signed_token(
             token,
             secret_key=self.settings.auth_secret_key,
             expected_type=TELEGRAM_LINK_TOKEN_TYPE,
+        )
+        return str(payload["sub"])
+
+    def decode_client_link_token(self, token: str) -> str:
+        payload = decode_signed_token(
+            token,
+            secret_key=self.settings.auth_secret_key,
+            expected_type=TELEGRAM_CLIENT_LINK_TOKEN_TYPE,
         )
         return str(payload["sub"])
 
@@ -128,6 +146,121 @@ class TelegramBotService:
             "url": self._build_start_url(bot_username=bot_username, token=token),
             "expires_at": expires_at,
         }
+
+    async def generate_employee_link(
+        self,
+        *,
+        actor: CurrentActor,
+        employee_id: str,
+    ) -> dict[str, Any]:
+        """Admin-triggered invite: deep link for ANY employee in the
+        same organization. The resulting URL can be sent to that
+        employee through any channel; when they open it, the bot
+        binds the Telegram chat to that employee id."""
+        self._ensure_bot_configured()
+
+        employee = await self._get_active_employee(employee_id)
+        if employee is None:
+            raise RuntimeError("Target employee is not active")
+        if str(employee["organization_id"]) != str(actor.organization_id):
+            raise PermissionError("Employee belongs to a different organization")
+
+        token, expires_at = self.create_link_token(employee_id=str(employee["id"]))
+        bot_username = await self.get_bot_username()
+        return {
+            "url": self._build_start_url(bot_username=bot_username, token=token),
+            "expires_at": expires_at,
+        }
+
+    async def _get_active_client(self, client_id: str) -> dict[str, Any] | None:
+        try:
+            normalized_client_id = str(UUID(str(client_id)))
+        except ValueError:
+            return None
+
+        row = await self.db.fetchrow(
+            """
+            SELECT id, organization_id, first_name, last_name, company_name,
+                   phone, email, telegram_chat_id, is_active
+            FROM clients
+            WHERE id = $1 AND is_active = true
+            LIMIT 1
+            """,
+            normalized_client_id,
+        )
+        return dict(row) if row is not None else None
+
+    async def generate_client_link(
+        self,
+        *,
+        actor: CurrentActor,
+        client_id: str,
+    ) -> dict[str, Any]:
+        self._ensure_bot_configured()
+
+        client = await self._get_active_client(client_id)
+        if client is None:
+            raise RuntimeError("Target client is not active")
+        if str(client["organization_id"]) != str(actor.organization_id):
+            raise PermissionError("Client belongs to a different organization")
+
+        token, expires_at = self.create_client_link_token(client_id=str(client["id"]))
+        bot_username = await self.get_bot_username()
+        return {
+            "url": self._build_start_url(bot_username=bot_username, token=token),
+            "expires_at": expires_at,
+        }
+
+    async def get_binding_status(
+        self,
+        *,
+        organization_id: str,
+        employee_ids: list[str],
+        client_ids: list[str],
+    ) -> dict[str, dict[str, bool]]:
+        """Returns which of the given ids have a Telegram binding.
+
+        Employees are linked through `telegram_recipients` (active).
+        Clients are linked when `clients.telegram_chat_id` is populated.
+        """
+        result: dict[str, dict[str, bool]] = {
+            "employees": {},
+            "clients": {},
+        }
+        if employee_ids:
+            rows = await self.db.fetch(
+                """
+                SELECT user_id::text AS user_id
+                FROM telegram_recipients
+                WHERE organization_id = $1
+                  AND is_active = true
+                  AND user_id = ANY($2::uuid[])
+                """,
+                organization_id,
+                [str(x) for x in employee_ids],
+            )
+            linked = {str(row["user_id"]) for row in rows}
+            for emp_id in employee_ids:
+                result["employees"][str(emp_id)] = str(emp_id) in linked
+
+        if client_ids:
+            rows = await self.db.fetch(
+                """
+                SELECT id::text AS id
+                FROM clients
+                WHERE organization_id = $1
+                  AND id = ANY($2::uuid[])
+                  AND telegram_chat_id IS NOT NULL
+                  AND length(trim(telegram_chat_id)) > 0
+                """,
+                organization_id,
+                [str(x) for x in client_ids],
+            )
+            linked = {str(row["id"]) for row in rows}
+            for client_id in client_ids:
+                result["clients"][str(client_id)] = str(client_id) in linked
+
+        return result
 
     @staticmethod
     def extract_start_token(message_text: str | None) -> str | None:
@@ -152,6 +285,30 @@ class TelegramBotService:
         except TokenError:
             return None
         return await self._get_active_employee(employee_id)
+
+    async def _resolve_client_from_start_token(self, token: str) -> dict[str, Any] | None:
+        try:
+            client_id = self.decode_client_link_token(token)
+        except TokenError:
+            return None
+        return await self._get_active_client(client_id)
+
+    async def _bind_client_chat(
+        self,
+        *,
+        client: dict[str, Any],
+        telegram_chat_id: str,
+    ) -> None:
+        await self.db.execute(
+            """
+            UPDATE clients
+            SET telegram_chat_id = $2,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE id = $1
+            """,
+            str(client["id"]),
+            telegram_chat_id,
+        )
 
     async def _send_confirmation(self, *, chat_id: str) -> None:
         await self.gateway.send_message(chat_id=chat_id, text="✅")
@@ -297,26 +454,33 @@ class TelegramBotService:
                 )
             return
 
+        from_user = getattr(message, "from_user", None)
+
         employee = await self._resolve_employee_from_start_token(token)
-        if employee is None:
-            await self.gateway.send_message(
-                chat_id=chat_id,
-                text="Havola eskirgan yoki noto'g'ri. Iltimos, yangi havola oling.",
+        if employee is not None:
+            await self._upsert_recipient_binding(
+                employee=employee,
+                telegram_user_id=str(getattr(from_user, "id", "") or getattr(chat, "id")),
+                telegram_chat_id=chat_id,
+                telegram_username=str(getattr(from_user, "username", "") or "").strip() or None,
+                telegram_first_name=str(getattr(from_user, "first_name", "") or "").strip() or None,
+                telegram_last_name=str(getattr(from_user, "last_name", "") or "").strip() or None,
+                telegram_language_code=str(getattr(from_user, "language_code", "") or "").strip() or None,
+                chat_type=str(getattr(chat, "type", "private") or "private").strip() or "private",
             )
+            await self._send_confirmation(chat_id=chat_id)
             return
 
-        from_user = getattr(message, "from_user", None)
-        await self._upsert_recipient_binding(
-            employee=employee,
-            telegram_user_id=str(getattr(from_user, "id", "") or getattr(chat, "id")),
-            telegram_chat_id=chat_id,
-            telegram_username=str(getattr(from_user, "username", "") or "").strip() or None,
-            telegram_first_name=str(getattr(from_user, "first_name", "") or "").strip() or None,
-            telegram_last_name=str(getattr(from_user, "last_name", "") or "").strip() or None,
-            telegram_language_code=str(getattr(from_user, "language_code", "") or "").strip() or None,
-            chat_type=str(getattr(chat, "type", "private") or "private").strip() or "private",
+        client = await self._resolve_client_from_start_token(token)
+        if client is not None:
+            await self._bind_client_chat(client=client, telegram_chat_id=chat_id)
+            await self._send_confirmation(chat_id=chat_id)
+            return
+
+        await self.gateway.send_message(
+            chat_id=chat_id,
+            text="Havola eskirgan yoki noto'g'ri. Iltimos, yangi havola oling.",
         )
-        await self._send_confirmation(chat_id=chat_id)
 
 
 __all__ = ["TELEGRAM_LINK_TOKEN_TYPE", "TelegramBotService"]

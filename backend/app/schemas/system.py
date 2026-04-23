@@ -25,3 +25,25 @@ class AuditLogReadSchema(IDSchema):
 class TelegramDeepLinkSchema(BaseSchema):
     url: str
     expires_at: datetime
+
+
+class TelegramDeepLinkRequestSchema(BaseSchema):
+    """Body for POST /system/telegram/deep-link.
+
+    * target='self' (or omitted) — generate a link for the calling
+      employee, exactly the same as before.
+    * target='employee' + employee_id — admin generates a link on
+      behalf of another employee (used by the invite action in the
+      HR table).
+    * target='client' + client_id — admin generates a link that
+      binds a specific client's Telegram chat when followed.
+    """
+
+    target: str | None = None
+    employee_id: UUID | None = None
+    client_id: UUID | None = None
+
+
+class TelegramBindingStatusSchema(BaseSchema):
+    employees: dict[str, bool]
+    clients: dict[str, bool]

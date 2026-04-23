@@ -8,6 +8,7 @@ import {
   Send,
   Trash2,
   Undo2,
+  UserPlus,
 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -36,6 +37,7 @@ export interface RecordActionButtonsProps {
     acknowledge: string;
     reverse: string;
     postedLock: string;
+    telegramInvite: string;
   };
   isMedicineBatchesResource: boolean;
   canManageMedicineBatchOps: boolean;
@@ -45,11 +47,20 @@ export interface RecordActionButtonsProps {
   canDeleteActiveResource: boolean;
   isShipmentResource: boolean;
   isDebtResource: boolean;
+  // Invite-in-bot action. Two separate flags because the invite
+  // replaces the notify button on clients (no bot binding yet) but
+  // stands on its own for employees (employees never get a notify
+  // action, only invite → the existing telegram-alerts pipeline
+  // takes over once bound).
+  canInviteEmployeeToBot: boolean;
+  canInviteClientToBot: boolean;
+  isRecordLinkedToBot: (record: CrudRecord) => boolean;
   sessionDepartmentId: string | null | undefined;
   isMedicineBatchActionBusy: (recordId: string) => boolean;
   onOpenMedicineBatchQrCenter: (record: CrudRecord) => void | Promise<void>;
   onOpenMedicineBatchAttachmentPicker: (record: CrudRecord) => void;
   onOpenClientNotification: (record: CrudRecord) => void;
+  onOpenTelegramInvite: (record: CrudRecord) => void;
   onEditRecord: (record: CrudRecord) => void;
   onOpenAudit: (record: CrudRecord) => void;
   onDeleteRecord: (event: ReactMouseEvent<HTMLButtonElement>, record: CrudRecord) => void;
@@ -74,11 +85,15 @@ export function renderRecordActionButtons({
   canDeleteActiveResource,
   isShipmentResource,
   isDebtResource,
+  canInviteEmployeeToBot,
+  canInviteClientToBot,
+  isRecordLinkedToBot,
   sessionDepartmentId,
   isMedicineBatchActionBusy,
   onOpenMedicineBatchQrCenter,
   onOpenMedicineBatchAttachmentPicker,
   onOpenClientNotification,
+  onOpenTelegramInvite,
   onEditRecord,
   onOpenAudit,
   onDeleteRecord,
@@ -136,7 +151,12 @@ export function renderRecordActionButtons({
     }
   }
 
-  if (canSendClientNotifications) {
+  const isLinkedToBot = isRecordLinkedToBot(record);
+
+  // Clients: replace Notify with Invite when the client is not yet
+  // bound to a Telegram chat. Notify is hidden until there is a chat
+  // to receive the message — otherwise it just no-ops at the backend.
+  if (canSendClientNotifications && isLinkedToBot) {
     buttons.push(
       <Button
         key={`${actionKeyPrefix}-notify`}
@@ -154,6 +174,29 @@ export function renderRecordActionButtons({
       >
         <Send className="h-3.5 w-3.5" />
         {labels.notify}
+      </Button>,
+    );
+  }
+
+  const canInviteThisRecord = (canInviteClientToBot || canInviteEmployeeToBot) && !isLinkedToBot;
+  if (canInviteThisRecord) {
+    buttons.push(
+      <Button
+        key={`${actionKeyPrefix}-invite-tg`}
+        type="button"
+        size="sm"
+        variant="outline"
+        className="border-sky-300/70 bg-sky-50/80 text-sky-700 hover:bg-sky-100/90 hover:text-sky-800"
+        onClick={(event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          onOpenTelegramInvite(record);
+        }}
+        disabled={pendingAction}
+        data-tour="row-telegram-invite-action"
+      >
+        <UserPlus className="h-3.5 w-3.5" />
+        {labels.telegramInvite}
       </Button>,
     );
   }

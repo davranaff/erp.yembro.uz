@@ -44,6 +44,7 @@ import {
 } from '@/shared/api/inventory';
 import { baseQueryKeys, toQueryKey } from '@/shared/api/query-keys';
 import { getErrorMessage, useApiMutation, useApiQuery } from '@/shared/api/react-query';
+import { getTelegramBindingStatus, type TelegramBindingStatus } from '@/shared/api/telegram-bot';
 import {
   canAccessModuleAnalytics,
   canCreateCrudResource,
@@ -85,6 +86,7 @@ import { RecordsPaginationBar } from './module-crud/records-pagination-bar';
 import { RecordsTableView } from './module-crud/records-table';
 import { ShipmentAcknowledgeDialog } from './module-crud/shipment-acknowledge-dialog';
 import { StockMovementCards } from './module-crud/stock-movement-cards';
+import { TelegramInviteSheet } from './module-crud/telegram-invite-sheet';
 import { useAuditFormatters } from './module-crud/use-audit-formatters';
 import { useClientNotifications } from './module-crud/use-client-notifications';
 import { useDepartments } from './module-crud/use-departments';
@@ -509,6 +511,19 @@ export function ModuleCrudPage() {
     activeResource.path === 'clients',
   );
   const canSendClientNotifications = isClientResource && canEditActiveResource;
+  const isEmployeesResource = Boolean(
+    activeView === 'records' &&
+    activeResource &&
+    resourceModuleKey === 'hr' &&
+    activeResource.path === 'employees',
+  );
+  const canInviteToBot =
+    (sessionRoles.includes('admin') ||
+      sessionRoles.includes('super_admin') ||
+      sessionRoles.includes('manager')) &&
+    canEditActiveResource;
+  const canInviteEmployeeToBot = Boolean(isEmployeesResource && canInviteToBot);
+  const canInviteClientToBot = Boolean(isClientResource && canInviteToBot);
   const isClientDebtsResource = Boolean(
     activeView === 'records' &&
     activeResource &&
@@ -541,7 +556,9 @@ export function ModuleCrudPage() {
     canEditActiveResource ||
     canDeleteActiveResource ||
     canReadAuditActiveResource ||
-    isMedicineBatchesResource;
+    isMedicineBatchesResource ||
+    canInviteEmployeeToBot ||
+    canInviteClientToBot;
   const isWarehouseResource = Boolean(
     activeView === 'records' &&
     activeResource &&
@@ -746,6 +763,15 @@ export function ModuleCrudPage() {
             .filter((recordId) => recordId.length > 0)
         : [],
     [idColumn, isClientResource, visibleRecords],
+  );
+  const visibleEmployeeIds = useMemo(
+    () =>
+      isEmployeesResource
+        ? visibleRecords
+            .map((record) => getRecordId(record, idColumn))
+            .filter((recordId) => recordId.length > 0)
+        : [],
+    [idColumn, isEmployeesResource, visibleRecords],
   );
   const clientNotificationDepartmentId = selectedDepartmentId || fallbackDepartmentId || '';
   const totalCount = visibleRecords.length;
@@ -1035,6 +1061,90 @@ export function ModuleCrudPage() {
     getRecordSummaryLabel,
     setOperationMessage,
   });
+
+  const [telegramInviteState, setTelegramInviteState] = useState<
+    | { open: false }
+    | {
+        open: true;
+        target: 'employee' | 'client';
+        employeeId?: string;
+        clientId?: string;
+        subjectLabel: string;
+      }
+  >({ open: false });
+
+  const telegramBindingQuery = useApiQuery<TelegramBindingStatus>({
+    queryKey: [
+      'system',
+      'telegram',
+      'binding-status',
+      { employees: visibleEmployeeIds, clients: visibleClientIds },
+    ],
+    queryFn: () =>
+      getTelegramBindingStatus({
+        employeeIds: visibleEmployeeIds,
+        clientIds: visibleClientIds,
+      }),
+    enabled:
+      (canInviteEmployeeToBot && visibleEmployeeIds.length > 0) ||
+      (canInviteClientToBot && visibleClientIds.length > 0),
+    staleTime: 60_000,
+  });
+
+  const isRecordLinkedToBot = useCallback(
+    (record: CrudRecord): boolean => {
+      const recordId = getRecordId(record, idColumn);
+      if (!recordId) {
+        return false;
+      }
+      const data = telegramBindingQuery.data;
+      if (canInviteEmployeeToBot) {
+        return Boolean(data && data.employees[recordId]);
+      }
+      if (canInviteClientToBot) {
+        // Clients also carry `telegram_chat_id` directly on the record —
+        // use that as a free hint while the API query is in flight or
+        // before it refetches, so the UI doesn't flicker between invite
+        // and notify after the user just bound a chat.
+        const fromFetch = data ? data.clients[recordId] : undefined;
+        if (typeof fromFetch === 'boolean') {
+          return fromFetch;
+        }
+        const chatId = record['telegram_chat_id'];
+        return typeof chatId === 'string' && chatId.trim().length > 0;
+      }
+      return false;
+    },
+    [canInviteClientToBot, canInviteEmployeeToBot, idColumn, telegramBindingQuery.data],
+  );
+
+  const handleOpenTelegramInvite = useCallback(
+    (record: CrudRecord) => {
+      const recordId = getRecordId(record, idColumn);
+      if (!recordId) {
+        return;
+      }
+      const subjectLabel = getRecordSummaryLabel(record);
+      if (canInviteEmployeeToBot) {
+        setTelegramInviteState({
+          open: true,
+          target: 'employee',
+          employeeId: recordId,
+          subjectLabel,
+        });
+        return;
+      }
+      if (canInviteClientToBot) {
+        setTelegramInviteState({
+          open: true,
+          target: 'client',
+          clientId: recordId,
+          subjectLabel,
+        });
+      }
+    },
+    [canInviteClientToBot, canInviteEmployeeToBot, getRecordSummaryLabel, idColumn],
+  );
 
   useEffect(() => {
     if (!supportsStatistics) {
@@ -2220,6 +2330,7 @@ export function ModuleCrudPage() {
         acknowledge: t('crud.acknowledge', undefined, 'Принять'),
         reverse: t('crud.reverse', undefined, 'Сторно'),
         postedLock: t('crud.postedLock', undefined, 'Проведено'),
+        telegramInvite: t('telegramInvite.action', undefined, 'Пригласить в бот'),
       },
       isMedicineBatchesResource,
       canManageMedicineBatchOps,
@@ -2229,11 +2340,15 @@ export function ModuleCrudPage() {
       canDeleteActiveResource,
       isShipmentResource,
       isDebtResource,
+      canInviteEmployeeToBot,
+      canInviteClientToBot,
+      isRecordLinkedToBot,
       sessionDepartmentId,
       isMedicineBatchActionBusy: medicineBatchQr.isMedicineBatchActionBusy,
       onOpenMedicineBatchQrCenter: medicineBatchQr.handleOpenCenter,
       onOpenMedicineBatchAttachmentPicker: medicineBatchQr.handleOpenAttachmentPicker,
       onOpenClientNotification: clientNotifications.handleOpen,
+      onOpenTelegramInvite: handleOpenTelegramInvite,
       onEditRecord: handleEditRecord,
       onOpenAudit: handleOpenAudit,
       onDeleteRecord: handleDeleteRecord,
@@ -2822,6 +2937,22 @@ export function ModuleCrudPage() {
                 sendDisabled={clientNotifications.isSendDisabled}
                 onClose={() => clientNotifications.setIsSheetOpen(false)}
                 onSend={clientNotifications.handleSend}
+              />
+
+              <TelegramInviteSheet
+                open={telegramInviteState.open}
+                target={telegramInviteState.open ? telegramInviteState.target : 'self'}
+                subjectLabel={telegramInviteState.open ? telegramInviteState.subjectLabel : ''}
+                employeeId={telegramInviteState.open ? telegramInviteState.employeeId : undefined}
+                clientId={telegramInviteState.open ? telegramInviteState.clientId : undefined}
+                onOpenChange={(open) => {
+                  if (!open) {
+                    setTelegramInviteState({ open: false });
+                    // Refetch so the UI flips to «Уведомить» right after
+                    // the linked chat lands via the bot webhook.
+                    void telegramBindingQuery.refetch();
+                  }
+                }}
               />
 
               <Sheet

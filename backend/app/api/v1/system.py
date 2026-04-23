@@ -8,7 +8,11 @@ from fastapi import APIRouter, Depends, Header, HTTPException, Query, status
 from app.api.deps import CurrentActor, db_dependency, get_current_actor, require_access
 from app.db.pool import Database
 from app.repositories.system import AuditLogRepository
-from app.schemas.system import TelegramDeepLinkSchema
+from app.schemas.system import (
+    TelegramBindingStatusSchema,
+    TelegramDeepLinkRequestSchema,
+    TelegramDeepLinkSchema,
+)
 from app.services.system import AuditLogService
 from app.services.telegram_bot import TelegramBotService
 
@@ -67,23 +71,84 @@ async def list_audit_logs(
     return result.data
 
 
+def _require_admin_or_manager(actor: CurrentActor) -> None:
+    roles = {role.lower() for role in actor.roles}
+    if not roles & {"admin", "super_admin", "manager"}:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only admins or managers can invite others to the bot",
+        )
+
+
 @router.post(
     "/telegram/deep-link",
     status_code=status.HTTP_200_OK,
 )
 async def create_telegram_deep_link(
+    payload: TelegramDeepLinkRequestSchema | None = None,
     current_actor: CurrentActor = Depends(get_current_actor),
     db: Database = Depends(db_dependency),
 ) -> TelegramDeepLinkSchema:
     service = TelegramBotService(db)
+    target = (payload.target if payload else None) or "self"
     try:
-        payload = await service.generate_self_service_link(actor=current_actor)
+        if target == "self":
+            result = await service.generate_self_service_link(actor=current_actor)
+        elif target == "employee":
+            if payload is None or payload.employee_id is None:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="employee_id is required when target='employee'",
+                )
+            _require_admin_or_manager(current_actor)
+            result = await service.generate_employee_link(
+                actor=current_actor, employee_id=str(payload.employee_id)
+            )
+        elif target == "client":
+            if payload is None or payload.client_id is None:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="client_id is required when target='client'",
+                )
+            _require_admin_or_manager(current_actor)
+            result = await service.generate_client_link(
+                actor=current_actor, client_id=str(payload.client_id)
+            )
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Unknown target '{target}'",
+            )
+    except PermissionError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=str(exc),
+        ) from exc
     except RuntimeError as exc:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail=str(exc),
         ) from exc
-    return TelegramDeepLinkSchema.model_validate(payload)
+    return TelegramDeepLinkSchema.model_validate(result)
+
+
+@router.get(
+    "/telegram/binding-status",
+    status_code=status.HTTP_200_OK,
+)
+async def get_telegram_binding_status(
+    employee_ids: list[str] | None = Query(default=None),
+    client_ids: list[str] | None = Query(default=None),
+    current_actor: CurrentActor = Depends(get_current_actor),
+    db: Database = Depends(db_dependency),
+) -> TelegramBindingStatusSchema:
+    service = TelegramBotService(db)
+    result = await service.get_binding_status(
+        organization_id=str(current_actor.organization_id),
+        employee_ids=[value for value in (employee_ids or []) if value],
+        client_ids=[value for value in (client_ids or []) if value],
+    )
+    return TelegramBindingStatusSchema.model_validate(result)
 
 
 @router.post(
