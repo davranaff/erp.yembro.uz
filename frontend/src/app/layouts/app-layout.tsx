@@ -13,6 +13,7 @@ import { type ReactNode, useEffect, useMemo, useState } from 'react';
 import { NavLink, Outlet, type Path, type To, useLocation, useNavigate } from 'react-router-dom';
 
 import { useCommandPalette } from '@/app/ui/command-palette';
+import { CurrencyRatesMenu } from '@/app/ui/currency-rates-menu';
 import { LanguageSwitcher } from '@/app/ui/language-switcher';
 import { ProfileMenu } from '@/app/ui/profile-menu';
 import { Badge } from '@/components/ui/badge';
@@ -737,6 +738,11 @@ function WorkspaceNavigation() {
                   ⌘K
                 </kbd>
               </Button>
+              <CurrencyRatesMenu
+                canSyncFromCbu={
+                  sessionRoles.includes('admin') || sessionRoles.includes('super_admin')
+                }
+              />
               <LanguageSwitcher />
               <ProfileMenu
                 username={sessionUsername}

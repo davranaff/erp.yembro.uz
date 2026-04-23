@@ -52,6 +52,7 @@ export function TelegramInviteSheet({
   const [copied, setCopied] = useState(false);
 
   const mutation = useApiMutation<TelegramDeepLink, Error, void>({
+    mutationKey: ['system', 'telegram', 'deep-link', target, employeeId, clientId],
     mutationFn: () =>
       createTelegramDeepLink({
         target,

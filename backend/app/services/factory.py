@@ -157,47 +157,6 @@ class FactoryDailyLogService(BaseService):
     def __init__(self, repository: FactoryDailyLogRepository) -> None:
         super().__init__(repository=repository)
 
-    async def _check_feed_balance(
-        self,
-        *,
-        organization_id: str,
-        department_id: str,
-        warehouse_id: str | None,
-        feed_type_id: str,
-        needed: Decimal,
-        occurred_on: date,
-        exclude_daily_log_id: str | None = None,
-    ) -> None:
-        if needed <= 0:
-            return
-        ledger = StockLedgerService(StockMovementRepository(self.repository.db))
-        balance = await ledger.get_balance(
-            organization_id=organization_id,
-            department_id=department_id,
-            warehouse_id=warehouse_id,
-            item_type="feed",
-            item_key=f"feed_product:{feed_type_id}",
-            as_of=occurred_on,
-        )
-        if exclude_daily_log_id is not None:
-            own = await self.repository.db.fetchrow(
-                """
-                SELECT COALESCE(SUM(quantity), 0) AS q
-                FROM stock_movements
-                WHERE reference_table = 'factory_daily_logs'
-                  AND reference_id = $1
-                  AND movement_kind = 'outgoing'
-                """,
-                exclude_daily_log_id,
-            )
-            if own is not None:
-                balance = balance + Decimal(str(own["q"] or 0))
-        if balance < needed:
-            raise ValidationError(
-                f"Недостаточно корма для суточного расхода: "
-                f"нужно {needed} кг, на складе {balance} кг"
-            )
-
     async def _before_create(
         self,
         data: dict[str, Any],
@@ -225,23 +184,11 @@ class FactoryDailyLogService(BaseService):
                     next_data["healthy_count"] = 0
             else:
                 next_data["healthy_count"] = 0
-        # Pre-check feed balance — not allow consuming more than available.
-        feed_consumed = _as_decimal(next_data.get("feed_consumed_kg"))
-        feed_type_id = next_data.get("feed_type_id")
-        organization_id = str(next_data.get("organization_id") or "").strip()
-        if not organization_id and actor is not None:
-            organization_id = actor.organization_id
-        department_id = str(next_data.get("department_id") or "").strip()
-        occurred_on = _as_date(next_data.get("log_date") or date.today())
-        if feed_consumed > 0 and feed_type_id and organization_id and department_id:
-            await self._check_feed_balance(
-                organization_id=organization_id,
-                department_id=department_id,
-                warehouse_id=None,
-                feed_type_id=str(feed_type_id),
-                needed=feed_consumed,
-                occurred_on=occurred_on,
-            )
+        # Factory records feed consumption as a fact — no cross-module
+        # pre-check. The feed-module's ledger is not this service's
+        # source of truth: each department operates on its own book,
+        # and any stock-availability visibility is produced via the
+        # "Движения остатков" page under the factory module itself.
         return next_data
 
     async def _before_update(
@@ -252,24 +199,8 @@ class FactoryDailyLogService(BaseService):
         existing: Mapping[str, Any],
         actor=None,
     ) -> dict[str, Any]:
-        next_data = dict(data)
-        merged = {**existing, **next_data}
-        feed_consumed = _as_decimal(merged.get("feed_consumed_kg"))
-        feed_type_id = merged.get("feed_type_id")
-        organization_id = str(merged.get("organization_id") or "")
-        department_id = str(merged.get("department_id") or "")
-        occurred_on = _as_date(merged.get("log_date") or date.today())
-        if feed_consumed > 0 and feed_type_id and organization_id and department_id:
-            await self._check_feed_balance(
-                organization_id=organization_id,
-                department_id=department_id,
-                warehouse_id=None,
-                feed_type_id=str(feed_type_id),
-                needed=feed_consumed,
-                occurred_on=occurred_on,
-                exclude_daily_log_id=str(entity_id),
-            )
-        return next_data
+        del entity_id, existing, actor  # unused; kept for BaseService hook signature
+        return dict(data)
 
     async def _sync_feed_consumption_row(self, entity: Mapping[str, Any]) -> None:
         """Mirror daily log's feed entry into a feed_consumptions row.
@@ -332,46 +263,14 @@ class FactoryDailyLogService(BaseService):
             note,
         )
 
-    async def _sync_feed_stock(self, entity: Mapping[str, Any]) -> None:
-        """Sync outgoing feed stock movement when feed is consumed."""
-        feed_consumed = _as_decimal(entity.get("feed_consumed_kg"))
-        feed_type_id = entity.get("feed_type_id")
-        movements: list[StockMovementDraft] = []
-
-        if feed_consumed > 0 and feed_type_id:
-            movements.append(
-                StockMovementDraft(
-                    organization_id=str(entity["organization_id"]),
-                    department_id=str(entity["department_id"]),
-                    item_type="feed",
-                    item_key=f"feed_product:{feed_type_id}",
-                    movement_kind="outgoing",
-                    quantity=feed_consumed,
-                    unit="kg",
-                    occurred_on=_as_date(entity["log_date"]),
-                    reference_table="factory_daily_logs",
-                    reference_id=str(entity["id"]),
-                    note=f"Flock feed consumption",
-                )
-            )
-
-        ledger = StockLedgerService(StockMovementRepository(self.repository.db))
-        await ledger.replace_reference_movements(
-            reference_table="factory_daily_logs",
-            reference_id=str(entity["id"]),
-            movements=movements,
-        )
-
     async def _after_create(self, entity: Mapping[str, Any], *, actor=None) -> None:
         await self._recalculate_flock_count(str(entity["flock_id"]))
-        await self._sync_feed_stock(entity)
         await self._sync_feed_consumption_row(entity)
 
     async def _after_update(self, *, before: Mapping[str, Any], after: Mapping[str, Any], actor=None) -> None:
         await self._recalculate_flock_count(str(after["flock_id"]))
         if str(before.get("flock_id")) != str(after.get("flock_id")):
             await self._recalculate_flock_count(str(before["flock_id"]))
-        await self._sync_feed_stock(after)
         await self._sync_feed_consumption_row(after)
 
     async def _after_delete(self, *, deleted_entity: Mapping[str, Any], actor=None) -> None:
@@ -565,75 +464,21 @@ class FactoryMedicineUsageService(BaseService):
     def __init__(self, repository: FactoryMedicineUsageRepository) -> None:
         super().__init__(repository=repository)
 
-    async def _check_medicine_balance(
-        self,
-        *,
-        organization_id: str,
-        department_id: str,
-        warehouse_id: str | None,
-        medicine_type_id: str,
-        needed: Decimal,
-        occurred_on: date,
-        exclude_usage_id: str | None = None,
-    ) -> None:
-        if needed <= 0:
-            return
-        ledger = StockLedgerService(StockMovementRepository(self.repository.db))
-        balance = await ledger.get_balance(
-            organization_id=organization_id,
-            department_id=department_id,
-            warehouse_id=warehouse_id,
-            item_type="medicine",
-            item_key=f"medicine_usage:{medicine_type_id}",
-            as_of=occurred_on,
-        )
-        if exclude_usage_id is not None:
-            own = await self.repository.db.fetchrow(
-                """
-                SELECT COALESCE(SUM(quantity), 0) AS q
-                FROM stock_movements
-                WHERE reference_table = 'factory_medicine_usages'
-                  AND reference_id = $1
-                  AND movement_kind = 'outgoing'
-                """,
-                exclude_usage_id,
-            )
-            if own is not None:
-                balance = balance + Decimal(str(own["q"] or 0))
-        if balance < needed:
-            raise ValidationError(
-                f"Недостаточно лекарства: нужно {needed}, на складе {balance}"
-            )
-
     async def _before_create(
         self,
         data: dict[str, Any],
         *,
         actor=None,
     ) -> dict[str, Any]:
+        del actor  # unused; kept for BaseService hook signature
         next_data = dict(data)
         quantity = _as_decimal(next_data.get("quantity"))
         if quantity <= 0:
             raise ValidationError("quantity must be positive")
-        organization_id = str(next_data.get("organization_id") or "").strip()
-        if not organization_id and actor is not None:
-            organization_id = actor.organization_id
-        department_id = str(next_data.get("department_id") or "").strip()
-        warehouse_id = (
-            str(next_data["warehouse_id"]) if next_data.get("warehouse_id") else None
-        )
-        medicine_type_id = str(next_data.get("medicine_type_id") or "").strip()
-        occurred_on = _as_date(next_data.get("usage_date") or date.today())
-        if organization_id and department_id and medicine_type_id:
-            await self._check_medicine_balance(
-                organization_id=organization_id,
-                department_id=department_id,
-                warehouse_id=warehouse_id,
-                medicine_type_id=medicine_type_id,
-                needed=quantity,
-                occurred_on=occurred_on,
-            )
-        # Auto-calculate total_cost if unit_cost is provided
+        # Factory medicine usage is recorded as a fact — no cross-module
+        # balance check. If the operator needs to reconcile stock with
+        # the medicine module, they do it via the «Движения остатков»
+        # page under the factory itself.
         unit_cost = next_data.get("unit_cost")
         if unit_cost is not None and next_data.get("total_cost") is None:
             next_data["total_cost"] = _as_decimal(unit_cost) * quantity
@@ -647,66 +492,19 @@ class FactoryMedicineUsageService(BaseService):
         existing: Mapping[str, Any],
         actor=None,
     ) -> dict[str, Any]:
+        del entity_id, actor
         next_data = dict(data)
         merged = {**existing, **next_data}
         quantity = _as_decimal(merged.get("quantity"))
-        organization_id = str(merged.get("organization_id") or "")
-        department_id = str(merged.get("department_id") or "")
-        warehouse_id = (
-            str(merged["warehouse_id"]) if merged.get("warehouse_id") else None
-        )
-        medicine_type_id = str(merged.get("medicine_type_id") or "")
-        occurred_on = _as_date(merged.get("usage_date") or date.today())
-        if organization_id and department_id and medicine_type_id and quantity > 0:
-            await self._check_medicine_balance(
-                organization_id=organization_id,
-                department_id=department_id,
-                warehouse_id=warehouse_id,
-                medicine_type_id=medicine_type_id,
-                needed=quantity,
-                occurred_on=occurred_on,
-                exclude_usage_id=str(entity_id),
-            )
         unit_cost = next_data.get("unit_cost", existing.get("unit_cost"))
         if unit_cost is not None and next_data.get("total_cost") is None:
             next_data["total_cost"] = _as_decimal(unit_cost) * quantity
         return next_data
 
-    async def _sync_medicine_stock(self, entity: Mapping[str, Any]) -> None:
-        quantity = _as_decimal(entity.get("quantity"))
-        movements: list[StockMovementDraft] = []
-        if quantity > 0:
-            medicine_type_id = str(entity.get("medicine_type_id", ""))
-            movements.append(
-                StockMovementDraft(
-                    organization_id=str(entity["organization_id"]),
-                    department_id=str(entity["department_id"]),
-                    item_type="medicine",
-                    item_key=f"medicine_usage:{medicine_type_id}",
-                    movement_kind="outgoing",
-                    quantity=quantity,
-                    unit="pcs",
-                    occurred_on=_as_date(entity["usage_date"]),
-                    reference_table="factory_medicine_usages",
-                    reference_id=str(entity["id"]),
-                    note=str(entity.get("note")) if entity.get("note") else None,
-                )
-            )
-
-        ledger = StockLedgerService(StockMovementRepository(self.repository.db))
-        await ledger.replace_reference_movements(
-            reference_table="factory_medicine_usages",
-            reference_id=str(entity["id"]),
-            movements=movements,
-        )
-
-    async def _after_create(self, entity: Mapping[str, Any], *, actor=None) -> None:
-        await self._sync_medicine_stock(entity)
-
-    async def _after_update(self, *, before: Mapping[str, Any], after: Mapping[str, Any], actor=None) -> None:
-        await self._sync_medicine_stock(after)
-
     async def _after_delete(self, *, deleted_entity: Mapping[str, Any], actor=None) -> None:
+        # Clean up any legacy ledger rows from the cross-module era. New
+        # rows don't emit movements, so this is a no-op for data written
+        # after the decoupling.
         ledger = StockLedgerService(StockMovementRepository(self.repository.db))
         await ledger.clear_reference_movements(
             reference_table="factory_medicine_usages",
