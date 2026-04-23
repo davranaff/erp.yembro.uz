@@ -1,5 +1,8 @@
+import { MoreHorizontal } from 'lucide-react';
+
 import { Badge } from '@/components/ui/badge';
 import { EmptyState } from '@/components/ui/empty-state';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { CardSkeleton, TableSkeleton } from '@/components/ui/skeleton';
 import type { CrudFieldMeta, CrudRecord } from '@/shared/api/backend-crud';
 import { cn } from '@/shared/lib/cn';
@@ -14,6 +17,63 @@ import {
 } from '../module-crud-page.helpers';
 
 import type { ReactNode } from 'react';
+
+function RecordActionsMenu({
+  actions,
+  triggerLabel,
+}: {
+  actions: ReactNode[];
+  triggerLabel: string;
+}) {
+  if (actions.length === 0) {
+    return null;
+  }
+
+  // Single-action cell: don't bother with the menu wrapper.
+  if (actions.length === 1) {
+    return <div className="flex justify-end">{actions}</div>;
+  }
+
+  return (
+    <Popover>
+      <PopoverTrigger
+        aria-label={triggerLabel}
+        onClick={(event) => {
+          // The row's onClick also selects the record — stop it so the
+          // menu trigger doesn't double-fire as "open record".
+          event.stopPropagation();
+        }}
+        className={cn(
+          'inline-flex h-8 w-8 items-center justify-center rounded-lg border border-border/75 bg-card',
+          'text-muted-foreground shadow-[0_10px_24px_-20px_rgba(15,23,42,0.2)]',
+          'transition-colors hover:bg-muted/60 hover:text-foreground',
+          'outline-none aria-expanded:border-primary/40 aria-expanded:bg-secondary/60 aria-expanded:text-foreground',
+          'focus-visible:ring-3 focus-visible:border-ring focus-visible:ring-ring/50',
+        )}
+      >
+        <MoreHorizontal className="h-4 w-4" />
+      </PopoverTrigger>
+      <PopoverContent
+        align="end"
+        sideOffset={6}
+        className={cn(
+          'bg-popover w-56 rounded-xl border border-border/80 p-1.5',
+          'shadow-[0_24px_56px_-36px_rgba(15,23,42,0.28)]',
+        )}
+        onClick={(event) => event.stopPropagation()}
+      >
+        <div
+          className={cn(
+            'flex flex-col gap-1',
+            '[&>[data-slot=button]]:w-full [&>[data-slot=button]]:justify-start',
+          )}
+        >
+          {actions}
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+}
 
 type TranslateFn = (
   key: string,
@@ -247,10 +307,11 @@ export function RecordsTableView({
                     );
                   })}
                   {hasRecordActions ? (
-                    <td className="sticky right-0 whitespace-nowrap bg-inherit px-5 py-4">
-                      <div className="flex flex-wrap justify-end gap-2">
-                        {renderRecordActionButtons(record)}
-                      </div>
+                    <td className="sticky right-0 whitespace-nowrap bg-inherit px-5 py-4 text-right">
+                      <RecordActionsMenu
+                        actions={renderRecordActionButtons(record)}
+                        triggerLabel={t('crud.actions')}
+                      />
                     </td>
                   ) : null}
                 </tr>
