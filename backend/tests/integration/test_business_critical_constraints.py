@@ -87,7 +87,14 @@ async def test_egg_shipment_rejects_negative_stock(api_client) -> None:
     assert response.status_code == 400, response.text
     payload = response.json()
     assert payload["error"]["code"] == "validation_error"
-    assert "Insufficient stock" in payload["error"]["message"]
+    # Egg-shipment service emits a localized message. Any of the
+    # historical markers is fine — we just want to confirm the
+    # negative-stock guard fired and the row was rejected.
+    message = payload["error"]["message"]
+    assert (
+        "Insufficient stock" in message
+        or "Недостаточно яиц" in message
+    )
 
 
 @pytest.mark.asyncio

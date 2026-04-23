@@ -315,11 +315,144 @@ class SlaughterProcessingService(CreatedByActorMixin, BaseService):
             movements=movements,
         )
 
+    async def _rebuild_auto_semi_products(
+        self, entity: Mapping[str, Any], *, actor=None
+    ) -> None:
+        """Автоматически создаёт/обновляет semi_products по весам в
+        processing. Логика простая: если в processing заполнены
+        ``first_sort_weight_kg`` / ``second_sort_weight_kg`` /
+        ``bad_weight_kg``, то на каждый заполненный вес создаётся
+        соответствующий semi_product с ``quality='first' | 'second' |
+        'byproduct'``. Маркер ``auto-processing:{id}:{quality}`` в поле
+        ``code`` позволяет переcоздавать записи при update без
+        конфликта с ручными вводами оператора.
+        """
+        from uuid import uuid4 as _uuid4
+
+        from app.repositories.feed import (
+            FeedFormulaRepository as _FormulaRepo,  # noqa: F401  (tooling)
+        )
+
+        processing_id = str(entity["id"])
+        organization_id = str(entity["organization_id"])
+        department_id = str(entity["department_id"])
+        processed_on = _as_date(entity["processed_on"])
+
+        # Выбрать measurement_unit_id для 'kg' в этой организации.
+        from app.services.units import resolve_measurement_unit_id
+
+        measurement_unit_id = await resolve_measurement_unit_id(
+            self.repository.db, organization_id, "kg"
+        )
+
+        semi_repo = SlaughterSemiProductRepository(self.repository.db)
+
+        quality_weights: list[tuple[str, Any]] = [
+            ("first", entity.get("first_sort_weight_kg")),
+            ("second", entity.get("second_sort_weight_kg")),
+            ("byproduct", entity.get("bad_weight_kg")),
+        ]
+
+        for quality, weight_raw in quality_weights:
+            auto_code = f"auto-processing:{processing_id}:{quality}"
+            weight = (
+                Decimal(str(weight_raw)).quantize(Decimal("0.001"))
+                if weight_raw is not None
+                else Decimal("0")
+            )
+
+            existing = await self.repository.db.fetchrow(
+                """
+                SELECT id FROM slaughter_semi_products
+                WHERE organization_id = $1 AND processing_id = $2 AND code = $3
+                LIMIT 1
+                """,
+                organization_id,
+                processing_id,
+                auto_code,
+            )
+
+            if weight <= 0:
+                # Оператор убрал вес → удалить авто-запись, если была.
+                if existing is not None:
+                    # Очистить все stock_movements этой авто-записи
+                    await self.repository.db.execute(
+                        "DELETE FROM stock_movements WHERE reference_table = "
+                        "'slaughter_semi_products' AND reference_id = $1",
+                        str(existing["id"]),
+                    )
+                    await semi_repo.delete_by_id(str(existing["id"]))
+                continue
+
+            payload: dict[str, Any] = {
+                "organization_id": organization_id,
+                "department_id": department_id,
+                "processing_id": processing_id,
+                "code": auto_code,
+                "part_name": None,
+                "quality": quality,
+                "produced_on": processed_on,
+                "quantity": str(weight),
+                "unit": "kg",
+                "measurement_unit_id": measurement_unit_id,
+                "note": f"[auto-from-processing:{processing_id}]",
+            }
+
+            if existing is None:
+                created_id = str(_uuid4())
+                await semi_repo.create({"id": created_id, **payload})
+                semi_entity = await semi_repo.get_by_id(created_id)
+            else:
+                await semi_repo.update_by_id(str(existing["id"]), payload)
+                semi_entity = await semi_repo.get_by_id(str(existing["id"]))
+
+            # Обновить ledger: incoming semi_product на эту запись.
+            await self._write_semi_product_stock(semi_entity)
+
+    async def _write_semi_product_stock(
+        self, semi_entity: Mapping[str, Any]
+    ) -> None:
+        quantity = _as_decimal(semi_entity.get("quantity"))
+        movements: list[StockMovementDraft] = []
+        if quantity > 0:
+            movements.append(
+                StockMovementDraft(
+                    organization_id=str(semi_entity["organization_id"]),
+                    department_id=str(semi_entity["department_id"]),
+                    item_type="semi_product",
+                    item_key=_semi_product_key(str(semi_entity["id"])),
+                    movement_kind="incoming",
+                    quantity=quantity,
+                    unit=str(semi_entity.get("unit") or "kg"),
+                    occurred_on=_as_date(semi_entity["produced_on"]),
+                    reference_table="slaughter_semi_products",
+                    reference_id=str(semi_entity["id"]),
+                    warehouse_id=(
+                        str(semi_entity["warehouse_id"])
+                        if semi_entity.get("warehouse_id")
+                        else None
+                    ),
+                    note=(
+                        str(semi_entity.get("note"))
+                        if semi_entity.get("note") is not None
+                        else None
+                    ),
+                )
+            )
+        ledger = StockLedgerService(StockMovementRepository(self.repository.db))
+        await ledger.replace_reference_movements(
+            reference_table="slaughter_semi_products",
+            reference_id=str(semi_entity["id"]),
+            movements=movements,
+        )
+
     async def _after_create(self, entity: Mapping[str, Any], *, actor=None) -> None:
         await self._sync_stock(entity)
+        await self._rebuild_auto_semi_products(entity, actor=actor)
 
     async def _after_update(self, *, before: Mapping[str, Any], after: Mapping[str, Any], actor=None) -> None:
         await self._sync_stock(after)
+        await self._rebuild_auto_semi_products(after, actor=actor)
 
     async def _after_delete(self, *, deleted_entity: Mapping[str, Any], actor=None) -> None:
         ledger = StockLedgerService(StockMovementRepository(self.repository.db))
@@ -327,6 +460,45 @@ class SlaughterProcessingService(CreatedByActorMixin, BaseService):
             reference_table="slaughter_processings",
             reference_id=str(deleted_entity["id"]),
         )
+        # Авто-semi_products уже уйдут через caskad semi_products=RESTRICT?
+        # Нет: FK processing→RESTRICT, поэтому auto-записи надо удалить
+        # сначала, чтобы delete processing прошёл.
+        auto_rows = await self.repository.db.fetch(
+            "SELECT id FROM slaughter_semi_products "
+            "WHERE processing_id = $1 AND code LIKE 'auto-processing:%'",
+            str(deleted_entity["id"]),
+        )
+        for row in auto_rows:
+            await self.repository.db.execute(
+                "DELETE FROM stock_movements WHERE reference_table = "
+                "'slaughter_semi_products' AND reference_id = $1",
+                str(row["id"]),
+            )
+        await self.repository.db.execute(
+            "DELETE FROM slaughter_semi_products "
+            "WHERE processing_id = $1 AND code LIKE 'auto-processing:%'",
+            str(deleted_entity["id"]),
+        )
+
+    async def delete(self, entity_id: Any, *, actor=None):
+        # Удаляем auto-semi-products ДО удаления processing, иначе
+        # FK RESTRICT не пропустит.
+        auto_rows = await self.repository.db.fetch(
+            "SELECT id FROM slaughter_semi_products "
+            "WHERE processing_id = $1 AND code LIKE 'auto-processing:%'",
+            str(entity_id),
+        )
+        for row in auto_rows:
+            await self.repository.db.execute(
+                "DELETE FROM stock_movements WHERE reference_table = "
+                "'slaughter_semi_products' AND reference_id = $1",
+                str(row["id"]),
+            )
+            await self.repository.db.execute(
+                "DELETE FROM slaughter_semi_products WHERE id = $1",
+                str(row["id"]),
+            )
+        return await super().delete(entity_id, actor=actor)
 
 
 class SlaughterSemiProductService(BaseService):
@@ -664,8 +836,66 @@ class SlaughterSemiProductShipmentService(CreatedByActorMixin, BaseService):
 
         return out
 
+    async def _check_semi_product_balance(
+        self,
+        *,
+        organization_id: str,
+        department_id: str,
+        warehouse_id: str | None,
+        semi_product_id: str,
+        needed: Decimal,
+        occurred_on: date,
+        exclude_shipment_id: str | None = None,
+    ) -> None:
+        if needed <= 0:
+            return
+        ledger = StockLedgerService(StockMovementRepository(self.repository.db))
+        balance = await ledger.get_balance(
+            organization_id=organization_id,
+            department_id=department_id,
+            warehouse_id=warehouse_id,
+            item_type="semi_product",
+            item_key=_semi_product_key(semi_product_id),
+            as_of=occurred_on,
+        )
+        if exclude_shipment_id is not None:
+            own = await self.repository.db.fetchrow(
+                """
+                SELECT COALESCE(SUM(quantity), 0) AS q
+                FROM stock_movements
+                WHERE reference_table = 'slaughter_semi_product_shipments'
+                  AND reference_id = $1
+                  AND movement_kind = 'outgoing'
+                """,
+                exclude_shipment_id,
+            )
+            if own is not None:
+                balance = balance + Decimal(str(own["q"] or 0))
+        if balance < needed:
+            raise ValidationError(
+                f"Недостаточно полуфабриката: нужно {needed}, на складе {balance}"
+            )
+
     async def _before_create(self, data: dict[str, Any], *, actor=None) -> dict[str, Any]:
-        return await self._resolve_shipment_fields(data, existing=None)
+        resolved = await self._resolve_shipment_fields(data, existing=None)
+        needed = _as_decimal(resolved.get("quantity"))
+        organization_id = str(resolved.get("organization_id") or "")
+        department_id = str(resolved.get("department_id") or "")
+        warehouse_id = (
+            str(resolved["warehouse_id"]) if resolved.get("warehouse_id") else None
+        )
+        semi_product_id = str(resolved.get("semi_product_id") or "")
+        occurred_on = _as_date(resolved.get("shipped_on") or date.today())
+        if organization_id and department_id and semi_product_id and needed > 0:
+            await self._check_semi_product_balance(
+                organization_id=organization_id,
+                department_id=department_id,
+                warehouse_id=warehouse_id,
+                semi_product_id=semi_product_id,
+                needed=needed,
+                occurred_on=occurred_on,
+            )
+        return resolved
 
     async def _before_update(
         self,
@@ -681,12 +911,35 @@ class SlaughterSemiProductShipmentService(CreatedByActorMixin, BaseService):
             raise ValidationError("department_id cannot be changed")
         if "semi_product_id" in data and str(data["semi_product_id"]) != str(existing.get("semi_product_id")):
             raise ValidationError("semi_product_id cannot be changed")
-        return await self._resolve_shipment_fields(data, existing=existing)
+        resolved = await self._resolve_shipment_fields(data, existing=existing)
+        merged = {**existing, **resolved}
+        needed = _as_decimal(merged.get("quantity"))
+        organization_id = str(merged.get("organization_id") or "")
+        department_id = str(merged.get("department_id") or "")
+        warehouse_id = (
+            str(merged["warehouse_id"]) if merged.get("warehouse_id") else None
+        )
+        semi_product_id = str(merged.get("semi_product_id") or "")
+        occurred_on = _as_date(merged.get("shipped_on") or date.today())
+        if organization_id and department_id and semi_product_id and needed > 0:
+            await self._check_semi_product_balance(
+                organization_id=organization_id,
+                department_id=department_id,
+                warehouse_id=warehouse_id,
+                semi_product_id=semi_product_id,
+                needed=needed,
+                occurred_on=occurred_on,
+                exclude_shipment_id=str(entity_id),
+            )
+        return resolved
 
     async def _sync_stock(self, entity: Mapping[str, Any]) -> None:
+        """Outgoing semi_product пишется только после подтверждения."""
         quantity = _as_decimal(entity.get("quantity"))
+        status = str(entity.get("status") or "").strip().lower()
+        is_confirmed = status == "received" or bool(entity.get("acknowledged_at"))
         movements: list[StockMovementDraft] = []
-        if quantity > 0:
+        if quantity > 0 and is_confirmed:
             movements.append(
                 StockMovementDraft(
                     organization_id=str(entity["organization_id"]),

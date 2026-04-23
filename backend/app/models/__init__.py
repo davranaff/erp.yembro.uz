@@ -31,6 +31,7 @@ from app.models.incubation import (
 from app.models.feed import (
     FeedIngredient,
     FeedFormula,
+    FeedFormulaIngredient,
     FeedProductionBatch,
     FeedProductionQualityCheck,
     FeedProductShipment,
@@ -89,6 +90,7 @@ __all__ = [
     "FeedType",
     "FeedIngredient",
     "FeedFormula",
+    "FeedFormulaIngredient",
     "FeedProductionBatch",
     "FeedProductionQualityCheck",
     "FeedProductShipment",

@@ -325,6 +325,28 @@ class MedicineConsumptionService(CreatedByActorMixin, BaseService):
             movements=movements,
         )
 
+    async def _recalc_batch_remaining(self, batch_id: str) -> None:
+        """Держит medicine_batches.remaining_quantity в синхроне с реальным
+        расходом. До этой фикса колонка оставалась равной received_quantity
+        навсегда, из-за чего проверка «quantity > batch_remaining» была
+        фикцией и позволяла расходовать больше, чем есть."""
+        await self.repository.db.execute(
+            """
+            UPDATE medicine_batches
+            SET remaining_quantity = GREATEST(
+                received_quantity - COALESCE((
+                    SELECT SUM(quantity)
+                    FROM medicine_consumptions
+                    WHERE batch_id = $1
+                ), 0),
+                0
+            ),
+            updated_at = CURRENT_TIMESTAMP
+            WHERE id = $1
+            """,
+            batch_id,
+        )
+
     async def _after_create(
         self,
         entity: Mapping[str, Any],
@@ -332,6 +354,7 @@ class MedicineConsumptionService(CreatedByActorMixin, BaseService):
         actor=None,
     ) -> None:
         await self._sync_stock(entity)
+        await self._recalc_batch_remaining(str(entity["batch_id"]))
 
     async def _after_update(
         self,
@@ -341,6 +364,9 @@ class MedicineConsumptionService(CreatedByActorMixin, BaseService):
         actor=None,
     ) -> None:
         await self._sync_stock(after)
+        await self._recalc_batch_remaining(str(after["batch_id"]))
+        if str(before.get("batch_id")) != str(after.get("batch_id")):
+            await self._recalc_batch_remaining(str(before["batch_id"]))
 
     async def _after_delete(
         self,
@@ -353,6 +379,7 @@ class MedicineConsumptionService(CreatedByActorMixin, BaseService):
             reference_table="medicine_consumptions",
             reference_id=str(deleted_entity["id"]),
         )
+        await self._recalc_batch_remaining(str(deleted_entity["batch_id"]))
 
 
 __all__ = [

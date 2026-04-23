@@ -157,6 +157,47 @@ class FactoryDailyLogService(BaseService):
     def __init__(self, repository: FactoryDailyLogRepository) -> None:
         super().__init__(repository=repository)
 
+    async def _check_feed_balance(
+        self,
+        *,
+        organization_id: str,
+        department_id: str,
+        warehouse_id: str | None,
+        feed_type_id: str,
+        needed: Decimal,
+        occurred_on: date,
+        exclude_daily_log_id: str | None = None,
+    ) -> None:
+        if needed <= 0:
+            return
+        ledger = StockLedgerService(StockMovementRepository(self.repository.db))
+        balance = await ledger.get_balance(
+            organization_id=organization_id,
+            department_id=department_id,
+            warehouse_id=warehouse_id,
+            item_type="feed",
+            item_key=f"feed_product:{feed_type_id}",
+            as_of=occurred_on,
+        )
+        if exclude_daily_log_id is not None:
+            own = await self.repository.db.fetchrow(
+                """
+                SELECT COALESCE(SUM(quantity), 0) AS q
+                FROM stock_movements
+                WHERE reference_table = 'factory_daily_logs'
+                  AND reference_id = $1
+                  AND movement_kind = 'outgoing'
+                """,
+                exclude_daily_log_id,
+            )
+            if own is not None:
+                balance = balance + Decimal(str(own["q"] or 0))
+        if balance < needed:
+            raise ValidationError(
+                f"Недостаточно корма для суточного расхода: "
+                f"нужно {needed} кг, на складе {balance} кг"
+            )
+
     async def _before_create(
         self,
         data: dict[str, Any],
@@ -184,6 +225,50 @@ class FactoryDailyLogService(BaseService):
                     next_data["healthy_count"] = 0
             else:
                 next_data["healthy_count"] = 0
+        # Pre-check feed balance — not allow consuming more than available.
+        feed_consumed = _as_decimal(next_data.get("feed_consumed_kg"))
+        feed_type_id = next_data.get("feed_type_id")
+        organization_id = str(next_data.get("organization_id") or "").strip()
+        if not organization_id and actor is not None:
+            organization_id = actor.organization_id
+        department_id = str(next_data.get("department_id") or "").strip()
+        occurred_on = _as_date(next_data.get("log_date") or date.today())
+        if feed_consumed > 0 and feed_type_id and organization_id and department_id:
+            await self._check_feed_balance(
+                organization_id=organization_id,
+                department_id=department_id,
+                warehouse_id=None,
+                feed_type_id=str(feed_type_id),
+                needed=feed_consumed,
+                occurred_on=occurred_on,
+            )
+        return next_data
+
+    async def _before_update(
+        self,
+        entity_id: Any,
+        data: dict[str, Any],
+        *,
+        existing: Mapping[str, Any],
+        actor=None,
+    ) -> dict[str, Any]:
+        next_data = dict(data)
+        merged = {**existing, **next_data}
+        feed_consumed = _as_decimal(merged.get("feed_consumed_kg"))
+        feed_type_id = merged.get("feed_type_id")
+        organization_id = str(merged.get("organization_id") or "")
+        department_id = str(merged.get("department_id") or "")
+        occurred_on = _as_date(merged.get("log_date") or date.today())
+        if feed_consumed > 0 and feed_type_id and organization_id and department_id:
+            await self._check_feed_balance(
+                organization_id=organization_id,
+                department_id=department_id,
+                warehouse_id=None,
+                feed_type_id=str(feed_type_id),
+                needed=feed_consumed,
+                occurred_on=occurred_on,
+                exclude_daily_log_id=str(entity_id),
+            )
         return next_data
 
     async def _sync_feed_consumption_row(self, entity: Mapping[str, Any]) -> None:
@@ -338,10 +423,65 @@ class FactoryShipmentService(BaseService):
     def __init__(self, repository: FactoryShipmentRepository) -> None:
         super().__init__(repository=repository)
 
+    async def _before_create(
+        self, data: dict[str, Any], *, actor=None
+    ) -> dict[str, Any]:
+        out = dict(data)
+        birds_count = _as_int(out.get("birds_count"))
+        flock_id = str(out.get("flock_id") or "").strip()
+        if birds_count > 0 and flock_id:
+            row = await self.repository.db.fetchrow(
+                "SELECT current_count FROM factory_flocks WHERE id = $1",
+                flock_id,
+            )
+            if row is None:
+                raise ValidationError("flock not found")
+            available = int(row["current_count"] or 0)
+            if available < birds_count:
+                raise ValidationError(
+                    f"Недостаточно птицы в flock: нужно {birds_count}, "
+                    f"доступно {available}"
+                )
+        return out
+
+    async def _before_update(
+        self,
+        entity_id: Any,
+        data: dict[str, Any],
+        *,
+        existing: Mapping[str, Any],
+        actor=None,
+    ) -> dict[str, Any]:
+        out = dict(data)
+        merged = {**existing, **out}
+        birds_count = _as_int(merged.get("birds_count"))
+        flock_id = str(merged.get("flock_id") or "").strip()
+        if birds_count > 0 and flock_id:
+            row = await self.repository.db.fetchrow(
+                "SELECT current_count FROM factory_flocks WHERE id = $1",
+                flock_id,
+            )
+            if row is None:
+                raise ValidationError("flock not found")
+            available = int(row["current_count"] or 0)
+            # При редактировании собственного shipment учитываем, что
+            # его старое списание уже уменьшило current_count.
+            prior = _as_int(existing.get("birds_count"))
+            net_need = birds_count - prior
+            if net_need > available:
+                raise ValidationError(
+                    f"Недостаточно птицы: дополнительно нужно {net_need}, "
+                    f"доступно {available}"
+                )
+        return out
+
     async def _sync_stock(self, entity: Mapping[str, Any]) -> None:
+        """Outgoing пишется только после подтверждения получения."""
         birds_count = _as_int(entity.get("birds_count"))
+        status = str(entity.get("status") or "").strip().lower()
+        is_confirmed = status == "received" or bool(entity.get("acknowledged_at"))
         movements: list[StockMovementDraft] = []
-        if birds_count > 0:
+        if birds_count > 0 and is_confirmed:
             movements.append(
                 StockMovementDraft(
                     organization_id=str(entity["organization_id"]),
@@ -425,6 +565,46 @@ class FactoryMedicineUsageService(BaseService):
     def __init__(self, repository: FactoryMedicineUsageRepository) -> None:
         super().__init__(repository=repository)
 
+    async def _check_medicine_balance(
+        self,
+        *,
+        organization_id: str,
+        department_id: str,
+        warehouse_id: str | None,
+        medicine_type_id: str,
+        needed: Decimal,
+        occurred_on: date,
+        exclude_usage_id: str | None = None,
+    ) -> None:
+        if needed <= 0:
+            return
+        ledger = StockLedgerService(StockMovementRepository(self.repository.db))
+        balance = await ledger.get_balance(
+            organization_id=organization_id,
+            department_id=department_id,
+            warehouse_id=warehouse_id,
+            item_type="medicine",
+            item_key=f"medicine_usage:{medicine_type_id}",
+            as_of=occurred_on,
+        )
+        if exclude_usage_id is not None:
+            own = await self.repository.db.fetchrow(
+                """
+                SELECT COALESCE(SUM(quantity), 0) AS q
+                FROM stock_movements
+                WHERE reference_table = 'factory_medicine_usages'
+                  AND reference_id = $1
+                  AND movement_kind = 'outgoing'
+                """,
+                exclude_usage_id,
+            )
+            if own is not None:
+                balance = balance + Decimal(str(own["q"] or 0))
+        if balance < needed:
+            raise ValidationError(
+                f"Недостаточно лекарства: нужно {needed}, на складе {balance}"
+            )
+
     async def _before_create(
         self,
         data: dict[str, Any],
@@ -435,6 +615,24 @@ class FactoryMedicineUsageService(BaseService):
         quantity = _as_decimal(next_data.get("quantity"))
         if quantity <= 0:
             raise ValidationError("quantity must be positive")
+        organization_id = str(next_data.get("organization_id") or "").strip()
+        if not organization_id and actor is not None:
+            organization_id = actor.organization_id
+        department_id = str(next_data.get("department_id") or "").strip()
+        warehouse_id = (
+            str(next_data["warehouse_id"]) if next_data.get("warehouse_id") else None
+        )
+        medicine_type_id = str(next_data.get("medicine_type_id") or "").strip()
+        occurred_on = _as_date(next_data.get("usage_date") or date.today())
+        if organization_id and department_id and medicine_type_id:
+            await self._check_medicine_balance(
+                organization_id=organization_id,
+                department_id=department_id,
+                warehouse_id=warehouse_id,
+                medicine_type_id=medicine_type_id,
+                needed=quantity,
+                occurred_on=occurred_on,
+            )
         # Auto-calculate total_cost if unit_cost is provided
         unit_cost = next_data.get("unit_cost")
         if unit_cost is not None and next_data.get("total_cost") is None:
@@ -450,7 +648,25 @@ class FactoryMedicineUsageService(BaseService):
         actor=None,
     ) -> dict[str, Any]:
         next_data = dict(data)
-        quantity = _as_decimal(next_data.get("quantity", existing.get("quantity")))
+        merged = {**existing, **next_data}
+        quantity = _as_decimal(merged.get("quantity"))
+        organization_id = str(merged.get("organization_id") or "")
+        department_id = str(merged.get("department_id") or "")
+        warehouse_id = (
+            str(merged["warehouse_id"]) if merged.get("warehouse_id") else None
+        )
+        medicine_type_id = str(merged.get("medicine_type_id") or "")
+        occurred_on = _as_date(merged.get("usage_date") or date.today())
+        if organization_id and department_id and medicine_type_id and quantity > 0:
+            await self._check_medicine_balance(
+                organization_id=organization_id,
+                department_id=department_id,
+                warehouse_id=warehouse_id,
+                medicine_type_id=medicine_type_id,
+                needed=quantity,
+                occurred_on=occurred_on,
+                exclude_usage_id=str(entity_id),
+            )
         unit_cost = next_data.get("unit_cost", existing.get("unit_cost"))
         if unit_cost is not None and next_data.get("total_cost") is None:
             next_data["total_cost"] = _as_decimal(unit_cost) * quantity

@@ -71,11 +71,107 @@ class ChickShipmentService(BaseService):
     def __init__(self, repository: ChickShipmentRepository) -> None:
         super().__init__(repository=repository)
 
+    async def _check_chick_balance(
+        self,
+        *,
+        organization_id: str,
+        department_id: str,
+        warehouse_id: str | None,
+        run_id: str,
+        needed: Decimal,
+        occurred_on: date,
+        exclude_shipment_id: str | None = None,
+    ) -> None:
+        if needed <= 0:
+            return
+        ledger = StockLedgerService(StockMovementRepository(self.repository.db))
+        balance = await ledger.get_balance(
+            organization_id=organization_id,
+            department_id=department_id,
+            warehouse_id=warehouse_id,
+            item_type="chick",
+            item_key=_chick_run_key(run_id),
+            as_of=occurred_on,
+        )
+        if exclude_shipment_id is not None:
+            own = await self.repository.db.fetchrow(
+                """
+                SELECT COALESCE(SUM(quantity), 0) AS q
+                FROM stock_movements
+                WHERE reference_table = 'chick_shipments'
+                  AND reference_id = $1
+                  AND movement_kind = 'outgoing'
+                """,
+                exclude_shipment_id,
+            )
+            if own is not None:
+                balance = balance + Decimal(str(own["q"] or 0))
+        if balance < needed:
+            raise ValidationError(
+                f"Недостаточно цыплят в партии: нужно {needed}, доступно {balance}"
+            )
+
+    async def _before_create(
+        self, data: dict[str, Any], *, actor=None
+    ) -> dict[str, Any]:
+        out = dict(data)
+        run_id = str(out.get("run_id") or "").strip()
+        needed = _as_decimal(out.get("chicks_count"))
+        organization_id = str(out.get("organization_id") or "").strip()
+        if not organization_id and actor is not None:
+            organization_id = actor.organization_id
+        department_id = str(out.get("department_id") or "").strip()
+        warehouse_id = str(out["warehouse_id"]) if out.get("warehouse_id") else None
+        occurred_on = _as_date(out.get("shipped_on") or date.today())
+        if run_id and organization_id and department_id and needed > 0:
+            await self._check_chick_balance(
+                organization_id=organization_id,
+                department_id=department_id,
+                warehouse_id=warehouse_id,
+                run_id=run_id,
+                needed=needed,
+                occurred_on=occurred_on,
+            )
+        return out
+
+    async def _before_update(
+        self,
+        entity_id: Any,
+        data: dict[str, Any],
+        *,
+        existing: Mapping[str, Any],
+        actor=None,
+    ) -> dict[str, Any]:
+        out = dict(data)
+        merged = {**existing, **out}
+        run_id = str(merged.get("run_id") or "")
+        needed = _as_decimal(merged.get("chicks_count"))
+        organization_id = str(merged.get("organization_id") or "")
+        department_id = str(merged.get("department_id") or "")
+        warehouse_id = (
+            str(merged["warehouse_id"]) if merged.get("warehouse_id") else None
+        )
+        occurred_on = _as_date(merged.get("shipped_on") or date.today())
+        if run_id and organization_id and department_id and needed > 0:
+            await self._check_chick_balance(
+                organization_id=organization_id,
+                department_id=department_id,
+                warehouse_id=warehouse_id,
+                run_id=run_id,
+                needed=needed,
+                occurred_on=occurred_on,
+                exclude_shipment_id=str(entity_id),
+            )
+        return out
+
     async def _sync_stock(self, entity: Mapping[str, Any]) -> None:
+        """Outgoing пишется только после подтверждения получения."""
         run_id = entity.get("run_id")
         movement_rows: list[StockMovementDraft] = []
         quantity = _as_decimal(entity.get("chicks_count"))
-        if run_id is not None and quantity > 0:
+        status = str(entity.get("status") or "").strip().lower()
+        is_confirmed = status == "received" or bool(entity.get("acknowledged_at"))
+        if run_id is not None and quantity > 0 and is_confirmed:
             movement_rows.append(
                 StockMovementDraft(
                     organization_id=str(entity["organization_id"]),
@@ -212,11 +308,72 @@ class ChickShipmentService(BaseService):
         await self._delete_auto_ar(str(deleted_entity["id"]))
 
 
+def _incubation_batch_egg_key(batch_id: str) -> str:
+    """item_key для яиц, заложенных в инкубатор. Отдельный namespace от
+    «складских» яиц (egg:{production_id}) — так видно, сколько яиц
+    физически лежит в инкубационных шкафах и сколько из них даст цыплят."""
+    return f"egg_incubation:{batch_id}"
+
+
 class IncubationBatchService(BaseService):
     read_schema = IncubationBatchReadSchema
 
     def __init__(self, repository: IncubationBatchRepository) -> None:
         super().__init__(repository=repository)
+
+    async def _sync_stock(self, entity: Mapping[str, Any]) -> None:
+        """Incoming яиц в инкубатор. Это параллельный ledger для
+        инкубационных яиц — он не конкурирует с egg-производственным
+        складом, а учитывает именно «яйца в инкубационных шкафах»."""
+        quantity = _as_decimal(entity.get("eggs_arrived"))
+        movement_rows: list[StockMovementDraft] = []
+        if quantity > 0:
+            movement_rows.append(
+                StockMovementDraft(
+                    organization_id=str(entity["organization_id"]),
+                    department_id=str(entity["department_id"]),
+                    item_type="egg",
+                    item_key=_incubation_batch_egg_key(str(entity["id"])),
+                    movement_kind="incoming",
+                    quantity=quantity,
+                    unit="pcs",
+                    occurred_on=_as_date(entity["arrived_on"]),
+                    reference_table="incubation_batches",
+                    reference_id=str(entity["id"]),
+                    warehouse_id=(
+                        str(entity["warehouse_id"]) if entity.get("warehouse_id") else None
+                    ),
+                    note=(
+                        str(entity.get("batch_code"))
+                        if entity.get("batch_code") is not None
+                        else None
+                    ),
+                )
+            )
+
+        ledger = StockLedgerService(StockMovementRepository(self.repository.db))
+        await ledger.replace_reference_movements(
+            reference_table="incubation_batches",
+            reference_id=str(entity["id"]),
+            movements=movement_rows,
+        )
+
+    async def _after_create(
+        self,
+        entity: Mapping[str, Any],
+        *,
+        actor=None,
+    ) -> None:
+        await self._sync_stock(entity)
+
+    async def _after_update(
+        self,
+        *,
+        before: Mapping[str, Any],
+        after: Mapping[str, Any],
+        actor=None,
+    ) -> None:
+        await self._sync_stock(after)
 
     async def _after_delete(
         self,

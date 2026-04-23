@@ -47,6 +47,16 @@ class FeedProductionBatch(Base, IDMixin, TimestampMixin):
         index=True,
     )
     note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    total_cost: Mapped[Decimal] = mapped_column(
+        Numeric(16, 2), nullable=False, default=0, server_default="0"
+    )
+    unit_cost: Mapped[Decimal] = mapped_column(
+        Numeric(16, 4), nullable=False, default=0, server_default="0"
+    )
+    cost_currency_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("currencies.id", ondelete="RESTRICT"),
+        nullable=True,
+    )
     created_by: Mapped[UUID | None] = mapped_column(
         ForeignKey("employees.id", ondelete="SET NULL"),
         nullable=True,

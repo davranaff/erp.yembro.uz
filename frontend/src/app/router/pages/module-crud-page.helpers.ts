@@ -1413,7 +1413,97 @@ const resourceUiConfigs: Record<string, ResourceUiConfig> = {
       'unit',
       'note',
     ],
+    tableOrder: [
+      'batch_code',
+      'started_on',
+      'finished_on',
+      'formula_id',
+      'planned_output',
+      'actual_output',
+      'total_cost',
+      'unit_cost',
+      'cost_currency_id',
+      'warehouse_id',
+    ],
     hiddenFields: ['invoice_no'],
+    // Себестоимость рассчитывается сервисом автоматически из moving-average
+    // цены приходов сырья. Оператор не должен вводить руками — прячем в форме,
+    // но оставляем в таблице как справочную колонку.
+    formHiddenFields: ['total_cost', 'unit_cost', 'cost_currency_id'],
+    fieldHelpers: {
+      formula_id: {
+        ru: 'Формула — рецепт корма. Перед созданием убедитесь, что у формулы добавлен состав: сколько каждого ингредиента нужно на 1 кг. Сырьё списывается автоматически по пропорции × actual_output.',
+        uz: 'Formula — emni tayyorlash retsepti. Yaratishdan oldin tarkibi kiritilgan bo‘lishi kerak: har bir ingredient 1 kg uchun qancha. Xomashyo nisbat × actual_output avtomatik chiqariladi.',
+        en: 'Formula = feed recipe. Make sure the formula has its composition filled (how much of each ingredient per 1 kg). Raw is auto-consumed by ratio × actual_output.',
+      },
+      planned_output: {
+        ru: 'Плановый выход в кг. Перед сохранением система проверит, что сырья на складе хватает на эту партию.',
+        uz: 'Rejalashtirilgan chiqish (kg). Saqlashdan oldin tizim omborda shu partiya uchun xomashyo yetarliligini tekshiradi.',
+        en: 'Planned output in kg. Before saving, the system checks that stock has enough ingredients for this batch.',
+      },
+      actual_output: {
+        ru: 'Фактический выход. По этому значению списывается сырьё и считается себестоимость. Можно обновлять после фактического взвешивания.',
+        uz: 'Haqiqiy chiqish. Xomashyo shu qiymat bo‘yicha chiqariladi, tannarx hisoblanadi. Haqiqiy tortgandan keyin yangilash mumkin.',
+        en: 'Actual output. Raw is consumed and cost computed from this. You can update after real weighing.',
+      },
+      total_cost: {
+        ru: 'Себестоимость партии — рассчитывается автоматически как Σ(израсходовано_кг × средняя_цена_ингредиента).',
+        uz: 'Partiya tannarxi — avtomatik hisoblanadi: Σ(ishlatilgan_kg × ingredient_o‘rtacha_narxi).',
+        en: 'Batch total cost — auto-computed as Σ(consumed_kg × ingredient_moving_avg_price).',
+      },
+      unit_cost: {
+        ru: 'Себестоимость 1 кг корма = total_cost / actual_output. Поле только для чтения.',
+        uz: '1 kg em tannarxi = total_cost / actual_output. Faqat o‘qish uchun.',
+        en: 'Cost per 1 kg = total_cost / actual_output. Read-only.',
+      },
+      cost_currency_id: {
+        ru: 'Валюта, в которой посчитана себестоимость (берётся из валюты последнего приходного ордера ингредиентов).',
+        uz: 'Tannarx hisoblangan valyuta (ingredientlarning oxirgi kelish buyurtmasidan olinadi).',
+        en: 'Cost currency (taken from the most recent ingredient arrival).',
+      },
+    },
+    hideDepartmentFieldWhenScoped: true,
+    hideOrganizationFieldWhenScoped: true,
+  },
+  'feed:formula-ingredients': {
+    formOrder: [
+      'formula_id',
+      'ingredient_id',
+      'quantity_per_unit',
+      'unit',
+      'measurement_unit_id',
+      'sort_order',
+    ],
+    tableOrder: [
+      'formula_id',
+      'ingredient_id',
+      'quantity_per_unit',
+      'unit',
+      'sort_order',
+    ],
+    hiddenFields: [],
+    fieldHelpers: {
+      formula_id: {
+        ru: 'Формула, к которой относится этот ингредиент.',
+        uz: 'Bu ingredient tegishli bo‘lgan formula.',
+        en: 'Formula this ingredient belongs to.',
+      },
+      ingredient_id: {
+        ru: 'Ингредиент из справочника сырья.',
+        uz: 'Xomashyo katalogidan ingredient.',
+        en: 'Ingredient from the raw-materials catalog.',
+      },
+      quantity_per_unit: {
+        ru: 'Сколько килограммов этого ингредиента нужно на 1 кг готового корма. Пример: 0.45 = 45% доля в составе. Сумма долей всех ингредиентов формулы обычно равна 1.00.',
+        uz: '1 kg tayyor emga qancha kilogramm shu ingredient kerak. Masalan: 0.45 = tarkibda 45%. Formula ingredientlarining umumiy ulushi odatda 1.00 ga teng.',
+        en: 'Kg of this ingredient per 1 kg of finished feed. Example: 0.45 = 45% share. All formula ingredients typically sum to 1.00.',
+      },
+      sort_order: {
+        ru: 'Порядок отображения в списке. 0 = первый.',
+        uz: 'Ro‘yxatda ko‘rinish tartibi. 0 = birinchi.',
+        en: 'Display order in the list. 0 = first.',
+      },
+    },
     hideDepartmentFieldWhenScoped: true,
     hideOrganizationFieldWhenScoped: true,
   },
@@ -2267,8 +2357,12 @@ const POSTING_STATUS_BADGES: Record<string, { variant: BadgeVariant; label: stri
 };
 
 const SHIPMENT_STATUS_BADGES: Record<string, { variant: BadgeVariant; label: string }> = {
-  sent: { variant: 'warning', label: 'Отправлено' },
-  received: { variant: 'success', label: 'Принято' },
+  // `sent` = отправлено, но клиент пока не подтвердил получение. Пока
+  // статус 'sent', товар физически в пути, но учётно всё ещё на складе
+  // отправителя. Явно показываем оператору, что остатки не списаны.
+  sent: { variant: 'warning', label: 'Ожидает подтверждения · на складе' },
+  // `received` = клиент подтвердил, остатки списаны со склада отправителя.
+  received: { variant: 'success', label: 'Принято · списано со склада' },
   discrepancy: { variant: 'destructive', label: 'Расхождение' },
 };
 

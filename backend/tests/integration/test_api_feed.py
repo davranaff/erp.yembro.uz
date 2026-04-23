@@ -9,6 +9,7 @@ FEED_RESOURCES = [
     ("/api/v1/feed/types", "feed_type"),
     ("/api/v1/feed/ingredients", "feed_ingredient"),
     ("/api/v1/feed/formulas", "feed_formula"),
+    ("/api/v1/feed/formula-ingredients", "feed_formula_ingredient"),
     ("/api/v1/feed/raw-arrivals", "feed_raw_arrival"),
     ("/api/v1/feed/production-batches", "feed_production_batch"),
     ("/api/v1/feed/raw-consumptions", "feed_raw_consumption"),
@@ -34,5 +35,6 @@ async def test_feed_ingredient_delete_returns_descriptive_conflict_for_real_depe
     assert payload["ok"] is False
     message = str(payload["error"]["message"])
     assert message.startswith("Cannot delete this ingredient because it is still used in ")
+    assert "formula ingredients (2)" in message
     assert "raw arrivals (2)" in message
     assert "raw consumptions (" in message

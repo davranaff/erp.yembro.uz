@@ -160,6 +160,46 @@ class EggShipmentService(BaseService):
                 f"Shipment blocked: latest quality check status is '{status}' (must be 'passed')",
             )
 
+    async def _check_egg_balance(
+        self,
+        *,
+        organization_id: str,
+        department_id: str,
+        warehouse_id: str | None,
+        production_id: str,
+        needed: Decimal,
+        occurred_on: date,
+        exclude_shipment_id: str | None = None,
+    ) -> None:
+        if needed <= 0:
+            return
+        ledger = StockLedgerService(StockMovementRepository(self.repository.db))
+        balance = await ledger.get_balance(
+            organization_id=organization_id,
+            department_id=department_id,
+            warehouse_id=warehouse_id,
+            item_type="egg",
+            item_key=_egg_key(production_id),
+            as_of=occurred_on,
+        )
+        if exclude_shipment_id is not None:
+            own = await self.repository.db.fetchrow(
+                """
+                SELECT COALESCE(SUM(quantity), 0) AS q
+                FROM stock_movements
+                WHERE reference_table = 'egg_shipments'
+                  AND reference_id = $1
+                  AND movement_kind = 'outgoing'
+                """,
+                exclude_shipment_id,
+            )
+            if own is not None:
+                balance = balance + Decimal(str(own["q"] or 0))
+        if balance < needed:
+            raise ValidationError(
+                f"Недостаточно яиц: нужно {needed}, на складе {balance}"
+            )
+
     async def _before_create(
         self,
         data: dict[str, Any],
@@ -169,6 +209,24 @@ class EggShipmentService(BaseService):
         if data.get("production_id") is None:
             raise ValidationError("production_id is required for egg shipment")
         await self._ensure_quality_passed(str(data["production_id"]))
+        organization_id = str(data.get("organization_id") or "").strip()
+        if not organization_id and actor is not None:
+            organization_id = actor.organization_id
+        department_id = str(data.get("department_id") or "").strip()
+        warehouse_id = (
+            str(data["warehouse_id"]) if data.get("warehouse_id") else None
+        )
+        needed = _as_decimal(data.get("eggs_count"))
+        occurred_on = _as_date(data.get("shipped_on") or date.today())
+        if organization_id and department_id and needed > 0:
+            await self._check_egg_balance(
+                organization_id=organization_id,
+                department_id=department_id,
+                warehouse_id=warehouse_id,
+                production_id=str(data["production_id"]),
+                needed=needed,
+                occurred_on=occurred_on,
+            )
         return data
 
     async def _before_update(
@@ -184,15 +242,37 @@ class EggShipmentService(BaseService):
         production_id = data.get("production_id") or existing.get("production_id")
         if production_id is not None:
             await self._ensure_quality_passed(str(production_id))
+        merged = {**existing, **data}
+        organization_id = str(merged.get("organization_id") or "")
+        department_id = str(merged.get("department_id") or "")
+        warehouse_id = (
+            str(merged["warehouse_id"]) if merged.get("warehouse_id") else None
+        )
+        needed = _as_decimal(merged.get("eggs_count"))
+        occurred_on = _as_date(merged.get("shipped_on") or date.today())
+        if production_id and organization_id and department_id and needed > 0:
+            await self._check_egg_balance(
+                organization_id=organization_id,
+                department_id=department_id,
+                warehouse_id=warehouse_id,
+                production_id=str(production_id),
+                needed=needed,
+                occurred_on=occurred_on,
+                exclude_shipment_id=str(entity_id),
+            )
         return data
 
     async def _sync_stock(self, entity: Mapping[str, Any]) -> None:
+        """Outgoing пишется только после подтверждения — до этого
+        яйца числятся на складе отправителя."""
         production_id = entity.get("production_id")
         if production_id is None:
             return
 
+        status = str(entity.get("status") or "").strip().lower()
+        is_confirmed = status == "received" or bool(entity.get("acknowledged_at"))
         quantity = _as_decimal(entity.get("eggs_count"))
-        if quantity <= 0:
+        if quantity <= 0 or not is_confirmed:
             movements: list[StockMovementDraft] = []
         else:
             movements = [

@@ -34,6 +34,12 @@ class FeedFormula(Base, IDMixin, TimestampMixin):
         back_populates="formula",
         lazy="selectin",
     )
+    ingredients: Mapped[List["FeedFormulaIngredient"]] = relationship(
+        "FeedFormulaIngredient",
+        back_populates="formula",
+        lazy="selectin",
+        cascade="all, delete-orphan",
+    )
 
     __table_args__ = (
         UniqueConstraint(
