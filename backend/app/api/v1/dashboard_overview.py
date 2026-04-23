@@ -969,18 +969,6 @@ def _build_executive_dashboard(
     )
 
     alerts: list[DashboardAlertSchema] = []
-    if health_index < 55:
-        alerts.append(
-            DashboardAlertSchema(
-                key="health_index_bad",
-                level="critical",
-                title="Индекс здоровья бизнеса просел",
-                message="Общий индекс ниже безопасного уровня.",
-                value=_round_value(health_index),
-                unit="%",
-            )
-        )
-
     if current_snapshot.operating_profit < 0:
         alerts.append(
             DashboardAlertSchema(
@@ -1005,28 +993,8 @@ def _build_executive_dashboard(
             )
         )
 
-    bad_modules = [pulse for pulse in current_snapshot.pulse.values() if pulse.status == "bad"]
-    if bad_modules:
-        alerts.append(
-            DashboardAlertSchema(
-                key="modules_in_bad_zone",
-                level="warning",
-                title="Есть департаменты в красной зоне",
-                message="Минимум один департамент показывает слабый операционный score.",
-                value=float(len(bad_modules)),
-                unit="шт",
-            )
-        )
-
     return DashboardExecutiveDashboardSchema(
         kpis=[
-            _metric(
-                key="health_index",
-                label="Индекс здоровья бизнеса",
-                value=health_index,
-                unit="%",
-                previous_value=previous_health,
-            ),
             _metric(
                 key="operating_profit",
                 label="Операционная прибыль",
@@ -1042,152 +1010,14 @@ def _build_executive_dashboard(
                 previous_value=previous_net_cashflow,
             ),
             _metric(
-                key="value_chain_output",
-                label="Сквозной выпуск",
-                value=current_snapshot.output_total,
-                unit="ед.",
-                previous_value=previous_output_total,
-            ),
-            _metric(
-                key="value_chain_loss_rate",
-                label="Сквозные потери",
-                value=current_snapshot.loss_rate,
+                key="health_index",
+                label="Индекс здоровья бизнеса",
+                value=health_index,
                 unit="%",
-                previous_value=previous_loss_rate,
-            ),
-            _metric(
-                key="active_risks",
-                label="Активные риски",
-                value=float(current_snapshot.active_risks),
-                unit="шт",
-                previous_value=previous_active_risks,
+                previous_value=previous_health,
             ),
         ],
-        charts=[
-            DashboardChartSchema(
-                key="finance_overview",
-                title="Финансы: выручка, расходы, прибыль, cashflow",
-                description="Ежедневная динамика ключевых финансовых сигналов.",
-                type="line",
-                unit=currency_code,
-                series=[
-                    _series(
-                        "revenue",
-                        "Выручка",
-                        [(label, revenue) for label, revenue, _, _, _ in current_snapshot.finance_series],
-                    ),
-                    _series(
-                        "expenses",
-                        "Расходы",
-                        [(label, expenses) for label, _, expenses, _, _ in current_snapshot.finance_series],
-                    ),
-                    _series(
-                        "profit",
-                        "Прибыль",
-                        [(label, profit) for label, _, _, profit, _ in current_snapshot.finance_series],
-                    ),
-                    _series(
-                        "cashflow",
-                        "Cashflow",
-                        [(label, cashflow) for label, _, _, _, cashflow in current_snapshot.finance_series],
-                    ),
-                ],
-            ),
-            DashboardChartSchema(
-                key="value_chain_trend",
-                title="Сквозная цепочка: выпуск vs потери",
-                description="Как меняется выпуск и уровень потерь в операционной цепочке.",
-                type="line",
-                unit="ед.",
-                series=[
-                    _series(
-                        "output",
-                        "Выпуск",
-                        [(label, output) for label, output, _ in current_snapshot.chain_series],
-                    ),
-                    _series(
-                        "losses",
-                        "Потери",
-                        [(label, losses) for label, _, losses in current_snapshot.chain_series],
-                    ),
-                ],
-            ),
-            DashboardChartSchema(
-                key="department_contribution",
-                title="Общая оценка отделов",
-                description="Какие отделы сейчас тянут результат вверх, а какие проседают.",
-                type="bar",
-                unit="%",
-                series=[
-                    _series(
-                        "score",
-                        "Оценка",
-                        [(pulse.label, pulse.score) for pulse in pulse_items],
-                    )
-                ],
-            ),
-            DashboardChartSchema(
-                key="department_revenue",
-                title="Выручка по отделам",
-                description="Показывает, какие отделы приносят основную выручку за период.",
-                type="bar",
-                unit=currency_code,
-                series=[
-                    _series(
-                        "revenue",
-                        "Выручка",
-                        [(pulse.label, pulse.revenue) for pulse in revenue_pulse_items],
-                    )
-                ],
-            ),
-            DashboardChartSchema(
-                key="department_operations",
-                title="Выпуск и потери по отделам",
-                description="Сравнение полезного выпуска и объёма потерь по каждому отделу.",
-                type="bar",
-                unit="ед.",
-                series=[
-                    _series(
-                        "output",
-                        "Выпуск",
-                        [(pulse.label, pulse.output) for pulse in operations_pulse_items],
-                    ),
-                    _series(
-                        "losses",
-                        "Потери",
-                        [(pulse.label, pulse.losses) for pulse in operations_pulse_items],
-                    ),
-                ],
-            ),
-            DashboardChartSchema(
-                key="department_loss_rate",
-                title="Доля потерь по отделам",
-                description="Показывает, где потери уже выходят за безопасный уровень.",
-                type="bar",
-                unit="%",
-                series=[
-                    _series(
-                        "loss_rate",
-                        "Потери",
-                        [(pulse.label, pulse.loss_rate) for pulse in loss_pulse_items],
-                    )
-                ],
-            ),
-            DashboardChartSchema(
-                key="expense_category_burn",
-                title="Куда уходят деньги",
-                description="Топ категорий расходов за выбранный период.",
-                type="bar",
-                unit=currency_code,
-                series=[
-                    _series(
-                        "amount",
-                        "Расходы",
-                        current_snapshot.expense_categories,
-                    )
-                ],
-            ),
-        ],
+        charts=[],
         tables=[department_table, risk_table],
         alerts=alerts,
     )

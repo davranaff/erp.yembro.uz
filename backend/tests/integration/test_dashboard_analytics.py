@@ -38,41 +38,17 @@ async def test_dashboard_analytics_exposes_full_egg_farm_operational_flow(api_cl
     kpis = {item["key"] for item in egg_module["kpis"]}
     assert {
         "net_eggs",
-        "current_stock",
+        "loss_rate",
         "shipment_volume",
-        "eggs_to_incubation",
-        "feed_consumed",
-        "medicine_consumed",
-        "client_base",
-        "total_expenses",
         "financial_result",
-        "net_cashflow",
-        "cash_balance",
+        "total_expenses",
     } <= kpis
 
     chart_keys = {chart["key"] for chart in egg_module["charts"]}
-    assert {
-        "egg_output_daily",
-        "egg_monthly_flow",
-        "egg_destination_flow",
-        "farm_feed_supply",
-        "farm_medicine_usage",
-        "egg_revenue_daily",
-        "egg_finance_overview",
-        "egg_expense_categories",
-    } <= chart_keys
+    assert {"egg_output_daily"} <= chart_keys
 
     table_keys = {table["key"] for table in egg_module["tables"]}
-    assert {
-        "egg_clients",
-        "egg_destination_balance",
-        "egg_feed_types",
-        "egg_client_registry",
-        "egg_recent_shipments",
-        "egg_expense_categories_table",
-        "egg_cash_accounts",
-        "egg_recent_expenses",
-    } <= table_keys
+    assert {"egg_clients"} <= table_keys
 
 
 @pytest.mark.asyncio
@@ -93,6 +69,8 @@ async def test_dashboard_analytics_exposes_full_incubation_operational_flow(api_
         "chicks_hatched",
         "hatch_rate",
         "chicks_dispatched",
+        "financial_result",
+        "total_expenses",
     } <= kpis
 
     chart_keys = {chart["key"] for chart in incubation_module["charts"]}
@@ -127,6 +105,8 @@ async def test_dashboard_analytics_exposes_full_factory_operational_flow(api_cli
         "fcr",
         "avg_weight_per_bird",
         "total_shipped",
+        "financial_result",
+        "total_expenses",
     } <= kpis
 
 
@@ -144,42 +124,15 @@ async def test_dashboard_analytics_exposes_full_feed_mill_operational_flow(api_c
 
     kpis = {item["key"] for item in feed_module["kpis"]}
     assert {
-        "raw_arrivals",
-        "raw_consumed",
         "product_output",
         "product_shipped",
-        "client_base",
-        "sales_revenue",
-        "stock_total",
-        "total_expenses",
+        "shrinkage_pct",
         "financial_result",
-        "net_cashflow",
-        "cash_balance",
+        "total_expenses",
     } <= kpis
 
-    chart_keys = {chart["key"] for chart in feed_module["charts"]}
-    assert {
-        "feed_raw_flow",
-        "feed_product_flow",
-        "feed_shipment_rate",
-        "feed_revenue",
-        "feed_ingredient_mix",
-        "feed_finance_overview",
-        "feed_expense_categories",
-    } <= chart_keys
-
     table_keys = {table["key"] for table in feed_module["tables"]}
-    assert {
-        "feed_formulas",
-        "feed_clients",
-        "feed_client_registry",
-        "feed_low_raw_stock",
-        "feed_recent_batches",
-        "feed_recent_shipments",
-        "feed_expense_categories_table",
-        "feed_cash_accounts",
-        "feed_recent_expenses",
-    } <= table_keys
+    assert {"feed_low_raw_stock"} <= table_keys
 
 
 @pytest.mark.asyncio
@@ -196,40 +149,14 @@ async def test_dashboard_analytics_exposes_full_vet_pharmacy_operational_flow(ap
 
     kpis = {item["key"] for item in vet_module["kpis"]}
     assert {
-        "medicine_arrivals",
-        "medicine_consumed",
-        "client_base",
-        "current_stock",
         "expiring_batches",
         "expired_batches",
-        "turnover_rate",
-        "total_expenses",
         "financial_result",
-        "net_cashflow",
-        "cash_balance",
+        "total_expenses",
     } <= kpis
 
-    chart_keys = {chart["key"] for chart in vet_module["charts"]}
-    assert {
-        "medicine_flow",
-        "medicine_stock",
-        "medicine_expiry",
-        "medicine_turnover_rate",
-        "medicine_finance_overview",
-        "medicine_expense_categories",
-    } <= chart_keys
-
     table_keys = {table["key"] for table in vet_module["tables"]}
-    assert {
-        "medicine_suppliers",
-        "medicine_client_registry",
-        "medicine_expiry_batches",
-        "medicine_recent_batches",
-        "medicine_latest_consumptions",
-        "medicine_expense_categories_table",
-        "medicine_cash_accounts",
-        "medicine_recent_expenses",
-    } <= table_keys
+    assert {"medicine_expiry_batches"} <= table_keys
 
 
 @pytest.mark.asyncio
@@ -246,41 +173,17 @@ async def test_dashboard_analytics_exposes_full_slaughterhouse_operational_flow(
 
     kpis = {item["key"] for item in slaughter_module["kpis"]}
     assert {
-        "birds_arrived",
         "birds_processed",
-        "first_sort_total",
-        "second_sort_total",
-        "bad_total",
-        "semi_product_output",
+        "net_meat_share_pct",
+        "waste_share_pct",
         "shipment_volume",
-        "client_base",
-        "total_expenses",
+        "shipment_revenue",
         "financial_result",
-        "net_cashflow",
-        "cash_balance",
+        "total_expenses",
     } <= kpis
 
     chart_keys = {chart["key"] for chart in slaughter_module["charts"]}
-    assert {
-        "slaughter_flow",
-        "slaughter_quality",
-        "slaughter_semi_products",
-        "slaughter_process_rate",
-        "slaughter_semi_flow",
-        "slaughter_revenue",
-        "slaughter_finance_overview",
-        "slaughter_expense_categories",
-    } <= chart_keys
+    assert {"slaughter_semi_flow"} <= chart_keys
 
     table_keys = {table["key"] for table in slaughter_module["tables"]}
-    assert {
-        "slaughter_top_products",
-        "slaughter_clients",
-        "slaughter_client_registry",
-        "slaughter_recent_arrivals",
-        "slaughter_recent_processings",
-        "slaughter_recent_shipments",
-        "slaughter_expense_categories_table",
-        "slaughter_cash_accounts",
-        "slaughter_recent_expenses",
-    } <= table_keys
+    assert {"slaughter_clients"} <= table_keys

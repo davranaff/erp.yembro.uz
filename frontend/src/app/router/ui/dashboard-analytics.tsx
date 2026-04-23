@@ -17,7 +17,6 @@ import {
   YAxis,
 } from 'recharts';
 
-import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   ChartContainer,
@@ -364,22 +363,6 @@ function EmptyChartState({ label }: { label: string }) {
       {label}
     </div>
   );
-}
-
-function getChartKindLabel(chart: DashboardChart, t: ReturnType<typeof useI18n>['t']) {
-  if (chart.type === 'line') {
-    return t('dashboard.chartKindTrend', undefined, 'Тренд');
-  }
-
-  if (chart.type === 'stacked-bar') {
-    return t('dashboard.chartKindComposition', undefined, 'Состав');
-  }
-
-  if (chart.series.length === 1) {
-    return t('dashboard.chartKindComparison', undefined, 'Сравнение');
-  }
-
-  return t('dashboard.chartKindSnapshot', undefined, 'Срез');
 }
 
 function AreaGraph({
@@ -815,7 +798,6 @@ export function DashboardChartCard({
     'w-full',
     shouldSpanWide ? 'h-[320px] sm:h-[360px] xl:h-[420px]' : 'h-[260px] sm:h-[300px] xl:h-[340px]',
   );
-  const chartKindLabel = getChartKindLabel(chart, t);
 
   let content = <EmptyChartState label={t('common.noData')} />;
 
@@ -832,42 +814,17 @@ export function DashboardChartCard({
   }
 
   return (
-    <Card
-      className={cn(
-        'border-primary/24 bg-card shadow-[0_24px_64px_-48px_rgba(15,23,42,0.16)]',
-        shouldSpanWide && 'xl:col-span-2',
-      )}
-    >
-      <CardHeader className={cn(compact ? 'space-y-0 pb-4' : 'space-y-1')}>
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div className="space-y-1">
-            <div className="flex flex-wrap items-center gap-2">
-              <Badge
-                variant="outline"
-                className="border-primary/18 rounded-full bg-background px-2.5 py-0.5 text-[10px] text-muted-foreground"
-              >
-                {chartKindLabel}
-              </Badge>
-              {chart.series.length > 1 ? (
-                <Badge
-                  variant="outline"
-                  className="border-primary/18 rounded-full bg-background px-2.5 py-0.5 text-[10px] text-muted-foreground"
-                >
-                  {chart.series.length} {t('dashboard.chartSeriesLabelShort', undefined, 'сер.')}
-                </Badge>
-              ) : null}
-            </div>
-            <CardTitle className="text-base font-semibold text-foreground">{chart.title}</CardTitle>
-            {!compact && !minimalMode && chart.description ? (
-              <CardDescription>{chart.description}</CardDescription>
-            ) : null}
-          </div>
-        </div>
+    <Card className={cn('rounded-xl border bg-card shadow-sm', shouldSpanWide && 'xl:col-span-2')}>
+      <CardHeader className="space-y-1 pb-3">
+        <CardTitle className="text-base font-semibold tracking-tight text-foreground">
+          {chart.title}
+        </CardTitle>
+        {!compact && !minimalMode && chart.description ? (
+          <CardDescription className="text-xs">{chart.description}</CardDescription>
+        ) : null}
       </CardHeader>
-      <CardContent className="px-4 pb-4 pt-0 sm:px-6 sm:pb-6">
-        <div className="border-primary/14 rounded-[24px] border bg-background/50 p-2 sm:p-3">
-          <div className={chartHeightClass}>{content}</div>
-        </div>
+      <CardContent className="pt-0">
+        <div className={chartHeightClass}>{content}</div>
       </CardContent>
     </Card>
   );
@@ -888,89 +845,51 @@ export function DashboardBreakdownCard({
   const topItem = hasTopItem ? breakdown.items[0] : null;
   const remainingItems = breakdown.items.slice(hasTopItem ? 1 : 0);
 
+  const allItems = hasTopItem && topItem ? [topItem, ...remainingItems] : remainingItems;
+
   return (
-    <Card className="border-accent/28 bg-card shadow-[0_24px_64px_-48px_rgba(15,23,42,0.16)]">
-      <CardHeader className={cn(compact ? 'space-y-0 pb-4' : 'space-y-1')}>
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div className="space-y-1">
-            <div className="flex flex-wrap items-center gap-2">
-              <Badge
-                variant="outline"
-                className="border-primary/18 rounded-full bg-background px-2.5 py-0.5 text-[10px] text-muted-foreground"
-              >
-                {t('dashboard.breakdownKindLabel', undefined, 'Список')}
-              </Badge>
-              <Badge
-                variant="outline"
-                className="border-primary/18 rounded-full bg-background px-2.5 py-0.5 text-[10px] text-muted-foreground"
-              >
-                {breakdown.items.length} {t('dashboard.breakdownLabelShort', undefined, 'поз.')}
-              </Badge>
-            </div>
-            <CardTitle className="text-base font-semibold text-foreground">
-              {breakdown.title}
-            </CardTitle>
-            {!compact && !minimalMode && breakdown.description ? (
-              <CardDescription>{breakdown.description}</CardDescription>
-            ) : null}
-          </div>
-        </div>
+    <Card className="rounded-xl border bg-card shadow-sm">
+      <CardHeader className="space-y-1 pb-3">
+        <CardTitle className="text-base font-semibold tracking-tight text-foreground">
+          {breakdown.title}
+        </CardTitle>
+        {!compact && !minimalMode && breakdown.description ? (
+          <CardDescription className="text-xs">{breakdown.description}</CardDescription>
+        ) : null}
       </CardHeader>
-      <CardContent className="space-y-3">
+      <CardContent className="pt-0">
         {breakdown.items.length === 0 ? (
-          <div className="border-accent/34 rounded-[22px] border border-dashed bg-card px-4 py-8 text-sm text-muted-foreground">
+          <div className="rounded-lg border border-dashed px-4 py-8 text-center text-sm text-muted-foreground">
             {t('common.noData')}
           </div>
         ) : (
-          <>
-            {hasTopItem && topItem ? (
-              <div className="border-primary/16 rounded-[22px] border bg-background/60 px-4 py-3">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-                  {t('dashboard.topItemLabel', undefined, 'Главная позиция')}
-                </p>
-                <div className="mt-2 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                  <div className="min-w-0 space-y-1">
-                    <p className="text-sm font-medium text-foreground">{topItem.label}</p>
-                    {!minimalMode && topItem.caption ? (
-                      <p className="text-xs leading-5 text-muted-foreground">{topItem.caption}</p>
-                    ) : null}
-                  </div>
-                  <span className="font-mono text-sm font-medium tabular-nums text-foreground">
-                    {formatValue(
-                      topItem.value,
-                      locale,
-                      (topItem as { unit?: string | null }).unit ?? breakdownUnit,
-                    )}
-                  </span>
-                </div>
-              </div>
-            ) : null}
-            {remainingItems.map((item, index) => {
+          <ul className="divide-y rounded-lg border">
+            {allItems.map((item, index) => {
               const itemUnit = (item as { unit?: string | null }).unit ?? breakdownUnit;
 
               return (
-                <div
+                <li
                   key={`${breakdown.key}-${item.label}-${index}`}
-                  className="flex flex-col gap-3 rounded-[22px] border border-primary/20 bg-card px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
+                  className="flex items-center justify-between gap-4 px-4 py-2.5"
                 >
                   <div className="flex min-w-0 items-center gap-3">
-                    <span className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-primary/10 text-[11px] font-semibold text-primary">
-                      {index + 2}
+                    <span className="w-6 shrink-0 text-xs font-medium tabular-nums text-muted-foreground">
+                      {index + 1}.
                     </span>
-                    <div className="min-w-0 space-y-1">
-                      <span className="text-sm text-foreground">{item.label}</span>
+                    <div className="min-w-0">
+                      <span className="block truncate text-sm text-foreground">{item.label}</span>
                       {!minimalMode && item.caption ? (
-                        <p className="text-xs leading-5 text-muted-foreground">{item.caption}</p>
+                        <p className="truncate text-xs text-muted-foreground">{item.caption}</p>
                       ) : null}
                     </div>
                   </div>
-                  <span className="font-mono text-sm font-medium tabular-nums text-foreground">
+                  <span className="shrink-0 font-mono text-sm font-medium tabular-nums text-foreground">
                     {formatValue(item.value, locale, itemUnit)}
                   </span>
-                </div>
+                </li>
               );
             })}
-          </>
+          </ul>
         )}
       </CardContent>
     </Card>

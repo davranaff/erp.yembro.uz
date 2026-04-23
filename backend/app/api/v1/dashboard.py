@@ -2165,7 +2165,9 @@ async def _build_slaughterhouse_section(
             ) AS processed_weight_kg,
             SUM(COALESCE(sp.first_sort_weight_kg, 0)) AS first_sort_weight_kg,
             SUM(COALESCE(sp.second_sort_weight_kg, 0)) AS second_sort_weight_kg,
-            SUM(COALESCE(sp.bad_weight_kg, 0)) AS bad_weight_kg
+            SUM(COALESCE(sp.bad_weight_kg, 0)) AS bad_weight_kg,
+            SUM(COALESCE(sp.net_meat_kg, 0)) AS net_meat_kg,
+            SUM(COALESCE(sp.waste_kg, 0)) AS waste_kg
         FROM slaughter_processings sp
         INNER JOIN slaughter_arrivals ar ON ar.id = sp.arrival_id
         INNER JOIN departments d ON d.id = sp.department_id
@@ -2297,11 +2299,18 @@ async def _build_slaughterhouse_section(
     first_sort_weight_total = _sum_rows(quality_rows, "first_sort_weight_kg")
     second_sort_weight_total = _sum_rows(quality_rows, "second_sort_weight_kg")
     bad_weight_total = _sum_rows(quality_rows, "bad_weight_kg")
+    net_meat_total = _sum_rows(quality_rows, "net_meat_kg")
+    waste_total = _sum_rows(quality_rows, "waste_kg")
     meat_weight_total = first_sort_weight_total + second_sort_weight_total
-    dressing_yield_pct = _ratio(processed_weight_total, arrival_weight_total)
     first_sort_weight_share_pct = _ratio(first_sort_weight_total, processed_weight_total)
     bad_weight_share_pct = _ratio(bad_weight_total, processed_weight_total)
     meat_weight_share_pct = _ratio(meat_weight_total, processed_weight_total)
+    # % distribution of net meat vs waste out of the total reported
+    # weight (net_meat + waste). If neither column is filled, shares
+    # stay at 0 — the operator sees the KPI as "нет данных".
+    meat_plus_waste_total = net_meat_total + waste_total
+    net_meat_share_pct = _ratio(net_meat_total, meat_plus_waste_total)
+    waste_share_pct = _ratio(waste_total, meat_plus_waste_total)
 
     return DashboardSectionSchema(
         key="slaughterhouse",
@@ -2317,7 +2326,10 @@ async def _build_slaughterhouse_section(
             _metric(key="bad_total", label="Брак / плохой", value=_sum_rows(quality_rows, "bad_count"), unit="шт"),
             _metric(key="arrival_weight_kg", label="Вес поступившей птицы", value=arrival_weight_total, unit="кг"),
             _metric(key="processed_weight_kg", label="Вес после разделки", value=processed_weight_total, unit="кг"),
-            _metric(key="dressing_yield_pct", label="Убойный выход", value=dressing_yield_pct, unit="%"),
+            _metric(key="net_meat_kg", label="Чистое мясо", value=net_meat_total, unit="кг"),
+            _metric(key="waste_kg", label="Отходы", value=waste_total, unit="кг"),
+            _metric(key="net_meat_share_pct", label="Доля чистого мяса", value=net_meat_share_pct, unit="%"),
+            _metric(key="waste_share_pct", label="Доля отходов", value=waste_share_pct, unit="%"),
             _metric(key="first_sort_weight_share_pct", label="Доля первого сорта по весу", value=first_sort_weight_share_pct, unit="%"),
             _metric(key="bad_weight_share_pct", label="Доля брака по весу", value=bad_weight_share_pct, unit="%"),
             _metric(key="semi_products", label="Полуфабриката произведено", value=_sum_rows(semi_rows, "value"), unit="кг"),
@@ -2507,6 +2519,26 @@ def _chart_copy(charts: dict[str, DashboardChartSchema], key: str) -> DashboardC
     return chart.model_copy(deep=True)
 
 
+def _pick_finance_kpis(
+    finance_by_key: dict[str, DashboardMetricSchema],
+) -> list[DashboardMetricSchema]:
+    """Return the minimal finance-KPI pair surfaced on operational dashboards.
+
+    Keeps the module dashboard focused on operational numbers while still
+    answering the two money questions every operator gets asked:
+    «В плюсе или минусе?» (``financial_result``) and
+    «Сколько уходит на текущие расходы?» (``total_expenses``).
+    """
+    return [
+        metric
+        for metric in (
+            finance_by_key.get("financial_result"),
+            finance_by_key.get("total_expenses"),
+        )
+        if metric is not None
+    ]
+
+
 def _department_label(row: dict[str, object] | None) -> str:
     if row is None:
         return ""
@@ -2627,7 +2659,6 @@ async def _build_egg_dashboard_module(
     base = await _build_egg_farm_section(db, start_date, end_date, department_ids)
     metrics = _metric_map(base)
     charts = _chart_map(base)
-    breakdowns = _breakdown_map(base)
     finance_analytics = await _build_module_finance_analytics(
         db,
         module_key="egg",
@@ -2636,41 +2667,24 @@ async def _build_egg_dashboard_module(
         end_date=end_date,
         department_ids=department_ids,
     )
+    finance_by_key = {metric.key: metric for metric in finance_analytics.metrics}
 
-    recent_shipments_rows = await db.fetch(
-        f"""
-        SELECT
-            es.id::text AS key,
-            CONCAT(TO_CHAR(es.shipped_on, 'YYYY-MM-DD'), ' • ', {_client_label_sql('c')}) AS label,
-            es.eggs_count AS value,
-            CONCAT('Выручка: ', ROUND(COALESCE(es.unit_price, 0) * es.eggs_count, 2)::text, ' UZS') AS caption
-        FROM egg_shipments es
-        INNER JOIN clients c ON c.id = es.client_id
-        WHERE {_date_condition('es.shipped_on')} AND {_department_condition('es.department_id')}
-        ORDER BY es.shipped_on DESC, es.created_at DESC
-        LIMIT 8
-        """,
-        start_date,
-        end_date,
-        department_ids,
-    )
-    client_registry_rows = await db.fetch(
+    client_rows = await db.fetch(
         f"""
         SELECT
             c.id::text AS key,
             {_client_label_sql('c')} AS label,
-            COUNT(es.id) AS value,
+            SUM(es.eggs_count) AS value,
+            'шт' AS unit,
             CONCAT(
                 COALESCE(NULLIF(c.phone, ''), 'без телефона'),
-                CASE
-                    WHEN NULLIF(c.company_name, '') IS NOT NULL THEN CONCAT(' • ', c.company_name)
-                    ELSE ''
-                END
+                ' • отгрузок: ',
+                COUNT(*)::text
             ) AS caption
         FROM egg_shipments es
         INNER JOIN clients c ON c.id = es.client_id
         WHERE {_date_condition('es.shipped_on')} AND {_department_condition('es.department_id')}
-        GROUP BY c.id, c.company_name, c.first_name, c.last_name, c.client_code
+        GROUP BY c.id, c.company_name, c.first_name, c.last_name, c.client_code, c.phone
         ORDER BY value DESC, label
         LIMIT 8
         """,
@@ -2678,27 +2692,6 @@ async def _build_egg_dashboard_module(
         end_date,
         department_ids,
     )
-
-    quality_stats_row = await db.fetchrow(
-        f"""
-        SELECT
-            COUNT(*) FILTER (WHERE qc.status = 'passed') AS passed,
-            COUNT(*) FILTER (WHERE qc.status = 'failed') AS failed,
-            COUNT(*) FILTER (WHERE qc.status = 'pending') AS pending,
-            COUNT(*) AS total
-        FROM egg_quality_checks qc
-        WHERE {_date_condition('qc.checked_on')}
-          AND {_department_condition('qc.department_id')}
-        """,
-        start_date,
-        end_date,
-        department_ids,
-    )
-    qc_passed = _to_float(quality_stats_row["passed"]) if quality_stats_row is not None else 0.0
-    qc_failed = _to_float(quality_stats_row["failed"]) if quality_stats_row is not None else 0.0
-    qc_pending = _to_float(quality_stats_row["pending"]) if quality_stats_row is not None else 0.0
-    qc_total = _to_float(quality_stats_row["total"]) if quality_stats_row is not None else 0.0
-    qc_pass_rate = _ratio(qc_passed, qc_passed + qc_failed)
 
     loss_rate = metrics.get("loss_rate").value if metrics.get("loss_rate") is not None else 0.0
     alerts: list[DashboardAlertSchema] = []
@@ -2708,7 +2701,7 @@ async def _build_egg_dashboard_module(
                 key="egg_loss_rate_critical",
                 level="critical",
                 title="Высокий процент потерь",
-                message="Потери яиц превысили критический порог.",
+                message="Потери яиц превысили критический порог 12%.",
                 value=loss_rate,
                 unit="%",
             )
@@ -2719,115 +2712,37 @@ async def _build_egg_dashboard_module(
                 key="egg_loss_rate_warning",
                 level="warning",
                 title="Рост потерь яиц",
-                message="Потери выше целевого операционного уровня.",
+                message="Потери выше целевого операционного уровня 7%.",
                 value=loss_rate,
-                unit="%",
-            )
-        )
-    if qc_pending > 0:
-        alerts.append(
-            DashboardAlertSchema(
-                key="egg_quality_pending",
-                level="warning",
-                title="Ожидают контроля качества",
-                message="Есть партии яиц, ожидающие проверки — они блокируют отгрузки клиентам.",
-                value=qc_pending,
-                unit="шт",
-            )
-        )
-    if qc_failed > 0 and qc_total > 0 and qc_pass_rate < 90:
-        alerts.append(
-            DashboardAlertSchema(
-                key="egg_quality_pass_rate_low",
-                level="warning",
-                title="Низкий процент прохождения QC",
-                message="Процент проверок качества яиц, прошедших успешно, ниже 90%.",
-                value=qc_pass_rate,
                 unit="%",
             )
         )
 
     selected_charts = [
         _chart_copy(charts, "egg_output_daily"),
-        _chart_copy(charts, "egg_monthly_flow"),
-        _chart_copy(charts, "egg_destination_flow"),
-        _chart_copy(charts, "egg_loss_rate"),
-        _chart_copy(charts, "farm_feed_supply"),
-        _chart_copy(charts, "farm_medicine_usage"),
-        _chart_copy(charts, "egg_revenue_daily"),
     ]
 
-    module = DashboardModuleSchema(
+    return DashboardModuleSchema(
         key="egg_farm",
         title="Маточник",
-        description="Операционный контур маточника: выпуск, потери, отгрузка и ключевые ресурсы.",
+        description="Выпуск яиц, потери и отгрузки.",
         kpis=[
-            _metric_from(metrics, "net_eggs", key="net_eggs", label="Чистый выпуск яиц"),
-            _metric_from(metrics, "current_stock", key="current_stock", label="Остаток яиц", unit="шт"),
-            _metric_from(metrics, "loss_rate", key="loss_rate", label="Процент потерь", unit="%"),
-            _metric_from(metrics, "sales_volume", key="shipment_volume", label="Объём отгрузки", unit="шт"),
-            _metric_from(
-                metrics,
-                "eggs_to_incubation",
-                key="eggs_to_incubation",
-                label="Передано в инкубацию",
-                unit="шт",
-            ),
-            _metric_from(metrics, "sales_revenue", key="egg_revenue", label="Выручка от яиц", unit="UZS"),
-            _metric_from(metrics, "feed_consumed", key="feed_consumed", label="Расход корма", unit="кг"),
-            _metric_from(metrics, "medicine_used", key="medicine_consumed", label="Расход лекарств", unit="ед."),
-            _metric_from(metrics, "client_base", key="client_base", label="Клиентская база", unit="клиентов"),
-            DashboardMetricSchema(
-                key="egg_quality_pass_rate",
-                label="Процент прохождения QC",
-                value=qc_pass_rate,
-                unit="%",
-            ),
-            DashboardMetricSchema(
-                key="egg_quality_pending",
-                label="Ожидают проверки",
-                value=qc_pending,
-                unit="шт",
-            ),
-            *finance_analytics.metrics,
+            _metric_from(metrics, "net_eggs", key="net_eggs", label="Чистый выпуск яиц", unit="шт"),
+            _metric_from(metrics, "loss_rate", key="loss_rate", label="% потерь", unit="%"),
+            _metric_from(metrics, "sales_volume", key="shipment_volume", label="Отгружено клиентам", unit="шт"),
+            *_pick_finance_kpis(finance_by_key),
         ],
-        charts=[chart for chart in [*selected_charts, *finance_analytics.charts] if chart is not None],
+        charts=[chart for chart in selected_charts if chart is not None],
         tables=[
-            _table_from_breakdown(
-                breakdowns.get("egg_clients"),
+            DashboardTableSchema(
                 key="egg_clients",
-                title="Выручка по клиентам",
-                description="Какие клиенты дают основную выручку по яйцам.",
+                title="Клиенты по яйцам",
+                description="Топ покупателей по объёму отгрузок за период.",
+                items=_table_items_from_rows(client_rows),
             ),
-            _table_from_breakdown(
-                breakdowns.get("egg_destination_balance"),
-                key="egg_destination_balance",
-                title="Баланс движения яиц",
-                description="Куда уходит выпуск маточника внутри выбранного периода.",
-            ),
-            _table_from_breakdown(
-                breakdowns.get("egg_feed_types"),
-                key="egg_feed_types",
-                title="Структура расхода корма",
-                description="Какие типы корма больше всего потребляются в маточнике.",
-            ),
-            DashboardTableSchema(
-                key="egg_client_registry",
-                title="Активная клиентская база",
-                description="Клиенты, которые реально участвовали в отгрузках яиц за период.",
-                items=_table_items_from_rows(client_registry_rows),
-            ),
-            DashboardTableSchema(
-                key="egg_recent_shipments",
-                title="Последние отгрузки",
-                description="Последние операции отгрузки яиц клиентам.",
-                items=_table_items_from_rows(recent_shipments_rows, default_unit="шт"),
-            ),
-            *finance_analytics.tables,
         ],
-        alerts=[*alerts, *finance_analytics.alerts],
+        alerts=alerts,
     )
-    return module
 
 
 async def _build_incubation_dashboard_module(
@@ -2839,6 +2754,15 @@ async def _build_incubation_dashboard_module(
     base = await _build_incubation_section(db, start_date, end_date, department_ids)
     metrics = _metric_map(base)
     charts = _chart_map(base)
+    finance_analytics = await _build_module_finance_analytics(
+        db,
+        module_key="incubation",
+        module_prefix="incubation",
+        start_date=start_date,
+        end_date=end_date,
+        department_ids=department_ids,
+    )
+    finance_by_key = {metric.key: metric for metric in finance_analytics.metrics}
 
     eggs_set_row = await db.fetchrow(
         f"""
@@ -2992,6 +2916,7 @@ async def _build_incubation_dashboard_module(
             _metric_from(metrics, "chicks_hatched", key="chicks_hatched", label="Птенцов вывелось", unit="шт"),
             _metric_from(metrics, "hatch_rate", key="hatch_rate", label="Hatch rate", unit="%"),
             _metric_from(metrics, "sales_volume", key="chicks_dispatched", label="Отгружено", unit="шт", value=dispatched_total),
+            *_pick_finance_kpis(finance_by_key),
         ],
         charts=[chart for chart in selected_charts if chart is not None],
         tables=[
@@ -3021,6 +2946,15 @@ async def _build_factory_dashboard_module(
     base = await _build_factory_section(db, start_date, end_date, department_ids)
     metrics = _metric_map(base)
     charts = _chart_map(base)
+    finance_analytics = await _build_module_finance_analytics(
+        db,
+        module_key="factory",
+        module_prefix="factory",
+        start_date=start_date,
+        end_date=end_date,
+        department_ids=department_ids,
+    )
+    finance_by_key = {metric.key: metric for metric in finance_analytics.metrics}
 
     # --- Flock performance (active flocks with mortality % in window) ---
     flock_perf_rows = await db.fetch(
@@ -3117,6 +3051,7 @@ async def _build_factory_dashboard_module(
             _metric_from(metrics, "fcr", key="fcr", label="FCR (корм/привес)", unit="кг/кг"),
             _metric_from(metrics, "avg_weight_per_bird", key="avg_weight_per_bird", label="Средний вес птицы", unit="кг"),
             _metric_from(metrics, "total_shipped", key="total_shipped", label="Отгружено", unit="шт"),
+            *_pick_finance_kpis(finance_by_key),
         ],
         charts=[chart for chart in selected_charts if chart is not None],
         tables=[
@@ -3145,8 +3080,6 @@ async def _build_feed_mill_dashboard_module(
 ) -> DashboardModuleSchema:
     base = await _build_feed_mill_section(db, start_date, end_date, department_ids)
     metrics = _metric_map(base)
-    charts = _chart_map(base)
-    breakdowns = _breakdown_map(base)
     finance_analytics = await _build_module_finance_analytics(
         db,
         module_key="feed",
@@ -3155,37 +3088,7 @@ async def _build_feed_mill_dashboard_module(
         end_date=end_date,
         department_ids=department_ids,
     )
-
-    stock_row = await db.fetchrow(
-        """
-        WITH balances AS (
-            SELECT
-                sm.item_key,
-                SUM(
-                    CASE
-                        WHEN sm.movement_kind IN ('incoming', 'transfer_in', 'adjustment_in')
-                        THEN sm.quantity
-                        ELSE -sm.quantity
-                    END
-                ) AS balance
-            FROM stock_movements sm
-            INNER JOIN departments d ON d.id = sm.department_id
-            WHERE d.module_key = 'feed'
-              AND sm.item_type = 'feed'
-              AND ($1::date IS NULL OR sm.occurred_on <= $1::date)
-              AND ($2::uuid[] IS NULL OR sm.department_id = ANY($2::uuid[]))
-            GROUP BY sm.item_key
-        )
-        SELECT
-            COALESCE(SUM(CASE WHEN item_key LIKE 'feed_raw:%' THEN balance ELSE 0 END), 0) AS raw_stock,
-            COALESCE(SUM(CASE WHEN item_key LIKE 'feed_product:%' THEN balance ELSE 0 END), 0) AS product_stock
-        FROM balances
-        """,
-        end_date,
-        department_ids,
-    )
-    raw_stock = _to_float(stock_row["raw_stock"]) if stock_row is not None else 0.0
-    product_stock = _to_float(stock_row["product_stock"]) if stock_row is not None else 0.0
+    finance_by_key = {metric.key: metric for metric in finance_analytics.metrics}
 
     low_raw_stock_rows = await db.fetch(
         """
@@ -3222,110 +3125,21 @@ async def _build_feed_mill_dashboard_module(
         end_date,
         department_ids,
     )
-    recent_batches_rows = await db.fetch(
-        f"""
-        SELECT
-            fpb.id::text AS key,
-            COALESCE(NULLIF(fpb.batch_code, ''), fpb.id::text) AS label,
-            COALESCE(fpb.actual_output, 0) AS value,
-            CONCAT(
-                'Формула: ',
-                COALESCE(NULLIF(ff.name, ''), NULLIF(ff.code, ''), '—'),
-                ' • ',
-                TO_CHAR(COALESCE(fpb.finished_on, fpb.started_on), 'YYYY-MM-DD')
-            ) AS caption
-        FROM feed_production_batches fpb
-        INNER JOIN departments d ON d.id = fpb.department_id
-        LEFT JOIN feed_formulas ff ON ff.id = fpb.formula_id
-        WHERE d.module_key = 'feed'
-          AND {_date_condition('COALESCE(fpb.finished_on, fpb.started_on)')}
-          AND {_department_condition('fpb.department_id')}
-        ORDER BY COALESCE(fpb.finished_on, fpb.started_on) DESC, fpb.created_at DESC
-        LIMIT 8
-        """,
-        start_date,
-        end_date,
-        department_ids,
-    )
-    client_registry_rows = await db.fetch(
-        f"""
-        SELECT
-            c.id::text AS key,
-            {_client_label_sql('c')} AS label,
-            COUNT(*) AS value,
-            'отгрузок' AS unit,
-            CONCAT(
-                COALESCE(NULLIF(c.phone, ''), 'без телефона'),
-                ' • продукт: ',
-                ROUND(SUM(fps.quantity), 3)::text,
-                ' кг'
-            ) AS caption
-        FROM feed_product_shipments fps
-        INNER JOIN departments d ON d.id = fps.department_id
-        INNER JOIN clients c ON c.id = fps.client_id
-        WHERE d.module_key = 'feed'
-          AND fps.client_id IS NOT NULL
-          AND {_date_condition('fps.shipped_on')}
-          AND {_department_condition('fps.department_id')}
-        GROUP BY c.id, c.company_name, c.first_name, c.last_name, c.client_code, c.phone
-        ORDER BY value DESC, label
-        LIMIT 8
-        """,
-        start_date,
-        end_date,
-        department_ids,
-    )
-    recent_shipments_rows = await db.fetch(
-        f"""
-        SELECT
-            fps.id::text AS key,
-            CONCAT(TO_CHAR(fps.shipped_on, 'YYYY-MM-DD'), ' • ', {_client_label_sql('c')}) AS label,
-            fps.quantity AS value,
-            CONCAT(
-                'Выручка: ',
-                ROUND(COALESCE(fps.unit_price, 0) * fps.quantity, 2)::text,
-                ' UZS'
-            ) AS caption
-        FROM feed_product_shipments fps
-        INNER JOIN departments d ON d.id = fps.department_id
-        LEFT JOIN clients c ON c.id = fps.client_id
-        WHERE d.module_key = 'feed'
-          AND {_date_condition('fps.shipped_on')}
-          AND {_department_condition('fps.department_id')}
-        ORDER BY fps.shipped_on DESC, fps.created_at DESC
-        LIMIT 8
-        """,
-        start_date,
-        end_date,
-        department_ids,
-    )
-
-    quality_stats_row = await db.fetchrow(
-        f"""
-        SELECT
-            COUNT(*) FILTER (WHERE qc.status = 'passed') AS passed,
-            COUNT(*) FILTER (WHERE qc.status = 'failed') AS failed,
-            COUNT(*) FILTER (WHERE qc.status = 'pending') AS pending,
-            COUNT(*) AS total
-        FROM feed_production_quality_checks qc
-        WHERE {_date_condition('qc.checked_on')}
-          AND {_department_condition('qc.department_id')}
-        """,
-        start_date,
-        end_date,
-        department_ids,
-    )
-    qc_passed = _to_float(quality_stats_row["passed"]) if quality_stats_row is not None else 0.0
-    qc_failed = _to_float(quality_stats_row["failed"]) if quality_stats_row is not None else 0.0
-    qc_pending = _to_float(quality_stats_row["pending"]) if quality_stats_row is not None else 0.0
-    qc_total = _to_float(quality_stats_row["total"]) if quality_stats_row is not None else 0.0
-    qc_pass_rate = _ratio(qc_passed, qc_passed + qc_failed)
-
-    shipment_rate = metrics.get("shipment_rate").value if metrics.get("shipment_rate") is not None else 0.0
-    output_value = metrics.get("product_output").value if metrics.get("product_output") is not None else 0.0
     shrinkage_pct_val = metrics.get("shrinkage_pct").value if metrics.get("shrinkage_pct") is not None else 0.0
     raw_consumed_value = metrics.get("raw_consumptions").value if metrics.get("raw_consumptions") is not None else 0.0
+
     alerts: list[DashboardAlertSchema] = []
+    if low_raw_stock_rows:
+        alerts.append(
+            DashboardAlertSchema(
+                key="feed_low_raw_stock",
+                level="warning",
+                title="Критичные остатки сырья",
+                message="Есть ингредиенты с низким остатком — закупите до остановки линии.",
+                value=float(len(low_raw_stock_rows)),
+                unit="шт",
+            )
+        )
     if raw_consumed_value > 0 and shrinkage_pct_val > 3:
         alerts.append(
             DashboardAlertSchema(
@@ -3337,133 +3151,27 @@ async def _build_feed_mill_dashboard_module(
                 unit="%",
             )
         )
-    if output_value > 0 and shipment_rate < 65:
-        alerts.append(
-            DashboardAlertSchema(
-                key="feed_shipment_rate_low",
-                level="warning",
-                title="Низкая реализация выпуска",
-                message="Отгрузка готового продукта отстаёт от объёма выпуска.",
-                value=shipment_rate,
-                unit="%",
-            )
-        )
-    if low_raw_stock_rows:
-        alerts.append(
-            DashboardAlertSchema(
-                key="feed_low_raw_stock",
-                level="warning",
-                title="Критичные остатки сырья",
-                message="Есть ингредиенты с низким остатком.",
-                value=float(len(low_raw_stock_rows)),
-                unit="шт",
-            )
-        )
-    if qc_pending > 0:
-        alerts.append(
-            DashboardAlertSchema(
-                key="feed_quality_pending",
-                level="warning",
-                title="Ожидают контроля качества",
-                message="Есть партии корма, ожидающие проверки — они блокируют отгрузку клиентам.",
-                value=qc_pending,
-                unit="шт",
-            )
-        )
-    if qc_failed > 0 and qc_total > 0 and qc_pass_rate < 90:
-        alerts.append(
-            DashboardAlertSchema(
-                key="feed_quality_pass_rate_low",
-                level="warning",
-                title="Низкий процент прохождения QC",
-                message="Процент проверок качества корма, прошедших успешно, ниже 90%.",
-                value=qc_pass_rate,
-                unit="%",
-            )
-        )
-
-    selected_charts = [
-        _chart_copy(charts, "feed_raw_flow"),
-        _chart_copy(charts, "feed_product_flow"),
-        _chart_copy(charts, "feed_shipment_rate"),
-        _chart_copy(charts, "feed_revenue"),
-        _chart_copy(charts, "feed_ingredient_mix"),
-    ]
 
     return DashboardModuleSchema(
         key="feed_mill",
         title="Корма завод",
-        description="Сырьё, формулы продукта, клиентская база и последние операции кормового производства.",
+        description="Выпуск, отгрузки и остатки сырья.",
         kpis=[
-            _metric_from(metrics, "raw_arrivals", key="raw_arrivals", label="Приход сырья", unit="кг"),
-            _metric_from(metrics, "raw_consumptions", key="raw_consumed", label="Расход сырья", unit="кг"),
             _metric_from(metrics, "product_output", key="product_output", label="Выпуск готового корма", unit="кг"),
-            _metric_from(metrics, "sales_volume", key="product_shipped", label="Отгрузка готового продукта", unit="кг"),
-            _metric_from(metrics, "client_base", key="client_base", label="Клиентская база", unit="клиентов"),
-            _metric_from(metrics, "sales_revenue", key="sales_revenue", label="Выручка", unit="UZS"),
-            _metric(
-                key="stock_total",
-                label="Текущий остаток сырьё+продукт",
-                value=raw_stock + product_stock,
-                unit="кг",
-            ),
-            _metric_from(metrics, "shipment_rate", key="shipment_rate", label="Shipment rate / output utilization", unit="%"),
+            _metric_from(metrics, "sales_volume", key="product_shipped", label="Отгрузка продукта", unit="кг"),
             _metric_from(metrics, "shrinkage_pct", key="shrinkage_pct", label="Технологические потери", unit="%"),
-            DashboardMetricSchema(
-                key="feed_quality_pass_rate",
-                label="Процент прохождения QC",
-                value=qc_pass_rate,
-                unit="%",
-            ),
-            DashboardMetricSchema(
-                key="feed_quality_pending",
-                label="Ожидают проверки",
-                value=qc_pending,
-                unit="шт",
-            ),
-            *finance_analytics.metrics,
+            *_pick_finance_kpis(finance_by_key),
         ],
-        charts=[chart for chart in [*selected_charts, *finance_analytics.charts] if chart is not None],
+        charts=[],
         tables=[
-            _table_from_breakdown(
-                breakdowns.get("feed_formulas"),
-                key="feed_formulas",
-                title="Продукт и формулы",
-                description="Какие формулы дают основной выпуск готового продукта.",
-            ),
-            _table_from_breakdown(
-                breakdowns.get("feed_clients"),
-                key="feed_clients",
-                title="Выручка по клиентам",
-                description="Какие клиенты дают основной сбыт и выручку по готовому корму.",
-            ),
-            DashboardTableSchema(
-                key="feed_client_registry",
-                title="Активная клиентская база",
-                description="Контрагенты, которые участвовали в поставках сырья и отгрузках готового продукта.",
-                items=_table_items_from_rows(client_registry_rows),
-            ),
             DashboardTableSchema(
                 key="feed_low_raw_stock",
                 title="Сырьё с низким остатком",
-                description="Позиции, которые рискуют остановить выпуск.",
+                description="Ингредиенты, которые рискуют остановить выпуск — закупите в первую очередь.",
                 items=_table_items_from_rows(low_raw_stock_rows, default_unit="кг"),
             ),
-            DashboardTableSchema(
-                key="feed_recent_batches",
-                title="Последние производственные партии",
-                description="Последние batch'и выпуска готового корма.",
-                items=_table_items_from_rows(recent_batches_rows, default_unit="кг"),
-            ),
-            DashboardTableSchema(
-                key="feed_recent_shipments",
-                title="Последние отгрузки продукта",
-                description="Последние отгрузки готового корма клиентам.",
-                items=_table_items_from_rows(recent_shipments_rows, default_unit="кг"),
-            ),
-            *finance_analytics.tables,
         ],
-        alerts=[*alerts, *finance_analytics.alerts],
+        alerts=alerts,
     )
 
 
@@ -3474,8 +3182,6 @@ async def _build_vet_pharmacy_dashboard_module(
     department_ids: list[UUID] | None,
 ) -> DashboardModuleSchema:
     base = await _build_vet_pharmacy_section(db, start_date, end_date, department_ids)
-    metrics = _metric_map(base)
-    charts = _chart_map(base)
     breakdowns = _breakdown_map(base)
     finance_analytics = await _build_module_finance_analytics(
         db,
@@ -3485,6 +3191,7 @@ async def _build_vet_pharmacy_dashboard_module(
         end_date=end_date,
         department_ids=department_ids,
     )
+    finance_by_key = {metric.key: metric for metric in finance_analytics.metrics}
 
     as_of = end_date or date.today()
     expiry_row = await db.fetchrow(
@@ -3512,141 +3219,6 @@ async def _build_vet_pharmacy_dashboard_module(
     expiring_count = _to_float(expiry_row["expiring_count"]) if expiry_row is not None else 0.0
     expired_count = _to_float(expiry_row["expired_count"]) if expiry_row is not None else 0.0
 
-    stock_value_row = await db.fetchrow(
-        """
-        SELECT
-            COALESCE(SUM(
-                CASE
-                    WHEN mb.unit_cost IS NOT NULL AND mb.remaining_quantity > 0
-                    THEN mb.remaining_quantity * mb.unit_cost
-                    ELSE 0
-                END
-            ), 0) AS stock_value,
-            COALESCE(SUM(
-                CASE
-                    WHEN mb.unit_cost IS NOT NULL
-                      AND mb.remaining_quantity > 0
-                      AND mb.expiry_date IS NOT NULL
-                      AND mb.expiry_date <= ($1::date + INTERVAL '30 days')
-                    THEN mb.remaining_quantity * mb.unit_cost
-                    ELSE 0
-                END
-            ), 0) AS value_at_risk,
-            COALESCE(SUM(
-                CASE
-                    WHEN mb.unit_cost IS NOT NULL
-                      AND mb.remaining_quantity > 0
-                      AND mb.expiry_date IS NOT NULL
-                      AND mb.expiry_date < $1::date
-                    THEN mb.remaining_quantity * mb.unit_cost
-                    ELSE 0
-                END
-            ), 0) AS expired_value
-        FROM medicine_batches mb
-        INNER JOIN departments d ON d.id = mb.department_id
-        WHERE d.module_key = 'medicine'
-          AND ($2::uuid[] IS NULL OR mb.department_id = ANY($2::uuid[]))
-        """,
-        as_of,
-        department_ids,
-    )
-    stock_value_uzs = _to_float(stock_value_row["stock_value"]) if stock_value_row is not None else 0.0
-    value_at_risk_uzs = _to_float(stock_value_row["value_at_risk"]) if stock_value_row is not None else 0.0
-    expired_value_uzs = _to_float(stock_value_row["expired_value"]) if stock_value_row is not None else 0.0
-
-    latest_consumptions_rows = await db.fetch(
-        f"""
-        SELECT
-            mc.id::text AS key,
-            CONCAT(
-                TO_CHAR(mc.consumed_on, 'YYYY-MM-DD'),
-                ' • ',
-                COALESCE(NULLIF(mt.name, ''), NULLIF(mt.code, ''), 'Лекарство')
-            ) AS label,
-            mc.quantity AS value,
-            CONCAT(
-                'Партия: ',
-                COALESCE(NULLIF(mb.batch_code, ''), mb.id::text),
-                ' • ',
-                COALESCE(NULLIF(mc.purpose, ''), 'операционное списание')
-            ) AS caption,
-            mc.unit AS unit
-        FROM medicine_consumptions mc
-        INNER JOIN departments d ON d.id = mc.department_id
-        LEFT JOIN medicine_batches mb ON mb.id = mc.batch_id
-        LEFT JOIN medicine_types mt ON mt.id = mb.medicine_type_id
-        WHERE d.module_key = 'medicine'
-          AND {_date_condition('mc.consumed_on')}
-          AND {_department_condition('mc.department_id')}
-        ORDER BY mc.consumed_on DESC, mc.created_at DESC
-        LIMIT 8
-        """,
-        start_date,
-        end_date,
-        department_ids,
-    )
-    client_registry_rows = await db.fetch(
-        f"""
-        SELECT
-            c.id::text AS key,
-            {_client_label_sql('c')} AS label,
-            COUNT(*) AS value,
-            'операций' AS unit,
-            CONCAT(
-                COALESCE(NULLIF(c.phone, ''), 'без телефона'),
-                ' • расход: ',
-                ROUND(SUM(mc.quantity), 3)::text,
-                ' ед.'
-            ) AS caption
-        FROM medicine_consumptions mc
-        INNER JOIN departments d ON d.id = mc.department_id
-        INNER JOIN clients c ON c.id = mc.client_id
-        WHERE d.module_key = 'medicine'
-          AND mc.client_id IS NOT NULL
-          AND {_date_condition('mc.consumed_on')}
-          AND {_department_condition('mc.department_id')}
-        GROUP BY c.id, c.company_name, c.first_name, c.last_name, c.client_code, c.phone
-        ORDER BY value DESC, label
-        LIMIT 8
-        """,
-        start_date,
-        end_date,
-        department_ids,
-    )
-    recent_batches_rows = await db.fetch(
-        f"""
-        SELECT
-            mb.id::text AS key,
-            CONCAT(
-                TO_CHAR(mb.arrived_on, 'YYYY-MM-DD'),
-                ' • ',
-                COALESCE(NULLIF(mt.name, ''), NULLIF(mt.code, ''), 'Лекарство')
-            ) AS label,
-            mb.received_quantity AS value,
-            CONCAT(
-                'Партия: ',
-                COALESCE(NULLIF(mb.batch_code, ''), mb.id::text),
-                ' • ',
-                COALESCE(NULLIF(mb.barcode, ''), 'без штрихкода'),
-                ' • ',
-                COALESCE(TO_CHAR(mb.expiry_date, 'YYYY-MM-DD'), 'без срока')
-            ) AS caption,
-            mb.unit AS unit
-        FROM medicine_batches mb
-        INNER JOIN departments d ON d.id = mb.department_id
-        LEFT JOIN medicine_types mt ON mt.id = mb.medicine_type_id
-        WHERE d.module_key = 'medicine'
-          AND {_date_condition('mb.arrived_on')}
-          AND {_department_condition('mb.department_id')}
-        ORDER BY mb.arrived_on DESC, mb.created_at DESC
-        LIMIT 8
-        """,
-        start_date,
-        end_date,
-        department_ids,
-    )
-
-    turnover_rate = metrics.get("turnover_rate").value if metrics.get("turnover_rate") is not None else 0.0
     alerts: list[DashboardAlertSchema] = []
     if expired_count > 0:
         alerts.append(
@@ -3654,104 +3226,41 @@ async def _build_vet_pharmacy_dashboard_module(
                 key="medicine_expired_batches",
                 level="critical",
                 title="Есть просроченные партии",
-                message="На складе есть партии с истекшим сроком годности.",
+                message="На складе есть партии с истекшим сроком годности — оформите списание.",
                 value=expired_count,
                 unit="шт",
             )
         )
-    if expiring_count > 0:
-        alerts.append(
-            DashboardAlertSchema(
-                key="medicine_expiring_batches",
-                level="warning",
-                title="Партии с близким сроком",
-                message="Есть партии, истекающие в ближайшие 30 дней.",
-                value=expiring_count,
-                unit="шт",
-            )
-        )
-    if turnover_rate < 30 and metrics.get("arrivals", DashboardMetricSchema(key="", label="", value=0)).value > 0:
-        alerts.append(
-            DashboardAlertSchema(
-                key="medicine_turnover_low",
-                level="warning",
-                title="Низкая оборачиваемость",
-                message="Доля расхода существенно ниже входящего объёма.",
-                value=turnover_rate,
-                unit="%",
-            )
-        )
-    if stock_value_uzs > 0 and value_at_risk_uzs / stock_value_uzs >= 0.10:
-        alerts.append(
-            DashboardAlertSchema(
-                key="medicine_value_at_risk_high",
-                level="warning",
-                title="Стоимость под риском истечения",
-                message="Более 10% стоимости остатка истекает в ближайшие 30 дней.",
-                value=value_at_risk_uzs,
-                unit="UZS",
-            )
-        )
-
-    selected_charts = [
-        _chart_copy(charts, "medicine_flow"),
-        _chart_copy(charts, "medicine_stock"),
-        _chart_copy(charts, "medicine_expiry"),
-        _chart_copy(charts, "medicine_turnover_rate"),
-    ]
 
     return DashboardModuleSchema(
         key="vet_pharmacy",
         title="Вет аптека",
-        description="Контроль приходов/расходов лекарств, сроков годности и складских рисков.",
+        description="Контроль сроков годности лекарств на складе.",
         kpis=[
-            _metric_from(metrics, "arrivals", key="medicine_arrivals", label="Приход лекарств", unit="ед."),
-            _metric_from(metrics, "consumptions", key="medicine_consumed", label="Расход лекарств", unit="ед."),
-            _metric_from(metrics, "client_base", key="client_base", label="Клиентская база", unit="клиентов"),
-            _metric_from(metrics, "stock", key="current_stock", label="Текущий остаток", unit="ед."),
-            _metric(key="stock_value_uzs", label="Стоимость остатков", value=stock_value_uzs, unit="UZS"),
-            _metric(key="value_at_risk_uzs", label="Стоимость под риском (≤30 дней)", value=value_at_risk_uzs, unit="UZS"),
-            _metric(key="expired_value_uzs", label="Стоимость просроченных партий", value=expired_value_uzs, unit="UZS"),
-            _metric(key="expiring_batches", label="Партии скоро истекают", value=expiring_count, unit="шт"),
-            _metric(key="expired_batches", label="Просрочено / заблокировано", value=expired_count, unit="шт"),
-            _metric_from(metrics, "turnover_rate", key="turnover_rate", label="Turnover rate", unit="%"),
-            *finance_analytics.metrics,
+            _metric(
+                key="expiring_batches",
+                label="Партии скоро истекают",
+                value=expiring_count,
+                unit="шт",
+            ),
+            _metric(
+                key="expired_batches",
+                label="Просрочено / заблокировано",
+                value=expired_count,
+                unit="шт",
+            ),
+            *_pick_finance_kpis(finance_by_key),
         ],
-        charts=[chart for chart in [*selected_charts, *finance_analytics.charts] if chart is not None],
+        charts=[],
         tables=[
-            _table_from_breakdown(
-                breakdowns.get("medicine_suppliers"),
-                key="medicine_suppliers",
-                title="Клиентская база вет аптеки",
-                description="Контрагенты, которые участвуют в приходе и расходе лекарств.",
-            ),
-            DashboardTableSchema(
-                key="medicine_client_registry",
-                title="Активная клиентская база",
-                description="Поставщики и получатели, реально участвовавшие в движении лекарств за период.",
-                items=_table_items_from_rows(client_registry_rows),
-            ),
             _table_from_breakdown(
                 breakdowns.get("medicine_batches"),
                 key="medicine_expiry_batches",
                 title="Партии со сроками годности",
-                description="Партии с ближайшими сроками и остатком.",
+                description="Конкретные партии с ближайшими сроками — используйте их первыми.",
             ),
-            DashboardTableSchema(
-                key="medicine_recent_batches",
-                title="Последние партии прихода",
-                description="Последние принятые партии со штрихкодом и сроком годности.",
-                items=_table_items_from_rows(recent_batches_rows),
-            ),
-            DashboardTableSchema(
-                key="medicine_latest_consumptions",
-                title="Последние списания / выдачи",
-                description="Последние расходные операции по лекарствам.",
-                items=_table_items_from_rows(latest_consumptions_rows),
-            ),
-            *finance_analytics.tables,
         ],
-        alerts=[*alerts, *finance_analytics.alerts],
+        alerts=alerts,
     )
 
 
@@ -3763,8 +3272,6 @@ async def _build_slaughterhouse_dashboard_module(
 ) -> DashboardModuleSchema:
     base = await _build_slaughterhouse_section(db, start_date, end_date, department_ids)
     metrics = _metric_map(base)
-    charts = _chart_map(base)
-    breakdowns = _breakdown_map(base)
     finance_analytics = await _build_module_finance_analytics(
         db,
         module_key="slaughter",
@@ -3773,6 +3280,7 @@ async def _build_slaughterhouse_dashboard_module(
         end_date=end_date,
         department_ids=department_ids,
     )
+    finance_by_key = {metric.key: metric for metric in finance_analytics.metrics}
 
     semi_flow_rows = await db.fetch(
         f"""
@@ -3806,38 +3314,18 @@ async def _build_slaughterhouse_dashboard_module(
         end_date,
         department_ids,
     )
-    recent_shipments_rows = await db.fetch(
-        f"""
-        SELECT
-            ss.id::text AS key,
-            CONCAT(TO_CHAR(ss.shipped_on, 'YYYY-MM-DD'), ' • ', {_client_label_sql('c')}) AS label,
-            ss.quantity AS value,
-            CONCAT('Выручка: ', ROUND(COALESCE(ss.unit_price, 0) * ss.quantity, 2)::text, ' UZS') AS caption
-        FROM slaughter_semi_product_shipments ss
-        INNER JOIN departments d ON d.id = ss.department_id
-        INNER JOIN clients c ON c.id = ss.client_id
-        WHERE d.module_key = 'slaughter'
-          AND {_date_condition('ss.shipped_on')}
-          AND {_department_condition('ss.department_id')}
-        ORDER BY ss.shipped_on DESC, ss.created_at DESC
-        LIMIT 8
-        """,
-        start_date,
-        end_date,
-        department_ids,
-    )
-    client_registry_rows = await db.fetch(
+    client_rows = await db.fetch(
         f"""
         SELECT
             c.id::text AS key,
             {_client_label_sql('c')} AS label,
-            COUNT(*) AS value,
-            'отгрузок' AS unit,
+            SUM(ss.quantity) AS value,
+            'кг' AS unit,
             CONCAT(
                 COALESCE(NULLIF(c.phone, ''), 'без телефона'),
-                ' • полуфабрикат: ',
-                ROUND(SUM(ss.quantity), 3)::text,
-                ' кг'
+                ' • выручка: ',
+                ROUND(SUM(COALESCE(ss.unit_price, 0) * ss.quantity), 0)::text,
+                ' UZS'
             ) AS caption
         FROM slaughter_semi_product_shipments ss
         INNER JOIN departments d ON d.id = ss.department_id
@@ -3854,352 +3342,57 @@ async def _build_slaughterhouse_dashboard_module(
         end_date,
         department_ids,
     )
-    recent_arrivals_rows = await db.fetch(
-        f"""
-        SELECT
-            ar.id::text AS key,
-            TO_CHAR(ar.arrived_on, 'YYYY-MM-DD') AS label,
-            ar.birds_received AS value,
-            CONCAT(
-                'Средний вес: ',
-                CASE
-                    WHEN ar.arrival_total_weight_kg IS NOT NULL AND ar.birds_received > 0
-                    THEN ROUND(ar.arrival_total_weight_kg / ar.birds_received, 3)::text
-                    ELSE '—'
-                END,
-                ' кг'
-            ) AS caption
-        FROM slaughter_arrivals ar
-        INNER JOIN departments d ON d.id = ar.department_id
-        WHERE d.module_key = 'slaughter'
-          AND {_date_condition('ar.arrived_on')}
-          AND {_department_condition('ar.department_id')}
-        ORDER BY ar.arrived_on DESC, ar.created_at DESC
-        LIMIT 8
-        """,
-        start_date,
-        end_date,
-        department_ids,
-    )
-    recent_processings_rows = await db.fetch(
-        f"""
-        SELECT
-            sp.id::text AS key,
-            CONCAT(
-                TO_CHAR(sp.processed_on, 'YYYY-MM-DD'),
-                ' • переработка'
-            ) AS label,
-            sp.birds_processed AS value,
-            CONCAT(
-                '1 сорт: ',
-                sp.first_sort_count::text,
-                ' • 2 сорт: ',
-                sp.second_sort_count::text,
-                ' • брак: ',
-                sp.bad_count::text
-            ) AS caption
-        FROM slaughter_processings sp
-        INNER JOIN departments d ON d.id = sp.department_id
-        WHERE d.module_key = 'slaughter'
-          AND {_date_condition('sp.processed_on')}
-          AND {_department_condition('sp.department_id')}
-        ORDER BY sp.processed_on DESC, sp.created_at DESC
-        LIMIT 8
-        """,
-        start_date,
-        end_date,
-        department_ids,
-    )
-    quality_stats_row = await db.fetchrow(
-        f"""
-        SELECT
-            COUNT(*) FILTER (WHERE qc.status = 'passed') AS passed,
-            COUNT(*) FILTER (WHERE qc.status = 'failed') AS failed,
-            COUNT(*) FILTER (WHERE qc.status = 'pending') AS pending,
-            COUNT(*) AS total
-        FROM slaughter_quality_checks qc
-        INNER JOIN departments d ON d.id = qc.department_id
-        WHERE d.module_key = 'slaughter'
-          AND {_date_condition('qc.checked_on')}
-          AND {_department_condition('qc.department_id')}
-        """,
-        start_date,
-        end_date,
-        department_ids,
-    )
-    recent_quality_rows = await db.fetch(
-        f"""
-        SELECT
-            qc.id::text AS key,
-            CONCAT(
-                TO_CHAR(qc.checked_on, 'YYYY-MM-DD'),
-                ' • ',
-                CASE qc.status
-                    WHEN 'passed' THEN 'пройдено'
-                    WHEN 'failed' THEN 'отклонено'
-                    ELSE 'в ожидании'
-                END
-            ) AS label,
-            1 AS value,
-            CONCAT(
-                'Сорт: ',
-                COALESCE(qc.grade, '—'),
-                CASE
-                    WHEN qc.notes IS NOT NULL AND qc.notes <> ''
-                    THEN CONCAT(' • ', LEFT(qc.notes, 80))
-                    ELSE ''
-                END
-            ) AS caption
-        FROM slaughter_quality_checks qc
-        INNER JOIN departments d ON d.id = qc.department_id
-        WHERE d.module_key = 'slaughter'
-          AND {_date_condition('qc.checked_on')}
-          AND {_department_condition('qc.department_id')}
-        ORDER BY qc.checked_on DESC, qc.created_at DESC
-        LIMIT 8
-        """,
-        start_date,
-        end_date,
-        department_ids,
-    )
-    # slaughter_monthly_analytics rollup table was removed; compute the
-    # monthly trend live from the source operational tables instead.
-    monthly_trend_rows = await db.fetch(
-        f"""
-        WITH processed AS (
-          SELECT
-            DATE_TRUNC('month', sp.processed_on)::date AS month_start,
-            SUM(sp.birds_processed) AS birds_processed,
-            SUM(sp.first_sort_count) AS first_sort_count,
-            SUM(sp.first_sort_count + sp.second_sort_count + sp.bad_count) AS total_sorted
-          FROM slaughter_processings sp
-          INNER JOIN departments d ON d.id = sp.department_id
-          WHERE d.module_key = 'slaughter'
-            AND {_date_condition('sp.processed_on')}
-            AND {_department_condition('sp.department_id')}
-          GROUP BY DATE_TRUNC('month', sp.processed_on)
-        ),
-        shipments AS (
-          SELECT
-            DATE_TRUNC('month', sps.shipped_on)::date AS month_start,
-            SUM(sps.quantity) AS shipped_quantity,
-            SUM(COALESCE(sps.quantity, 0) * COALESCE(sps.unit_price, 0)) AS shipped_amount
-          FROM slaughter_semi_product_shipments sps
-          INNER JOIN departments d ON d.id = sps.department_id
-          WHERE d.module_key = 'slaughter'
-            AND {_date_condition('sps.shipped_on')}
-            AND {_department_condition('sps.department_id')}
-          GROUP BY DATE_TRUNC('month', sps.shipped_on)
-        )
-        SELECT
-          TO_CHAR(month_start, 'YYYY-MM') AS label,
-          COALESCE(SUM(birds_processed), 0) AS birds_processed,
-          COALESCE(SUM(shipped_quantity), 0) AS shipped_quantity,
-          COALESCE(SUM(shipped_amount), 0) AS shipped_amount,
-          COALESCE(SUM(first_sort_count), 0) AS first_sort_count,
-          COALESCE(SUM(total_sorted), 0) AS total_sorted
-        FROM (
-          SELECT month_start, birds_processed, NULL::numeric AS shipped_quantity,
-                 NULL::numeric AS shipped_amount, first_sort_count, total_sorted
-          FROM processed
-          UNION ALL
-          SELECT month_start, NULL::numeric AS birds_processed, shipped_quantity,
-                 shipped_amount, NULL::numeric AS first_sort_count,
-                 NULL::numeric AS total_sorted
-          FROM shipments
-        ) combined
-        GROUP BY month_start
-        ORDER BY month_start
-        """,
-        start_date,
-        end_date,
-        department_ids,
-    )
 
-    qc_passed = _to_float(quality_stats_row["passed"]) if quality_stats_row is not None else 0.0
-    qc_failed = _to_float(quality_stats_row["failed"]) if quality_stats_row is not None else 0.0
-    qc_pending = _to_float(quality_stats_row["pending"]) if quality_stats_row is not None else 0.0
-    qc_total = _to_float(quality_stats_row["total"]) if quality_stats_row is not None else 0.0
-    qc_pass_rate = _ratio(qc_passed, qc_passed + qc_failed)
+    waste_share_val = metrics.get("waste_share_pct").value if metrics.get("waste_share_pct") is not None else 0.0
 
-    process_rate = metrics.get("process_rate").value if metrics.get("process_rate") is not None else 0.0
-    first_sort_share = metrics.get("first_sort_share").value if metrics.get("first_sort_share") is not None else 0.0
-    dressing_yield_pct_val = metrics.get("dressing_yield_pct").value if metrics.get("dressing_yield_pct") is not None else 0.0
-    first_sort_weight_share_val = metrics.get("first_sort_weight_share_pct").value if metrics.get("first_sort_weight_share_pct") is not None else 0.0
-    bad_weight_share_val = metrics.get("bad_weight_share_pct").value if metrics.get("bad_weight_share_pct") is not None else 0.0
     alerts: list[DashboardAlertSchema] = []
-    if process_rate < 80:
+    if waste_share_val > 35:
         alerts.append(
             DashboardAlertSchema(
-                key="slaughter_process_rate_low",
+                key="slaughter_waste_share_high",
                 level="warning",
-                title="Низкий process rate",
-                message="Обработка отстаёт от входящего потока птицы.",
-                value=process_rate,
-                unit="%",
-            )
-        )
-    if first_sort_share < 55:
-        alerts.append(
-            DashboardAlertSchema(
-                key="slaughter_first_sort_share_low",
-                level="warning",
-                title="Низкая доля first sort",
-                message="Доля первого сорта ниже операционного ориентира.",
-                value=first_sort_share,
-                unit="%",
-            )
-        )
-    if dressing_yield_pct_val > 0 and dressing_yield_pct_val < 68:
-        alerts.append(
-            DashboardAlertSchema(
-                key="slaughter_dressing_yield_low",
-                level="warning",
-                title="Низкий убойный выход",
-                message="Убойный выход ниже отраслевого ориентира 70–75%.",
-                value=dressing_yield_pct_val,
-                unit="%",
-            )
-        )
-    if bad_weight_share_val > 5:
-        alerts.append(
-            DashboardAlertSchema(
-                key="slaughter_bad_weight_share_high",
-                level="warning",
-                title="Повышенная доля брака",
-                message="Доля брака по весу превышает 5% — проверьте качество поступления и линию.",
-                value=bad_weight_share_val,
-                unit="%",
-            )
-        )
-    if qc_pending > 0:
-        alerts.append(
-            DashboardAlertSchema(
-                key="slaughter_quality_pending",
-                level="warning",
-                title="Ожидают контроля качества",
-                message="Есть полуфабрикаты, ожидающие проверки — они блокируют отгрузки клиентам.",
-                value=qc_pending,
-                unit="шт",
-            )
-        )
-    if qc_failed > 0 and qc_total > 0 and qc_pass_rate < 90:
-        alerts.append(
-            DashboardAlertSchema(
-                key="slaughter_quality_pass_rate_low",
-                level="warning",
-                title="Низкий процент прохождения QC",
-                message="Процент проверок, прошедших успешно, ниже 90%.",
-                value=qc_pass_rate,
+                title="Повышенная доля отходов",
+                message="Доля отходов выше 35% от веса разделки — проверьте, куда уходит лишний вес.",
+                value=waste_share_val,
                 unit="%",
             )
         )
 
-    selected_charts = [
-        _chart_copy(charts, "slaughter_flow"),
-        _chart_copy(charts, "slaughter_quality"),
-        _chart_copy(charts, "slaughter_semi_products"),
-        _chart_copy(charts, "slaughter_process_rate"),
-        DashboardChartSchema(
-            key="slaughter_semi_flow",
-            title="Выпуск / отгрузка полуфабрикатов",
-            description="Сравнение выпуска и клиентской отгрузки полуфабрикатов.",
-            type="line",
-            unit="кг",
-            series=_wide_series(
-                semi_flow_rows,
-                ("produced", "Выпуск", "produced"),
-                ("shipped", "Отгрузка", "shipped"),
-            ),
+    semi_flow_chart = DashboardChartSchema(
+        key="slaughter_semi_flow",
+        title="Выпуск / отгрузка полуфабрикатов",
+        description="Сравнение выпуска и клиентской отгрузки полуфабрикатов.",
+        type="line",
+        unit="кг",
+        series=_wide_series(
+            semi_flow_rows,
+            ("produced", "Выпуск", "produced"),
+            ("shipped", "Отгрузка", "shipped"),
         ),
-        _chart_copy(charts, "slaughter_revenue"),
-        DashboardChartSchema(
-            key="slaughter_monthly_trend",
-            title="Помесячная аналитика",
-            description="Птица, отгрузки и первый сорт по закрытым месяцам.",
-            type="line",
-            unit="шт",
-            series=_wide_series(
-                monthly_trend_rows,
-                ("birds_processed", "Птицы обработано", "birds_processed"),
-                ("shipped_quantity", "Отгружено, кг", "shipped_quantity"),
-                ("first_sort_count", "Первый сорт", "first_sort_count"),
-            ),
-        ),
-    ]
+    )
 
     return DashboardModuleSchema(
         key="slaughterhouse",
         title="Убойня",
-        description="Приход птицы, сортировка, разделка, полуфабрикат и клиентский поток убойного контура.",
+        description="Переработка птицы: обработано, выход, отгрузки и выручка.",
         kpis=[
-            _metric_from(metrics, "arrivals", key="birds_arrived", label="Птицы пришло", unit="шт"),
             _metric_from(metrics, "processed", key="birds_processed", label="Птицы обработано", unit="шт"),
-            _metric_from(metrics, "first_sort_total", key="first_sort_total", label="Первый сорт", unit="шт"),
-            _metric_from(metrics, "second_sort_total", key="second_sort_total", label="Второй сорт", unit="шт"),
-            _metric_from(metrics, "bad_total", key="bad_total", label="Брак / плохой", unit="шт"),
-            _metric_from(metrics, "process_rate", key="process_rate", label="Process rate", unit="%"),
-            _metric_from(metrics, "first_sort_share", key="first_sort_share", label="Доля first sort", unit="%"),
-            _metric_from(metrics, "dressing_yield_pct", key="dressing_yield_pct", label="Убойный выход", unit="%"),
-            _metric_from(metrics, "first_sort_weight_share_pct", key="first_sort_weight_share_pct", label="Доля первого сорта по весу", unit="%"),
-            _metric_from(metrics, "bad_weight_share_pct", key="bad_weight_share_pct", label="Доля брака по весу", unit="%"),
-            _metric_from(metrics, "semi_products", key="semi_product_output", label="Объём полуфабрикатов", unit="кг"),
+            _metric_from(metrics, "net_meat_share_pct", key="net_meat_share_pct", label="Доля чистого мяса", unit="%"),
+            _metric_from(metrics, "waste_share_pct", key="waste_share_pct", label="Доля отходов", unit="%"),
             _metric_from(metrics, "sales_volume", key="shipment_volume", label="Отгружено полуфабриката", unit="кг"),
-            _metric_from(metrics, "sales_revenue", key="shipment_revenue", label="Выручка от отгрузок", unit="UZS"),
-            _metric_from(metrics, "client_base", key="client_base", label="Клиентская база", unit="клиентов"),
-            _metric(key="quality_checks_passed", label="QC: пройдено", value=qc_passed, unit="шт"),
-            _metric(key="quality_checks_failed", label="QC: отклонено", value=qc_failed, unit="шт"),
-            _metric(key="quality_checks_pending", label="QC: в ожидании", value=qc_pending, unit="шт"),
-            _metric(key="quality_pass_rate", label="QC: процент прохождения", value=qc_pass_rate, unit="%"),
-            *finance_analytics.metrics,
+            _metric_from(metrics, "sales_revenue", key="shipment_revenue", label="Выручка", unit="UZS"),
+            *_pick_finance_kpis(finance_by_key),
         ],
-        charts=[chart for chart in [*selected_charts, *finance_analytics.charts] if chart is not None],
+        charts=[semi_flow_chart],
         tables=[
-            _table_from_breakdown(
-                breakdowns.get("slaughter_parts"),
-                key="slaughter_top_products",
-                title="Топ полуфабрикаты",
-                description="Наиболее объёмные позиции по выпуску.",
-            ),
-            _table_from_breakdown(
-                breakdowns.get("slaughter_clients"),
+            DashboardTableSchema(
                 key="slaughter_clients",
                 title="Клиенты по полуфабрикату",
-                description="Какие клиенты дают основной сбыт и выручку по полуфабрикату.",
+                description="Топ клиентов по объёму отгрузок и выручке.",
+                items=_table_items_from_rows(client_rows),
             ),
-            DashboardTableSchema(
-                key="slaughter_client_registry",
-                title="Активная клиентская база",
-                description="Поставщики птицы и покупатели полуфабриката, участвовавшие в операциях за период.",
-                items=_table_items_from_rows(client_registry_rows),
-            ),
-            DashboardTableSchema(
-                key="slaughter_recent_arrivals",
-                title="Последний приход птицы",
-                description="Последние зафиксированные поступления птицы в убойный контур.",
-                items=_table_items_from_rows(recent_arrivals_rows, default_unit="шт"),
-            ),
-            DashboardTableSchema(
-                key="slaughter_recent_processings",
-                title="Последняя разделка",
-                description="Последние операции переработки с разрезом по сортам и браку.",
-                items=_table_items_from_rows(recent_processings_rows, default_unit="шт"),
-            ),
-            DashboardTableSchema(
-                key="slaughter_recent_shipments",
-                title="Последние отгрузки клиентам",
-                description="Последние клиентские отгрузки полуфабрикатов.",
-                items=_table_items_from_rows(recent_shipments_rows, default_unit="кг"),
-            ),
-            DashboardTableSchema(
-                key="slaughter_recent_quality_checks",
-                title="Последние проверки качества",
-                description="Статусы контроля качества — помогают понять, что блокирует отгрузку.",
-                items=_table_items_from_rows(recent_quality_rows),
-            ),
-            *finance_analytics.tables,
         ],
-        alerts=[*alerts, *finance_analytics.alerts],
+        alerts=alerts,
     )
 
 

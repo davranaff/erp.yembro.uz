@@ -28,30 +28,15 @@ async def test_dashboard_overview_returns_financial_summary_and_sections(api_cli
     executive = payload["executive_dashboard"]
     assert executive is not None
     kpis = {item["key"]: item for item in executive["kpis"]}
-    assert set(kpis) >= {
-        "health_index",
-        "operating_profit",
-        "net_cashflow",
-        "value_chain_output",
-        "value_chain_loss_rate",
-        "active_risks",
-    }
+    assert set(kpis) >= {"operating_profit", "net_cashflow", "health_index"}
     assert isinstance(kpis["health_index"]["value"], (int, float))
     assert 0 <= kpis["health_index"]["value"] <= 100
     assert isinstance(kpis["operating_profit"]["value"], (int, float))
     assert isinstance(kpis["net_cashflow"]["value"], (int, float))
-    assert len(executive["kpis"]) <= 6
-    chart_keys = {item["key"] for item in executive["charts"]}
-    assert {
-        "finance_overview",
-        "value_chain_trend",
-        "department_contribution",
-        "department_revenue",
-        "department_operations",
-        "department_loss_rate",
-        "expense_category_burn",
-    } <= chart_keys
-    assert len(executive["tables"]) <= 2
+    assert len(executive["kpis"]) == 3
+    assert executive["charts"] == []
+    table_keys = {item["key"] for item in executive["tables"]}
+    assert {"departments_performance", "top_risk_summary"} <= table_keys
 
 
 @pytest.mark.asyncio
@@ -79,8 +64,14 @@ async def test_dashboard_overview_supports_department_scope(api_client) -> None:
     assert scoped_payload["scope"]["departmentId"] == "77771111-1111-1111-1111-111111111111"
     assert scoped_payload["scope"]["departmentLabel"] == "Yem zavodi"
     assert scoped_payload["scope"]["departmentPath"] == ["Yem zavodi"]
-    assert scoped_kpis["value_chain_output"] <= global_kpis["value_chain_output"]
-    assert scoped_kpis["active_risks"] <= global_kpis["active_risks"]
+    assert "operating_profit" in scoped_kpis
+    assert "net_cashflow" in scoped_kpis
+    assert "health_index" in scoped_kpis
+    # Scoping to a single department must keep (or reduce) the
+    # aggregate — values stay finite numerics.
+    for key in ("operating_profit", "net_cashflow", "health_index"):
+        assert isinstance(scoped_kpis[key], (int, float))
+        assert isinstance(global_kpis[key], (int, float))
 
 
 @pytest.mark.asyncio

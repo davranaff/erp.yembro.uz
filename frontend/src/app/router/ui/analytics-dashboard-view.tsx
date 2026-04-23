@@ -51,7 +51,6 @@ export type AnalyticsSectionDescriptor = {
   section: DashboardSection | null;
 };
 
-type MetricCategory = 'health' | 'finance' | 'flow' | 'risk' | 'operations';
 type AnalyticsDashboardLayoutMode = 'default' | 'executive';
 
 type AnalyticsDashboardViewProps = {
@@ -132,48 +131,6 @@ const HERO_META_ICON_MAP = {
   updated: Clock3,
 } satisfies Record<string, LucideIcon>;
 
-const METRIC_CATEGORY_MAP: Record<string, MetricCategory> = {
-  health_index: 'health',
-  operating_profit: 'finance',
-  financial_result: 'finance',
-  net_cashflow: 'finance',
-  cash_balance: 'finance',
-  sales_revenue: 'finance',
-  egg_revenue: 'finance',
-  shipment_revenue: 'finance',
-  value_chain_output: 'flow',
-  net_eggs: 'flow',
-  chicks_hatched: 'flow',
-  birds_processed: 'flow',
-  product_output: 'flow',
-  semi_product_output: 'flow',
-  shipment_volume: 'flow',
-  product_shipped: 'flow',
-  chicks_dispatched: 'flow',
-  sent_to_slaughter: 'flow',
-  eggs_to_incubation: 'operations',
-  eggs_arrived: 'operations',
-  eggs_set: 'operations',
-  medicine_consumed: 'operations',
-  current_stock: 'operations',
-  stock_total: 'operations',
-  chicks_stock: 'operations',
-  client_base: 'operations',
-  value_chain_loss_rate: 'risk',
-  active_risks: 'risk',
-  active_alerts: 'risk',
-  critical_stock_items: 'risk',
-  expired_batches: 'risk',
-  expiring_batches: 'risk',
-  bad_eggs: 'risk',
-  loss_rate: 'risk',
-  hatch_rate: 'health',
-  process_rate: 'health',
-  shipment_rate: 'health',
-  turnover_rate: 'health',
-  first_sort_share: 'health',
-};
-
 const formatMetricValue = (value: number, locale: string, unit?: string | null) => {
   const formatter = new Intl.NumberFormat(locale, {
     maximumFractionDigits: Number.isInteger(value) ? 0 : 2,
@@ -222,22 +179,6 @@ const resolveMetricTone = (metric: DashboardMetric): AnalyticsStatusTone => {
   }
 
   return 'neutral';
-};
-
-const metricStatusLabel = (
-  tone: AnalyticsStatusTone,
-  t: (key: string, params?: Record<string, string | number>, fallback?: string) => string,
-): string => {
-  if (tone === 'good') {
-    return t('common.good');
-  }
-  if (tone === 'warning') {
-    return t('common.warning');
-  }
-  if (tone === 'bad') {
-    return t('common.bad');
-  }
-  return t('common.neutral');
 };
 
 const hasMeaningfulSectionData = (section: DashboardSection | null): boolean => {
@@ -329,49 +270,6 @@ export const getAnalyticsStatusClasses = (tone: AnalyticsStatusTone) => {
   return 'border-primary/24 bg-card text-muted-foreground';
 };
 
-const getMetricCategory = (metric: DashboardMetric): MetricCategory =>
-  METRIC_CATEGORY_MAP[metric.key] ?? 'operations';
-
-const getMetricCategoryLabel = (category: MetricCategory, t: TranslateFn): string => {
-  if (category === 'health') {
-    return t('dashboard.metricCategoryHealth', undefined, 'Состояние');
-  }
-
-  if (category === 'finance') {
-    return t('dashboard.metricCategoryFinance', undefined, 'Финансы');
-  }
-
-  if (category === 'flow') {
-    return t('dashboard.metricCategoryFlow', undefined, 'Объём');
-  }
-
-  if (category === 'risk') {
-    return t('dashboard.metricCategoryRisk', undefined, 'Риски');
-  }
-
-  return t('dashboard.metricCategoryOperations', undefined, 'Операции');
-};
-
-const getMetricCategoryClasses = (category: MetricCategory): string => {
-  if (category === 'health') {
-    return 'border-emerald-200/80 bg-emerald-50/90 text-emerald-700';
-  }
-
-  if (category === 'finance') {
-    return 'border-sky-200/80 bg-sky-50/90 text-sky-700';
-  }
-
-  if (category === 'flow') {
-    return 'border-orange-200/80 bg-orange-50/90 text-orange-700';
-  }
-
-  if (category === 'risk') {
-    return 'border-rose-200/80 bg-rose-50/90 text-rose-700';
-  }
-
-  return 'border-primary/20 bg-background text-foreground';
-};
-
 const getTrendIcon = (trend?: DashboardMetric['trend']): LucideIcon => {
   if (trend === 'up') {
     return ArrowUpRight;
@@ -412,13 +310,11 @@ function HeroMetaPill({
   icon: LucideIcon;
 }) {
   return (
-    <div className="border-primary/16 min-w-[11rem] rounded-[20px] border bg-background/90 px-4 py-3 shadow-[0_18px_38px_-30px_rgba(15,23,42,0.14)]">
-      <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-        <Icon className="h-3.5 w-3.5" />
-        {label}
-      </div>
-      <p className="mt-2 text-sm font-medium leading-5 text-foreground">{value}</p>
-    </div>
+    <span className="inline-flex items-center gap-1.5">
+      <Icon className="h-3.5 w-3.5 text-muted-foreground" />
+      <span className="text-muted-foreground">{label}:</span>
+      <span className="font-medium text-foreground">{value}</span>
+    </span>
   );
 }
 
@@ -434,17 +330,9 @@ function FilterPanelBlock({
   dataTour?: string;
 }) {
   return (
-    <div
-      data-tour={dataTour}
-      className={cn(
-        'border-primary/16 rounded-[24px] border bg-background/60 p-3 shadow-[0_18px_42px_-34px_rgba(15,23,42,0.14)]',
-        className,
-      )}
-    >
-      <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-        {label}
-      </p>
-      <div className="mt-3">{children}</div>
+    <div data-tour={dataTour} className={cn('space-y-1.5', className)}>
+      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{label}</p>
+      {children}
     </div>
   );
 }
@@ -508,84 +396,58 @@ function SummaryMetricCard({ metric }: { metric: DashboardMetric }) {
   const Icon = SUMMARY_ICON_MAP[metric.key] ?? Landmark;
   const tone = resolveMetricTone(metric);
   const deltaLabel = formatDeltaLabel(metric, locale);
-  const statusLabel = metricStatusLabel(tone, t);
   const TrendIcon = getTrendIcon(metric.trend);
-  const category = getMetricCategory(metric);
   const previousValueLabel = buildPreviousValueLabel(metric, locale, t);
 
+  const toneBarClass = cn(
+    'absolute inset-y-0 left-0 w-0.5',
+    tone === 'good' && 'bg-emerald-400/80',
+    tone === 'warning' && 'bg-amber-400/80',
+    tone === 'bad' && 'bg-rose-400/80',
+    tone === 'neutral' && 'bg-primary/30',
+  );
+
+  const iconClass = cn(
+    'flex h-9 w-9 shrink-0 items-center justify-center rounded-lg',
+    tone === 'good' && 'bg-emerald-50 text-emerald-600',
+    tone === 'warning' && 'bg-amber-50 text-amber-600',
+    tone === 'bad' && 'bg-rose-50 text-rose-600',
+    tone === 'neutral' && 'bg-muted/60 text-muted-foreground',
+  );
+
+  const deltaClass = cn(
+    'inline-flex items-center gap-1 text-xs font-medium',
+    tone === 'good' && 'text-emerald-600',
+    tone === 'warning' && 'text-amber-600',
+    tone === 'bad' && 'text-rose-600',
+    tone === 'neutral' && 'text-muted-foreground',
+  );
+
   return (
-    <div
-      className={cn(
-        'rounded-[24px] border bg-card p-4 shadow-[0_22px_60px_-46px_rgba(15,23,42,0.18)]',
-        tone === 'good' && 'border-emerald-200/80',
-        tone === 'warning' && 'border-amber-200/80',
-        tone === 'bad' && 'border-rose-200/80',
-        tone === 'neutral' && 'border-primary/24',
-      )}
-    >
-      <div className="flex items-start justify-between gap-3">
-        <Badge
-          variant="outline"
-          className={cn('rounded-full px-3 py-1 text-[10px]', getMetricCategoryClasses(category))}
-        >
-          {getMetricCategoryLabel(category, t)}
-        </Badge>
-        <span
-          className={cn(
-            'flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border',
-            tone === 'bad'
-              ? 'border-rose-200/70 bg-rose-50/90 text-rose-600'
-              : tone === 'warning'
-                ? 'border-amber-200/70 bg-amber-50/90 text-amber-600'
-                : tone === 'good'
-                  ? 'border-emerald-200/70 bg-emerald-50/90 text-emerald-600'
-                  : 'border-primary/24 bg-card text-muted-foreground',
-          )}
-        >
+    <div className="relative overflow-hidden rounded-xl border bg-card p-5 shadow-sm transition hover:shadow-md">
+      <span className={toneBarClass} aria-hidden="true" />
+      <div className="flex items-start gap-3">
+        <span className={iconClass}>
           <Icon className="h-4 w-4" />
         </span>
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-xs font-medium uppercase tracking-wide text-muted-foreground">
+            {metric.label}
+          </p>
+          <p className="mt-1.5 text-2xl font-semibold tracking-tight text-foreground">
+            {formatMetricValue(metric.value, locale, metric.unit)}
+          </p>
+          {deltaLabel ? (
+            <span className={cn('mt-2 flex items-center', deltaClass)}>
+              <TrendIcon className="mr-1 h-3.5 w-3.5" />
+              {deltaLabel}
+              {previousValueLabel ? (
+                <span className="ml-1.5 text-muted-foreground">· {previousValueLabel}</span>
+              ) : null}
+            </span>
+          ) : null}
+        </div>
       </div>
-
-      <div className="mt-4 space-y-2">
-        <p className="text-sm font-medium leading-5 text-foreground">{metric.label}</p>
-        <p className="text-3xl font-semibold tracking-[-0.05em] text-foreground">
-          {formatMetricValue(metric.value, locale, metric.unit)}
-        </p>
-      </div>
-
-      <div className="mt-4 flex flex-wrap items-center gap-2">
-        <Badge className={cn('text-[10px]', getAnalyticsStatusClasses(tone))}>{statusLabel}</Badge>
-        {deltaLabel ? (
-          <Badge
-            variant="outline"
-            className={cn(
-              'rounded-full border px-3 py-1 text-[10px]',
-              tone === 'good' && 'border-emerald-200/70 bg-emerald-50/80 text-emerald-700',
-              tone === 'warning' && 'border-amber-200/70 bg-amber-50/80 text-amber-700',
-              tone === 'bad' && 'border-rose-200/70 bg-rose-50/80 text-rose-700',
-              tone === 'neutral' && 'border-primary/18 bg-background text-muted-foreground',
-            )}
-          >
-            <TrendIcon className="mr-1.5 h-3.5 w-3.5" />
-            {deltaLabel}
-          </Badge>
-        ) : (
-          <Badge
-            variant="outline"
-            className="border-primary/18 rounded-full bg-background px-3 py-1 text-[10px] text-muted-foreground"
-          >
-            {t('dashboard.metricNoComparison', undefined, 'Без сравнения')}
-          </Badge>
-        )}
-      </div>
-
-      {previousValueLabel ? (
-        <p className="mt-3 text-xs text-muted-foreground">{previousValueLabel}</p>
-      ) : (
-        <p className="mt-3 text-xs text-muted-foreground">
-          {t('dashboard.metricNoComparison', undefined, 'Без сравнения')}
-        </p>
-      )}
     </div>
   );
 }
@@ -594,53 +456,42 @@ function SectionMetricCard({ metric }: { metric: DashboardMetric }) {
   const { locale, t } = useI18n();
   const tone = resolveMetricTone(metric);
   const deltaLabel = formatDeltaLabel(metric, locale);
-  const statusLabel = metricStatusLabel(tone, t);
-  const category = getMetricCategory(metric);
   const previousValueLabel = buildPreviousValueLabel(metric, locale, t);
+  const TrendIcon = getTrendIcon(metric.trend);
+
+  const toneBarClass = cn(
+    'absolute inset-y-0 left-0 w-0.5',
+    tone === 'good' && 'bg-emerald-400/80',
+    tone === 'warning' && 'bg-amber-400/80',
+    tone === 'bad' && 'bg-rose-400/80',
+    tone === 'neutral' && 'bg-primary/30',
+  );
+
+  const deltaClass = cn(
+    'mt-1.5 inline-flex items-center gap-1 text-xs font-medium',
+    tone === 'good' && 'text-emerald-600',
+    tone === 'warning' && 'text-amber-600',
+    tone === 'bad' && 'text-rose-600',
+    tone === 'neutral' && 'text-muted-foreground',
+  );
 
   return (
-    <div
-      className={cn(
-        'rounded-[20px] border bg-card px-4 py-3 shadow-[0_16px_42px_-34px_rgba(15,23,42,0.14)]',
-        tone === 'good' && 'border-emerald-200/75',
-        tone === 'warning' && 'border-amber-200/75',
-        tone === 'bad' && 'border-rose-200/75',
-        tone === 'neutral' && 'border-primary/20',
-      )}
-    >
-      <div className="flex items-start justify-between gap-3">
-        <Badge
-          variant="outline"
-          className={cn(
-            'rounded-full px-2.5 py-0.5 text-[10px]',
-            getMetricCategoryClasses(category),
-          )}
-        >
-          {getMetricCategoryLabel(category, t)}
-        </Badge>
-        <Badge className={cn('px-2 py-0.5 text-[10px]', getAnalyticsStatusClasses(tone))}>
-          {statusLabel}
-        </Badge>
-      </div>
-      <p className="mt-3 text-sm font-medium leading-5 text-foreground">{metric.label}</p>
-      <p className="mt-3 text-xl font-semibold tracking-tight text-foreground">
+    <div className="relative overflow-hidden rounded-xl border bg-card px-4 py-3 shadow-sm transition hover:shadow-md">
+      <span className={toneBarClass} aria-hidden="true" />
+      <p className="truncate text-xs font-medium uppercase tracking-wide text-muted-foreground">
+        {metric.label}
+      </p>
+      <p className="mt-1 text-xl font-semibold tracking-tight text-foreground">
         {formatMetricValue(metric.value, locale, metric.unit)}
       </p>
       {deltaLabel ? (
-        <p
-          className={cn(
-            'mt-1 text-xs font-medium',
-            tone === 'good' && 'text-emerald-600',
-            tone === 'warning' && 'text-amber-600',
-            tone === 'bad' && 'text-rose-600',
-            tone === 'neutral' && 'text-muted-foreground',
-          )}
-        >
+        <span className={deltaClass}>
+          <TrendIcon className="mr-0.5 h-3.5 w-3.5" />
           {deltaLabel}
-        </p>
+        </span>
       ) : null}
       {previousValueLabel ? (
-        <p className="mt-1 text-xs text-muted-foreground">{previousValueLabel}</p>
+        <p className="mt-0.5 text-xs text-muted-foreground">{previousValueLabel}</p>
       ) : null}
     </div>
   );
@@ -658,12 +509,16 @@ function EmptySectionCard({
   const { t } = useI18n();
 
   return (
-    <Card className="rounded-[28px] border-accent/30 bg-card shadow-[0_26px_72px_-46px_rgba(15,23,42,0.16)]">
-      <CardHeader className="space-y-2">
-        <CardTitle className="text-xl tracking-[-0.03em] text-foreground">{title}</CardTitle>
-        {!minimalMode && caption ? <CardDescription>{caption}</CardDescription> : null}
+    <Card className="rounded-xl border bg-card shadow-sm">
+      <CardHeader className="space-y-1 pb-3">
+        <CardTitle className="text-lg font-semibold tracking-tight text-foreground">
+          {title}
+        </CardTitle>
+        {!minimalMode && caption ? (
+          <CardDescription className="text-sm">{caption}</CardDescription>
+        ) : null}
       </CardHeader>
-      <CardContent className="flex min-h-[16rem] items-center justify-center">
+      <CardContent className="flex min-h-[14rem] items-center justify-center pt-0">
         <EmptyState
           icon={BarChart3}
           title={t('dashboard.noDataTitle')}
@@ -685,8 +540,6 @@ function AnalyticsOverviewSection({
   index,
   minimalMode = false,
 }: AnalyticsSectionDescriptor & { index: number; minimalMode?: boolean }) {
-  const { t } = useI18n();
-
   if (!section || !hasMeaningfulSectionData(section)) {
     return <EmptySectionCard title={title} caption={caption} minimalMode={minimalMode} />;
   }
@@ -697,56 +550,24 @@ function AnalyticsOverviewSection({
   const primaryBreakdown = hasPrimaryBreakdown ? section.breakdowns[0] : null;
   const remainingCharts = section.charts.slice(hasPrimaryChart ? 1 : 0);
   const remainingBreakdowns = section.breakdowns.slice(hasPrimaryBreakdown ? 1 : 0);
-  const counts = getSectionCounts(section);
   const useSeparatedContentLayout =
     section.metrics.length === 0 && section.charts.length > 0 && section.breakdowns.length > 0;
 
   return (
-    <section
-      id={`dashboard-section-${section.key}`}
-      className="border-primary/22 rounded-[30px] border bg-card p-4 shadow-[0_28px_82px_-58px_rgba(15,23,42,0.16)] sm:p-5"
-    >
-      <div className="space-y-4">
-        <div className="flex flex-col gap-3 xl:flex-row xl:items-start xl:justify-between">
-          <div className="space-y-2">
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="inline-flex h-8 min-w-8 items-center justify-center rounded-full bg-primary/10 px-2 text-sm font-semibold text-primary">
-                {index + 1}
-              </span>
-              {counts.metrics > 0 ? (
-                <Badge
-                  variant="outline"
-                  className="border-primary/18 rounded-full bg-background px-3 py-1 text-[10px] text-muted-foreground"
-                >
-                  {counts.metrics} KPI
-                </Badge>
-              ) : null}
-              {counts.charts > 0 ? (
-                <Badge
-                  variant="outline"
-                  className="border-primary/18 rounded-full bg-background px-3 py-1 text-[10px] text-muted-foreground"
-                >
-                  {counts.charts} {t('dashboard.chartBlockLabelShort', undefined, 'граф.')}
-                </Badge>
-              ) : null}
-              {counts.breakdowns > 0 ? (
-                <Badge
-                  variant="outline"
-                  className="border-primary/18 rounded-full bg-background px-3 py-1 text-[10px] text-muted-foreground"
-                >
-                  {counts.breakdowns} {t('dashboard.breakdownBlockLabelShort', undefined, 'списк.')}
-                </Badge>
-              ) : null}
-            </div>
-            <div className="space-y-1">
-              <h2 className="text-2xl font-semibold tracking-[-0.04em] text-foreground">{title}</h2>
-              {!minimalMode && caption ? (
-                <p className="text-sm text-muted-foreground">{caption}</p>
-              ) : null}
-            </div>
-          </div>
+    <section id={`dashboard-section-${section.key}`} className="space-y-4">
+      <div className="flex items-baseline gap-3">
+        <span className="inline-flex h-7 w-7 items-center justify-center rounded-md bg-muted text-xs font-semibold text-muted-foreground">
+          {index + 1}
+        </span>
+        <div className="min-w-0">
+          <h2 className="text-xl font-semibold tracking-tight text-foreground">{title}</h2>
+          {!minimalMode && caption ? (
+            <p className="mt-0.5 text-sm text-muted-foreground">{caption}</p>
+          ) : null}
         </div>
+      </div>
 
+      <div className="space-y-4">
         {section.metrics.length > 0 ? (
           <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
             {section.metrics.map((metric) => (
@@ -855,71 +676,39 @@ export function AnalyticsDashboardView({
 
   return (
     <section className="flex w-full flex-col gap-6 py-1 sm:py-2" data-tour="dashboard-page">
-      <Card
-        className="border-primary/26 relative overflow-hidden rounded-[32px] bg-card shadow-[0_30px_90px_-56px_rgba(15,23,42,0.18)]"
-        data-tour="dashboard-hero"
-      >
-        <div
-          aria-hidden="true"
-          className="pointer-events-none absolute inset-0"
-          style={{
-            background:
-              'radial-gradient(circle at 88% 10%, hsl(var(--accent) / 0.14), transparent 24%), radial-gradient(circle at 12% 0%, hsl(var(--primary) / 0.12), transparent 18%)',
-          }}
-        />
-        <CardContent className="relative flex flex-col gap-5 p-5 sm:p-6 xl:flex-row xl:items-end xl:justify-between">
-          <div className="min-w-0 space-y-5">
-            <Badge className={cn('text-xs', getAnalyticsStatusClasses(badgeTone))}>
-              {badgeLabel}
-            </Badge>
-            <div className="space-y-3">
-              <h1
-                className="text-3xl font-semibold tracking-[-0.05em] text-foreground sm:text-4xl"
-                style={{ fontFamily: 'Fraunces, serif' }}
-              >
-                {title}
-              </h1>
-              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-                <HeroMetaPill
-                  icon={HERO_META_ICON_MAP.scope}
-                  label={t('dashboard.scopeTitle', undefined, 'Срез')}
-                  value={scopeLabel}
-                />
-                <HeroMetaPill
-                  icon={HERO_META_ICON_MAP.period}
-                  label={t('dashboard.periodTitle', undefined, 'Период')}
-                  value={periodLabel}
-                />
-                {updatedAtLabel ? (
-                  <HeroMetaPill
-                    icon={HERO_META_ICON_MAP.updated}
-                    label={t('dashboard.updatedAt')}
-                    value={updatedAtLabel}
-                  />
-                ) : null}
-              </div>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+      <div className="flex flex-col gap-4 border-b pb-5" data-tour="dashboard-hero">
+        <div className="flex flex-wrap items-center gap-3">
+          <h1 className="text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
+            {title}
+          </h1>
+          <Badge className={cn('text-xs', getAnalyticsStatusClasses(badgeTone))}>
+            {badgeLabel}
+          </Badge>
+        </div>
+        <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-sm text-muted-foreground">
+          <HeroMetaPill
+            icon={HERO_META_ICON_MAP.scope}
+            label={t('dashboard.scopeTitle', undefined, 'Срез')}
+            value={scopeLabel}
+          />
+          <HeroMetaPill
+            icon={HERO_META_ICON_MAP.period}
+            label={t('dashboard.periodTitle', undefined, 'Период')}
+            value={periodLabel}
+          />
+          {updatedAtLabel ? (
+            <HeroMetaPill
+              icon={HERO_META_ICON_MAP.updated}
+              label={t('dashboard.updatedAt')}
+              value={updatedAtLabel}
+            />
+          ) : null}
+        </div>
+      </div>
 
-      <Card
-        className="border-accent/28 rounded-[30px] bg-card shadow-[0_24px_80px_-52px_rgba(15,23,42,0.14)]"
-        data-tour="dashboard-filters"
-      >
-        {!minimalMode ? (
-          <CardHeader className="pb-0">
-            <CardTitle className="text-lg tracking-[-0.03em] text-foreground">
-              {t('dashboard.filterPanelTitle', undefined, 'Фильтры и период')}
-            </CardTitle>
-          </CardHeader>
-        ) : null}
+      <Card className="rounded-xl border bg-card shadow-sm" data-tour="dashboard-filters">
         <CardContent
-          className={cn(
-            'grid gap-3 p-4',
-            !minimalMode && 'pt-4',
-            'xl:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)]',
-          )}
+          className={cn('grid gap-4 p-4', 'xl:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)]')}
         >
           <FilterPanelBlock label={t('dashboard.quickRangesTitle', undefined, 'Быстрый период')}>
             <div className="flex flex-wrap gap-2" data-tour="dashboard-quick-ranges">
