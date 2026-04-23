@@ -83,16 +83,26 @@ export type ListExchangeRatesParams = {
 
 export const listExchangeRates = (params: ListExchangeRatesParams = {}) => {
   const search = new URLSearchParams();
-  if (params.currencyId) search.set('currency_id', params.currencyId);
-  if (params.dateFrom) search.set('date_from', params.dateFrom);
-  if (params.dateTo) search.set('date_to', params.dateTo);
-  if (params.limit != null) search.set('limit', String(params.limit));
-  if (params.offset != null) search.set('offset', String(params.offset));
-  if (params.orderBy) search.set('order_by', params.orderBy);
+  if (params.currencyId) {
+    search.set('currency_id', params.currencyId);
+  }
+  if (params.dateFrom) {
+    search.set('date_from', params.dateFrom);
+  }
+  if (params.dateTo) {
+    search.set('date_to', params.dateTo);
+  }
+  if (params.limit !== undefined) {
+    search.set('limit', String(params.limit));
+  }
+  if (params.offset !== undefined) {
+    search.set('offset', String(params.offset));
+  }
+  if (params.orderBy) {
+    search.set('order_by', params.orderBy);
+  }
   const qs = search.toString();
-  const path = qs
-    ? `/core/currency-exchange-rates?${qs}`
-    : `/core/currency-exchange-rates`;
+  const path = qs ? `/core/currency-exchange-rates?${qs}` : `/core/currency-exchange-rates`;
   return apiClient.get<CurrencyExchangeRateListResponse>(
     path,
     currencyExchangeRateListResponseSchema,
@@ -101,15 +111,14 @@ export const listExchangeRates = (params: ListExchangeRatesParams = {}) => {
 
 export const getLatestExchangeRate = (currencyId: string) => {
   const qs = new URLSearchParams({ currency_id: currencyId }).toString();
-  return apiClient.get<LatestRate>(
-    `/core/currency-exchange-rates/latest?${qs}`,
-    latestRateSchema,
-  );
+  return apiClient.get<LatestRate>(`/core/currency-exchange-rates/latest?${qs}`, latestRateSchema);
 };
 
 export const resolveExchangeRate = (currencyId: string, onDate?: string) => {
   const search = new URLSearchParams({ currency_id: currencyId });
-  if (onDate) search.set('on_date', onDate);
+  if (onDate) {
+    search.set('on_date', onDate);
+  }
   return apiClient.get<ResolvedRate>(
     `/core/currency-exchange-rates/resolve?${search.toString()}`,
     resolvedRateSchema,

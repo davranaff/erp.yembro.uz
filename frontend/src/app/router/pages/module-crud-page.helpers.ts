@@ -1474,13 +1474,7 @@ const resourceUiConfigs: Record<string, ResourceUiConfig> = {
       'measurement_unit_id',
       'sort_order',
     ],
-    tableOrder: [
-      'formula_id',
-      'ingredient_id',
-      'quantity_per_unit',
-      'unit',
-      'sort_order',
-    ],
+    tableOrder: ['formula_id', 'ingredient_id', 'quantity_per_unit', 'unit', 'sort_order'],
     hiddenFields: [],
     fieldHelpers: {
       formula_id: {

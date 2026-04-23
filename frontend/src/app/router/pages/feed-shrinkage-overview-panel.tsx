@@ -68,7 +68,7 @@ function LotRow({ item }: LotRowProps) {
           −{formatKg(item.loss_quantity)} ({formatPercent(item.loss_percent)})
         </div>
       </td>
-      <td className="px-4 py-3 align-top text-right text-xs text-muted-foreground">
+      <td className="px-4 py-3 text-right align-top text-xs text-muted-foreground">
         {item.is_frozen ? (
           <span className="inline-flex items-center gap-1 rounded-full bg-sky-500/10 px-2 py-0.5 text-sky-700 ring-1 ring-inset ring-sky-500/25">
             <Snowflake className="h-3 w-3" />

@@ -64,6 +64,7 @@ import { useWorkspaceStore } from '@/shared/workspace';
 import { AdvanceBalancePanel } from './advance-balance-panel';
 import { DebtPaymentsPanel } from './debt-payments-panel';
 import { DebtsAgingPanel } from './debts-aging-panel';
+import { FeedShrinkageOverviewPanel } from './feed-shrinkage-overview-panel';
 import { FlockKpiPanel } from './flock-kpi-panel';
 import { MedicineConsumeButton } from './medicine-consume-sheet';
 import { AnalyticsStatsView } from './module-crud/analytics-stats-view';
@@ -132,7 +133,6 @@ import {
   type ResourceCategoryGroupId,
   type SubmitMode,
 } from './module-crud-page.helpers';
-import { FeedShrinkageOverviewPanel } from './feed-shrinkage-overview-panel';
 
 export function ModuleCrudPage() {
   const { t, locale, language } = useI18n();

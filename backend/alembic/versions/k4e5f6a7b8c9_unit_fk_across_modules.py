@@ -105,7 +105,31 @@ def upgrade() -> None:
     bind = op.get_bind()
 
     # 1. Seed canonical measurement_units per organization if missing.
+    # Handles two flavours of prior state:
+    #   (a) An earlier migration (a1b2c3d4e5f6) inserted the same
+    #       display name under a *different* code (e.g. code='ton',
+    #       name='Tonna'). We normalize its code to the canonical one
+    #       so lookups by the canonical code succeed.
+    #   (b) Nothing exists for this (org, code) yet — insert fresh.
     for code, name, sort_order in CANONICAL_UNITS:
+        bind.execute(
+            sa.text(
+                """
+                UPDATE measurement_units
+                SET code = CAST(:code AS VARCHAR),
+                    sort_order = :sort_order,
+                    updated_at = NOW()
+                WHERE name = CAST(:name AS VARCHAR)
+                  AND code <> CAST(:code AS VARCHAR)
+                  AND NOT EXISTS (
+                      SELECT 1 FROM measurement_units peer
+                      WHERE peer.organization_id = measurement_units.organization_id
+                        AND peer.code = CAST(:code AS VARCHAR)
+                  )
+                """
+            ),
+            {"code": code, "name": name, "sort_order": sort_order},
+        )
         bind.execute(
             sa.text(
                 """
@@ -114,7 +138,8 @@ def upgrade() -> None:
                 FROM organizations o
                 WHERE NOT EXISTS (
                     SELECT 1 FROM measurement_units mu
-                    WHERE mu.organization_id = o.id AND mu.code = CAST(:code AS VARCHAR)
+                    WHERE mu.organization_id = o.id
+                      AND (mu.code = CAST(:code AS VARCHAR) OR mu.name = CAST(:name AS VARCHAR))
                 )
                 """
             ),

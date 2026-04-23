@@ -166,11 +166,7 @@ const MODULE_ANALYTICS_BLUEPRINTS: Record<string, ModuleAnalyticsBlueprint> = {
           'financial_result',
           'total_expenses',
         ],
-        chartKeys: [
-          'factory_mortality_trend',
-          'factory_weight_gain',
-          'factory_shipments_flow',
-        ],
+        chartKeys: ['factory_mortality_trend', 'factory_weight_gain', 'factory_shipments_flow'],
         breakdownKeys: ['factory_flock_performance', 'factory_shipment_clients'],
       },
       {
@@ -225,12 +221,7 @@ const MODULE_ANALYTICS_BLUEPRINTS: Record<string, ModuleAnalyticsBlueprint> = {
         titleFallback: 'Главное',
         descriptionKey: 'dashboard.moduleOverviewDescription',
         descriptionFallback: '{module}: сроки годности партий и деньги отдела.',
-        metricKeys: [
-          'expiring_batches',
-          'expired_batches',
-          'financial_result',
-          'total_expenses',
-        ],
+        metricKeys: ['expiring_batches', 'expired_batches', 'financial_result', 'total_expenses'],
         chartKeys: [],
         breakdownKeys: ['medicine_expiry_batches'],
       },
