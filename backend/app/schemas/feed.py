@@ -70,26 +70,6 @@ class FeedFormulaListResponse(CRUDListResponse[FeedFormulaReadSchema]):
     """Paginated feed formula response."""
 
 
-class FeedFormulaIngredientCreateSchema(OpenSchema, BaseCreateSchema):
-    """Input payload to create feed formula ingredient."""
-
-
-class FeedFormulaIngredientUpdateSchema(OpenSchema, BaseUpdateSchema):
-    """Input payload to update feed formula ingredient."""
-
-
-class FeedFormulaIngredientReadSchema(OpenSchema, BaseReadSchema):
-    """Readable feed formula ingredient response."""
-
-
-class FeedFormulaIngredientListParams(CRUDBaseParams):
-    """Pagination + query params for feed formula ingredient list."""
-
-
-class FeedFormulaIngredientListResponse(CRUDListResponse[FeedFormulaIngredientReadSchema]):
-    """Paginated feed formula ingredient response."""
-
-
 class FeedProductionBatchCreateSchema(OpenSchema, BaseCreateSchema):
     """Input payload to create feed production batch."""
 
@@ -272,11 +252,6 @@ __all__ = [
     "FeedFormulaReadSchema",
     "FeedFormulaListParams",
     "FeedFormulaListResponse",
-    "FeedFormulaIngredientCreateSchema",
-    "FeedFormulaIngredientUpdateSchema",
-    "FeedFormulaIngredientReadSchema",
-    "FeedFormulaIngredientListParams",
-    "FeedFormulaIngredientListResponse",
     "FeedProductionBatchCreateSchema",
     "FeedProductionBatchUpdateSchema",
     "FeedProductionBatchReadSchema",

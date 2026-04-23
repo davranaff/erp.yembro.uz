@@ -10,7 +10,6 @@ from app.api.deps import CurrentActor, db_dependency, get_current_actor, require
 from app.api.module_stats import ModuleStatsTable, register_module_stats_route
 from app.db.pool import Database
 from app.repositories.feed import (
-    FeedFormulaIngredientRepository,
     FeedFormulaRepository,
     FeedIngredientRepository,
     FeedLotShrinkageStateRepository,
@@ -23,7 +22,6 @@ from app.repositories.feed import (
     FeedTypeRepository,
 )
 from app.services.feed import (
-    FeedFormulaIngredientService,
     FeedFormulaService,
     FeedIngredientService,
     FeedProductShipmentService,
@@ -68,15 +66,6 @@ router.include_router(
         service_factory=lambda db: FeedFormulaService(FeedFormulaRepository(db)),
         permission_prefix="feed_formula",
         tags=["feed-formula"],
-    )
-)
-
-router.include_router(
-    build_crud_router(
-        prefix="formula-ingredients",
-        service_factory=lambda db: FeedFormulaIngredientService(FeedFormulaIngredientRepository(db)),
-        permission_prefix="feed_formula_ingredient",
-        tags=["feed-formula-ingredient"],
     )
 )
 
@@ -340,11 +329,6 @@ register_module_stats_route(
         ModuleStatsTable(key="types", label="Types", table="feed_types"),
         ModuleStatsTable(key="ingredients", label="Ingredients", table="feed_ingredients"),
         ModuleStatsTable(key="formulas", label="Formulas", table="feed_formulas"),
-        ModuleStatsTable(
-            key="formula_ingredients",
-            label="Formula Ingredients",
-            table="feed_formula_ingredients",
-        ),
         ModuleStatsTable(
             key="raw_arrivals",
             label="Raw Arrivals",

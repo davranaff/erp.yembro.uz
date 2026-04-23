@@ -17,7 +17,6 @@ ALL_RESOURCES = [
     ("/api/v1/feed/types", "feed_type"),
     ("/api/v1/feed/ingredients", "feed_ingredient"),
     ("/api/v1/feed/formulas", "feed_formula"),
-    ("/api/v1/feed/formula-ingredients", "feed_formula_ingredient"),
     ("/api/v1/feed/raw-arrivals", "feed_raw_arrival"),
     ("/api/v1/feed/production-batches", "feed_production_batch"),
     ("/api/v1/feed/raw-consumptions", "feed_raw_consumption"),

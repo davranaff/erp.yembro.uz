@@ -1,7 +1,7 @@
 from app.models.feed.feed_arrival import FeedArrival
 from app.models.feed.feed_consumption import FeedConsumption
 from app.models.feed.feed_ingredient import FeedIngredient
-from app.models.feed.feed_formula import FeedFormula, FeedFormulaIngredient
+from app.models.feed.feed_formula import FeedFormula
 from app.models.feed.feed_production import FeedProductShipment, FeedProductionBatch
 from app.models.feed.feed_quality_check import FeedProductionQualityCheck
 from app.models.feed.feed_raw_arrival import FeedRawArrival
@@ -14,7 +14,6 @@ __all__ = [
     "FeedConsumption",
     "FeedIngredient",
     "FeedFormula",
-    "FeedFormulaIngredient",
     "FeedLotShrinkageState",
     "FeedProductShipment",
     "FeedProductionBatch",

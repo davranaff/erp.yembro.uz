@@ -28,7 +28,6 @@ OPERATIONAL_ALERT_SPECS: dict[str, OperationalAlertSpec] = {
     "feed_types": OperationalAlertSpec(resource_label="Типы корма", module_label="Корма"),
     "feed_ingredients": OperationalAlertSpec(resource_label="Сырьё", module_label="Корма"),
     "feed_formulas": OperationalAlertSpec(resource_label="Продукт", module_label="Корма"),
-    "feed_formula_ingredients": OperationalAlertSpec(resource_label="Комбинация сырья", module_label="Корма"),
     "feed_production_batches": OperationalAlertSpec(resource_label="Выпуск продукта", module_label="Корма"),
     "feed_product_shipments": OperationalAlertSpec(resource_label="Отгрузки продукта", module_label="Корма"),
     "medicine_batches": OperationalAlertSpec(resource_label="Партии лекарств", module_label="Вет аптека"),

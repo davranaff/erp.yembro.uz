@@ -16,7 +16,6 @@ from app.repositories.finance import (
     SupplierDebtRepository,
 )
 from app.repositories.feed import (
-    FeedFormulaIngredientRepository,
     FeedFormulaRepository,
     FeedIngredientRepository,
     FeedProductionBatchRepository,
@@ -60,7 +59,6 @@ __all__ = [
     "FeedTypeRepository",
     "FeedIngredientRepository",
     "FeedFormulaRepository",
-    "FeedFormulaIngredientRepository",
     "FeedProductionBatchRepository",
     "FeedProductShipmentRepository",
     "EmployeeRepository",

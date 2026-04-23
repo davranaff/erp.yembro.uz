@@ -13,7 +13,6 @@ from app.repositories.core import (
 )
 from app.repositories.feed import (
     FeedConsumptionRepository,
-    FeedFormulaIngredientRepository,
     FeedFormulaRepository,
     FeedIngredientRepository,
     FeedProductionBatchRepository,
@@ -28,7 +27,6 @@ from app.repositories.hr import EmployeeRepository
 from app.repositories.inventory import StockMovementRepository
 from app.schemas.feed import (
     FeedConsumptionReadSchema,
-    FeedFormulaIngredientReadSchema,
     FeedFormulaReadSchema,
     FeedIngredientReadSchema,
     FeedProductionBatchReadSchema,
@@ -129,11 +127,9 @@ class FeedIngredientService(BaseService):
         dependency_row = await self.repository.db.fetchrow(
             """
             SELECT
-                (SELECT COUNT(*) FROM feed_formula_ingredients WHERE ingredient_id = $1) AS formula_items_count,
-                (SELECT COUNT(*) FROM feed_raw_arrivals WHERE ingredient_id = $2) AS raw_arrivals_count,
-                (SELECT COUNT(*) FROM feed_raw_consumptions WHERE ingredient_id = $3) AS raw_consumptions_count
+                (SELECT COUNT(*) FROM feed_raw_arrivals WHERE ingredient_id = $1) AS raw_arrivals_count,
+                (SELECT COUNT(*) FROM feed_raw_consumptions WHERE ingredient_id = $2) AS raw_consumptions_count
             """,
-            entity_id,
             entity_id,
             entity_id,
         )
@@ -141,7 +137,6 @@ class FeedIngredientService(BaseService):
             return
 
         dependency_labels = {
-            "formula_items_count": "formula ingredients",
             "raw_arrivals_count": "raw arrivals",
             "raw_consumptions_count": "raw consumptions",
         }
@@ -173,13 +168,6 @@ class FeedFormulaService(BaseService):
     read_schema = FeedFormulaReadSchema
 
     def __init__(self, repository: FeedFormulaRepository) -> None:
-        super().__init__(repository=repository)
-
-
-class FeedFormulaIngredientService(BaseService):
-    read_schema = FeedFormulaIngredientReadSchema
-
-    def __init__(self, repository: FeedFormulaIngredientRepository) -> None:
         super().__init__(repository=repository)
 
 
@@ -675,7 +663,6 @@ __all__ = [
     "FeedTypeService",
     "FeedIngredientService",
     "FeedFormulaService",
-    "FeedFormulaIngredientService",
     "FeedProductionBatchService",
     "FeedProductShipmentService",
     "FeedRawArrivalService",

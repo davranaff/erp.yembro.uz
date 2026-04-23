@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from typing import List
 from uuid import UUID
 
 from sqlalchemy import Boolean, ForeignKey, String, Text, UniqueConstraint
@@ -25,16 +24,10 @@ class FeedIngredient(Base, IDMixin, TimestampMixin):
         nullable=False,
         index=True,
     )
-    supplier_category: Mapped[str | None] = mapped_column(String(120), nullable=True)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default="true")
 
     organization: Mapped["Organization"] = relationship("Organization", back_populates="feed_ingredients")
-    formula_items: Mapped[List["FeedFormulaIngredient"]] = relationship(
-        "FeedFormulaIngredient",
-        back_populates="ingredient",
-        lazy="selectin",
-    )
 
     __table_args__ = (
         UniqueConstraint("organization_id", "name", name="uq_feed_ingredient_org_name"),

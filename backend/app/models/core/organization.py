@@ -148,12 +148,6 @@ class Organization(Base, IDMixin, TimestampMixin):
         cascade="all, delete-orphan",
         lazy="selectin",
     )
-    feed_formula_ingredients: Mapped[List["FeedFormulaIngredient"]] = relationship(
-        "FeedFormulaIngredient",
-        back_populates="organization",
-        cascade="all, delete-orphan",
-        lazy="selectin",
-    )
     medicine_types: Mapped[List["MedicineType"]] = relationship(
         "MedicineType",
         back_populates="organization",

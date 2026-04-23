@@ -67,8 +67,8 @@ department_modules:
   sort_order: 50
   is_department_assignable: true
   analytics_section_key: "feed_mill"
-  implicit_read_permissions: '["feed_type.read", "feed_ingredient.read", "feed_formula.read", "feed_formula_ingredient.read", "feed_raw_arrival.read", "feed_raw_consumption.read", "feed_production_batch.read", "feed_production_quality_check.read", "feed_product_shipment.read", "stock_movement.read", "warehouse.read"]'
-  analytics_read_permissions: '["feed_ingredient.read", "feed_formula.read", "feed_formula_ingredient.read", "feed_raw_arrival.read", "feed_raw_consumption.read", "feed_production_batch.read", "feed_production_quality_check.read", "feed_product_shipment.read"]'
+  implicit_read_permissions: '["feed_type.read", "feed_ingredient.read", "feed_formula.read", "feed_raw_arrival.read", "feed_raw_consumption.read", "feed_production_batch.read", "feed_production_quality_check.read", "feed_product_shipment.read", "stock_movement.read", "warehouse.read"]'
+  analytics_read_permissions: '["feed_ingredient.read", "feed_formula.read", "feed_raw_arrival.read", "feed_raw_consumption.read", "feed_production_batch.read", "feed_production_quality_check.read", "feed_product_shipment.read"]'
   is_active: true
 - id: "31555555-5555-5555-5555-555555555555"
   key: "medicine"
@@ -643,16 +643,6 @@ workspace_resources:
   description: "Рецептуры готового продукта"
   permission_prefix: "feed_formula"
   sort_order: 20
-  is_head_visible: false
-  is_active: true
-- id: "32000000-0000-0000-0000-000000000035"
-  module_key: "feed"
-  key: "formula-ingredients"
-  name: "Комбинация сырья"
-  path: "formula-ingredients"
-  description: "Состав продукта по сырьевым компонентам"
-  permission_prefix: "feed_formula_ingredient"
-  sort_order: 30
   is_head_visible: false
   is_active: true
 - id: "32000000-0000-0000-0000-000000000036"

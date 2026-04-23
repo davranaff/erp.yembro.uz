@@ -15,10 +15,6 @@ class FeedFormulaRepository(BaseRepository[dict[str, object]]):
     table = "feed_formulas"
 
 
-class FeedFormulaIngredientRepository(BaseRepository[dict[str, object]]):
-    table = "feed_formula_ingredients"
-
-
 class FeedProductionBatchRepository(BaseRepository[dict[str, object]]):
     table = "feed_production_batches"
 
@@ -55,7 +51,6 @@ __all__ = [
     "FeedTypeRepository",
     "FeedIngredientRepository",
     "FeedFormulaRepository",
-    "FeedFormulaIngredientRepository",
     "FeedProductionBatchRepository",
     "FeedProductShipmentRepository",
     "FeedRawArrivalRepository",

@@ -15,7 +15,6 @@ from app.services.finance import (
     SupplierDebtService,
 )
 from app.services.feed import (
-    FeedFormulaIngredientService,
     FeedFormulaService,
     FeedIngredientService,
     FeedProductShipmentService,
@@ -55,7 +54,6 @@ __all__ = [
     "CashTransactionService",
     "SupplierDebtService",
     "DebtPaymentService",
-    "FeedFormulaIngredientService",
     "FeedFormulaService",
     "FeedIngredientService",
     "FeedProductShipmentService",
