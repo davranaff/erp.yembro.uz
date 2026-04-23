@@ -321,6 +321,132 @@ async def shrinkage_report(
         ],
     }
 
+
+@router.get(
+    "/shrinkage/overview",
+    status_code=status.HTTP_200_OK,
+    dependencies=[Depends(shrinkage_run_read)],
+    tags=["feed-shrinkage-overview"],
+)
+async def shrinkage_overview(
+    current_actor: CurrentActor = Depends(get_current_actor),
+    db: Database = Depends(db_dependency),
+) -> dict[str, object]:
+    """Auto-applied, flat view of shrinkage per lot.
+
+    Page users just want: «партия N — было 11 000 кг, сейчас 9 500 кг».
+    This endpoint:
+
+    1. Runs the shrinkage algorithm for today (idempotent —
+       last_applied_on prevents double-counting, so every page view
+       is at most one full cycle, usually zero).
+    2. Returns a flat list of every lot that has an active profile,
+       split into raw ingredients and finished feed.
+    """
+    runner = FeedShrinkageRunner(db)
+    await runner.apply_for_organization(current_actor.organization_id)
+
+    raw_rows = await db.fetch(
+        """
+        SELECT
+            s.id::text              AS state_id,
+            ra.id::text             AS lot_id,
+            ra.arrived_on           AS started_on,
+            fi.name                 AS name,
+            fi.code                 AS code,
+            w.name                  AS warehouse_name,
+            s.initial_quantity      AS initial_quantity,
+            s.accumulated_loss      AS accumulated_loss,
+            s.last_applied_on       AS last_applied_on,
+            s.is_frozen             AS is_frozen
+        FROM feed_raw_arrivals ra
+        LEFT JOIN feed_lot_shrinkage_state s
+          ON s.lot_type = 'raw_arrival' AND s.lot_id = ra.id
+        LEFT JOIN feed_ingredients fi ON fi.id = ra.ingredient_id
+        LEFT JOIN warehouses w ON w.id = ra.warehouse_id
+        WHERE ra.organization_id = $1 AND s.id IS NOT NULL
+        ORDER BY ra.arrived_on DESC, ra.id
+        """,
+        current_actor.organization_id,
+    )
+
+    batch_rows = await db.fetch(
+        """
+        SELECT
+            s.id::text              AS state_id,
+            pb.id::text             AS lot_id,
+            pb.finished_on          AS started_on,
+            pb.batch_code           AS batch_code,
+            ft.name                 AS name,
+            ft.code                 AS code,
+            w.name                  AS warehouse_name,
+            s.initial_quantity      AS initial_quantity,
+            s.accumulated_loss      AS accumulated_loss,
+            s.last_applied_on       AS last_applied_on,
+            s.is_frozen             AS is_frozen
+        FROM feed_production_batches pb
+        JOIN feed_formulas ff ON ff.id = pb.formula_id
+        LEFT JOIN feed_types ft ON ft.id = ff.feed_type_id
+        LEFT JOIN feed_lot_shrinkage_state s
+          ON s.lot_type = 'production_batch' AND s.lot_id = pb.id
+        LEFT JOIN warehouses w ON w.id = pb.warehouse_id
+        WHERE pb.organization_id = $1 AND s.id IS NOT NULL
+        ORDER BY pb.finished_on DESC NULLS LAST, pb.id
+        """,
+        current_actor.organization_id,
+    )
+
+    def _to_item(row: dict[str, object], *, lot_label_parts: list[str]) -> dict[str, object]:
+        from decimal import Decimal as _D
+
+        initial = _D(str(row["initial_quantity"] or 0))
+        loss = _D(str(row["accumulated_loss"] or 0))
+        current = initial - loss
+        percent = (loss / initial * _D("100")) if initial > 0 else _D("0")
+        return {
+            "state_id": row["state_id"],
+            "lot_id": row["lot_id"],
+            "lot_label": " · ".join(p for p in lot_label_parts if p),
+            "name": row["name"],
+            "code": row["code"],
+            "warehouse_name": row["warehouse_name"],
+            "started_on": row["started_on"].isoformat() if row["started_on"] else None,
+            "initial_quantity": str(initial),
+            "current_quantity": str(current),
+            "loss_quantity": str(loss),
+            "loss_percent": f"{percent:.2f}",
+            "last_applied_on": (
+                row["last_applied_on"].isoformat() if row["last_applied_on"] else None
+            ),
+            "is_frozen": bool(row["is_frozen"]),
+        }
+
+    return {
+        "ingredients": [
+            _to_item(
+                dict(row),
+                lot_label_parts=[
+                    str(row["name"] or ""),
+                    (row["started_on"].isoformat() if row["started_on"] else ""),
+                    str(row["warehouse_name"] or ""),
+                ],
+            )
+            for row in raw_rows
+        ],
+        "feed_products": [
+            _to_item(
+                dict(row),
+                lot_label_parts=[
+                    str(row["name"] or ""),
+                    str(row["batch_code"] or ""),
+                    (row["started_on"].isoformat() if row["started_on"] else ""),
+                ],
+            )
+            for row in batch_rows
+        ],
+    }
+
+
 register_module_stats_route(
     router,
     module="feed",

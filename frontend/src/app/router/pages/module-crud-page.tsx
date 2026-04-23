@@ -132,6 +132,7 @@ import {
   type ResourceCategoryGroupId,
   type SubmitMode,
 } from './module-crud-page.helpers';
+import { FeedShrinkageOverviewPanel } from './feed-shrinkage-overview-panel';
 
 export function ModuleCrudPage() {
   const { t, locale, language } = useI18n();
@@ -2422,6 +2423,14 @@ export function ModuleCrudPage() {
         actionLabel={t('common.back')}
         onAction={() => navigate(-1)}
       />
+    );
+  }
+
+  if (activeResource && activeResource.key === 'shrinkage-overview') {
+    return (
+      <div className="space-y-6" data-tour="module-page">
+        <FeedShrinkageOverviewPanel />
+      </div>
     );
   }
 
