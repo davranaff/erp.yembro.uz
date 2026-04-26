@@ -14,8 +14,8 @@ Atomic-транзакция:
        - current_module = incubation (пока не передали дальше)
        - current_block = hatcher_block run-а (или incubator_block)
        - quantity = hatched_count
-       - accumulated_cost_uzs = run.batch.accumulated_cost_uzs
-         (вся себестоимость яиц переходит на цыплят).
+       - accumulated_cost_uzs = egg_batch.accumulated_cost_uzs после writeoff
+         (себестоимость выжившей части яиц; стоимость потерь списана на 91.02).
     3. Закрыть egg-batch:
        - egg_batch.current_quantity = 0
        - egg_batch.state = COMPLETED

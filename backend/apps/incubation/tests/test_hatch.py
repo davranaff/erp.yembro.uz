@@ -132,8 +132,9 @@ def test_hatch_creates_chick_batch(run, chick_nom, egg_batch):
     assert result.chick_batch.nomenclature_id == chick_nom.id
     assert result.chick_batch.current_quantity == Decimal("920")
     assert result.chick_batch.parent_batch_id == egg_batch.id
-    # Cost inheritance
-    assert result.chick_batch.accumulated_cost_uzs == Decimal("5000000.00")
+    # Cost inheritance: 80 lost eggs are written off (80 × 5 000 = 400 000),
+    # chick_batch receives the remaining cost (5 000 000 − 400 000 = 4 600 000).
+    assert result.chick_batch.accumulated_cost_uzs == Decimal("4600000.00")
 
 
 def test_hatch_closes_egg_batch(run, chick_nom, egg_batch):
