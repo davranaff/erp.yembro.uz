@@ -88,12 +88,21 @@ if [[ "${RUN_MIGRATIONS}" == "1" ]]; then
 fi
 
 if [[ -f "${EDGE_DIR}/compose.edge.yml" && -f "${EDGE_DIR}/.env" ]]; then
+  # Sync Caddyfile so the proxy always uses the version from the repo.
+  REPO_CADDYFILE="$(cd "$(dirname "$0")/../.." && pwd)/deploy/caddy/Caddyfile"
+  if [[ -f "${REPO_CADDYFILE}" ]]; then
+    mkdir -p "${EDGE_DIR}/deploy/caddy"
+    cp "${REPO_CADDYFILE}" "${EDGE_DIR}/deploy/caddy/Caddyfile"
+  fi
+
   edge_compose_args=(
     --env-file "${EDGE_DIR}/.env"
     -f "${EDGE_DIR}/compose.edge.yml"
   )
   COMPOSE_PROJECT_NAME="${edge_compose_project_name:-yembro-edge}" \
     docker compose "${edge_compose_args[@]}" up -d proxy
+  COMPOSE_PROJECT_NAME="${edge_compose_project_name:-yembro-edge}" \
+    docker compose "${edge_compose_args[@]}" exec -T proxy caddy reload --config /etc/caddy/Caddyfile 2>&1 || true
 fi
 
 service_is_ready() {
