@@ -17,6 +17,6 @@ jobs:
       environment_name: staging
       deploy_path: /opt/yembro/staging
       image_alias: staging
-      frontend_api_base_url: /api
+      frontend_api_base_url: ''
       public_base_url: https://staging.erp.yembro.uz
     secrets: inherit
