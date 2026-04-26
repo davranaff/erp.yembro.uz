@@ -1,41 +1,18 @@
 services:
-  frontend:
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile
-      target: builder
-    env_file:
-      - ./.env
-    depends_on:
-      - api
-    environment:
-      - CHOKIDAR_USEPOLLING=true
-      - WDS_SOCKET_PORT=0
-    ports:
-      - "${FRONTEND_PUBLISHED_PORT:-30080}:${FRONTEND_CONTAINER_PORT:-30080}"
-    volumes:
-      - ./frontend:/app
-      - /app/node_modules
-    command: >
-      sh -c "npm ci --include=dev && npm run dev -- --host $${APP_HOST:-0.0.0.0} --port $${FRONTEND_CONTAINER_PORT:-30080}"
-    restart: unless-stopped
-
   postgres:
     image: postgres:16-alpine
     environment:
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      POSTGRES_DB: ${POSTGRES_DB}
-    command:
-      - postgres
-      - -p
-      - ${POSTGRES_CONTAINER_PORT}
+      POSTGRES_USER: ${POSTGRES_USER:-erp}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-erp}
+      POSTGRES_DB: ${POSTGRES_DB:-erp}
     ports:
-      - "${POSTGRES_PUBLISHED_PORT:-30001}:${POSTGRES_CONTAINER_PORT:-30010}"
+      - "${POSTGRES_PUBLISHED_PORT:-5432}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -p ${POSTGRES_CONTAINER_PORT}"]
+      test:
+        - CMD-SHELL
+        - "pg_isready -U $${POSTGRES_USER:-erp} -d $${POSTGRES_DB:-erp}"
       interval: 5s
       timeout: 5s
       retries: 20
@@ -43,12 +20,13 @@ services:
 
   redis:
     image: redis:7-alpine
-    command:
-      - redis-server
-      - --port
-      - ${REDIS_CONTAINER_PORT}
     ports:
-      - "${REDIS_PUBLISHED_PORT:-30002}:${REDIS_CONTAINER_PORT:-30011}"
+      - "${REDIS_PUBLISHED_PORT:-6379}:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
     restart: unless-stopped
 
   api:
@@ -61,11 +39,15 @@ services:
       postgres:
         condition: service_healthy
       redis:
-        condition: service_started
+        condition: service_healthy
+    environment:
+      POSTGRES_HOST: ${POSTGRES_HOST:-postgres}
+      POSTGRES_PORT: "5432"
     ports:
-      - "${APP_PUBLISHED_PORT:-30000}:${APP_CONTAINER_PORT:-30000}"
+      - "${APP_PUBLISHED_PORT:-30000}:30000"
     command: >
-      sh -c "python -m alembic upgrade head && uvicorn app.main:app --host ${APP_HOST:-0.0.0.0} --port ${APP_CONTAINER_PORT:-30000} --reload --reload-dir /app"
+      sh -c "python manage.py migrate --noinput &&
+             python manage.py runserver 0.0.0.0:30000"
     volumes:
       - ./backend:/app
     restart: unless-stopped
@@ -77,10 +59,16 @@ services:
     env_file:
       - ./.env
     depends_on:
-      - redis
-      - postgres
-    command: >
-      sh -c "taskiq worker app.taskiq_app:broker --fs-discover"
+      api:
+        condition: service_started
+      redis:
+        condition: service_healthy
+    environment:
+      POSTGRES_HOST: ${POSTGRES_HOST:-postgres}
+      POSTGRES_PORT: "5432"
+    command: ["celery", "-A", "config", "worker", "-l", "info"]
+    volumes:
+      - ./backend:/app
     restart: unless-stopped
 
   scheduler:
@@ -90,10 +78,40 @@ services:
     env_file:
       - ./.env
     depends_on:
-      - redis
-      - postgres
-    command: >
-      sh -c "taskiq scheduler app.tasks.scheduler:scheduler app.tasks.jobs"
+      api:
+        condition: service_started
+      redis:
+        condition: service_healthy
+    environment:
+      POSTGRES_HOST: ${POSTGRES_HOST:-postgres}
+      POSTGRES_PORT: "5432"
+    command:
+      - celery
+      - -A
+      - config
+      - beat
+      - -l
+      - info
+      - --scheduler
+      - django_celery_beat.schedulers:DatabaseScheduler
+    volumes:
+      - ./backend:/app
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.dev
+    env_file:
+      - ./.env
+    depends_on:
+      - api
+    ports:
+      - "${FRONTEND_PUBLISHED_PORT:-30080}:3000"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+      - /app/.next
     restart: unless-stopped
 
 volumes:

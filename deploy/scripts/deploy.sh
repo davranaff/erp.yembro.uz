@@ -78,8 +78,13 @@ fi
 docker compose "${compose_args[@]}" up -d api worker scheduler frontend
 
 if [[ "${RUN_MIGRATIONS}" == "1" ]]; then
-  docker compose "${compose_args[@]}" exec -T api python -m app.scripts.sync_role_templates || \
-    echo "WARN: sync_role_templates failed (existing orgs may lack module-manager roles)" >&2
+  # Optional Django post-migrate hook. Define a custom management command
+  # `bootstrap_roles` (or any other one-shot task) if you need to seed data
+  # after every deploy. Failure is logged but does not abort the deploy.
+  if docker compose "${compose_args[@]}" exec -T api python manage.py help bootstrap_roles >/dev/null 2>&1; then
+    docker compose "${compose_args[@]}" exec -T api python manage.py bootstrap_roles || \
+      echo "WARN: bootstrap_roles failed (existing orgs may lack default roles)" >&2
+  fi
 fi
 
 if [[ -f "${EDGE_DIR}/compose.edge.yml" && -f "${EDGE_DIR}/.env" ]]; then

@@ -3,51 +3,120 @@ SHELL := /bin/bash
 COMPOSE_FILE ?= docker-compose.yml
 PYTHON ?= python
 BACKEND_DIR ?= backend
+DC := docker compose -f $(COMPOSE_FILE)
 
-.PHONY: help install install-backend install-frontend install-all up down logs logs-frontend test test-integration db-clean fixtures fixtures-minimal fixtures-list permissions-sync permissions-sync-dry permissions-sync-codes-only permissions-check
+.PHONY: help init install install-backend install-frontend install-all \
+        up down restart rebuild build logs ps \
+        backend-logs frontend-logs celery-logs \
+        backend-sh frontend-sh db-sh \
+        migrate makemigrations superuser shell collectstatic \
+        test test-integration \
+        fixtures fixtures-list \
+        clean prune
 
 help:
 	@echo "Available targets:"
-	@echo "  make install         - install backend dependencies"
-	@echo "  make install-frontend - install frontend dependencies"
-	@echo "  make install-all      - install backend + frontend dependencies"
-	@echo "  make up              - build and start docker compose services"
-	@echo "  make down            - stop and remove compose services (volumes)"
-	@echo "  make logs            - show logs of all services"
-	@echo "  make logs-frontend   - show frontend container logs"
-	@echo "  make test            - run all backend tests"
-	@echo "  make test-integration - run backend integration tests"
-	@echo "  make db-clean        - truncate all database tables and reset identities"
-	@echo "  make fixtures        - load backend fixtures into the running database"
-	@echo "  make fixtures-minimal - reset database and load a minimal seed (1 org, 1 admin user)"
-	@echo "  make fixtures-list   - print available backend fixture files"
-	@echo "  make permissions-sync - auto-sync all permissions discovered in project sources"
-	@echo "  make permissions-sync-dry - preview permission sync changes without writing to DB"
-	@echo "  make permissions-sync-codes-only - sync permissions table only (skip privileged role grants)"
-	@echo "  make permissions-check - fail if there are missing permissions or privileged role grants"
+	@echo ""
+	@echo "  make init              - copy backend/.env.example -> backend/.env (and frontend)"
+	@echo "  make install           - install backend dependencies"
+	@echo "  make install-frontend  - install frontend dependencies"
+	@echo "  make install-all       - install backend + frontend dependencies"
+	@echo ""
+	@echo "  make build             - build all images"
+	@echo "  make up                - start all services"
+	@echo "  make down              - stop all services (keep volumes)"
+	@echo "  make restart           - restart all services"
+	@echo "  make rebuild           - rebuild and restart"
+	@echo "  make logs              - tail all logs"
+	@echo "  make ps                - show running services"
+	@echo ""
+	@echo "  make migrate           - run Django migrations"
+	@echo "  make makemigrations    - create Django migrations"
+	@echo "  make superuser         - create Django superuser"
+	@echo "  make shell             - open Django shell"
+	@echo "  make collectstatic     - collect static files"
+	@echo ""
+	@echo "  make backend-sh        - shell into backend container"
+	@echo "  make frontend-sh       - shell into frontend container"
+	@echo "  make db-sh             - psql into postgres"
+	@echo ""
+	@echo "  make test              - run backend tests"
+	@echo "  make fixtures          - loaddata for every yaml in backend/fixtures"
+	@echo "  make fixtures-list     - print available backend fixture files"
+	@echo ""
+	@echo "  make clean             - stop and remove containers + volumes"
+	@echo "  make prune             - prune docker resources"
+
+init:
+	@test -f backend/.env || cp backend/.env.example backend/.env
+	@test -f frontend/.env || cp frontend/.env.example frontend/.env 2>/dev/null || true
+	@echo "env files ready"
 
 install:
 	cd $(BACKEND_DIR) && $(PYTHON) -m pip install -r requirements.txt
 
-install-backend:
-	cd $(BACKEND_DIR) && $(PYTHON) -m pip install -r requirements.txt
+install-backend: install
 
 install-frontend:
 	cd frontend && npm install
 
 install-all: install-backend install-frontend
 
+build:
+	$(DC) build
+
 up:
-	docker compose -f $(COMPOSE_FILE) up --build -d
+	$(DC) up -d
 
 down:
-	docker compose -f $(COMPOSE_FILE) down --remove-orphans -v
+	$(DC) down --remove-orphans
+
+restart:
+	$(DC) restart
+
+rebuild:
+	$(DC) down --remove-orphans
+	$(DC) build
+	$(DC) up -d
 
 logs:
-	docker compose -f $(COMPOSE_FILE) logs -f
+	$(DC) logs -f
 
-logs-frontend:
-	docker compose -f $(COMPOSE_FILE) logs -f frontend
+ps:
+	$(DC) ps
+
+backend-logs:
+	$(DC) logs -f api
+
+frontend-logs:
+	$(DC) logs -f frontend
+
+celery-logs:
+	$(DC) logs -f worker scheduler
+
+backend-sh:
+	$(DC) exec api sh
+
+frontend-sh:
+	$(DC) exec frontend sh
+
+db-sh:
+	$(DC) exec postgres psql -U $${POSTGRES_USER:-erp} -d $${POSTGRES_DB:-erp}
+
+migrate:
+	$(DC) exec api python manage.py migrate
+
+makemigrations:
+	$(DC) exec api python manage.py makemigrations
+
+superuser:
+	$(DC) exec api python manage.py createsuperuser
+
+shell:
+	$(DC) exec api python manage.py shell
+
+collectstatic:
+	$(DC) exec api python manage.py collectstatic --noinput
 
 test:
 	cd $(BACKEND_DIR) && pytest
@@ -55,33 +124,19 @@ test:
 test-integration:
 	cd $(BACKEND_DIR) && pytest tests/integration
 
-db-clean:
-	docker compose -f $(COMPOSE_FILE) exec -T api python -m app.scripts.db_clean
-
 fixtures:
-	docker compose -f $(COMPOSE_FILE) exec -T api python -m app.scripts.load_fixtures
-
-fixtures-minimal:
-	docker compose -f $(COMPOSE_FILE) exec -T api python -m app.scripts.load_minimal_fixtures
+	@for f in $(BACKEND_DIR)/fixtures/*.yaml $(BACKEND_DIR)/fixtures/*.json; do \
+	  [ -e "$$f" ] || continue; \
+	  echo "loaddata $$f"; \
+	  $(DC) exec -T api python manage.py loaddata "$$(basename $$f)"; \
+	done
 
 fixtures-list:
 	@echo "Available fixtures in $(BACKEND_DIR)/fixtures"
-	@find $(BACKEND_DIR)/fixtures -maxdepth 1 -type f -name '*.yaml' -print
+	@find $(BACKEND_DIR)/fixtures -maxdepth 1 -type f \( -name '*.yaml' -o -name '*.json' \) -print 2>/dev/null || echo "  (none)"
 
-permissions-sync:
-	docker compose -f $(COMPOSE_FILE) exec -T api python -m app.scripts.sync_permissions
+clean:
+	$(DC) down -v --remove-orphans
 
-permissions-sync-dry:
-	docker compose -f $(COMPOSE_FILE) exec -T api python -m app.scripts.sync_permissions --dry-run
-
-permissions-sync-codes-only:
-	docker compose -f $(COMPOSE_FILE) exec -T api python -m app.scripts.sync_permissions --skip-privileged-roles
-
-permissions-check:
-	docker compose -f $(COMPOSE_FILE) exec -T api python -m app.scripts.sync_permissions --dry-run --fail-on-diff
-
-roles-sync:
-	docker compose -f $(COMPOSE_FILE) exec -T api python -m app.scripts.sync_role_templates
-
-roles-sync-dry:
-	docker compose -f $(COMPOSE_FILE) exec -T api python -m app.scripts.sync_role_templates --dry-run
+prune:
+	docker system prune -f

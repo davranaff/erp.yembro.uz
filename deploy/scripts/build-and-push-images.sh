@@ -81,10 +81,10 @@ docker buildx build \
 docker buildx build \
   --platform linux/amd64 \
   -f "${ROOT_DIR}/frontend/Dockerfile" \
-  --build-arg "VITE_API_BASE_URL=${FRONTEND_API_BASE_URL}" \
-  --build-arg "VITE_AUTH_LOGIN_ENDPOINT=/auth/login" \
-  --build-arg "VITE_REQUEST_TIMEOUT_MS=15000" \
-  --build-arg "VITE_APP_NAME=Yembro" \
+  --build-arg "NEXT_PUBLIC_API_URL=${FRONTEND_API_BASE_URL}" \
+  --build-arg "NEXT_PUBLIC_AUTH_LOGIN_ENDPOINT=${FRONTEND_API_BASE_URL}/auth/token/" \
+  --build-arg "NEXT_PUBLIC_REQUEST_TIMEOUT_MS=15000" \
+  --build-arg "NEXT_PUBLIC_APP_NAME=Yembro" \
   -t "${FRONTEND_IMAGE_SHA}" \
   -t "${FRONTEND_IMAGE_ALIAS}" \
   --push \

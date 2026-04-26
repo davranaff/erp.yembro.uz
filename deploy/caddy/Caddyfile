@@ -5,13 +5,13 @@
 {$PRIMARY_DOMAIN} {
 	encode zstd gzip
 
-	@api path /api/* /health
-	handle @api {
+	@backend path /api/* /admin/* /static/* /media/* /health
+	handle @backend {
 		reverse_proxy prod-api:30000
 	}
 
 	handle {
-		reverse_proxy prod-frontend:80
+		reverse_proxy prod-frontend:3000
 	}
 }
 
@@ -23,13 +23,13 @@
 {$STAGING_DOMAIN} {
 	encode zstd gzip
 
-	@api path /api/* /health
-	handle @api {
+	@backend path /api/* /admin/* /static/* /media/* /health
+	handle @backend {
 		reverse_proxy staging-api:30000
 	}
 
 	handle {
-		reverse_proxy staging-frontend:80
+		reverse_proxy staging-frontend:3000
 	}
 }
 

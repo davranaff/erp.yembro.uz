@@ -1,0 +1,316 @@
+# Core-fixture для новой организации YemBro ERP.
+#
+# Запуск:
+#   python manage.py seed_organization <org_code>
+#   python manage.py seed_organization <org_code> --config path/to/other.yaml
+#   python manage.py seed_organization <org_code> --dry-run
+#
+# Идемпотентен: повторный прогон не создаёт дубликатов и не перезаписывает
+# вручную изменённые поля. Резолверы:
+#   module: feed         → Module.objects.get(code='feed')         (глобальный)
+#   account: "10"        → GLAccount(organization=org, code='10')
+#   subaccount: "10.05"  → GLSubaccount(account__organization=org, code='10.05')
+#   unit: kg             → Unit(organization=org, code='kg')
+#   category: "Корма"    → Category(organization=org, name='Корма')
+#   parent (для expense_articles): код другой статьи
+
+version: 1
+description: "Стандартный набор для бройлерной/яичной фермы"
+
+# ─────────────────────────────────────────────────────────────────────
+# 1. Единицы измерения
+# ─────────────────────────────────────────────────────────────────────
+units:
+  - {code: pcs,   name: "Штука"}
+  - {code: kg,    name: "Килограмм"}
+  - {code: t,     name: "Тонна"}
+  - {code: g,     name: "Грамм"}
+  - {code: l,     name: "Литр"}
+  - {code: ml,    name: "Миллилитр"}
+  - {code: head,  name: "Голова"}
+  - {code: dose,  name: "Доза"}
+  - {code: m2,    name: "Квадратный метр"}
+  - {code: m3,    name: "Кубический метр"}
+
+# ─────────────────────────────────────────────────────────────────────
+# 2. План счетов (синтетические счета)
+# ─────────────────────────────────────────────────────────────────────
+accounts:
+  # Активы
+  - {code: "10", name: "Материалы",                     type: asset}
+  - {code: "20", name: "Основное производство",         type: expense}
+  - {code: "26", name: "Общехозяйственные расходы",     type: expense}
+  - {code: "43", name: "Готовая продукция",             type: asset}
+  - {code: "44", name: "Расходы на продажу",            type: expense}
+  - {code: "50", name: "Касса",                         type: asset}
+  - {code: "51", name: "Расчётный счёт",                type: asset}
+  - {code: "52", name: "Валютный счёт",                 type: asset}
+  - {code: "57", name: "Переводы в пути",               type: asset}
+  - {code: "58", name: "Электронные кошельки / Click",  type: asset}
+  - {code: "60", name: "Расчёты с поставщиками",        type: liability}
+  - {code: "62", name: "Расчёты с покупателями",        type: asset}
+  - {code: "70", name: "Расчёты с персоналом",          type: liability}
+  - {code: "71", name: "Расчёты с подотчётными лицами", type: asset}
+  - {code: "76", name: "Расчёты с разными дебиторами/кредиторами", type: liability}
+  - {code: "79", name: "Внутрихозяйственные расчёты",   type: service}
+  - {code: "84", name: "Нераспределённая прибыль (убыток)", type: equity}
+  - {code: "90", name: "Продажи",                       type: income}
+  - {code: "91", name: "Прочие доходы и расходы",       type: income}
+  - {code: "99", name: "Прибыли и убытки",              type: service}
+
+# ─────────────────────────────────────────────────────────────────────
+# 3. Субсчета
+#    module — опционально. Привязка к модулю помогает фильтровать в UI.
+# ─────────────────────────────────────────────────────────────────────
+subaccounts:
+  # 10 · Материалы
+  - {code: "10.01", account: "10", name: "Сырьё и материалы"}
+  - {code: "10.02", account: "10", name: "Живая птица (ремонт молодняк)"}
+  - {code: "10.03", account: "10", name: "Ветпрепараты",         module: vet}
+  - {code: "10.04", account: "10", name: "Топливо и ГСМ"}
+  - {code: "10.05", account: "10", name: "Корма",                module: feed}
+  - {code: "10.06", account: "10", name: "Инвентарь и хозтовары"}
+  - {code: "10.07", account: "10", name: "Тара и упаковка"}
+  - {code: "10.08", account: "10", name: "Запчасти"}
+
+  # 20 · Основное производство (НЗП)
+  - {code: "20.01", account: "20", name: "НЗП · Маточник",        module: matochnik}
+  - {code: "20.02", account: "20", name: "НЗП · Откорм бройлера", module: feedlot}
+  - {code: "20.03", account: "20", name: "НЗП · Инкубация",       module: incubation}
+  - {code: "20.04", account: "20", name: "НЗП · Убойня",          module: slaughter}
+  - {code: "20.05", account: "20", name: "НЗП · Производство кормов", module: feed}
+
+  # 26 · Общехозяйственные расходы
+  - {code: "26.01", account: "26", name: "Аренда и коммунальные"}
+  - {code: "26.02", account: "26", name: "Связь и интернет"}
+  - {code: "26.03", account: "26", name: "Обслуживание и ремонт"}
+  - {code: "26.04", account: "26", name: "Канцелярия и офис"}
+  - {code: "26.05", account: "26", name: "Налоги (кроме на прибыль)"}
+  - {code: "26.06", account: "26", name: "Прочие административные"}
+
+  # 43 · Готовая продукция
+  - {code: "43.01", account: "43", name: "Тушки и разделка",       module: slaughter}
+  - {code: "43.02", account: "43", name: "Инкубационное яйцо",     module: matochnik}
+  - {code: "43.03", account: "43", name: "Живая птица на продажу", module: feedlot}
+  - {code: "43.04", account: "43", name: "Готовый комбикорм",      module: feed}
+
+  # 44 · Расходы на продажу
+  - {code: "44.01", account: "44", name: "Транспортные расходы"}
+  - {code: "44.02", account: "44", name: "Реклама и маркетинг"}
+  - {code: "44.03", account: "44", name: "Прочие коммерческие"}
+
+  # 50 · Касса (наличные)
+  - {code: "50.01", account: "50", name: "Касса организации (UZS)"}
+  - {code: "50.02", account: "50", name: "Касса в иностранной валюте"}
+
+  # 51 · Банк (UZS)
+  - {code: "51.01", account: "51", name: "Расчётный счёт UZS"}
+  - {code: "51.02", account: "51", name: "Расчётный счёт UZS · резерв"}
+
+  # 52 · Валютный счёт
+  - {code: "52.01", account: "52", name: "Валютный счёт USD"}
+  - {code: "52.02", account: "52", name: "Валютный счёт прочая валюта"}
+
+  # 57 · Переводы в пути
+  - {code: "57.01", account: "57", name: "Переводы в пути"}
+
+  # 58 · Электронные кошельки / Click
+  - {code: "58.01", account: "58", name: "Click (электронный кошелёк)"}
+  - {code: "58.02", account: "58", name: "Прочие электронные деньги"}
+
+  # 60 · Поставщики
+  - {code: "60.01", account: "60", name: "Расчёты с поставщиками (UZS)"}
+  - {code: "60.02", account: "60", name: "Расчёты с поставщиками в валюте"}
+  - {code: "60.03", account: "60", name: "Авансы выданные"}
+
+  # 62 · Покупатели
+  - {code: "62.01", account: "62", name: "Расчёты с покупателями (UZS)"}
+  - {code: "62.02", account: "62", name: "Расчёты с покупателями в валюте"}
+  - {code: "62.03", account: "62", name: "Авансы полученные"}
+
+  # 70 · Зарплата
+  - {code: "70.01", account: "70", name: "Расчёты с персоналом по оплате труда"}
+
+  # 71 · Подотчётные
+  - {code: "71.01", account: "71", name: "Расчёты с подотчётными лицами"}
+
+  # 76 · Прочие расчёты
+  - {code: "76.01", account: "76", name: "Прочие дебиторы"}
+  - {code: "76.02", account: "76", name: "Прочие кредиторы"}
+
+  # 79 · Внутрихозяйственные расчёты (транзит между модулями)
+  - {code: "79.01", account: "79", name: "Межмодульные передачи"}
+
+  # 84 · Нераспределённая прибыль
+  - {code: "84.01", account: "84", name: "Нераспределённая прибыль текущего года"}
+  - {code: "84.02", account: "84", name: "Нераспределённая прибыль прошлых лет"}
+
+  # 90 · Продажи
+  - {code: "90.01", account: "90", name: "Выручка от продаж"}
+  - {code: "90.02", account: "90", name: "Себестоимость продаж"}
+  - {code: "90.03", account: "90", name: "Скидки и возвраты"}
+
+  # 91 · Прочие
+  - {code: "91.01", account: "91", name: "Прочие доходы"}
+  - {code: "91.02", account: "91", name: "Прочие расходы"}
+  - {code: "91.03", account: "91", name: "Курсовые разницы (доход)"}
+  - {code: "91.04", account: "91", name: "Курсовые разницы (расход)"}
+
+  # 99 · Прибыли и убытки
+  - {code: "99.01", account: "99", name: "Прибыли и убытки"}
+
+# ─────────────────────────────────────────────────────────────────────
+# 4. Статьи расходов/доходов (аналитика поверх плана счетов)
+#    Двухпроходный seed: parent создаётся первым.
+# ─────────────────────────────────────────────────────────────────────
+expense_articles:
+  # Группы (без default_subaccount — это рубрики)
+  - {code: UTILS,         name: "Коммунальные услуги", kind: expense}
+  - {code: COMMS,         name: "Связь и интернет",    kind: expense}
+  - {code: SALARY_GROUP,  name: "Зарплата и налоги",   kind: expense}
+  - {code: PRODUCTION,    name: "Производственные расходы", kind: expense}
+  - {code: TRANSPORT,     name: "Транспорт и ГСМ",     kind: expense}
+  - {code: ADMIN,         name: "Административные",    kind: expense}
+  - {code: SALES_EXP,     name: "Коммерческие",        kind: expense}
+  - {code: TAX,           name: "Налоги",              kind: expense}
+  - {code: OTHER_EXP,     name: "Прочие расходы",      kind: expense}
+  - {code: INCOME_GROUP,  name: "Прочие доходы",       kind: income}
+  - {code: FX,            name: "Курсовые разницы",    kind: transfer}
+
+  # Детальные статьи
+  - {code: GAS,           name: "Газ",                       kind: expense, parent: UTILS, default_subaccount: "26.01"}
+  - {code: ELECTRICITY,   name: "Электричество",             kind: expense, parent: UTILS, default_subaccount: "26.01"}
+  - {code: WATER,         name: "Вода",                      kind: expense, parent: UTILS, default_subaccount: "26.01"}
+  - {code: HEATING,       name: "Отопление",                 kind: expense, parent: UTILS, default_subaccount: "26.01"}
+  - {code: WASTE,         name: "Вывоз ТБО",                 kind: expense, parent: UTILS, default_subaccount: "26.01"}
+
+  - {code: INTERNET,      name: "Интернет",                  kind: expense, parent: COMMS, default_subaccount: "26.02"}
+  - {code: PHONE,         name: "Телефон/мобильная связь",   kind: expense, parent: COMMS, default_subaccount: "26.02"}
+
+  - {code: SALARY,        name: "Зарплата",                  kind: salary,  parent: SALARY_GROUP, default_subaccount: "70.01"}
+  - {code: PAYROLL_TAX,   name: "Налоги с ФОТ",              kind: expense, parent: SALARY_GROUP, default_subaccount: "26.05"}
+
+  - {code: VET_SUPPLIES,  name: "Закупка ветпрепаратов",     kind: expense, parent: PRODUCTION, default_subaccount: "10.03", default_module: vet}
+  - {code: FEED_PURCHASE, name: "Закупка сырья для кормов",  kind: expense, parent: PRODUCTION, default_subaccount: "10.01", default_module: feed}
+  - {code: DISINFECTION,  name: "Дезинфекция",               kind: expense, parent: PRODUCTION, default_subaccount: "26.06"}
+  - {code: EQUIP_REPAIR,  name: "Ремонт оборудования",       kind: expense, parent: PRODUCTION, default_subaccount: "26.03"}
+  - {code: EQUIP_MAINT,   name: "Обслуживание оборудования", kind: expense, parent: PRODUCTION, default_subaccount: "26.03"}
+
+  - {code: FUEL,          name: "Топливо и ГСМ",             kind: expense, parent: TRANSPORT, default_subaccount: "10.04"}
+  - {code: TRANSPORT_SVC, name: "Транспортные услуги",       kind: expense, parent: TRANSPORT, default_subaccount: "44.01"}
+
+  - {code: OFFICE,        name: "Канцелярия/офис",           kind: expense, parent: ADMIN,     default_subaccount: "26.04"}
+  - {code: RENT,          name: "Аренда помещений",          kind: expense, parent: ADMIN,     default_subaccount: "26.01"}
+  - {code: ADVERTISING,   name: "Реклама и маркетинг",       kind: expense, parent: SALES_EXP, default_subaccount: "44.02"}
+
+  - {code: TAX_OTHER,     name: "Прочие налоги",             kind: expense, parent: TAX,       default_subaccount: "26.05"}
+
+  - {code: OTHER_INCOME,  name: "Прочий доход",              kind: income,  parent: INCOME_GROUP, default_subaccount: "91.01"}
+  - {code: OTHER_EXPENSE, name: "Прочий расход",             kind: expense, parent: OTHER_EXP,    default_subaccount: "91.02"}
+
+  - {code: FX_GAIN,       name: "Курсовая разница (доход)",  kind: income,  parent: FX, default_subaccount: "91.03"}
+  - {code: FX_LOSS,       name: "Курсовая разница (расход)", kind: expense, parent: FX, default_subaccount: "91.04"}
+
+# ─────────────────────────────────────────────────────────────────────
+# 5. Категории номенклатуры (привязаны к модулям)
+# ─────────────────────────────────────────────────────────────────────
+categories:
+  - {name: "Корма",                  module: feed,       default_gl_subaccount: "10.05"}
+  - {name: "Сырьё для кормов",       module: feed,       default_gl_subaccount: "10.01"}
+  - {name: "Ветпрепараты",           module: vet,        default_gl_subaccount: "10.03"}
+  - {name: "Маточник",               module: matochnik,  default_gl_subaccount: "20.01"}
+  - {name: "Инкубация",              module: incubation, default_gl_subaccount: "20.03"}
+  - {name: "Откорм",                 module: feedlot,    default_gl_subaccount: "20.02"}
+  - {name: "Готовая продукция убоя", module: slaughter,  default_gl_subaccount: "43.01"}
+  - {name: "Тара и упаковка",        default_gl_subaccount: "10.07"}
+  - {name: "Топливо и ГСМ",          default_gl_subaccount: "10.04"}
+  - {name: "Хозтовары и инвентарь",  default_gl_subaccount: "10.06"}
+  - {name: "Запчасти",               default_gl_subaccount: "10.08"}
+
+# ─────────────────────────────────────────────────────────────────────
+# 6. Производственные блоки
+#    Хотя бы один блок на каждый продуктовый модуль.
+# ─────────────────────────────────────────────────────────────────────
+blocks:
+  # Маточник
+  - {code: "МТЧ-1", name: "Корпус маточника №1", kind: matochnik, module: matochnik}
+
+  # Инкубация
+  - {code: "ИНК-1", name: "Инкубационный шкаф №1", kind: incubation, module: incubation}
+  - {code: "ВЫВ-1", name: "Выводной шкаф №1",      kind: hatcher,    module: incubation}
+
+  # Откорм
+  - {code: "ПТ-1", name: "Птичник №1", kind: feedlot, module: feedlot}
+  - {code: "ПТ-2", name: "Птичник №2", kind: feedlot, module: feedlot}
+
+  # Убой
+  - {code: "ЛН-1", name: "Линия разделки №1", kind: slaughter_line, module: slaughter}
+
+  # Корма
+  - {code: "МКС-1", name: "Линия замеса №1", kind: mixer_line, module: feed}
+  - {code: "БНК-1", name: "Бункер готового комбикорма №1", kind: storage_bin, module: feed}
+
+  # Вет.аптека
+  - {code: "ВЕТ-1", name: "Склад препаратов", kind: vet_storage, module: vet}
+
+# ─────────────────────────────────────────────────────────────────────
+# 7. Склады
+#    По одному (или несколько) на каждый модуль с привязкой к default_gl_subaccount.
+# ─────────────────────────────────────────────────────────────────────
+warehouses:
+  # Производственные склады
+  - {code: "СК-К",  name: "Склад кормов",                module: feed,       default_gl_subaccount: "10.05", production_block: "БНК-1"}
+  - {code: "СК-СР", name: "Склад сырья для кормов",      module: feed,       default_gl_subaccount: "10.01"}
+  - {code: "СК-В",  name: "Склад ветпрепаратов",         module: vet,        default_gl_subaccount: "10.03", production_block: "ВЕТ-1"}
+  - {code: "СК-М",  name: "Склад маточника",             module: matochnik,  default_gl_subaccount: "20.01"}
+  - {code: "СК-И",  name: "Склад инкубации",             module: incubation, default_gl_subaccount: "20.03"}
+  - {code: "СК-Ф",  name: "Склад фабрики откорма",       module: feedlot,    default_gl_subaccount: "20.02"}
+  - {code: "СК-ГП", name: "Склад готовой продукции (убой)", module: slaughter, default_gl_subaccount: "43.01"}
+  - {code: "СК-ОБЩ", name: "Общий склад (хозтовары, инвентарь)", module: stock, default_gl_subaccount: "10.06"}
+
+  # «Кассы» = warehouse-маркеры финансовых каналов с привязкой к 50/51/52/58 субсчетам.
+  # Используются в платежах для выбора cash_subaccount.
+  - {code: "КАССА-НАЛ",   name: "Касса · наличные UZS",          module: stock, default_gl_subaccount: "50.01"}
+  - {code: "БАНК-UZS",    name: "Расчётный счёт UZS",            module: stock, default_gl_subaccount: "51.01"}
+  - {code: "БАНК-USD",    name: "Валютный счёт USD",             module: stock, default_gl_subaccount: "52.01"}
+  - {code: "CLICK",       name: "Click (электронный кошелёк)",   module: stock, default_gl_subaccount: "58.01"}
+  - {code: "ПЕР-ПУТ",     name: "Переводы в пути",               module: stock, default_gl_subaccount: "57.01"}
+
+# ─────────────────────────────────────────────────────────────────────
+# 8. Демо-номенклатура (минимальный стартовый набор SKU)
+#    Опционально — можно вырубить флагом `--skip-nomenclature`.
+# ─────────────────────────────────────────────────────────────────────
+nomenclature:
+  # Корма (готовый комбикорм)
+  - {sku: "FEED-START",  name: "Старт-комбикорм (1-14 дн.)",   category: "Корма", unit: kg, default_gl_subaccount: "10.05"}
+  - {sku: "FEED-GROW",   name: "Гровер-комбикорм (15-28 дн.)", category: "Корма", unit: kg, default_gl_subaccount: "10.05"}
+  - {sku: "FEED-FINISH", name: "Финиш-комбикорм (29+ дн.)",    category: "Корма", unit: kg, default_gl_subaccount: "10.05"}
+
+  # Сырьё для кормов
+  - {sku: "RAW-CORN",     name: "Кукуруза",   category: "Сырьё для кормов", unit: kg, default_gl_subaccount: "10.01", base_moisture_pct: "14.00"}
+  - {sku: "RAW-WHEAT",    name: "Пшеница",    category: "Сырьё для кормов", unit: kg, default_gl_subaccount: "10.01", base_moisture_pct: "14.00"}
+  - {sku: "RAW-SOY-MEAL", name: "Шрот соевый", category: "Сырьё для кормов", unit: kg, default_gl_subaccount: "10.01", base_moisture_pct: "12.00"}
+  - {sku: "RAW-PREMIX",   name: "Премикс",     category: "Сырьё для кормов", unit: kg, default_gl_subaccount: "10.01", base_moisture_pct: "10.00"}
+  - {sku: "RAW-LIMESTONE", name: "Известняк (карбонат кальция)", category: "Сырьё для кормов", unit: kg, default_gl_subaccount: "10.01"}
+
+  # Ветпрепараты (типовые)
+  - {sku: "VET-VAC-NB",   name: "Вакцина Ньюкасл",      category: "Ветпрепараты", unit: dose, default_gl_subaccount: "10.03"}
+  - {sku: "VET-VAC-IB",   name: "Вакцина инфекц. бронхит", category: "Ветпрепараты", unit: dose, default_gl_subaccount: "10.03"}
+  - {sku: "VET-AB-ENRO",  name: "Антибиотик · Энрофлоксацин", category: "Ветпрепараты", unit: ml, default_gl_subaccount: "10.03"}
+  - {sku: "VET-VIT-AD3E", name: "Витамин AD3E",          category: "Ветпрепараты", unit: ml, default_gl_subaccount: "10.03"}
+  - {sku: "VET-ELECTRO",  name: "Электролит для воды",   category: "Ветпрепараты", unit: g,  default_gl_subaccount: "10.03"}
+
+  # Готовая продукция убоя
+  - {sku: "CARCASS-WHOLE", name: "Тушка цельная",       category: "Готовая продукция убоя", unit: kg, default_gl_subaccount: "43.01"}
+  - {sku: "CUT-BREAST",    name: "Грудка",              category: "Готовая продукция убоя", unit: kg, default_gl_subaccount: "43.01"}
+  - {sku: "CUT-LEG",       name: "Окорочок",            category: "Готовая продукция убоя", unit: kg, default_gl_subaccount: "43.01"}
+  - {sku: "CUT-WING",      name: "Крыло",               category: "Готовая продукция убоя", unit: kg, default_gl_subaccount: "43.01"}
+  - {sku: "CUT-OFFAL",     name: "Субпродукты (печень, желудок, сердце)", category: "Готовая продукция убоя", unit: kg, default_gl_subaccount: "43.01"}
+
+  # Инкубационное яйцо / суточный молодняк
+  - {sku: "EGG-HATCH",   name: "Яйцо инкубационное",   category: "Маточник",  unit: pcs, default_gl_subaccount: "43.02"}
+  - {sku: "CHICK-DAY",   name: "Суточный цыплёнок",    category: "Инкубация", unit: head, default_gl_subaccount: "20.03"}
+
+  # Тара
+  - {sku: "PACK-BOX-10",  name: "Короб картонный 10 кг",  category: "Тара и упаковка", unit: pcs, default_gl_subaccount: "10.07"}
+  - {sku: "PACK-BAG-50",  name: "Мешок полипропиленовый 50 кг", category: "Тара и упаковка", unit: pcs, default_gl_subaccount: "10.07"}

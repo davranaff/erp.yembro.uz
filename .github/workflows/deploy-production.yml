@@ -17,6 +17,6 @@ jobs:
       environment_name: production
       deploy_path: /opt/yembro/prod
       image_alias: production
-      frontend_api_base_url: /api/v1
+      frontend_api_base_url: /api
       public_base_url: https://erp.yembro.uz
     secrets: inherit

@@ -22,10 +22,10 @@ esac
 
 case "${FIXTURE_SET}" in
   minimal)
-    LOADER_MODULE="app.scripts.load_minimal_fixtures"
+    FIXTURE_GLOB="minimal_*.yaml minimal_*.json"
     ;;
   full)
-    LOADER_MODULE="app.scripts.load_fixtures"
+    FIXTURE_GLOB="*.yaml *.json"
     ;;
   *)
     echo "Unsupported fixture set: ${FIXTURE_SET}. Expected minimal or full." >&2
@@ -77,6 +77,15 @@ if [[ "${POSTGRES_READY:-0}" != "1" ]]; then
   exit 1
 fi
 
-docker compose "${compose_args[@]}" run --rm api python -m "${LOADER_MODULE}"
+FIXTURE_FILES=$(docker compose "${compose_args[@]}" run --rm --no-deps api sh -c \
+  "cd /app/fixtures 2>/dev/null && ls -1 ${FIXTURE_GLOB} 2>/dev/null" || true)
+
+if [[ -z "${FIXTURE_FILES// /}" ]]; then
+  echo "No fixture files matching '${FIXTURE_GLOB}' found in backend/fixtures/" >&2
+  exit 1
+fi
+
+# shellcheck disable=SC2086
+docker compose "${compose_args[@]}" run --rm api python manage.py loaddata ${FIXTURE_FILES}
 
 echo "Fixtures loaded for ${ENVIRONMENT}: ${FIXTURE_SET}"
