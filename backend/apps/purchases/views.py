@@ -73,6 +73,16 @@ class PurchaseOrderViewSet(ImmutableStatusMixin, DeleteReasonMixin, OrgScopedMod
             raise DRFValidationError(exc.message_dict if hasattr(exc, "message_dict") else exc.messages)
 
         order.refresh_from_db()
+
+        try:
+            from apps.tgbot.notifications import fmt_purchase_confirmed
+            from apps.tgbot.tasks import notify_admins_task
+            notify_admins_task.delay(
+                fmt_purchase_confirmed(order), str(order.organization_id)
+            )
+        except Exception:
+            pass
+
         data = self.get_serializer(order).data
         data["_result"] = {
             "stock_movement": {

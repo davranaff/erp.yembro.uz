@@ -120,7 +120,19 @@ export default function ReceiveModal({ onClose }: Props) {
           <label>
             Закуп * <span style={{ fontSize: 11, color: 'var(--fg-3)' }}>(PurchaseOrder для compliance/audit)</span>
           </label>
-          <select className="input" value={purchase} onChange={(e) => setPurchase(e.target.value)}>
+          <select
+            className="input"
+            value={purchase}
+            onChange={(e) => {
+              const id = e.target.value;
+              setPurchase(id);
+              const po = purchases?.find((p) => p.id === id);
+              if (po) {
+                if (po.counterparty) setSupplier(po.counterparty);
+                if (po.warehouse) setWarehouse(po.warehouse);
+              }
+            }}
+          >
             <option value="">— выберите закуп —</option>
             {purchases?.map((p) => (
               <option key={p.id} value={p.id}>
@@ -128,6 +140,28 @@ export default function ReceiveModal({ onClose }: Props) {
               </option>
             ))}
           </select>
+          {purchase && (() => {
+            const po = purchases?.find((p) => p.id === purchase);
+            if (!po) return null;
+            return (
+              <div style={{
+                marginTop: 6, padding: '6px 10px',
+                background: 'var(--bg-soft)', borderRadius: 5,
+                fontSize: 12, color: 'var(--fg-2)',
+                display: 'flex', gap: 16, flexWrap: 'wrap',
+              }}>
+                {po.counterparty_name && <span>Поставщик: <b>{po.counterparty_name}</b></span>}
+                {po.amount_uzs && (
+                  <span>Сумма: <b className="mono">
+                    {parseFloat(po.amount_uzs).toLocaleString('ru-RU', { maximumFractionDigits: 0 })} сум
+                  </b></span>
+                )}
+                {po.items && po.items.length > 0 && (
+                  <span>Позиций: <b>{po.items.length}</b></span>
+                )}
+              </div>
+            );
+          })()}
           {fieldErrors.purchase && (
             <div style={{ fontSize: 11, color: 'var(--danger)' }}>
               {(fieldErrors.purchase as unknown as string[]).join(' · ')}

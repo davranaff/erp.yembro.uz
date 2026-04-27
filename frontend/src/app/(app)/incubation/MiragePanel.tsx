@@ -3,6 +3,7 @@
 import { useState } from 'react';
 
 import DataTable from '@/components/ui/DataTable';
+import EmptyState from '@/components/ui/EmptyState';
 import Icon from '@/components/ui/Icon';
 import Panel from '@/components/ui/Panel';
 import RowActions from '@/components/ui/RowActions';
@@ -46,7 +47,24 @@ export default function MiragePanel({ run }: Props) {
           isLoading={isLoading}
           rows={rows}
           rowKey={(m) => m.id}
-          emptyMessage="Овоскопий ещё не было. Обычно проводят на 7-й, 14-й и 18-й день."
+          emptyMessage={
+            <EmptyState
+              icon="egg"
+              title="Овоскопий пока не было"
+              description="Овоскопия — просвечивание яиц фонарём для проверки оплодотворённости и жизнеспособности зародыша. Позволяет убрать брак до вывода."
+              steps={[
+                { label: 'Проведите первую овоскопию на 7-й день — выявит неоплодотворённые' },
+                { label: 'Вторая — на 14-й день: выявляет замершие эмбрионы' },
+                { label: 'Третья — на 18-й день перед переводом на вывод' },
+                { label: 'Нажмите «+ Овоскопия» и введите результаты проверки' },
+              ]}
+              action={{
+                label: 'Добавить овоскопию',
+                onClick: () => { setEditing(null); setModalOpen(true); },
+              }}
+              hint="Норма оплодотворённости: 90–95%. Ниже 85% — сигнал для проверки качества яиц или работы самцов."
+            />
+          }
           columns={[
             { key: 'date', label: 'Дата', mono: true,
               render: (m) => m.inspection_date },

@@ -8,6 +8,7 @@ import { OpenSaleFromModule } from '@/components/SellBatchButton';
 import Badge from '@/components/ui/Badge';
 import DataTable from '@/components/ui/DataTable';
 import Icon from '@/components/ui/Icon';
+import EmptyState from '@/components/ui/EmptyState';
 import KpiCard from '@/components/ui/KpiCard';
 import Panel from '@/components/ui/Panel';
 import RowActions from '@/components/ui/RowActions';
@@ -215,12 +216,22 @@ export default function MatochnikPage() {
           rowKey={(h) => h.id}
           error={error}
           emptyMessage={
-            <>
-              Нет стад.{' '}
-              <button className="btn btn-ghost btn-sm" onClick={() => setCreateOpen(true)}>
-                Добавить первое
-              </button>
-            </>
+            <EmptyState
+              icon="egg"
+              title="Стад пока нет"
+              description="Маточник — это родительское стадо, которое несёт инкубационные яйца. Стадо проходит фазы разгона, продуктива и снятия."
+              steps={[
+                { label: 'Создайте новое стадо — укажите корпус, направление и количество голов' },
+                { label: 'Зафиксируйте дату посадки и возраст птицы' },
+                { label: 'Ведите ежедневный яйцесбор через кнопку «Запись»' },
+                { label: 'Сформируйте партию яиц для инкубации через «Сформировать партию»' },
+              ]}
+              action={{
+                label: 'Новое стадо',
+                onClick: () => { setEditing(null); setCreateOpen(true); },
+              }}
+              hint="Яйца из стада передаются в инкубацию — для этого нужно сформировать яичную партию."
+            />
           }
           onRowClick={(h) => setSel(h)}
           rowProps={(h) => ({ active: sel?.id === h.id })}
@@ -452,7 +463,19 @@ export default function MatochnikPage() {
             <DataTable<DailyEggProduction>
               rows={eggRecords?.slice(0, 15) ?? []}
               rowKey={(e) => e.id}
-              emptyMessage="Нет записей"
+              emptyMessage={
+                <EmptyState
+                  icon="egg"
+                  title="Яйцесбора пока нет"
+                  description="Ежедневно фиксируйте количество собранных и бракованных яиц. На основе этих данных считаются яйценоскость и продуктивность стада."
+                  steps={[
+                    { label: 'Нажмите «+ Запись» в панели яйцесбора' },
+                    { label: 'Введите дату, количество собранных яиц и брак' },
+                    { label: 'Чистые яйца = собрано − брак — они учитываются в статистике' },
+                  ]}
+                  hint="Для передачи яиц в инкубацию используйте кнопку «Сформировать партию» вверху."
+                />
+              }
               columns={[
                 { key: 'date', label: 'Дата', mono: true, cellStyle: { fontSize: 12 },
                   render: (e) => e.date },
@@ -491,7 +514,18 @@ export default function MatochnikPage() {
               <DataTable
                 rows={mortalityRecords?.slice(0, 15) ?? []}
                 rowKey={(m) => m.id}
-                emptyMessage="Нет записей о падеже"
+                emptyMessage={
+                  <EmptyState
+                    icon="close"
+                    title="Записей о падеже нет"
+                    description="Записывайте каждый случай гибели птицы с причиной — это необходимо для ветеринарного контроля и анализа выживаемости стада."
+                    steps={[
+                      { label: 'Нажмите «+ Падёж» в панели падежа' },
+                      { label: 'Укажите дату, количество голов и причину гибели' },
+                    ]}
+                    hint="Данные о падеже отражаются в истории стада и влияют на текущее поголовье."
+                  />
+                }
                 columns={[
                   { key: 'date', label: 'Дата', mono: true, cellStyle: { fontSize: 12 },
                     render: (m) => m.date },

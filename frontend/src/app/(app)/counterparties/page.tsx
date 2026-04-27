@@ -9,14 +9,45 @@ import Icon from '@/components/ui/Icon';
 import Panel from '@/components/ui/Panel';
 import RowActions from '@/components/ui/RowActions';
 import Seg from '@/components/ui/Seg';
+import TgConnectModal from '@/components/ui/TgConnectModal';
 import {
   useCounterparties,
   useDeleteCounterparty,
 } from '@/hooks/useCounterparties';
 import { useHasLevel } from '@/hooks/usePermissions';
+import { useTgCounterpartyLink } from '@/hooks/useTgBot';
 import type { Counterparty, CounterpartyKind } from '@/types/auth';
 
 import CounterpartyModal from './CounterpartyModal';
+
+function TgStatusButton({ counterparty, onOpenModal }: { counterparty: Counterparty; onOpenModal: () => void }) {
+  const { data: link } = useTgCounterpartyLink(counterparty.id);
+  const connected = Boolean(link);
+  return (
+    <button
+      onClick={onOpenModal}
+      title={connected ? `Telegram подключён${link?.tg_username ? `: @${link.tg_username}` : ''}` : 'Привязать Telegram'}
+      className="btn btn-secondary btn-sm"
+      style={{
+        display: 'flex', alignItems: 'center', gap: 6,
+        color: connected ? '#229ED9' : undefined,
+      }}
+    >
+      {/* Telegram plane icon */}
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+        <path
+          d="M22 2L11 13"
+          stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
+        />
+        <path
+          d="M22 2L15 22L11 13L2 9L22 2Z"
+          stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
+        />
+      </svg>
+      {connected ? 'TG подключён' : 'Привязать TG'}
+    </button>
+  );
+}
 
 const KIND_LABEL: Record<CounterpartyKind, string> = {
   supplier: 'Поставщик',
@@ -45,6 +76,7 @@ export default function CounterpartiesPage() {
   const [sel, setSel] = useState<Counterparty | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<Counterparty | null>(null);
+  const [tgModal, setTgModal] = useState<Counterparty | null>(null);
 
   const hasLevel = useHasLevel();
   const canEdit = hasLevel('core', 'rw');
@@ -219,9 +251,12 @@ export default function CounterpartiesPage() {
           onClose={() => setSel(null)}
           actions={
             canEdit ? (
-              <button className="btn btn-secondary btn-sm" onClick={() => handleEdit(sel)}>
-                Редактировать
-              </button>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <TgStatusButton counterparty={sel} onOpenModal={() => setTgModal(sel)} />
+                <button className="btn btn-secondary btn-sm" onClick={() => handleEdit(sel)}>
+                  Редактировать
+                </button>
+              </div>
             ) : null
           }
         >
@@ -247,6 +282,15 @@ export default function CounterpartiesPage() {
             ]}
           />
         </DetailDrawer>
+      )}
+
+      {tgModal && (
+        <TgConnectModal
+          mode="counterparty"
+          counterpartyId={tgModal.id}
+          counterpartyName={tgModal.name}
+          onClose={() => setTgModal(null)}
+        />
       )}
 
       {modalOpen && (

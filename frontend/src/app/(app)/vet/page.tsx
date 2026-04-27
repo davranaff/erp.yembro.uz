@@ -7,6 +7,7 @@ import OpexButton from '@/components/OpexButton';
 import SellBatchButton, { OpenSaleFromModule } from '@/components/SellBatchButton';
 import Badge from '@/components/ui/Badge';
 import DataTable from '@/components/ui/DataTable';
+import EmptyState from '@/components/ui/EmptyState';
 import Icon from '@/components/ui/Icon';
 import KpiCard from '@/components/ui/KpiCard';
 import Panel from '@/components/ui/Panel';
@@ -22,6 +23,8 @@ import {
   useReleaseQuarantine,
 } from '@/hooks/useVet';
 import type { VetDrug, VetStockBatch, VetStockStatus, VetTreatmentLog } from '@/types/auth';
+
+import BarcodeLabel from '@/components/BarcodeLabel';
 
 import ConfirmDeleteWithReason from '@/components/ConfirmDeleteWithReason';
 
@@ -161,7 +164,24 @@ export default function VetPage() {
             isLoading={stockLoading}
             rows={stock}
             rowKey={(s) => s.id}
-            emptyMessage="Нет лотов."
+            emptyMessage={
+              <EmptyState
+                icon="bag"
+                title="Препаратов на складе нет"
+                description="Ветаптека учитывает остатки лекарств, вакцин и витаминов. Каждый лот фиксирует партию поступления с датой годности и карантином."
+                steps={[
+                  { label: 'Добавьте SKU препарата во вкладке «SKU препаратов»' },
+                  { label: 'Нажмите «+ Приход» — выберите препарат, lot и дату годности' },
+                  { label: 'Лот попадёт в карантин — выпустите после проверки документов' },
+                  { label: 'После выпуска препарат доступен для записи лечений' },
+                ]}
+                action={{
+                  label: 'Приход препарата',
+                  onClick: () => setReceiveOpen(true),
+                }}
+                hint="Препараты с каренцией автоматически блокируют реализацию яиц и мяса до окончания периода ожидания."
+              />
+            }
             onRowClick={(s) => setSelStock(s)}
             rowProps={(s) => ({ active: selStock?.id === s.id })}
             columns={[
@@ -232,7 +252,24 @@ export default function VetPage() {
             isLoading={trLoading}
             rows={treatments}
             rowKey={(t) => t.id}
-            emptyMessage="Нет записей лечения."
+            emptyMessage={
+              <EmptyState
+                icon="book"
+                title="Записей лечения пока нет"
+                description="Журнал лечений фиксирует каждое применение препарата: какой стаде или партии, какой препарат, доза и срок каренции."
+                steps={[
+                  { label: 'Убедитесь, что на складе есть доступный препарат' },
+                  { label: 'Нажмите «+ Лечение» — выберите блок/стадо, препарат и дозу' },
+                  { label: 'Укажите количество голов и дату лечения' },
+                  { label: 'Запись автоматически включит каренцию для этого блока' },
+                ]}
+                action={{
+                  label: 'Записать лечение',
+                  onClick: () => setTreatmentOpen(true),
+                }}
+                hint="Каренция (период ожидания) рассчитывается по препарату — в это время продукция блокируется для реализации."
+              />
+            }
             onRowClick={(t) => setSelTr(t)}
             rowProps={(t) => ({ active: selTr?.id === t.id })}
             columns={[
@@ -280,7 +317,23 @@ export default function VetPage() {
           <DataTable<VetDrug>
             rows={drugs}
             rowKey={(d) => d.id}
-            emptyMessage="Нет SKU препаратов."
+            emptyMessage={
+              <EmptyState
+                icon="box"
+                title="SKU препаратов не добавлено"
+                description="SKU — это справочник препаратов (вакцин, антибиотиков, витаминов). Без SKU нельзя оприходовать препарат на склад."
+                steps={[
+                  { label: 'Нажмите «+ Препарат» — введите название и тип (вакцина, антибиотик и т.д.)' },
+                  { label: 'Укажите путь введения и срок каренции по умолчанию' },
+                  { label: 'После сохранения SKU доступен для прихода на склад' },
+                ]}
+                action={{
+                  label: 'Добавить препарат',
+                  onClick: () => setDrugModalOpen(true),
+                }}
+                hint="SKU создаётся один раз — далее на него делаются все лотовые приходы с разными датами годности."
+              />
+            }
             onRowClick={(d) => setSelDrug(d)}
             rowProps={(d) => ({ active: selDrug?.id === d.id })}
             columns={[
@@ -339,22 +392,23 @@ export default function VetPage() {
               <div style={{
                 fontSize: 11, fontWeight: 700, color: 'var(--fg-3)',
                 textTransform: 'uppercase', letterSpacing: '.04em',
-                marginBottom: 4,
+                marginBottom: 8,
               }}>
                 Штрих-код
               </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                <code style={{
-                  flex: 1, fontSize: 16, fontWeight: 700,
-                  fontFamily: 'var(--font-mono)',
-                  background: 'var(--bg-card, #fff)',
-                  padding: '8px 12px',
-                  border: '1px solid var(--border)',
-                  borderRadius: 4,
-                  letterSpacing: '0.06em',
-                }}>
-                  {selStock.barcode}
-                </code>
+
+              {/* Визуальный Code128 SVG */}
+              <div style={{ marginBottom: 10, overflowX: 'auto' }}>
+                <BarcodeLabel
+                  barcode={selStock.barcode}
+                  drugName={selStock.drug_name}
+                  lotNumber={selStock.lot_number}
+                  expirationDate={selStock.expiration_date}
+                />
+              </div>
+
+              {/* Кнопки */}
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                 <button
                   className="btn btn-ghost btn-sm"
                   onClick={() => {
@@ -364,9 +418,24 @@ export default function VetPage() {
                 >
                   Копировать
                 </button>
+                <button
+                  className="btn btn-secondary btn-sm"
+                  onClick={() => {
+                    const p = new URLSearchParams({
+                      barcode: selStock.barcode!,
+                      ...(selStock.drug_name ? { drug: selStock.drug_name } : {}),
+                      ...(selStock.lot_number ? { lot: selStock.lot_number } : {}),
+                      ...(selStock.expiration_date ? { exp: selStock.expiration_date } : {}),
+                    });
+                    window.open(`/print/vet-label?${p}`, '_blank');
+                  }}
+                >
+                  Печать этикетки
+                </button>
               </div>
+
               <div style={{ fontSize: 11, color: 'var(--fg-3)', marginTop: 6 }}>
-                Public-страница: <code>/scan/{selStock.barcode}</code>
+                Сканер открывает: <code>/scan/{selStock.barcode}</code>
               </div>
             </div>
           )}

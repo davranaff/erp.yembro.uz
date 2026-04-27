@@ -3,9 +3,11 @@
 import { useMemo, useState } from 'react';
 
 import BatchSelector from '@/components/BatchSelector';
+import Icon from '@/components/ui/Icon';
 import Modal from '@/components/ui/Modal';
 import { ApiError } from '@/lib/api';
 import { useProductionBlocks } from '@/hooks/useBlocks';
+import { herdsCrud } from '@/hooks/useMatochnik';
 import { useModules } from '@/hooks/useModules';
 import { useUnits } from '@/hooks/useNomenclature';
 import { usePeople } from '@/hooks/usePeople';
@@ -53,8 +55,13 @@ export default function TreatmentModal({ onClose }: Props) {
   const { data: blocks } = useProductionBlocks();
   const { data: units } = useUnits();
   const { data: people } = usePeople({ is_active: 'true' });
+  const { data: herdsRaw } = herdsCrud.useList();
+  const herds = herdsRaw?.filter((h) => h.status !== 'depopulated');
 
   const vetModuleId = modules?.find((m) => m.code === 'vet')?.id ?? '';
+
+  const [herdPickerOpen, setHerdPickerOpen] = useState(false);
+  const [herdSearch, setHerdSearch] = useState('');
 
   const [docNumber, setDocNumber] = useState('');
   const [treatmentDate, setTreatmentDate] = useState(new Date().toISOString().slice(0, 10));
@@ -177,12 +184,107 @@ export default function TreatmentModal({ onClose }: Props) {
               filter={{ state: 'active' }}
             />
           ) : (
-            <input
-              className="input mono"
-              value={targetHerd}
-              onChange={(e) => setTargetHerd(e.target.value)}
-              placeholder="UUID стада из /api/matochnik/herds/"
-            />
+            <>
+              <button
+                type="button"
+                className="input"
+                onClick={() => setHerdPickerOpen(true)}
+                style={{
+                  textAlign: 'left',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  gap: 8,
+                }}
+              >
+                <span style={{
+                  color: targetHerd ? 'var(--fg-1)' : 'var(--fg-3)',
+                  flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                }}>
+                  {targetHerd
+                    ? (() => {
+                        const h = herds?.find((x) => x.id === targetHerd);
+                        return h
+                          ? `${h.doc_number} · ${h.block_code ?? h.block} · ${h.current_heads} гол · ${h.current_age_weeks ?? '?'} нед`
+                          : `Стадо · ${targetHerd.slice(0, 8)}…`;
+                      })()
+                    : '— выберите стадо —'}
+                </span>
+                <Icon name="chevron-down" size={12} style={{ color: 'var(--fg-3)' }} />
+              </button>
+
+              {herdPickerOpen && (
+                <Modal
+                  title="Выбор стада"
+                  onClose={() => setHerdPickerOpen(false)}
+                  footer={
+                    targetHerd ? (
+                      <button
+                        className="btn btn-ghost"
+                        onClick={() => { setTargetHerd(''); setHerdPickerOpen(false); }}
+                        style={{ color: 'var(--danger)' }}
+                      >
+                        Очистить
+                      </button>
+                    ) : null
+                  }
+                >
+                  <input
+                    className="input"
+                    autoFocus
+                    value={herdSearch}
+                    onChange={(e) => setHerdSearch(e.target.value)}
+                    placeholder="Поиск по номеру, блоку…"
+                    style={{ marginBottom: 12 }}
+                  />
+                  <div style={{ maxHeight: 380, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 4 }}>
+                    {(herds ?? [])
+                      .filter((h) =>
+                        !herdSearch ||
+                        h.doc_number.toLowerCase().includes(herdSearch.toLowerCase()) ||
+                        (h.block_code ?? '').toLowerCase().includes(herdSearch.toLowerCase())
+                      )
+                      .map((h) => {
+                        const isSel = h.id === targetHerd;
+                        return (
+                          <button
+                            key={h.id}
+                            type="button"
+                            onClick={() => { setTargetHerd(h.id); setHerdPickerOpen(false); }}
+                            style={{
+                              display: 'flex',
+                              gap: 10,
+                              alignItems: 'center',
+                              padding: 10,
+                              border: '1px solid var(--border)',
+                              borderRadius: 6,
+                              background: isSel ? 'var(--bg-soft)' : 'var(--bg-card)',
+                              textAlign: 'left',
+                              cursor: 'pointer',
+                              borderLeft: isSel ? '3px solid var(--brand-orange)' : '1px solid var(--border)',
+                            }}
+                          >
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 2 }}>
+                                <span className="badge id">{h.doc_number}</span>
+                                <span style={{ fontSize: 11, color: 'var(--fg-3)' }} className="mono">{h.status}</span>
+                              </div>
+                              <div style={{ fontSize: 12, color: 'var(--fg-2)' }}>
+                                {h.block_code ?? h.block} · {h.current_heads} гол
+                              </div>
+                              <div className="mono" style={{ fontSize: 11, color: 'var(--fg-3)', marginTop: 2 }}>
+                                Возраст: {h.current_age_weeks ?? '?'} нед · Направление: {h.direction}
+                              </div>
+                            </div>
+                            {isSel && <Icon name="check" size={14} style={{ color: 'var(--brand-orange)' }} />}
+                          </button>
+                        );
+                      })}
+                  </div>
+                </Modal>
+              )}
+            </>
           )}
         </div>
 

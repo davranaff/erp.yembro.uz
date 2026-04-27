@@ -1,3 +1,4 @@
+from django.contrib.contenttypes.models import ContentType
 from rest_framework import serializers
 
 from apps.currency.serializers import ExchangeRateNestedSerializer
@@ -26,6 +27,7 @@ class PurchaseOrderSerializer(serializers.ModelSerializer):
     exchange_rate_source_detail = ExchangeRateNestedSerializer(
         source="exchange_rate_source", read_only=True
     )
+    content_type_id = serializers.SerializerMethodField()
     # Опциональный явный курс — если указан в payload, confirm возьмёт его
     # вместо CBU. Сохраняется как `exchange_rate_override` на модели.
     exchange_rate_override = serializers.DecimalField(
@@ -34,6 +36,9 @@ class PurchaseOrderSerializer(serializers.ModelSerializer):
 
     def get_currency_code(self, obj):
         return obj.currency.code if obj.currency_id else None
+
+    def get_content_type_id(self, obj):
+        return ContentType.objects.get_for_model(PurchaseOrder).id
     # doc_number — необязателен при create; будет сгенерирован в confirm.
     doc_number = serializers.CharField(
         max_length=32, required=False, allow_blank=True
@@ -43,6 +48,7 @@ class PurchaseOrderSerializer(serializers.ModelSerializer):
         model = PurchaseOrder
         fields = (
             "id",
+            "content_type_id",
             "doc_number",
             "date",
             "module",
@@ -68,6 +74,7 @@ class PurchaseOrderSerializer(serializers.ModelSerializer):
         )
         read_only_fields = (
             "id",
+            "content_type_id",
             "status",
             "payment_status",
             "paid_amount_uzs",

@@ -47,3 +47,14 @@ export const useReversePayment = paymentsCrud.makeAction<{ reason?: string }, Pa
 export const useCancelPayment = paymentsCrud.makeAction<{ reason?: string }, Payment>(
   (id) => `/api/payments/${id}/cancel/`,
 );
+
+export interface AllocateInput {
+  target_content_type: number;
+  target_object_id: string;
+  amount_uzs: string;
+  notes?: string;
+}
+
+export const useAllocatePayment = paymentsCrud.makeAction<AllocateInput, Payment>(
+  (id) => `/api/payments/${id}/allocate/`,
+);

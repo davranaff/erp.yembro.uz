@@ -2,6 +2,7 @@
 
 import Badge from '@/components/ui/Badge';
 import DataTable from '@/components/ui/DataTable';
+import EmptyState from '@/components/ui/EmptyState';
 import Icon from '@/components/ui/Icon';
 import Panel from '@/components/ui/Panel';
 import RowActions from '@/components/ui/RowActions';
@@ -64,7 +65,20 @@ export default function EggBatchesPanel({ herd }: Props) {
         isLoading={isLoading}
         rows={batches}
         rowKey={(b) => b.id}
-        emptyMessage="Партий пока нет. Сформируйте партию из яйцесбора кнопкой «Сформировать партию»."
+        emptyMessage={
+          <EmptyState
+            icon="egg"
+            title="Яичных партий пока нет"
+            description="Партия яиц формируется из накопленного яйцесбора и передаётся в инкубацию. Без партии яйца остаются «свободными» и не попадают в инкубатор."
+            steps={[
+              { label: 'Убедитесь, что есть записи яйцесбора за несколько дней' },
+              { label: 'Нажмите «Сформировать партию» в верхней части карточки стада' },
+              { label: 'Укажите диапазон дат и количество яиц для передачи' },
+              { label: 'Нажмите «В инкубацию» — партия уйдёт в модуль «Инкубация»' },
+            ]}
+            hint="Одно стадо может формировать несколько партий — каждая партия отслеживается отдельно."
+          />
+        }
         columns={[
           { key: 'doc', label: 'Документ', mono: true, cellStyle: { fontSize: 12 },
             render: (b) => b.doc_number },

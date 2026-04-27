@@ -9,6 +9,7 @@ import Badge from '@/components/ui/Badge';
 import DataTable from '@/components/ui/DataTable';
 import HelpHint from '@/components/ui/HelpHint';
 import Icon from '@/components/ui/Icon';
+import EmptyState from '@/components/ui/EmptyState';
 import KpiCard from '@/components/ui/KpiCard';
 import Panel from '@/components/ui/Panel';
 import RowActions from '@/components/ui/RowActions';
@@ -187,7 +188,20 @@ export default function FeedlotPage() {
           rows={batches}
           rowKey={(b) => b.id}
           error={error}
-          emptyMessage="Нет партий. Размещение партии — после вывода в /incubation, кнопка «→ В откорм»."
+          emptyMessage={
+            <EmptyState
+              icon="factory"
+              title="Партий на откорме пока нет"
+              description="Фабрика откорма — это финальная стадия выращивания бройлеров. Цыплята поступают из инкубации и растут до убойного веса."
+              steps={[
+                { label: 'В модуле «Инкубация» проведите вывод цыплят' },
+                { label: 'Нажмите «→ В откорм» на карточке выведенной партии' },
+                { label: 'Откормочная партия появится здесь — ведите взвешивания и кормление' },
+                { label: 'Когда птица готова — нажмите «Отправить на убой»' },
+              ]}
+              hint="Партия создаётся автоматически из инкубации через межмодульный трансфер — вручную не создаётся."
+            />
+          }
           onRowClick={(b) => { setSel(b); setTab('overview'); }}
           rowProps={(b) => ({ active: sel?.id === b.id })}
           columns={[
@@ -420,7 +434,19 @@ export default function FeedlotPage() {
               <DataTable
                 rows={mortality ?? []}
                 rowKey={(m) => m.id}
-                emptyMessage="Нет записей о падеже."
+                emptyMessage={
+                  <EmptyState
+                    icon="close"
+                    title="Падежа не зафиксировано"
+                    description="Записывайте каждый случай гибели птицы с указанием причины — это необходимо для ветеринарного контроля и точного расчёта живого веса партии."
+                    steps={[
+                      { label: 'Нажмите «+ Записать падёж» в верхней части панели' },
+                      { label: 'Укажите дату, день откорма и количество павших голов' },
+                      { label: 'По возможности укажите причину (болезнь, травма, прочее)' },
+                    ]}
+                    hint="Падёж автоматически уменьшает текущее поголовье партии и учитывается при расчёте FCR."
+                  />
+                }
                 columns={[
                   { key: 'date', label: 'Дата', mono: true, cellStyle: { fontSize: 12 },
                     render: (m) => m.date },

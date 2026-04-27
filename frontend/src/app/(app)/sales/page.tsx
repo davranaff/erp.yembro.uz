@@ -10,6 +10,7 @@ import Panel from '@/components/ui/Panel';
 import RowActions from '@/components/ui/RowActions';
 import Seg from '@/components/ui/Seg';
 import { useHasLevel } from '@/hooks/usePermissions';
+import { useSendDebtReminder } from '@/hooks/useTgBot';
 import { salesCrud, useConfirmSale, useReverseSale } from '@/hooks/useSales';
 import type { SaleOrder, SalePaymentStatus, SaleStatus } from '@/types/auth';
 
@@ -64,6 +65,7 @@ export default function SalesPage() {
 
   const confirmMutation = useConfirmSale();
   const reverseMutation = useReverseSale();
+  const sendReminder = useSendDebtReminder();
 
   const totals = useMemo(() => {
     const list = orders ?? [];
@@ -221,6 +223,18 @@ export default function SalesPage() {
                       label: 'Принять оплату',
                       hidden: !(o.status === 'confirmed' && o.payment_status !== 'paid'),
                       onClick: () => setPayFor(o),
+                    },
+                    {
+                      label: 'Напомнить в TG',
+                      hidden: !(
+                        o.status === 'confirmed' &&
+                        (o.payment_status === 'unpaid' || o.payment_status === 'partial')
+                      ),
+                      disabled: sendReminder.isPending,
+                      onClick: () => sendReminder.mutate(
+                        { sale_order_id: o.id },
+                        { onSuccess: () => alert('Напоминание отправлено в Telegram'), onError: (e) => alert('Ошибка: ' + e.message) }
+                      ),
                     },
                     {
                       label: 'Сторно',

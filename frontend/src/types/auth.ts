@@ -1446,6 +1446,7 @@ export interface PurchaseItem {
 
 export interface PurchaseOrder {
   id: string;
+  content_type_id: number;
   doc_number: string;
   date: string;
 

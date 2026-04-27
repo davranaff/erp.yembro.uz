@@ -17,6 +17,7 @@ import ExpenseArticlesSection from './ExpenseArticlesSection';
 import IntegrationsSection from './IntegrationsSection';
 import ModulesSection from './ModulesSection';
 import RolesSection from './RolesSection';
+import TelegramSection from './TelegramSection';
 
 interface Section {
   key: string;
@@ -48,6 +49,7 @@ const SECTIONS: Section[] = [
     module: 'admin',  min: 'r' },
   { key: 'int',      title: 'Интеграции',   desc: 'CBU, 1С, Банк-клиент, ЭДО',   group: 'system',
     module: 'admin',  min: 'r' },
+  { key: 'tg',       title: 'Telegram',     desc: 'Уведомления и аналитика',      group: 'personal' },
 ];
 
 const GROUP_LABEL: Record<Section['group'], string> = {
@@ -93,6 +95,7 @@ export default function SettingsPage() {
       case 'role':     return <RolesSection />;
       case 'aud':      return <AuditSection />;
       case 'int':      return <IntegrationsSection />;
+      case 'tg':       return <TelegramSection />;
       default:         return null;
     }
   };

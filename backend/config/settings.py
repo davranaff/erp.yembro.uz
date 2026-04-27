@@ -50,6 +50,7 @@ INSTALLED_APPS = [
     "apps.dashboard",
     "apps.sales",
     "apps.seeding",
+    "apps.tgbot",
 ]
 
 AUTH_USER_MODEL = "users.User"
@@ -188,3 +189,9 @@ CELERY_TASK_TRACK_STARTED = True
 # точного курса на дату документа (выходные, праздники CBU). Хардкод по
 # умолчанию — 7 дней; повышайте через env, если ЦБ долго не публикует.
 FX_FALLBACK_DAYS = env.int("FX_FALLBACK_DAYS", default=7)
+
+# ── Telegram Bot ─────────────────────────────────────────────────────────────
+TELEGRAM_BOT_TOKEN = env("TELEGRAM_BOT_TOKEN", default="")
+TELEGRAM_BOT_USERNAME = env("TELEGRAM_BOT_USERNAME", default="")
+TELEGRAM_WEBHOOK_SECRET = env("TELEGRAM_WEBHOOK_SECRET", default="")
+

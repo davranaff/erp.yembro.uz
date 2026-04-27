@@ -5,6 +5,7 @@ import { useMemo, useState } from 'react';
 import DetailDrawer, { KV } from '@/components/DetailDrawer';
 import Badge from '@/components/ui/Badge';
 import DataTable from '@/components/ui/DataTable';
+import EmptyState from '@/components/ui/EmptyState';
 import Icon from '@/components/ui/Icon';
 import KpiCard from '@/components/ui/KpiCard';
 import Panel from '@/components/ui/Panel';
@@ -302,9 +303,21 @@ export default function TransfersPage() {
           rowKey={(t) => t.id}
           error={error}
           emptyMessage={
-            route
-              ? 'Нет передач по этому маршруту. Попробуйте другой или сбросьте фильтр.'
-              : 'Нет передач.'
+            route ? (
+              'Нет передач по этому маршруту. Попробуйте другой или сбросьте фильтр.'
+            ) : (
+              <EmptyState
+                icon="chart"
+                title="Межмодульных передач пока нет"
+                description="Передачи — это документы перемещения партий между модулями: инкубация→откорм, откорм→убойня. Они создаются автоматически при соответствующих операциях."
+                steps={[
+                  { label: 'В «Инкубации» — нажмите «→ В откорм» на выведенной партии цыплят' },
+                  { label: 'В «Фабрике откорма» — нажмите «Отправить на убой» для готовой партии' },
+                  { label: 'Принимающий модуль подтверждает передачу — статус меняется на «Проведён»' },
+                ]}
+                hint="Межмодульные передачи не создаются вручную — они являются следствием операций в других модулях."
+              />
+            )
           }
           onRowClick={(t) => setSel(t)}
           rowProps={(t) => ({ active: sel?.id === t.id })}

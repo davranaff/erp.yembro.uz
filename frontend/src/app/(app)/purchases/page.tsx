@@ -21,6 +21,7 @@ import type {
   PurchaseStatus,
 } from '@/types/auth';
 
+import PayPurchaseModal from './PayPurchaseModal';
 import PurchaseOrderModal from './PurchaseOrderModal';
 
 const STATUS_LABEL: Record<PurchaseStatus, string> = {
@@ -62,6 +63,7 @@ export default function PurchasesPage() {
   const [tab, setTab] = useState<'all' | PurchaseStatus>('all');
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<PurchaseOrder | null>(null);
+  const [payingOrder, setPayingOrder] = useState<PurchaseOrder | null>(null);
 
   const hasLevel = useHasLevel();
   const canEdit = hasLevel('purchases', 'rw');
@@ -233,6 +235,14 @@ export default function PurchasesPage() {
                       onClick: () => handleConfirm(o),
                     },
                     {
+                      label: 'Оплатить',
+                      hidden: !(
+                        (o.status === 'confirmed' || o.status === 'paid') &&
+                        parseFloat(o.paid_amount_uzs || '0') < parseFloat(o.amount_uzs || '0')
+                      ),
+                      onClick: () => setPayingOrder(o),
+                    },
+                    {
                       label: 'Сторно',
                       danger: true,
                       hidden: !(o.status === 'confirmed' && parseFloat(o.paid_amount_uzs || '0') === 0),
@@ -251,6 +261,12 @@ export default function PurchasesPage() {
         <PurchaseOrderModal
           initial={editing}
           onClose={() => { setModalOpen(false); setEditing(null); }}
+        />
+      )}
+      {payingOrder && (
+        <PayPurchaseModal
+          order={payingOrder}
+          onClose={() => setPayingOrder(null)}
         />
       )}
     </>

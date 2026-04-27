@@ -127,4 +127,5 @@ urlpatterns = [
         "api/sales/",
         include("apps.sales.urls", namespace="sales"),
     ),
+    path("api/tg/", include("apps.tgbot.urls")),
 ]

@@ -8,6 +8,7 @@ import { OpenSaleFromModule } from '@/components/SellBatchButton';
 import DataTable from '@/components/ui/DataTable';
 import Badge from '@/components/ui/Badge';
 import Icon from '@/components/ui/Icon';
+import EmptyState from '@/components/ui/EmptyState';
 import KpiCard from '@/components/ui/KpiCard';
 import Panel from '@/components/ui/Panel';
 import RowActions from '@/components/ui/RowActions';
@@ -175,7 +176,24 @@ export default function IncubationPage() {
           rows={runs}
           rowKey={(r) => r.id}
           error={error}
-          emptyMessage="Нет партий инкубации."
+          emptyMessage={
+            <EmptyState
+              icon="incubator"
+              title="Партий инкубации пока нет"
+              description="Инкубация — это процесс вывода цыплят из яиц маточника. Каждая партия проходит стадии: инкубатор → выводной шкаф → вывод цыплят."
+              steps={[
+                { label: 'Убедитесь, что в маточнике есть сформированная яичная партия' },
+                { label: 'Нажмите «Загрузить партию» — выберите инкубатор и количество яиц' },
+                { label: 'Отслеживайте режим температуры и влажности во вкладке «Режим»' },
+                { label: 'На 18-й день переведите на вывод, на 21-й — проведите вывод цыплят' },
+              ]}
+              action={{
+                label: 'Загрузить партию',
+                onClick: () => setCreateOpen(true),
+              }}
+              hint="После вывода цыплята автоматически передаются в Фабрику откорма через межмодульный трансфер."
+            />
+          }
           onRowClick={(r) => { setSel(r); setTab('overview'); }}
           rowProps={(r) => ({ active: sel?.id === r.id })}
           columns={[

@@ -9,6 +9,7 @@ import Badge from '@/components/ui/Badge';
 import DataTable from '@/components/ui/DataTable';
 import HelpHint from '@/components/ui/HelpHint';
 import Icon from '@/components/ui/Icon';
+import EmptyState from '@/components/ui/EmptyState';
 import KpiCard from '@/components/ui/KpiCard';
 import Panel from '@/components/ui/Panel';
 import RowActions from '@/components/ui/RowActions';
@@ -225,7 +226,24 @@ export default function SlaughterPage() {
           rows={shifts}
           rowKey={(s) => s.id}
           error={error}
-          emptyMessage="Нет смен."
+          emptyMessage={
+            <EmptyState
+              icon="box"
+              title="Смен убоя пока нет"
+              description="Убойня — это модуль учёта переработки птицы. Каждая смена фиксирует забой партии с выходами продуктов, контролем качества и лабораторией."
+              steps={[
+                { label: 'Убедитесь, что в «Фабрике откорма» есть партия со статусом «К съёму»' },
+                { label: 'Нажмите «+ Новая смена» — выберите линию, дату и откормочную партию' },
+                { label: 'Заполните выходы продукции (тушки, субпродукты, отходы) во вкладке «Выходы»' },
+                { label: 'Проведите смену — она зафиксирует себестоимость и остатки на складе' },
+              ]}
+              action={{
+                label: 'Новая смена',
+                onClick: () => setCreateOpen(true),
+              }}
+              hint="Только проведённые смены влияют на складские остатки и себестоимость продукции."
+            />
+          }
           onRowClick={(s) => { setSel(s); setTab('overview'); }}
           rowProps={(s) => ({ active: sel?.id === s.id })}
           columns={[
@@ -539,10 +557,21 @@ export default function SlaughterPage() {
                   ]}
                 />
               ) : (
-                <div style={{ padding: 24, textAlign: 'center', color: 'var(--fg-3)' }}>
-                  Контроль качества не заполнен.{' '}
-                  <HelpHint text="Без отметки ветеринара провести смену невозможно." />
-                </div>
+                <EmptyState
+                  icon="check"
+                  title="Контроль качества не заполнен"
+                  description="Контроль качества фиксирует прохождение ветеринарной инспекции, дефекты тушек и температуру охлаждения. Без этой отметки провести смену невозможно."
+                  steps={[
+                    { label: 'Нажмите «Заполнить» в верхней части панели' },
+                    { label: 'Укажите результат вет. инспекции и параметры качества' },
+                    { label: 'После заполнения смену можно будет провести' },
+                  ]}
+                  action={canEdit && (sel.status === 'active' || sel.status === 'closed') ? {
+                    label: 'Заполнить контроль',
+                    onClick: () => setQcOpen(true),
+                  } : undefined}
+                  hint="Без отметки ветеринара провести смену невозможно."
+                />
               )}
             </Panel>
           )}

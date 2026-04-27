@@ -3,6 +3,7 @@
 import { useMemo, useState } from 'react';
 
 import DataTable from '@/components/ui/DataTable';
+import EmptyState from '@/components/ui/EmptyState';
 import Icon from '@/components/ui/Icon';
 import Panel from '@/components/ui/Panel';
 import { feedConsumptionCrud } from '@/hooks/useMatochnik';
@@ -43,11 +44,23 @@ export default function FeedConsumptionPanel({ herd }: Props) {
           </button>
         }
       >
+        {(!records || records.length === 0) ? (
+          <EmptyState
+            icon="bag"
+            title="Расхода кормов пока нет"
+            description="Фиксируйте суточное потребление корма стадом — это основа для расчёта FCR (конверсии корма) и реальной себестоимости яйца."
+            action={{
+              label: 'Записать расход',
+              onClick: () => setOpen(true),
+            }}
+            hint="FCR = кг корма ÷ кг яйца. Норма для кур-несушек: 2.0–2.5 кг корма на кг яичной массы."
+          />
+        ) : (
         <DataTable<BreedingFeedConsumption>
           isLoading={isLoading}
           rows={records}
           rowKey={(r) => r.id}
-          emptyMessage="Записей нет. Нажмите «Расход» чтобы зафиксировать суточное потребление."
+          emptyMessage="—"
           columns={[
             { key: 'date', label: 'Дата', mono: true, cellStyle: { fontSize: 12 },
               render: (r) => r.date },
@@ -71,6 +84,7 @@ export default function FeedConsumptionPanel({ herd }: Props) {
               render: (r) => r.total_cost_uzs ? fmtUzs(r.total_cost_uzs) : '—' },
           ]}
         />
+        )}
       </Panel>
 
       {open && (

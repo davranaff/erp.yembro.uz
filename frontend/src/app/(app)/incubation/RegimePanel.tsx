@@ -3,6 +3,7 @@
 import { useState } from 'react';
 
 import DataTable from '@/components/ui/DataTable';
+import EmptyState from '@/components/ui/EmptyState';
 import Icon from '@/components/ui/Icon';
 import Panel from '@/components/ui/Panel';
 import RowActions from '@/components/ui/RowActions';
@@ -61,7 +62,24 @@ export default function RegimePanel({ run }: Props) {
           isLoading={isLoading}
           rows={rows}
           rowKey={(r) => r.id}
-          emptyMessage="Замеров режима пока нет."
+          emptyMessage={
+            <EmptyState
+              icon="chart"
+              title="Замеров режима пока нет"
+              description="Режим инкубации — это ежедневный контроль температуры, влажности и поворотов яйца. Отклонения от нормы снижают выводимость."
+              steps={[
+                { label: 'Нажмите «+ Замер» для добавления показаний текущего дня' },
+                { label: 'Введите фактическую температуру (норма 37.5–37.8°C) и влажность' },
+                { label: 'Укажите количество поворотов яйца (норма: 4–8 раз в сутки)' },
+                { label: 'Система подсветит отклонения от целевых значений красным' },
+              ]}
+              action={{
+                label: 'Добавить замер',
+                onClick: () => { setEditing(null); setModalOpen(true); },
+              }}
+              hint="Критичные дни: 1–7 (закладка), 14–18 (перевод). Особо важен контроль в эти периоды."
+            />
+          }
           columns={[
             { key: 'day', label: 'День', mono: true, width: 60,
               render: (r) => `${r.day}/${run.days_total}` },
