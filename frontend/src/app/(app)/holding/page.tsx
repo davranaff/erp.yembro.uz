@@ -104,7 +104,7 @@ export default function HoldingPage() {
           valueSuffix="UZS"
         />
         <KpiCard
-          tone="warn"
+          tone="orange"
           iconName="chart"
           label="Дебиторка"
           sub="всё время (не period-scoped)"
