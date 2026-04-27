@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 
 import { ORG_COOKIE } from './lib/tokens';
 
-const PUBLIC_PATHS = new Set(['/login']);
+const PUBLIC_PATHS = new Set(['/', '/login']);
 
 /**
  * Серверный guard на cookie `erp.org`. JWT-токены живут в localStorage и

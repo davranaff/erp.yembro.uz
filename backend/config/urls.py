@@ -128,4 +128,5 @@ urlpatterns = [
         include("apps.sales.urls", namespace="sales"),
     ),
     path("api/tg/", include("apps.tgbot.urls")),
+    path("api/landing/", include("apps.landing.urls", namespace="landing")),
 ]

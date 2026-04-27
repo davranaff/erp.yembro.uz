@@ -51,6 +51,7 @@ INSTALLED_APPS = [
     "apps.sales",
     "apps.seeding",
     "apps.tgbot",
+    "apps.landing",
 ]
 
 AUTH_USER_MODEL = "users.User"
@@ -194,4 +195,8 @@ FX_FALLBACK_DAYS = env.int("FX_FALLBACK_DAYS", default=7)
 TELEGRAM_BOT_TOKEN = env("TELEGRAM_BOT_TOKEN", default="")
 TELEGRAM_BOT_USERNAME = env("TELEGRAM_BOT_USERNAME", default="")
 TELEGRAM_WEBHOOK_SECRET = env("TELEGRAM_WEBHOOK_SECRET", default="")
+
+# ── Landing / Demo leads ──────────────────────────────────────────────────────
+# Telegram chat_id через запятую — куда слать уведомления о новых заявках с лендинга
+DEMO_NOTIFY_CHAT_IDS = env.str("DEMO_NOTIFY_CHAT_IDS", default="")
 

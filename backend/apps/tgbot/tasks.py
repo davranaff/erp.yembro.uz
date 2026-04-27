@@ -8,8 +8,15 @@ logger = logging.getLogger(__name__)
 
 
 @shared_task(name="apps.tgbot.notify_admins_task")
-def notify_admins_task(text: str, organization_id: str) -> dict:
-    """Рассылает text всем активным TgLink (admin) для org."""
+def notify_admins_task(text: str, organization_id: str, module_code: str | None = None) -> dict:
+    """Рассылает text активным TgLink для org.
+
+    Если передан module_code — получают только пользователи с доступом
+    к этому модулю (уровень >= 'r'). Без module_code — все активные.
+    """
+    from apps.common.permissions import _effective_level, level_satisfies
+    from apps.organizations.models import OrganizationMembership
+
     from .bot import send_message
     from .models import TgLink
 
@@ -17,12 +24,23 @@ def notify_admins_task(text: str, organization_id: str) -> dict:
         organization_id=organization_id,
         is_active=True,
         user__isnull=False,
-    )
+    ).select_related("user")
+
     sent = 0
     for link in links:
+        if module_code is not None:
+            membership = OrganizationMembership.objects.filter(
+                organization_id=organization_id,
+                user=link.user,
+            ).first()
+            if membership is None:
+                continue
+            actual = _effective_level(membership, module_code)
+            if not level_satisfies(actual, "r"):
+                continue
         if send_message(link.chat_id, text):
             sent += 1
-    logger.info("notify_admins_task: sent=%d org=%s", sent, organization_id)
+    logger.info("notify_admins_task: sent=%d org=%s module=%s", sent, organization_id, module_code)
     return {"sent": sent}
 
 

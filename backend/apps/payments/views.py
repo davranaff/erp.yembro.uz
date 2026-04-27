@@ -66,7 +66,7 @@ class PaymentViewSet(ImmutableStatusMixin, DeleteReasonMixin, OrgScopedModelView
             from apps.tgbot.notifications import fmt_payment_posted
             from apps.tgbot.tasks import notify_admins_task
             notify_admins_task.delay(
-                fmt_payment_posted(payment), str(payment.organization_id)
+                fmt_payment_posted(payment), str(payment.organization_id), "purchases"
             )
         except Exception:
             pass

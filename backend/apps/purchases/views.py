@@ -78,7 +78,7 @@ class PurchaseOrderViewSet(ImmutableStatusMixin, DeleteReasonMixin, OrgScopedMod
             from apps.tgbot.notifications import fmt_purchase_confirmed
             from apps.tgbot.tasks import notify_admins_task
             notify_admins_task.delay(
-                fmt_purchase_confirmed(order), str(order.organization_id)
+                fmt_purchase_confirmed(order), str(order.organization_id), "purchases"
             )
         except Exception:
             pass

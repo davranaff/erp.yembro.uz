@@ -41,12 +41,24 @@ def dispatch(update: dict) -> None:
 
     org = link.organization
     if text == "/report":
+        if not _has_module_access(link, "reports"):
+            send_message(chat_id, "⛔ Нет доступа к модулю <b>Отчёты</b>.")
+            return
         _handle_report(chat_id, org)
     elif text == "/stock":
+        if not _has_module_access(link, "ledger"):
+            send_message(chat_id, "⛔ Нет доступа к модулю <b>Бухгалтерия</b>.")
+            return
         _handle_stock(chat_id, org)
     elif text == "/cashflow":
+        if not _has_module_access(link, "reports"):
+            send_message(chat_id, "⛔ Нет доступа к модулю <b>Отчёты</b>.")
+            return
         _handle_cashflow(chat_id, org)
     elif text == "/production":
+        if not _has_module_access(link, "feedlot"):
+            send_message(chat_id, "⛔ Нет доступа к модулю <b>Производство</b>.")
+            return
         _handle_production(chat_id, org)
     else:
         send_message(chat_id, HELP_TEXT)
@@ -56,7 +68,21 @@ def _get_admin_link(chat_id: int):
     from .models import TgLink
     return TgLink.objects.filter(
         chat_id=chat_id, is_active=True, user__isnull=False
-    ).select_related("organization").first()
+    ).select_related("organization", "user").first()
+
+
+def _has_module_access(link, module_code: str) -> bool:
+    """Проверяет, есть ли у пользователя link доступ >= 'r' к модулю."""
+    from apps.common.permissions import _effective_level, level_satisfies
+    from apps.organizations.models import OrganizationMembership
+
+    membership = OrganizationMembership.objects.filter(
+        organization=link.organization,
+        user=link.user,
+    ).first()
+    if membership is None:
+        return False
+    return level_satisfies(_effective_level(membership, module_code), "r")
 
 
 def _handle_link(chat_id: int, text: str, tg_user: dict) -> None:
