@@ -418,13 +418,23 @@ export default function SlaughterPage() {
                   marginBottom: 12,
                 }}>
                   <div style={{
-                    fontSize: 11, fontWeight: 700, color: 'var(--fg-3)',
-                    textTransform: 'uppercase', letterSpacing: '.04em',
-                    marginBottom: 8,
+                    display: 'grid',
+                    gridTemplateColumns: '1fr auto auto',
+                    alignItems: 'center',
+                    marginBottom: 10,
                   }}>
-                    Разбивка по SKU · факт vs норма (бройлер)
+                    <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--fg-3)', textTransform: 'uppercase', letterSpacing: '.04em' }}>
+                      Разбивка по SKU · факт vs норма (бройлер)
+                    </div>
+                    <div className="mono" style={{ fontSize: 10, color: 'var(--fg-3)', textAlign: 'right', paddingRight: 10 }}>Факт</div>
+                    <div className="mono" style={{ fontSize: 10, color: 'var(--fg-3)', textAlign: 'right' }}>Δ норма</div>
                   </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                  <div style={{
+                    display: 'grid',
+                    gridTemplateColumns: '1fr auto auto',
+                    gap: '6px 0',
+                    alignItems: 'center',
+                  }}>
                     {stats.breakdown.map((row) => {
                       const yp = row.yield_pct ? parseFloat(row.yield_pct) : 0;
                       const norm = row.norm_pct ? parseFloat(row.norm_pct) : null;
@@ -433,16 +443,18 @@ export default function SlaughterPage() {
                       const barColor = !row.is_within_tolerance
                         ? 'var(--danger)'
                         : 'var(--brand-orange, #E8751A)';
-                      return (
-                        <div key={row.sku} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12 }}>
-                          <div style={{ minWidth: 130, fontWeight: 500 }}>
-                            <span className="mono" style={{ fontSize: 11, color: 'var(--fg-3)' }}>
-                              {row.sku}
-                            </span>{' '}
-                            {row.name}
+                      const devColor = dev === null
+                        ? 'var(--fg-3)'
+                        : !row.is_within_tolerance ? 'var(--danger)' : 'var(--success, #4caf50)';
+                      return [
+                        /* col 1: label + bar */
+                        <div key={`bar-${row.sku}`} style={{ display: 'flex', flexDirection: 'column', gap: 2, paddingRight: 10 }}>
+                          <div style={{ fontSize: 11, fontWeight: 500, display: 'flex', gap: 4, alignItems: 'baseline' }}>
+                            <span className="mono" style={{ color: 'var(--fg-3)', fontSize: 10 }}>{row.sku}</span>
+                            <span style={{ color: 'var(--fg-1)' }}>{row.name}</span>
                           </div>
                           <div style={{
-                            flex: 1, height: 12, background: 'var(--bg-soft)',
+                            height: 10, background: 'var(--bg-soft)',
                             borderRadius: 3, overflow: 'hidden', position: 'relative',
                           }}>
                             <div style={{
@@ -453,44 +465,55 @@ export default function SlaughterPage() {
                               <div style={{
                                 position: 'absolute', top: 0, bottom: 0,
                                 left: `${norm}%`, width: 1,
-                                background: 'var(--fg-3)', opacity: 0.7,
+                                background: 'var(--fg-3)', opacity: 0.5,
                               }} title={`Норма ${norm}%`} />
                             )}
                           </div>
-                          <div className="mono" style={{ minWidth: 60, textAlign: 'right', fontWeight: 600 }}>
-                            {yp.toFixed(2)}%
-                          </div>
-                          <div className="mono" style={{
-                            minWidth: 70, textAlign: 'right',
-                            color: dev === null ? 'var(--fg-3)'
-                              : !row.is_within_tolerance ? 'var(--danger)'
-                              : 'var(--fg-3)',
-                            fontSize: 11,
-                          }}>
-                            {dev !== null
-                              ? `${dev > 0 ? '+' : ''}${dev.toFixed(2)}%`
-                              : '— нет нормы'}
-                          </div>
-                        </div>
-                      );
+                        </div>,
+                        /* col 2: fact % */
+                        <div key={`pct-${row.sku}`} className="mono" style={{
+                          fontSize: 12, fontWeight: 700, textAlign: 'right',
+                          paddingRight: 10, whiteSpace: 'nowrap',
+                        }}>
+                          {yp.toFixed(2)}%
+                        </div>,
+                        /* col 3: deviation */
+                        <div key={`dev-${row.sku}`} className="mono" style={{
+                          fontSize: 11, textAlign: 'right', color: devColor,
+                          whiteSpace: 'nowrap',
+                        }}>
+                          {dev !== null
+                            ? `${dev > 0 ? '+' : ''}${dev.toFixed(2)}%`
+                            : <span style={{ color: 'var(--fg-3)' }}>—</span>}
+                        </div>,
+                      ];
                     })}
                   </div>
                   <div style={{
                     marginTop: 10, paddingTop: 8,
                     borderTop: '1px solid var(--border)',
-                    display: 'flex', justifyContent: 'space-between',
-                    fontSize: 12, fontWeight: 600,
+                    display: 'grid',
+                    gridTemplateColumns: '1fr auto auto',
+                    alignItems: 'center',
+                    fontSize: 12, fontWeight: 700,
                   }}>
-                    <span>Σ выходов / Отходы</span>
-                    <span className="mono">
-                      {fmtPct(stats.total_output_pct)} / {' '}
-                      <span style={{ color: 'var(--danger)' }}>
-                        {fmtPct(stats.waste_pct)}
-                      </span>
+                    <span style={{ color: 'var(--fg-2)' }}>Σ выходов</span>
+                    <span className="mono" style={{ textAlign: 'right', paddingRight: 10 }}>
+                      {fmtPct(stats.total_output_pct)}
+                    </span>
+                    <span className="mono" style={{ textAlign: 'right', color: 'var(--danger)' }}>
+                      {fmtPct(stats.waste_pct)}
                     </span>
                   </div>
-                  <div style={{ fontSize: 10, color: 'var(--fg-3)', marginTop: 4 }}>
-                    Серая чёрточка на полосе — норма по бройлеру (ROSS-308 / COBB-500). Допуск ±2%.
+                  <div style={{
+                    display: 'grid', gridTemplateColumns: '1fr auto auto',
+                    alignItems: 'center', marginTop: 2,
+                  }}>
+                    <div style={{ fontSize: 10, color: 'var(--fg-3)' }}>
+                      Чёрточка — норма ROSS-308/COBB-500. Допуск ±2%.
+                    </div>
+                    <div style={{ fontSize: 10, color: 'var(--fg-3)', textAlign: 'right', paddingRight: 10 }}>выход</div>
+                    <div style={{ fontSize: 10, color: 'var(--danger)', textAlign: 'right' }}>отходы</div>
                   </div>
                 </div>
               )}
