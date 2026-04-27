@@ -1280,38 +1280,61 @@ body.navigating * {
 
   /* Settings/roles grid уже single-column (см. .settings-grid выше) */
 
-  /* Командная палитра — почти fullscreen */
-  .cp-shell {
-    width: 100vw;
-    max-width: 100vw;
-    border-radius: 0;
-    max-height: 100vh;
-    max-height: 100dvh;
-    height: 100dvh;
-    padding-top: env(safe-area-inset-top);
-  }
+  /* Командная палитра — fullscreen на мобиле */
   .cp-backdrop {
     padding-top: 0;
-    align-items: stretch;
+    align-items: flex-start;
+  }
+  .cp-shell {
+    width: 100%;
+    max-width: 100%;
+    border-radius: 0;
+    height: 100dvh;
+    max-height: 100dvh;
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: env(safe-area-inset-bottom);
   }
   .cp-hint { display: none; }
 
-  /* Help / favorites menu — full width */
-  .help-menu,
-  .fav-menu {
-    width: calc(100vw - 16px);
-    right: -8px;
-    max-height: 70vh;
-    max-height: 70dvh;
+  /* Help-меню — фиксированное позиционирование, полная ширина снизу */
+  .help-menu {
+    position: fixed;
+    top: var(--topbar-h);
+    left: 8px;
+    right: 8px;
+    width: auto;
+    max-width: none;
+    max-height: calc(100dvh - var(--topbar-h) - 16px);
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
+    border-radius: 8px;
+    z-index: 100;
+  }
+
+  /* Favorites menu — фиксированное позиционирование */
+  .fav-menu {
+    position: fixed;
+    top: var(--topbar-h);
+    left: 8px;
+    right: 8px;
+    width: auto;
+    max-width: none;
+    max-height: calc(100dvh - var(--topbar-h) - 16px);
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    z-index: 100;
   }
 
   /* UserMenu dropdown урезаем под viewport */
   .topbar-user-menu {
-    width: calc(100vw - 16px) !important;
-    right: -4px !important;
-    max-width: 320px;
+    position: fixed !important;
+    top: var(--topbar-h) !important;
+    left: 8px !important;
+    right: 8px !important;
+    width: auto !important;
+    max-width: none !important;
+    max-height: calc(100dvh - var(--topbar-h) - 16px);
+    overflow-y: auto;
   }
 
   /* Topbar safe-area: notch не должен налезать на крошки */
