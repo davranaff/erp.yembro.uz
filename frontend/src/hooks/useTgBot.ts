@@ -37,7 +37,7 @@ export function useCreateTgLinkToken(counterpartyId?: string) {
     mutationFn: () =>
       apiFetch<TgLinkToken>('/api/tg/link-token/', {
         method: 'POST',
-        body: counterpartyId ? JSON.stringify({ counterparty: counterpartyId }) : '{}',
+        body: counterpartyId ? { counterparty: counterpartyId } : {},
       }),
   });
 }
@@ -46,7 +46,7 @@ export function useDisconnectTgLink() {
   const qc = useQueryClient();
   return useMutation<void, Error>({
     mutationFn: () =>
-      apiFetch<void>('/api/tg/links/me/', { method: 'DELETE' }),
+      apiFetch<void>('/api/tg/links/me/', { method: 'DELETE' }) as Promise<void>,
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['tg', 'link', 'me'] });
     },
@@ -78,7 +78,7 @@ export function useSendDebtReminder() {
     mutationFn: (body) =>
       apiFetch('/api/tg/send-debt-reminder/', {
         method: 'POST',
-        body: JSON.stringify(body),
+        body,
       }),
   });
 }
