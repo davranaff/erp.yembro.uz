@@ -172,6 +172,15 @@ class DailyEggProduction(UUIDModel, TimestampedModel):
 
 
 class BreedingMortality(UUIDModel, TimestampedModel):
+    class Cause(models.TextChoices):
+        DISEASE = "disease", "Болезнь"
+        TRAUMA = "trauma", "Травма"
+        HEAT_STRESS = "heat_stress", "Тепловой стресс"
+        SUFFOCATION = "suffocation", "Асфиксия"
+        CULLING = "culling", "Выбраковка"
+        OTHER = "other", "Иное"
+        UNKNOWN = "unknown", "Не установлена"
+
     herd = models.ForeignKey(
         BreedingHerd,
         on_delete=models.PROTECT,
@@ -179,7 +188,16 @@ class BreedingMortality(UUIDModel, TimestampedModel):
     )
     date = models.DateField(db_index=True)
     dead_count = models.PositiveIntegerField()
-    cause = models.CharField(max_length=128, blank=True)
+    cause = models.CharField(
+        max_length=16,
+        choices=Cause.choices,
+        default=Cause.UNKNOWN,
+        db_index=True,
+    )
+    cause_detail = models.CharField(
+        max_length=128, blank=True,
+        help_text="Свободный комментарий (диагноз, препарат и т.п.).",
+    )
     notes = models.TextField(blank=True)
     recorded_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,

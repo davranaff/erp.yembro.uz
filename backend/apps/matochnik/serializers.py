@@ -100,6 +100,7 @@ class BreedingMortalitySerializer(serializers.ModelSerializer):
             "date",
             "dead_count",
             "cause",
+            "cause_detail",
             "notes",
             "recorded_by",
             "created_at",

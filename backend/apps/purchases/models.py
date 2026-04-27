@@ -143,6 +143,10 @@ class PurchaseItem(UUIDModel, TimestampedModel):
         related_name="purchase_items",
     )
     quantity = models.DecimalField(max_digits=18, decimal_places=3)
+    received_qty = models.DecimalField(
+        max_digits=18, decimal_places=3, default=0,
+        help_text="Фактически принятое количество (частичная поставка).",
+    )
     unit_price = models.DecimalField(max_digits=18, decimal_places=2)
     line_total_foreign = models.DecimalField(
         max_digits=18, decimal_places=2, null=True, blank=True

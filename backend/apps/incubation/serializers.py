@@ -30,6 +30,7 @@ class IncubationRunSerializer(serializers.ModelSerializer):
             "expected_hatch_date",
             "actual_hatch_date",
             "eggs_loaded",
+            "eggs_broken_on_load",
             "fertile_eggs",
             "hatched_count",
             "discarded_count",

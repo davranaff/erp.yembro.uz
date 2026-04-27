@@ -139,6 +139,11 @@ class SlaughterShift(UUIDModel, TimestampedModel):
 
 
 class SlaughterYield(UUIDModel, TimestampedModel):
+    class Grade(models.TextChoices):
+        GRADE_1 = "grade_1", "1 сорт"
+        GRADE_2 = "grade_2", "2 сорт"
+        SUBSTANDARD = "substandard", "Некондиция"
+
     shift = models.ForeignKey(
         SlaughterShift, on_delete=models.CASCADE, related_name="yields"
     )
@@ -146,6 +151,13 @@ class SlaughterYield(UUIDModel, TimestampedModel):
         "nomenclature.NomenclatureItem",
         on_delete=models.PROTECT,
         related_name="slaughter_yields",
+    )
+    grade = models.CharField(
+        max_length=16,
+        choices=Grade.choices,
+        default=Grade.GRADE_1,
+        db_index=True,
+        help_text="Сортность продукции (1 сорт / 2 сорт / некондиция).",
     )
     quantity = models.DecimalField(max_digits=14, decimal_places=3)
     unit = models.ForeignKey(
@@ -166,11 +178,12 @@ class SlaughterYield(UUIDModel, TimestampedModel):
     notes = models.TextField(blank=True)
 
     class Meta:
-        ordering = ["shift", "nomenclature"]
-        unique_together = (("shift", "nomenclature"),)
+        ordering = ["shift", "nomenclature", "grade"]
+        unique_together = (("shift", "nomenclature", "grade"),)
         indexes = [
             models.Index(fields=["shift"]),
             models.Index(fields=["output_batch"]),
+            models.Index(fields=["shift", "grade"]),
         ]
         verbose_name = "Выход продукции"
         verbose_name_plural = "Выход продукции"
@@ -210,6 +223,10 @@ class SlaughterQualityCheck(UUIDModel, TimestampedModel):
     )
     cooling_temperature_c = models.DecimalField(
         max_digits=5, decimal_places=2, null=True, blank=True
+    )
+    confiscation_percent = models.DecimalField(
+        max_digits=5, decimal_places=2, null=True, blank=True,
+        help_text="% конфискованной продукции по результатам вет-контроля.",
     )
     vet_inspection_passed = models.BooleanField(default=False)
     inspector = models.ForeignKey(

@@ -1174,7 +1174,19 @@ body.navigating * {
   /* Topbar: сжимаем padding, скрываем breadcrumbs (оставляем только последний) */
   .topbar {
     padding: 0 10px;
-    gap: 6px;
+    gap: 4px;
+  }
+
+  /* Кнопки topbar — иконка без текста, квадратные */
+  .topbar-btn {
+    width: 36px;
+    height: 36px;
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    border-color: transparent;
   }
   .crumbs {
     font-size: 12px;
@@ -1306,6 +1318,13 @@ body.navigating * {
   .topbar {
     padding-left: max(10px, env(safe-area-inset-left));
     padding-right: max(10px, env(safe-area-inset-right));
+  }
+
+  /* UserMenu: скрываем имя, оставляем только аватар + chevron */
+  .topbar-user > span { display: none; }
+  .topbar-user {
+    padding: 4px 6px;
+    gap: 4px;
   }
 }
 

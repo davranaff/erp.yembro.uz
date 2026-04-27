@@ -13,6 +13,7 @@ class PurchaseItemSerializer(serializers.ModelSerializer):
             "id",
             "nomenclature",
             "quantity",
+            "received_qty",
             "unit_price",
             "line_total_foreign",
             "line_total_uzs",

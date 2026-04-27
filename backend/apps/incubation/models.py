@@ -48,6 +48,10 @@ class IncubationRun(UUIDModel, TimestampedModel):
     actual_hatch_date = models.DateField(null=True, blank=True)
 
     eggs_loaded = models.PositiveIntegerField()
+    eggs_broken_on_load = models.PositiveIntegerField(
+        default=0,
+        help_text="Яиц разбито/повреждено при закладке (вычитается из eggs_loaded).",
+    )
     fertile_eggs = models.PositiveIntegerField(null=True, blank=True)
     hatched_count = models.PositiveIntegerField(null=True, blank=True)
     discarded_count = models.PositiveIntegerField(null=True, blank=True)
@@ -128,11 +132,17 @@ class IncubationRun(UUIDModel, TimestampedModel):
                 )
         if self.eggs_loaded is not None and self.eggs_loaded <= 0:
             raise ValidationError({"eggs_loaded": "Должно быть больше нуля."})
-        # Arithmetic soft-guard
-        f, h, d = self.fertile_eggs, self.hatched_count, self.discarded_count
-        if f is not None and f > self.eggs_loaded:
+        broken = self.eggs_broken_on_load or 0
+        if self.eggs_loaded is not None and broken >= self.eggs_loaded:
             raise ValidationError(
-                {"fertile_eggs": "Оплодотворённых не может быть больше загруженных."}
+                {"eggs_broken_on_load": "Не может быть больше или равно eggs_loaded."}
+            )
+        # Arithmetic soft-guard: compare against net_loaded (after breakage)
+        net_loaded = (self.eggs_loaded or 0) - broken
+        f, h, d = self.fertile_eggs, self.hatched_count, self.discarded_count
+        if f is not None and f > net_loaded:
+            raise ValidationError(
+                {"fertile_eggs": "Оплодотворённых не может быть больше чистой закладки."}
             )
         if f is not None and h is not None and d is not None and (h + d) > f:
             raise ValidationError(

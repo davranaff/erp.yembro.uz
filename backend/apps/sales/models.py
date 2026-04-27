@@ -107,6 +107,10 @@ class SaleOrder(UUIDModel, TimestampedModel):
         default=PaymentStatus.UNPAID,
         db_index=True,
     )
+    due_date = models.DateField(
+        null=True, blank=True, db_index=True,
+        help_text="Плановая дата оплаты (для отчёта дебиторского старения).",
+    )
 
     notes = models.TextField(blank=True)
     created_by = models.ForeignKey(

@@ -611,12 +611,17 @@ export interface DailyEggProduction {
   created_at: string;
 }
 
+export type MortalityCause =
+  | 'disease' | 'trauma' | 'heat_stress' | 'suffocation'
+  | 'culling' | 'other' | 'unknown';
+
 export interface BreedingMortality {
   id: string;
   herd: string;
   date: string;
   dead_count: number;
-  cause: string;
+  cause: MortalityCause;
+  cause_detail: string;
   notes: string;
   recorded_by: string | null;
   created_at: string;
@@ -654,6 +659,7 @@ export interface IncubationRun {
   expected_hatch_date: string;
   actual_hatch_date: string | null;
   eggs_loaded: number;
+  eggs_broken_on_load: number;
   fertile_eggs: number | null;
   hatched_count: number | null;
   discarded_count: number | null;
@@ -994,10 +1000,13 @@ export interface SlaughterShift {
   updated_at: string;
 }
 
+export type SlaughterGrade = 'grade_1' | 'grade_2' | 'substandard';
+
 export interface SlaughterYield {
   id: string;
   shift: string;
   nomenclature: string;
+  grade: SlaughterGrade;
   nom_sku: string | null;
   nom_name: string | null;
   quantity: string;
@@ -1021,6 +1030,7 @@ export interface SlaughterQualityCheck {
   carcass_defect_percent: string | null;
   trauma_percent: string | null;
   cooling_temperature_c: string | null;
+  confiscation_percent: string | null;
   vet_inspection_passed: boolean;
   inspector: string;
   inspector_name: string | null;
@@ -1419,6 +1429,7 @@ export interface SaleOrder {
   // payments
   paid_amount_uzs: string;
   payment_status: SalePaymentStatus;
+  due_date: string | null;
 
   // derived
   margin_uzs?: string;
@@ -1441,6 +1452,7 @@ export interface PurchaseItem {
   id: string;
   nomenclature: string;
   quantity: string;
+  received_qty: string;
   unit_price: string;
   line_total_foreign: string | null;
   line_total_uzs: string;

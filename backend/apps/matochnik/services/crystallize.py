@@ -23,7 +23,7 @@ Atomic:
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import date as date_type
+from datetime import date as date_type, timedelta
 from decimal import Decimal
 from typing import Optional
 
@@ -85,6 +85,25 @@ def crystallize_egg_batch(
         raise EggCrystallizeError(
             {"date_to": "Конец диапазона раньше начала."}
         )
+
+    # Withdrawal guard: block crystallization if any active vet withdrawal covers date_from
+    from apps.vet.models import VetTreatmentLog
+    active_treatments = VetTreatmentLog.objects.filter(
+        target_herd=herd,
+        withdrawal_period_days__gt=0,
+    ).select_related()
+    for t in active_treatments:
+        withdrawal_end = t.treatment_date + timedelta(days=t.withdrawal_period_days)
+        if withdrawal_end >= date_from:
+            raise EggCrystallizeError(
+                {
+                    "date_from": (
+                        f"Стадо {herd.doc_number} находится под каренцией "
+                        f"(препарат от {t.treatment_date}, каренция до {withdrawal_end}). "
+                        f"Кристаллизация яиц запрещена."
+                    )
+                }
+            )
 
     records_qs = DailyEggProduction.objects.select_for_update().filter(
         herd=herd,

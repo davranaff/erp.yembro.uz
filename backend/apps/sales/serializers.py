@@ -79,6 +79,7 @@ class SaleOrderSerializer(serializers.ModelSerializer):
             "status",
             "payment_status",
             "paid_amount_uzs",
+            "due_date",
             "currency",
             "currency_code",
             "exchange_rate",
