@@ -9,7 +9,7 @@ membership. Без новой модели Holding — холдинг = множ
     - выручка по приходам (incoming payments) за период
     - расходы по уходящим платежам за период
     - сумма закупок confirmed за период
-    - дебиторка (paid_amount_uzs < amount_uzs по PO) — TODO когда появится sales
+    - дебиторка = sum(amount_uzs - paid_amount_uzs) по SaleOrder не-PAID
     - кредиторка = sum(amount_uzs - paid_amount_uzs) по PO в not-PAID
     - активные batches (state=ACTIVE)
     - активные модули
@@ -28,6 +28,7 @@ from apps.modules.models import OrganizationModule
 from apps.organizations.models import Organization
 from apps.payments.models import Payment
 from apps.purchases.models import PurchaseOrder
+from apps.sales.models import SaleOrder
 
 
 @dataclass
@@ -43,6 +44,7 @@ class CompanyConsolidation:
     payments_in_uzs: str
     payments_out_uzs: str
     creditor_balance_uzs: str  # сколько мы должны поставщикам
+    debtor_balance_uzs: str   # сколько нам должны покупатели
     active_batches: int
     modules_count: int
 
@@ -100,6 +102,23 @@ def consolidate(
         if creditor_balance < 0:
             creditor_balance = Decimal("0")
 
+        debtor = (
+            SaleOrder.objects.filter(
+                organization=org,
+                status=SaleOrder.Status.CONFIRMED,
+            )
+            .exclude(payment_status=SaleOrder.PaymentStatus.PAID)
+            .aggregate(
+                amt=Sum("amount_uzs"),
+                paid=Sum("paid_amount_uzs"),
+            )
+        )
+        debtor_balance = (debtor["amt"] or Decimal("0")) - (
+            debtor["paid"] or Decimal("0")
+        )
+        if debtor_balance < 0:
+            debtor_balance = Decimal("0")
+
         pay_in = (
             Payment.objects.filter(
                 organization=org,
@@ -145,6 +164,7 @@ def consolidate(
                 payments_in_uzs=str(pay_in),
                 payments_out_uzs=str(pay_out),
                 creditor_balance_uzs=str(creditor_balance),
+                debtor_balance_uzs=str(debtor_balance),
                 active_batches=active_batches,
                 modules_count=modules_count,
                 period_from=period_from.isoformat(),
@@ -165,6 +185,7 @@ def total_kpis(rows: list[CompanyConsolidation]) -> dict:
             "payments_in_uzs": "0",
             "payments_out_uzs": "0",
             "creditor_balance_uzs": "0",
+        "debtor_balance_uzs": "0",
         }
     return {
         "companies": len(rows),
@@ -181,5 +202,8 @@ def total_kpis(rows: list[CompanyConsolidation]) -> dict:
         ),
         "creditor_balance_uzs": str(
             sum((Decimal(r.creditor_balance_uzs) for r in rows), Decimal("0"))
+        ),
+        "debtor_balance_uzs": str(
+            sum((Decimal(r.debtor_balance_uzs) for r in rows), Decimal("0"))
         ),
     }

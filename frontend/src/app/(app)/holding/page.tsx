@@ -103,6 +103,14 @@ export default function HoldingPage() {
           value={data ? fmtMoney(data.totals.creditor_balance_uzs) : '—'}
           valueSuffix="UZS"
         />
+        <KpiCard
+          tone="warn"
+          iconName="chart"
+          label="Дебиторка"
+          sub="всё время (не period-scoped)"
+          value={data ? fmtMoney(data.totals.debtor_balance_uzs) : '—'}
+          valueSuffix="UZS"
+        />
       </div>
 
       <div className="filter-bar">
@@ -173,8 +181,11 @@ export default function HoldingPage() {
               cellStyle: { color: 'var(--danger)' },
               render: (c) => fmtMoney(c.payments_out_uzs) },
             { key: 'cred', label: 'Кредиторка', align: 'right', mono: true,
-              cellStyle: { fontWeight: 600 },
+              cellStyle: { fontWeight: 600, color: 'var(--danger)' },
               render: (c) => fmtMoney(c.creditor_balance_uzs) },
+            { key: 'debt', label: 'Дебиторка', align: 'right', mono: true,
+              cellStyle: { fontWeight: 600, color: 'var(--warning)' },
+              render: (c) => fmtMoney(c.debtor_balance_uzs) },
             { key: 'batches', label: 'Партий', align: 'right', mono: true,
               render: (c) => c.active_batches },
             { key: 'modules', label: 'Модулей', align: 'right', mono: true,

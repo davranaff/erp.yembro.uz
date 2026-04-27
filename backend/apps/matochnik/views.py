@@ -622,5 +622,3 @@ class BreedingFeedConsumptionViewSet(DeleteReasonMixin, _HerdScopedMixin, OrgSco
             )
         from apps.audit.models import AuditLog
         self._write_audit(AuditLog.Action.CREATE, instance)
-        from apps.audit.models import AuditLog
-        self._write_audit(AuditLog.Action.CREATE, instance)

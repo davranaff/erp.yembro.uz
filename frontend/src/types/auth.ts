@@ -373,6 +373,7 @@ export interface HoldingCompany {
   payments_in_uzs: string;
   payments_out_uzs: string;
   creditor_balance_uzs: string;
+  debtor_balance_uzs: string;
   active_batches: number;
   modules_count: number;
   period_from: string;
@@ -387,6 +388,7 @@ export interface HoldingTotals {
   payments_in_uzs: string;
   payments_out_uzs: string;
   creditor_balance_uzs: string;
+  debtor_balance_uzs: string;
 }
 
 export interface HoldingPayload {
