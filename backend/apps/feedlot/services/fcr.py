@@ -91,11 +91,8 @@ def total_gain_kg(feedlot_batch: FeedlotBatch) -> Decimal:
     """
     Суммарный прирост массы партии.
 
-    gain = avg_last × current_heads − avg_first × initial_heads.
+    gain = (avg_last − avg_first) × current_heads.
     Если взвешиваний нет — возвращаем 0.
-
-    Это упрощённая модель: «реальный» прирост требовал бы вычитать
-    падёж по дням с весом на тот день, но для KPI достаточно этой формулы.
     """
     last = get_latest_weighing(feedlot_batch)
     first = get_first_weighing(feedlot_batch)
@@ -103,9 +100,11 @@ def total_gain_kg(feedlot_batch: FeedlotBatch) -> Decimal:
         return Decimal("0")
     avg_first = Decimal(first.avg_weight_kg)
     avg_last = Decimal(last.avg_weight_kg)
-    initial = Decimal(feedlot_batch.initial_heads or 0)
     current = Decimal(feedlot_batch.current_heads or 0)
-    gain = (avg_last * current) - (avg_first * initial)
+    # Прирост = (конечный вес - начальный вес) × выжившее поголовье.
+    # Старая формула avg_last*current - avg_first*initial давала завышенный
+    # прирост при падеже (учитывала исчезнувший вес павших как прирост).
+    gain = (avg_last - avg_first) * current
     if gain < 0:
         gain = Decimal("0")
     return _q_kg(gain)
