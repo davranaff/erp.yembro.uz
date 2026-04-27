@@ -53,8 +53,6 @@ export const NAV: NavEntry[] = [
     aliases: ['родители', 'яйца', 'breeding'] },
   { key: 'incubation', label: 'Инкубация',        icon: 'incubator', href: '/incubation', module: 'incubation',
     aliases: ['инкубатор', 'вывод'] },
-  { key: 'feed',       label: 'Корма',            icon: 'bag',       href: '/feed',       module: 'feed',
-    aliases: ['комбикорм', 'рецепт'] },
   { key: 'feedlot',    label: 'Фабрика откорма',  icon: 'factory',   href: '/feedlot',    module: 'feedlot',
     aliases: ['откорм', 'птичник', 'feedlot'] },
   { key: 'slaughter',  label: 'Убойня',           icon: 'building',  href: '/slaughter',  module: 'slaughter',
@@ -63,6 +61,8 @@ export const NAV: NavEntry[] = [
     aliases: ['передача', 'transfer'] },
 
   { group: 'Обеспечение' },
+  { key: 'feed',       label: 'Корма',            icon: 'bag',       href: '/feed',       module: 'feed',
+    aliases: ['комбикорм', 'рецепт'] },
   { key: 'vet', label: 'Вет. аптека', icon: 'pharma', href: '/vet', module: 'vet',
     aliases: ['ветеринар', 'препараты', 'лекарства'] },
   { key: 'vet-tokens', label: 'Токены продавцов', icon: 'users', href: '/vet/seller-tokens', module: 'vet',
