@@ -14,13 +14,14 @@ from .serializers import (
     TgLinkTokenCreateSerializer,
     TgLinkTokenSerializer,
 )
-from .tasks import handle_tg_update_task, send_debt_reminder_task
+from .tasks import send_debt_reminder_task
 
 
 class TelegramWebhookView(APIView):
     """
     POST /api/tg/webhook/
     Принимает Telegram updates. Защита через X-Telegram-Bot-Api-Secret-Token.
+    Dispatch выполняется синхронно, чтобы не зависеть от Celery worker.
     """
     permission_classes = []
     authentication_classes = []
@@ -30,7 +31,12 @@ class TelegramWebhookView(APIView):
         expected = getattr(settings, "TELEGRAM_WEBHOOK_SECRET", "")
         if expected and secret != expected:
             return Response({"ok": False}, status=status.HTTP_403_FORBIDDEN)
-        handle_tg_update_task.delay(request.data)
+        try:
+            from .commands import dispatch
+            dispatch(request.data)
+        except Exception:
+            import logging
+            logging.getLogger(__name__).exception("tg webhook dispatch error")
         return Response({"ok": True})
 
 
