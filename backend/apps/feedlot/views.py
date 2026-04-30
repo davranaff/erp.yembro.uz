@@ -8,6 +8,7 @@ from rest_framework.filters import OrderingFilter, SearchFilter
 from rest_framework.response import Response
 
 from apps.common.lifecycle import DeleteReasonMixin, ImmutableStatusMixin
+from apps.common.permissions import can_see_finances
 from apps.common.viewsets import OrgScopedModelViewSet
 
 from .models import (
@@ -181,13 +182,23 @@ class FeedlotBatchViewSet(ImmutableStatusMixin, OrgScopedModelViewSet):
 
         feedlot_batch.refresh_from_db()
         data = self.get_serializer(feedlot_batch).data
+        # loss_amount_uzs — производная от Batch.accumulated_cost_uzs, который
+        # композитен (feed + vet + ...). Один владельца нет → требуем ledger.r
+        # как общефинансовый доступ.
+        finances_visible = can_see_finances(
+            request.user, request.organization, "ledger",
+        )
         data["_result"] = {
             "record_id": str(result.record.id),
             "batch_current_quantity": str(result.batch.current_quantity),
-            "loss_amount_uzs": str(result.loss_amount_uzs),
-            "journal_entry_doc": (
-                result.journal_entry.doc_number if result.journal_entry else None
+            "loss_amount_uzs": (
+                str(result.loss_amount_uzs) if finances_visible else None
             ),
+            "journal_entry_doc": (
+                result.journal_entry.doc_number
+                if result.journal_entry and finances_visible else None
+            ),
+            "_finances_visible": finances_visible,
         }
         return Response(data)
 
@@ -286,15 +297,24 @@ class FeedlotBatchViewSet(ImmutableStatusMixin, OrgScopedModelViewSet):
 
         feedlot_batch.refresh_from_db()
         data = self.get_serializer(feedlot_batch).data
+        # Стоимость скормленного корма — деньги feed-модуля (как и в matochnik).
+        finances_visible = can_see_finances(
+            request.user, request.organization, "feed",
+        )
         data["_result"] = {
             "consumption_id": str(result.consumption.id),
-            "amount_uzs": str(result.amount_uzs),
-            "journal_entry_doc": result.journal_entry.doc_number,
+            "amount_uzs": (
+                str(result.amount_uzs) if finances_visible else None
+            ),
+            "journal_entry_doc": (
+                result.journal_entry.doc_number if finances_visible else None
+            ),
             "feed_batch_remaining_kg": str(result.feed_batch.current_quantity_kg),
             "period_fcr": (
                 str(result.consumption.period_fcr)
                 if result.consumption.period_fcr is not None else None
             ),
+            "_finances_visible": finances_visible,
         }
         return Response(data)
 
