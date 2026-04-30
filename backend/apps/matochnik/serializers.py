@@ -2,6 +2,8 @@ from datetime import date as date_type
 
 from rest_framework import serializers
 
+from apps.common.serializers import FinancialFieldsMixin
+
 from .models import (
     BreedingFeedConsumption,
     BreedingHerd,
@@ -121,7 +123,12 @@ class BreedingMortalitySerializer(serializers.ModelSerializer):
         return attrs
 
 
-class BreedingFeedConsumptionSerializer(serializers.ModelSerializer):
+class BreedingFeedConsumptionSerializer(FinancialFieldsMixin, serializers.ModelSerializer):
+    # Цены — деньги модуля `feed` (FeedBatch.unit_cost_uzs). Производственный
+    # технолог маточника без feed/ledger-доступа их не должен видеть.
+    financial_fields = ("unit_cost_uzs", "total_cost_uzs")
+    finances_module = "feed"
+
     feed_batch_doc = serializers.SerializerMethodField()
     feed_batch_recipe = serializers.SerializerMethodField()
     unit_cost_uzs = serializers.SerializerMethodField()

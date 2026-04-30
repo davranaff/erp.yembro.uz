@@ -100,6 +100,7 @@ export interface HerdTimeline {
   to: string;
   events: HerdTimelineEvent[];
   counts: Record<HerdTimelineEventType, number>;
+  _finances_visible?: boolean;
 }
 
 /**
@@ -137,7 +138,8 @@ export interface HerdStats {
   eggs_total_clean: number;
   mortality_total: number;
   feed_total_kg: string;
-  feed_cost_total_uzs: string;
+  feed_cost_total_uzs: string | null;
+  _finances_visible?: boolean;
   fcr: string | null;
   egg_weight_g: number;
   active_withdrawal_until: string | null;

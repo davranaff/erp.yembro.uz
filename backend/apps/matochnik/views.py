@@ -9,6 +9,7 @@ from rest_framework.filters import OrderingFilter, SearchFilter
 from rest_framework.response import Response
 
 from apps.common.lifecycle import DeleteReasonMixin, ImmutableStatusMixin
+from apps.common.permissions import can_see_finances
 from apps.common.viewsets import OrgScopedModelViewSet
 
 from .models import (
@@ -109,6 +110,11 @@ class BreedingHerdViewSet(ImmutableStatusMixin, OrgScopedModelViewSet):
         today = date_type.today()
         start = today - timedelta(days=days - 1)
 
+        # RBAC по деньгам: feed-cost событий — модуль `feed` (или ledger).
+        finances_visible = can_see_finances(
+            request.user, request.organization, "feed",
+        )
+
         events: list[dict] = []
 
         # 1. Egg production
@@ -169,7 +175,10 @@ class BreedingHerdViewSet(ImmutableStatusMixin, OrgScopedModelViewSet):
                 "notes": f.notes or "",
                 "amount": str(f.quantity_kg),
                 "amount_label": "кг",
-                "cost_uzs": str(total_cost) if total_cost is not None else None,
+                "cost_uzs": (
+                    str(total_cost) if total_cost is not None and finances_visible
+                    else None
+                ),
             })
 
         # 4. Vet treatments
@@ -260,6 +269,7 @@ class BreedingHerdViewSet(ImmutableStatusMixin, OrgScopedModelViewSet):
                 "treatment": sum(1 for e in events if e["type"] == "treatment"),
                 "crystallize": sum(1 for e in events if e["type"] == "crystallize"),
             },
+            "_finances_visible": finances_visible,
         })
 
     @action(detail=True, methods=["get"])
@@ -283,6 +293,10 @@ class BreedingHerdViewSet(ImmutableStatusMixin, OrgScopedModelViewSet):
         days = int(request.query_params.get("days", 30))
         today = date_type.today()
         start = today - timedelta(days=days - 1)
+
+        finances_visible = can_see_finances(
+            request.user, request.organization, "feed",
+        )
 
         # Все записи в окне
         egg_qs = DailyEggProduction.objects.filter(
@@ -393,7 +407,11 @@ class BreedingHerdViewSet(ImmutableStatusMixin, OrgScopedModelViewSet):
             "eggs_total_clean": eggs_total_clean,
             "mortality_total": mortality_total,
             "feed_total_kg": str(feed_kg_total.quantize(Decimal("0.001"))),
-            "feed_cost_total_uzs": str(feed_cost_total.quantize(Decimal("0.01"))),
+            "feed_cost_total_uzs": (
+                str(feed_cost_total.quantize(Decimal("0.01")))
+                if finances_visible else None
+            ),
+            "_finances_visible": finances_visible,
             "fcr": str(fcr) if fcr is not None else None,
             "egg_weight_g": egg_weight_g,
             "active_withdrawal_until": (

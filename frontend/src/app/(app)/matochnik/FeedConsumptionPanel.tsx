@@ -7,6 +7,7 @@ import EmptyState from '@/components/ui/EmptyState';
 import Icon from '@/components/ui/Icon';
 import Panel from '@/components/ui/Panel';
 import { feedConsumptionCrud } from '@/hooks/useMatochnik';
+import { getFinancesVisible } from '@/lib/permissions';
 import type { BreedingFeedConsumption, BreedingHerd } from '@/types/auth';
 
 import FeedConsumptionModal from './FeedConsumptionModal';
@@ -32,6 +33,7 @@ export default function FeedConsumptionPanel({ herd }: Props) {
   const { data, isLoading } = feedConsumptionCrud.useList({ herd: herd.id });
 
   const records = useMemo(() => (data ?? []).slice(0, 20), [data]);
+  const showFinances = getFinancesVisible(records);
 
   return (
     <>
@@ -79,9 +81,11 @@ export default function FeedConsumptionPanel({ herd }: Props) {
               render: (r) => fmtKg(r.quantity_kg) },
             { key: 'per_head', label: 'На голову', align: 'right', mono: true, muted: true,
               render: (r) => r.per_head_g ? `${parseFloat(r.per_head_g).toFixed(1)} г` : '—' },
-            { key: 'cost', label: 'Стоимость', align: 'right', mono: true,
+            ...(showFinances ? [{
+              key: 'cost', label: 'Стоимость', align: 'right' as const, mono: true,
               cellStyle: { fontSize: 12, fontWeight: 600 },
-              render: (r) => r.total_cost_uzs ? fmtUzs(r.total_cost_uzs) : '—' },
+              render: (r: BreedingFeedConsumption) => r.total_cost_uzs ? fmtUzs(r.total_cost_uzs) : '—',
+            }] : []),
           ]}
         />
         )}

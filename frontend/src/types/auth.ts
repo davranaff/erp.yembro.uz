@@ -642,6 +642,7 @@ export interface BreedingFeedConsumption {
   per_head_g: string | null;
   notes: string;
   created_at: string;
+  _finances_visible?: boolean;
 }
 
 // incubation

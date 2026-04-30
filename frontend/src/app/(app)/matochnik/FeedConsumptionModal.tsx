@@ -1,11 +1,12 @@
 'use client';
 
 import { useMemo, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 
 import Modal from '@/components/ui/Modal';
 import { feedBatchesCrud } from '@/hooks/useFeed';
-import { feedConsumptionCrud } from '@/hooks/useMatochnik';
 import { ApiError } from '@/lib/api';
+import { enqueueOrSend } from '@/lib/offlineQueue';
 import type { BreedingHerd } from '@/types/auth';
 
 interface Props {
@@ -21,7 +22,7 @@ interface Props {
  *   - если есть ACTIVE egg-партия — создаст BatchCostEntry(FEED).
  */
 export default function FeedConsumptionModal({ herd, onClose }: Props) {
-  const create = feedConsumptionCrud.useCreate();
+  const qc = useQueryClient();
 
   const { data: allFeedBatches } = feedBatchesCrud.useList();
   // Для списания берём только те, у которых есть остаток.
@@ -35,14 +36,22 @@ export default function FeedConsumptionModal({ herd, onClose }: Props) {
   const [quantityKg, setQuantityKg] = useState('');
   const [perHeadG, setPerHeadG] = useState('');
   const [notes, setNotes] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [info, setInfo] = useState<string | null>(null);
+  const [error, setError] = useState<ApiError | null>(null);
 
   const selected = feedBatches.find((b) => b.id === feedBatch);
   const remaining = selected ? parseFloat(selected.current_quantity_kg) : null;
-  const unitCost = selected ? parseFloat(selected.unit_cost_uzs) : null;
-  const totalCost = quantityKg && unitCost ? parseFloat(quantityKg) * unitCost : null;
+  // unit_cost_uzs может прийти null/undefined для юзеров без feed/ledger-доступа
+  // (FinancialFieldsMixin nullify-ит). Тогда блок «Стоимость» просто не рисуем.
+  const unitCost = selected && selected.unit_cost_uzs
+    ? parseFloat(selected.unit_cost_uzs)
+    : null;
+  const totalCost = quantityKg && unitCost && !Number.isNaN(unitCost)
+    ? parseFloat(quantityKg) * unitCost
+    : null;
 
-  const error = create.error;
-  const fieldErrors = error instanceof ApiError && error.status === 400
+  const fieldErrors = error && error.status === 400
     ? ((error.data as Record<string, unknown>) ?? {})
     : {};
 
@@ -57,21 +66,36 @@ export default function FeedConsumptionModal({ herd, onClose }: Props) {
     Boolean(date)
     && Boolean(quantityKg)
     && parseFloat(quantityKg) > 0
-    && !create.isPending;
+    && !busy;
 
   const handleSave = async () => {
+    setError(null);
+    setInfo(null);
+    setBusy(true);
     try {
-      await create.mutateAsync({
-        herd: herd.id,
-        date,
-        feed_batch: feedBatch || null,
-        quantity_kg: quantityKg,
-        per_head_g: perHeadG || null,
-        notes,
-      } as never);
-      onClose();
-    } catch {
-      /* ошибка отображается из state mutation */
+      const result = await enqueueOrSend({
+        path: '/api/matochnik/feed-consumption/',
+        body: {
+          herd: herd.id,
+          date,
+          feed_batch: feedBatch || null,
+          quantity_kg: quantityKg,
+          per_head_g: perHeadG || null,
+          notes,
+        },
+      });
+      if (typeof result === 'object' && result !== null && 'queued' in result) {
+        setInfo('Нет сети. Запись сохранена локально и отправится автоматически когда сеть появится.');
+        setTimeout(onClose, 2000);
+      } else {
+        qc.invalidateQueries({ queryKey: ['matochnik'] });
+        qc.invalidateQueries({ queryKey: ['feed'] });
+        onClose();
+      }
+    } catch (e) {
+      setError(e as ApiError);
+    } finally {
+      setBusy(false);
     }
   };
 
@@ -81,9 +105,9 @@ export default function FeedConsumptionModal({ herd, onClose }: Props) {
       onClose={onClose}
       footer={
         <>
-          <button className="btn btn-ghost" onClick={onClose}>Отмена</button>
+          <button className="btn btn-ghost" onClick={onClose} disabled={busy}>Отмена</button>
           <button className="btn btn-primary" disabled={!canSave} onClick={handleSave}>
-            {create.isPending ? 'Сохранение…' : 'Сохранить и провести'}
+            {busy ? 'Сохранение…' : 'Сохранить и провести'}
           </button>
         </>
       }
@@ -119,11 +143,17 @@ export default function FeedConsumptionModal({ herd, onClose }: Props) {
           <label>Партия корма (опционально)</label>
           <select className="input" value={feedBatch} onChange={(e) => setFeedBatch(e.target.value)}>
             <option value="">— без партии (без проводки) —</option>
-            {feedBatches.map((b) => (
-              <option key={b.id} value={b.id}>
-                {b.doc_number} · {b.recipe_code ?? '—'} · остаток {parseFloat(b.current_quantity_kg).toLocaleString('ru-RU')} кг · {parseFloat(b.unit_cost_uzs).toLocaleString('ru-RU')} сум/кг
-              </option>
-            ))}
+            {feedBatches.map((b) => {
+              const remainingKg = parseFloat(b.current_quantity_kg).toLocaleString('ru-RU');
+              const priceLabel = b.unit_cost_uzs
+                ? ` · ${parseFloat(b.unit_cost_uzs).toLocaleString('ru-RU')} сум/кг`
+                : '';
+              return (
+                <option key={b.id} value={b.id}>
+                  {b.doc_number} · {b.recipe_code ?? '—'} · остаток {remainingKg} кг{priceLabel}
+                </option>
+              );
+            })}
           </select>
           {selected && remaining !== null && quantityKg && parseFloat(quantityKg) > remaining && (
             <div style={{ fontSize: 11, color: 'var(--danger)', marginTop: 4 }}>
@@ -173,7 +203,16 @@ export default function FeedConsumptionModal({ herd, onClose }: Props) {
         )}
       </div>
 
-      {error instanceof ApiError && error.status !== 400 && (
+      {info && (
+        <div style={{
+          marginTop: 10, padding: 10, fontSize: 13,
+          background: 'color-mix(in srgb, var(--brand-orange) 15%, transparent)',
+          color: 'var(--fg-1)', borderRadius: 6,
+        }}>
+          ⚡ {info}
+        </div>
+      )}
+      {error && error.status !== 400 && (
         <div style={{ marginTop: 10, padding: 8, background: '#fef2f2', color: 'var(--danger)', borderRadius: 6, fontSize: 12 }}>
           {error.message}
         </div>

@@ -1,10 +1,12 @@
 'use client';
 
 import { useMemo, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 
 import Modal from '@/components/ui/Modal';
 import { dailyEggCrud } from '@/hooks/useMatochnik';
 import { ApiError } from '@/lib/api';
+import { enqueueOrSend } from '@/lib/offlineQueue';
 import type { BreedingHerd } from '@/types/auth';
 
 interface Props {
@@ -19,13 +21,16 @@ interface Props {
  * вернёт 400. Показываем это в fieldErrors.
  */
 export default function EggProductionModal({ herd, onClose }: Props) {
-  const create = dailyEggCrud.useCreate();
+  const qc = useQueryClient();
   const { data: existing } = dailyEggCrud.useList({ herd: herd.id });
 
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
   const [collected, setCollected] = useState('');
   const [unfit, setUnfit] = useState('');
   const [notes, setNotes] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [info, setInfo] = useState<string | null>(null);
+  const [error, setError] = useState<ApiError | null>(null);
 
   // Предупреждение: запись за эту дату уже существует
   const dupeWarning = useMemo(() => {
@@ -46,8 +51,7 @@ export default function EggProductionModal({ herd, onClose }: Props) {
     return (clean / herd.current_heads) * 100;
   }, [clean, herd.current_heads]);
 
-  const error = create.error;
-  const fieldErrors = error instanceof ApiError && error.status === 400
+  const fieldErrors = error && error.status === 400
     ? ((error.data as Record<string, unknown>) ?? {})
     : {};
 
@@ -66,20 +70,35 @@ export default function EggProductionModal({ herd, onClose }: Props) {
     && collectedN >= 0
     && unfitN <= collectedN
     && !dupeWarning
-    && !create.isPending;
+    && !busy;
 
   const handleSave = async () => {
+    setError(null);
+    setInfo(null);
+    setBusy(true);
     try {
-      await create.mutateAsync({
-        herd: herd.id,
-        date,
-        eggs_collected: collectedN,
-        unfit_eggs: unfitN,
-        notes,
-      } as never);
-      onClose();
-    } catch {
-      /* showed via error */
+      const result = await enqueueOrSend({
+        path: '/api/matochnik/daily-egg/',
+        body: {
+          herd: herd.id,
+          date,
+          eggs_collected: collectedN,
+          unfit_eggs: unfitN,
+          notes,
+        },
+      });
+      if (typeof result === 'object' && result !== null && 'queued' in result) {
+        setInfo('Нет сети. Запись сохранена локально и отправится автоматически когда сеть появится.');
+        setTimeout(onClose, 2000);
+      } else {
+        qc.invalidateQueries({ queryKey: ['matochnik'] });
+        onClose();
+      }
+    } catch (e) {
+      const err = e as ApiError;
+      setError(err);
+    } finally {
+      setBusy(false);
     }
   };
 
@@ -89,9 +108,9 @@ export default function EggProductionModal({ herd, onClose }: Props) {
       onClose={onClose}
       footer={
         <>
-          <button className="btn btn-ghost" onClick={onClose}>Отмена</button>
+          <button className="btn btn-ghost" onClick={onClose} disabled={busy}>Отмена</button>
           <button className="btn btn-primary" disabled={!canSave} onClick={handleSave}>
-            {create.isPending ? 'Сохранение…' : 'Сохранить'}
+            {busy ? 'Сохранение…' : 'Сохранить'}
           </button>
         </>
       }
@@ -183,7 +202,16 @@ export default function EggProductionModal({ herd, onClose }: Props) {
         )}
       </div>
 
-      {error instanceof ApiError && error.status !== 400 && (
+      {info && (
+        <div style={{
+          marginTop: 10, padding: 10, fontSize: 13,
+          background: 'color-mix(in srgb, var(--brand-orange) 15%, transparent)',
+          color: 'var(--fg-1)', borderRadius: 6,
+        }}>
+          ⚡ {info}
+        </div>
+      )}
+      {error && error.status !== 400 && (
         <div style={{ marginTop: 10, padding: 8, background: '#fef2f2', color: 'var(--danger)', borderRadius: 6, fontSize: 12 }}>
           {error.message}
         </div>

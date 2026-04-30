@@ -232,3 +232,17 @@ INCUBATION_MIN_FERTILE_FOR_ALERT = env.int(
     "INCUBATION_MIN_FERTILE_FOR_ALERT", default=100,
 )
 
+# ── Matochnik KPI-алерты ────────────────────────────────────────────────────
+# Средняя яйценоскость за неделю ниже этого % → TG-алерт.
+MATOCHNIK_LOW_PRODUCTIVITY_ALERT_PCT = env.float(
+    "MATOCHNIK_LOW_PRODUCTIVITY_ALERT_PCT", default=50.0,
+)
+# Недельный падёж выше этого % от current_heads → TG-алерт.
+MATOCHNIK_MORTALITY_ALERT_PCT_WEEK = env.float(
+    "MATOCHNIK_MORTALITY_ALERT_PCT_WEEK", default=1.0,
+)
+# Стада младше этого возраста не алертим по продуктивности (ещё не несут).
+MATOCHNIK_PRODUCTIVITY_MIN_AGE_WEEKS = env.int(
+    "MATOCHNIK_PRODUCTIVITY_MIN_AGE_WEEKS", default=22,
+)
+
