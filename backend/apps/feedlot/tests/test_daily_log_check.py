@@ -22,6 +22,7 @@ from apps.feedlot.models import (
 )
 from apps.feedlot.tasks import daily_log_check_task
 from apps.modules.models import Module
+from apps.nomenclature.models import Category, NomenclatureItem, Unit
 from apps.organizations.models import Organization
 from apps.users.models import User
 from apps.warehouses.models import ProductionBlock
@@ -55,12 +56,23 @@ def house(org, m_feedlot):
 
 
 @pytest.fixture
-def parent_batch(org):
+def parent_batch(org, m_feedlot, house):
+    unit = Unit.objects.get_or_create(
+        organization=org, code="гол", defaults={"name": "Голов"},
+    )[0]
+    cat = Category.objects.get_or_create(organization=org, name="Птица DL")[0]
+    nom = NomenclatureItem.objects.create(
+        organization=org, sku="DL-PARENT-1", name="Цыпленок DL",
+        category=cat, unit=unit,
+    )
     return Batch.objects.create(
-        organization=org,
-        code="DL-PARENT-1",
-        kind="feedlot",
-        status="active",
+        organization=org, doc_number="П-DL-PARENT-1",
+        nomenclature=nom, unit=unit,
+        origin_module=m_feedlot, current_module=m_feedlot,
+        current_block=house,
+        current_quantity=Decimal("10000"),
+        initial_quantity=Decimal("10000"),
+        started_at=date.today() - timedelta(days=10),
     )
 
 

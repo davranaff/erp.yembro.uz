@@ -4,9 +4,11 @@ from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError as DRFValidationError
 from rest_framework.filters import OrderingFilter, SearchFilter
 from rest_framework.permissions import IsAuthenticated
+from rest_framework.renderers import JSONRenderer
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from apps.common.csv_export import CSVRenderer
 from apps.common.permissions import HasModulePermission
 from apps.common.viewsets import (
     OrganizationContextMixin,
@@ -489,10 +491,16 @@ class FeedLotShrinkageStateViewSet(OrgReadOnlyViewSet):
             )
 
         if lot_type and lot_id:
+            from django.core.exceptions import ObjectDoesNotExist
+            from rest_framework.exceptions import NotFound
+
             valid = {c[0] for c in FeedLotShrinkageState.LotType.choices}
             if lot_type not in valid:
                 raise DRFValidationError({"lot_type": f"Допустимо: {sorted(valid)}."})
-            res = apply_for_specific_lot(lot_type=lot_type, lot_id=lot_id, today=on_date)
+            try:
+                res = apply_for_specific_lot(lot_type=lot_type, lot_id=lot_id, today=on_date)
+            except ObjectDoesNotExist:
+                raise NotFound({"detail": "Партия не найдена."})
             return Response(_apply_result_to_dict(res))
 
         results = apply_for_organization(request.organization, today=on_date)
@@ -604,6 +612,9 @@ class FeedShrinkageReportView(OrganizationContextMixin, APIView):
 
     module_code = "feed"
     permission_classes = [IsAuthenticated, HasModulePermission]
+    # CSVRenderer нужен только для DRF content-negotiation (?format=csv).
+    # Реальный CSV рендерится через stream_csv() ниже.
+    renderer_classes = [JSONRenderer, CSVRenderer]
 
     def get(self, request, *args, **kwargs):
         from datetime import date as _date

@@ -36,13 +36,23 @@ def m_core():
 
 
 @pytest.fixture
-def user(org, m_core):
+def m_ledger():
+    return Module.objects.get(code="ledger")
+
+
+@pytest.fixture
+def user(org, m_core, m_ledger):
     u = User.objects.create(email="trace@y.local", full_name="T")
     membership = OrganizationMembership.objects.create(
         user=u, organization=org, is_active=True,
     )
     UserModuleAccessOverride.objects.create(
         membership=membership, module=m_core, level=AccessLevel.READ,
+    )
+    # Trace показывает себестоимость — нужен ledger.r,
+    # иначе FinancialFieldsMixin nullify-ит unit_cost_uzs / accumulated_cost_uzs.
+    UserModuleAccessOverride.objects.create(
+        membership=membership, module=m_ledger, level=AccessLevel.READ,
     )
     return u
 

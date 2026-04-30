@@ -11,6 +11,7 @@ from apps.batches.models import Batch
 from apps.incubation.models import IncubationRun
 from apps.incubation.services.kpi_alerts import collect_org_alerts
 from apps.modules.models import Module
+from apps.nomenclature.models import Category, NomenclatureItem, Unit
 from apps.organizations.models import Organization
 from apps.users.models import User
 from apps.warehouses.models import ProductionBlock
@@ -44,9 +45,23 @@ def incubator(org, m_inc):
 
 
 @pytest.fixture
-def parent_batch(org):
+def parent_batch(org, m_inc, incubator):
+    unit = Unit.objects.get_or_create(
+        organization=org, code="шт", defaults={"name": "Штук"},
+    )[0]
+    cat = Category.objects.get_or_create(organization=org, name="Яйцо KPI")[0]
+    nom = NomenclatureItem.objects.create(
+        organization=org, sku="INC-K-1", name="Яйца инкуб. KPI",
+        category=cat, unit=unit,
+    )
     return Batch.objects.create(
-        organization=org, code="INC-K-1", kind="incubation", status="active",
+        organization=org, doc_number="П-INC-K-1",
+        nomenclature=nom, unit=unit,
+        origin_module=m_inc, current_module=m_inc,
+        current_block=incubator,
+        current_quantity=Decimal("1000"),
+        initial_quantity=Decimal("1100"),
+        started_at=date.today() - timedelta(days=21),
     )
 
 

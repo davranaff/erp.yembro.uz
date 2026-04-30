@@ -197,7 +197,7 @@ def test_api_feed_user_can_load_and_sees_price(org, m_feed, raw_batch):
 
 def test_feed_user_does_not_see_vet_prices(org, m_feed, m_vet):
     """Симметричный тест: feed-менеджер НЕ должен видеть цены лекарств."""
-    from apps.vet.models import VetDrug, VetStockBatch
+    from apps.vet.models import DrugType, Route, VetDrug, VetStockBatch
     from apps.vet.serializers import VetStockBatchSerializer
 
     cat = Category.objects.get_or_create(organization=org, name="Лекарства тест")[0]
@@ -209,12 +209,15 @@ def test_feed_user_does_not_see_vet_prices(org, m_feed, m_vet):
         category=cat, unit=unit,
     )
     drug = VetDrug.objects.create(
-        organization=org,
-        sku="VET-T1",
-        name="Антибиотик тест",
-        unit=unit,
-        kind=VetDrug.Kind.MEDICINE,
+        organization=org, module=m_vet,
+        nomenclature=nom,
+        drug_type=DrugType.ANTIBIOTIC,
+        administration_route=Route.INJECTION,
     )
+    supplier = Counterparty.objects.get_or_create(
+        organization=org, code="K-VET-MM", kind="supplier",
+        defaults={"name": "Поставщик вет MM"},
+    )[0]
     wh = Warehouse.objects.get_or_create(
         organization=org, code="СК-VET",
         defaults={"module": m_vet, "name": "Склад вет"},
@@ -225,6 +228,7 @@ def test_feed_user_does_not_see_vet_prices(org, m_feed, m_vet):
         drug=drug,
         lot_number="L1",
         warehouse=wh,
+        supplier=supplier,
         received_date=date(2026, 4, 20),
         expiration_date=date(2027, 4, 20),
         quantity=Decimal("100"),

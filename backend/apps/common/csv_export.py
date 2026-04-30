@@ -12,10 +12,31 @@ import csv
 from typing import Any, Iterable
 
 from django.http import StreamingHttpResponse
+from rest_framework.renderers import BaseRenderer
+
+
+class CSVRenderer(BaseRenderer):
+    """Заглушка-renderer чтобы DRF content-negotiation принимал
+    `?format=csv` (иначе 404 на views без CSV-renderer'а). Реальный
+    рендер не нужен — view возвращает StreamingHttpResponse сам.
+
+    Подключайте к APIView/ViewSet через `renderer_classes = [JSONRenderer, CSVRenderer]`
+    рядом с использованием `wants_csv` / `stream_csv`.
+    """
+
+    media_type = "text/csv"
+    format = "csv"
+    charset = "utf-8"
+
+    def render(self, data, accepted_media_type=None, renderer_context=None):
+        return data if isinstance(data, (bytes, str)) else b""
 
 
 def wants_csv(request) -> bool:
-    fmt = request.query_params.get("format", "").lower()
+    fmt = (
+        request.query_params.get("download", "")
+        or request.query_params.get("format", "")
+    ).lower()
     if fmt == "csv":
         return True
     return "text/csv" in request.headers.get("Accept", "")

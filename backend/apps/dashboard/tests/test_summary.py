@@ -4,7 +4,9 @@ Smoke-тесты /api/dashboard/summary/ и /api/dashboard/cashflow/.
 import pytest
 from rest_framework.test import APIClient
 
+from apps.modules.models import Module
 from apps.organizations.models import Organization, OrganizationMembership
+from apps.rbac.models import AccessLevel, UserModuleAccessOverride
 from apps.users.models import User
 
 
@@ -19,8 +21,15 @@ def org():
 @pytest.fixture
 def user(org):
     u = User.objects.create(email="dash@y.local", full_name="D")
-    OrganizationMembership.objects.create(
+    membership = OrganizationMembership.objects.create(
         user=u, organization=org, is_active=True,
+    )
+    # Финансовый KPI / cashflow требует ledger.r — даём, чтобы smoke-тесты
+    # видели «сырое» содержимое endpoint'а. Отдельный кейс ниже проверяет
+    # обратный сценарий — без ledger.
+    ledger = Module.objects.get(code="ledger")
+    UserModuleAccessOverride.objects.create(
+        membership=membership, module=ledger, level=AccessLevel.READ,
     )
     return u
 

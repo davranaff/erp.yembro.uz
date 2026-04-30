@@ -53,9 +53,16 @@ class HoldingCompaniesView(APIView):
             .distinct()
         )
 
+        # Юзер вообще без membership — пустой ответ (200), не 403.
+        # 403 только когда у него ЕСТЬ организации, но ни в одной нет ledger.r.
+        if not orgs:
+            return Response({
+                "companies": [],
+                "totals": total_kpis([]),
+            })
+
         # Фильтруем — оставляем только организации, в которых у юзера есть
-        # доступ к финансам. В отфильтрованной выборке показываем агрегаты.
-        # Если нет ни одной — возвращаем 403.
+        # доступ к финансам.
         orgs_with_finance = [o for o in orgs if can_see_finances(request.user, o)]
         if not orgs_with_finance:
             return Response(

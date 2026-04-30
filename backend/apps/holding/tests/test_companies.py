@@ -4,7 +4,9 @@ Smoke-тесты /api/holding/companies/.
 import pytest
 from rest_framework.test import APIClient
 
+from apps.modules.models import Module
 from apps.organizations.models import Organization, OrganizationMembership
+from apps.rbac.models import AccessLevel, UserModuleAccessOverride
 from apps.users.models import User
 
 
@@ -19,8 +21,13 @@ def org():
 @pytest.fixture
 def user(org):
     u = User.objects.create(email="hold@y.local", full_name="H")
-    OrganizationMembership.objects.create(
+    membership = OrganizationMembership.objects.create(
         user=u, organization=org, is_active=True,
+    )
+    # Holding-страница финансовая — требует ledger.r хотя бы в одной орге.
+    ledger = Module.objects.get(code="ledger")
+    UserModuleAccessOverride.objects.create(
+        membership=membership, module=ledger, level=AccessLevel.READ,
     )
     return u
 

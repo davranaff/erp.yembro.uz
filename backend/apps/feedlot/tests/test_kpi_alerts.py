@@ -23,6 +23,7 @@ from apps.feedlot.models import (
 )
 from apps.feedlot.services.kpi_alerts import collect_org_alerts
 from apps.modules.models import Module
+from apps.nomenclature.models import Category, NomenclatureItem, Unit
 from apps.organizations.models import Organization
 from apps.users.models import User
 from apps.warehouses.models import ProductionBlock
@@ -56,9 +57,23 @@ def house(org, m_feedlot):
 
 
 @pytest.fixture
-def parent_batch(org):
+def parent_batch(org, m_feedlot, house):
+    unit = Unit.objects.get_or_create(
+        organization=org, code="гол", defaults={"name": "Голов"},
+    )[0]
+    cat = Category.objects.get_or_create(organization=org, name="Птица KPI")[0]
+    nom = NomenclatureItem.objects.create(
+        organization=org, sku="KPI-P-1", name="Цыпленок KPI",
+        category=cat, unit=unit,
+    )
     return Batch.objects.create(
-        organization=org, code="KPI-P-1", kind="feedlot", status="active",
+        organization=org, doc_number="П-KPI-P-1",
+        nomenclature=nom, unit=unit,
+        origin_module=m_feedlot, current_module=m_feedlot,
+        current_block=house,
+        current_quantity=Decimal("10000"),
+        initial_quantity=Decimal("10000"),
+        started_at=date.today() - timedelta(days=20),
     )
 
 

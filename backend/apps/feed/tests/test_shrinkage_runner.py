@@ -38,6 +38,12 @@ from apps.warehouses.models import StockMovement, Warehouse
 # ─── fixtures ─────────────────────────────────────────────────────────────
 
 
+@pytest.fixture(autouse=True)
+def _disable_autocreate(settings):
+    """Тесты явно создают профили — auto-create-сигнал мешает."""
+    settings.FEED_AUTO_CREATE_SHRINKAGE_PROFILE = False
+
+
 @pytest.fixture
 def org():
     return Organization.objects.get(code="DEFAULT")
@@ -705,8 +711,11 @@ def test_profile_from_different_org_does_not_apply():
     from apps.organizations.models import Organization
 
     org_a = Organization.objects.get(code="DEFAULT")
-    # Вторая организация
-    org_b = Organization.objects.create(code="OTHER", name="Другая орг")
+    # Вторая организация (наследуем accounting_currency от первой)
+    org_b = Organization.objects.create(
+        code="OTHER", name="Другая орг",
+        accounting_currency=org_a.accounting_currency,
+    )
     m_feed = Module.objects.get(code="feed")
 
     cat = Category.objects.create(organization=org_b, name="Зерно other-org")
