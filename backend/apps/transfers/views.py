@@ -49,6 +49,15 @@ class InterModuleTransferViewSet(OrgScopedModelViewSet):
     required_level = "r"
     write_level = "rw"
 
+    def get_permissions(self):
+        # `incoming` — это inbox конкретного модуля; гейт делается внутри
+        # action на уровне `to_module` (см. ниже). Не требуем stock-доступ,
+        # иначе feedlot.r-пользователь без stock не увидит свой inbox.
+        if getattr(self, "action", None) == "incoming":
+            from rest_framework.permissions import IsAuthenticated
+            return [IsAuthenticated()]
+        return super().get_permissions()
+
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
     filterset_fields = [
         "state",
@@ -139,3 +148,62 @@ class InterModuleTransferViewSet(OrgScopedModelViewSet):
                 exc.message_dict if hasattr(exc, "message_dict") else exc.messages
             )
         return Response(self.get_serializer(transfer).data)
+
+    @action(detail=False, methods=["get"], url_path="incoming")
+    def incoming(self, request):
+        """GET /api/transfers/incoming/?to_module=<code>
+
+        Универсальный endpoint для UI «Входящие партии» в любом модуле.
+        Возвращает transfer'ы с `to_module=<code>` в состояниях
+        AWAITING_ACCEPTANCE / UNDER_REVIEW (требуют действия пользователя).
+
+        RBAC:
+          - юзер должен иметь `r`-доступ к запрошенному `to_module`
+            (иначе 403). Это разрешает feedlot.r видеть свой incoming
+            без необходимости иметь stock-доступ.
+          - без `to_module` параметра возвращаем все incoming-транзферы по
+            всем модулям, к которым у юзера есть доступ (универсальный
+            inbox).
+        """
+        from apps.common.permissions import _effective_level, level_satisfies
+        from apps.modules.models import Module
+        from rest_framework.exceptions import PermissionDenied
+
+        org = getattr(request, "organization", None)
+        membership = getattr(request, "membership", None)
+        if org is None or membership is None:
+            return Response([])
+
+        to_module_code = request.query_params.get("to_module", "").strip()
+
+        qs = InterModuleTransfer.objects.filter(
+            organization=org,
+            state__in=[
+                InterModuleTransfer.State.AWAITING_ACCEPTANCE,
+                InterModuleTransfer.State.UNDER_REVIEW,
+            ],
+        )
+
+        if to_module_code:
+            # Точечный запрос: проверяем что у юзера есть r-доступ к этому модулю.
+            if not level_satisfies(_effective_level(membership, to_module_code), "r"):
+                raise PermissionDenied({
+                    "detail": f"Нет доступа к модулю '{to_module_code}'.",
+                })
+            qs = qs.filter(to_module__code=to_module_code)
+        else:
+            # Без фильтра — отдаём только те модули, к которым у юзера r+.
+            allowed_codes = [
+                code for code in Module.objects.values_list("code", flat=True)
+                if level_satisfies(_effective_level(membership, code), "r")
+            ]
+            qs = qs.filter(to_module__code__in=allowed_codes)
+
+        qs = qs.select_related(
+            "from_module", "to_module",
+            "from_block", "to_block",
+            "from_warehouse", "to_warehouse",
+            "nomenclature", "unit", "batch",
+        ).order_by("-transfer_date")
+
+        return Response(self.get_serializer(qs, many=True).data)

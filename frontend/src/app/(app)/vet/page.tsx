@@ -3,6 +3,7 @@
 import { useMemo, useState } from 'react';
 
 import DetailDrawer, { KV } from '@/components/DetailDrawer';
+import IncomingTransfersPanel from '@/components/IncomingTransfersPanel';
 import OpexButton from '@/components/OpexButton';
 import SellBatchButton, { OpenSaleFromModule } from '@/components/SellBatchButton';
 import Badge from '@/components/ui/Badge';
@@ -131,6 +132,12 @@ export default function VetPage() {
           )}
         </div>
       </div>
+
+      <IncomingTransfersPanel
+        module="vet"
+        subtitle="ждут приёма (закупки)"
+        invalidateKeys={[['vet']]}
+      />
 
       <div className="kpi-row">
         <KpiCard tone="orange" iconName="pharma" label="SKU препаратов" sub="активных" value={String(totals.drugs)} />

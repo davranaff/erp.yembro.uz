@@ -3,6 +3,7 @@
 import { useMemo, useState } from 'react';
 
 import DetailDrawer, { KV } from '@/components/DetailDrawer';
+import IncomingTransfersPanel from '@/components/IncomingTransfersPanel';
 import OpexButton from '@/components/OpexButton';
 import { OpenSaleFromModule } from '@/components/SellBatchButton';
 import ShrinkageWidget from '@/components/ShrinkageWidget';
@@ -228,6 +229,12 @@ export default function FeedPage() {
           {newButton()}
         </div>
       </div>
+
+      <IncomingTransfersPanel
+        module="feed"
+        subtitle="ждут приёма (закупки)"
+        invalidateKeys={[['feed']]}
+      />
 
       <div className="kpi-row">
         <KpiCard tone="orange" iconName="bag" label="Рецептур" sub="всего" value={String(totals.recipesCount)} />

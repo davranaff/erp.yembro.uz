@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 
 import DetailDrawer, { KV } from '@/components/DetailDrawer';
+import IncomingTransfersPanel from '@/components/IncomingTransfersPanel';
 import OpexButton from '@/components/OpexButton';
 import { OpenSaleFromModule } from '@/components/SellBatchButton';
 import Badge from '@/components/ui/Badge';
@@ -136,6 +137,12 @@ export default function FeedlotPage() {
           )}
         </div>
       </div>
+
+      <IncomingTransfersPanel
+        module="feedlot"
+        subtitle="ждут приёма из инкубации"
+        invalidateKeys={[['feedlot']]}
+      />
 
       <div className="kpi-row">
         <KpiCard
