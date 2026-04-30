@@ -404,9 +404,11 @@ export default function MatochnikPage() {
                   <div className="mono" style={{ fontSize: 18, fontWeight: 600 }}>
                     {parseFloat(stats.feed_total_kg).toLocaleString('ru-RU', { maximumFractionDigits: 0 })} кг
                   </div>
-                  <div style={{ fontSize: 11, color: 'var(--fg-3)' }}>
-                    {parseFloat(stats.feed_cost_total_uzs).toLocaleString('ru-RU', { maximumFractionDigits: 0 })} сум
-                  </div>
+                  {stats.feed_cost_total_uzs && (
+                    <div style={{ fontSize: 11, color: 'var(--fg-3)' }}>
+                      {parseFloat(stats.feed_cost_total_uzs).toLocaleString('ru-RU', { maximumFractionDigits: 0 })} сум
+                    </div>
+                  )}
                 </div>
                 <div>
                   <div style={{ fontSize: 11, color: 'var(--fg-3)' }}>FCR (кг корма / кг яйца)</div>
