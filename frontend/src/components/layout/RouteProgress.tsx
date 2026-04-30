@@ -45,6 +45,26 @@ export default function RouteProgress() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pathname, search]);
 
+  // Race-safe: targetPath совпал с pathname → закрываем navigation. Нужно
+  // потому что startNavigation отложен в queueMicrotask (см. ниже), и эффект
+  // выше может прочитать isNavigating=false до того, как контекст обновится.
+  // Также страхует от случая, когда patched pushState вызывается уже на
+  // целевой странице (логин-редирект — pathname уже /dashboard к моменту,
+  // когда startNavigation('/dashboard') добегает).
+  useEffect(() => {
+    if (isNavigating && targetPath === pathname) {
+      endNavigation();
+    }
+  }, [isNavigating, targetPath, pathname, endNavigation]);
+
+  // Safety: если navigation не закрылся за 5с (network-stall, ошибка) —
+  // принудительно гасим спиннер, чтобы UI не залипал.
+  useEffect(() => {
+    if (!isNavigating) return;
+    const t = setTimeout(() => endNavigation(), 5000);
+    return () => clearTimeout(t);
+  }, [isNavigating, endNavigation]);
+
   useEffect(() => {
     if (state !== 'done') return;
     hideTimer.current = setTimeout(() => setState('idle'), 260);
