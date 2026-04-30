@@ -107,6 +107,13 @@ export default function ReportsHomePage() {
           desc="Доходы − расходы = прибыль. Разрезы по модулям и статьям."
           icon="chart"
         />
+        <ReportCard
+          href="/reports/feed-shrinkage"
+          title="Потери от усушки"
+          subtitle="Списания по корму"
+          desc="Сколько сырья и готового корма потеряно от усушки за период. Разрезы по ингредиенту или складу."
+          icon="bag"
+        />
       </div>
     </>
   );

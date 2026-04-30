@@ -292,3 +292,134 @@ class JournalEntry(UUIDModel, TimestampedModel):
             raise ValidationError(
                 {"expense_article": "Статья из другой организации."}
             )
+
+
+# ─── Cash advances (подотчётные) ──────────────────────────────────────────
+
+
+class CashAdvance(UUIDModel, TimestampedModel):
+    """Подотчётные деньги, выданные сотруднику.
+
+    Lifecycle:
+      ISSUED → REPORTED → CLOSED
+        │         │          │
+        │         │          └─ остаток возвращён в кассу + создана JE
+        │         └─ сотрудник отчитался (заполнен spent_amount_uzs + чеки)
+        └─ выдали наличку из кассы (создаётся Payment OUT)
+
+    Не наследует ImmutableStatusMixin: бизнес-логика статусов сложнее
+    (можно отчитаться повторно если ошиблись с суммой). Жёстко защищаем
+    только переход CLOSED → * (через clean+ViewSet action).
+    """
+
+    class Status(models.TextChoices):
+        ISSUED = "issued", "Выдано"
+        REPORTED = "reported", "Отчитался"
+        CLOSED = "closed", "Закрыто"
+        CANCELLED = "cancelled", "Отменено"
+
+    organization = models.ForeignKey(
+        "organizations.Organization",
+        on_delete=models.PROTECT,
+        related_name="cash_advances",
+    )
+    doc_number = models.CharField(max_length=32, db_index=True)
+    issued_date = models.DateField(db_index=True)
+    closed_date = models.DateField(null=True, blank=True)
+
+    recipient = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="cash_advances",
+        help_text="Сотрудник, которому выдан подотчёт.",
+    )
+    purpose = models.CharField(
+        max_length=300,
+        help_text="На что выдан подотчёт (например «закупка ГСМ для трактора»).",
+    )
+
+    amount_uzs = models.DecimalField(
+        max_digits=18, decimal_places=2,
+        help_text="Сколько выдали наличными.",
+    )
+    spent_amount_uzs = models.DecimalField(
+        max_digits=18, decimal_places=2, default=0,
+        help_text="По чекам / отчёту — сколько потрачено.",
+    )
+    returned_amount_uzs = models.DecimalField(
+        max_digits=18, decimal_places=2, default=0,
+        help_text="Сколько вернули в кассу остатком (= amount − spent).",
+    )
+
+    expense_article = models.ForeignKey(
+        ExpenseArticle,
+        null=True,
+        blank=True,
+        on_delete=models.PROTECT,
+        related_name="cash_advances",
+        help_text=(
+            "Статья расходов, на которую списываются потраченные средства "
+            "при закрытии. Если не указана — закрытие требует ручной правки JE."
+        ),
+    )
+
+    status = models.CharField(
+        max_length=16,
+        choices=Status.choices,
+        default=Status.ISSUED,
+        db_index=True,
+    )
+    issued_payment = models.OneToOneField(
+        "payments.Payment",
+        null=True,
+        blank=True,
+        on_delete=models.PROTECT,
+        related_name="advance_issued_for",
+        help_text="Платёж OUT, который выдал наличные сотруднику.",
+    )
+    closing_journal_entry = models.OneToOneField(
+        JournalEntry,
+        null=True,
+        blank=True,
+        on_delete=models.PROTECT,
+        related_name="closes_advance",
+        help_text="Проводка списания на расходную статью при закрытии.",
+    )
+
+    notes = models.TextField(blank=True)
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="cash_advances_created",
+    )
+
+    class Meta:
+        ordering = ["-issued_date", "-doc_number"]
+        unique_together = (("organization", "doc_number"),)
+        indexes = [
+            models.Index(fields=["organization", "status"]),
+            models.Index(fields=["recipient", "status"]),
+            models.Index(fields=["organization", "-issued_date"]),
+        ]
+        verbose_name = "Подотчёт (выданная наличка)"
+        verbose_name_plural = "Подотчёты"
+
+    def __str__(self) -> str:
+        return f"{self.doc_number} · {self.recipient} · {self.amount_uzs} сум"
+
+    def clean(self):
+        super().clean()
+        if self.amount_uzs is not None and self.amount_uzs <= 0:
+            raise ValidationError({"amount_uzs": "Сумма должна быть больше нуля."})
+        if self.spent_amount_uzs is not None and self.amount_uzs is not None:
+            if self.spent_amount_uzs > self.amount_uzs:
+                raise ValidationError(
+                    {"spent_amount_uzs": "Потрачено больше чем выдано."}
+                )
+        if self.returned_amount_uzs is not None and self.amount_uzs is not None:
+            if self.returned_amount_uzs > self.amount_uzs:
+                raise ValidationError(
+                    {"returned_amount_uzs": "Возврат больше чем выдано."}
+                )

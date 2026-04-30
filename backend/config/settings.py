@@ -158,6 +158,13 @@ REST_FRAMEWORK = {
     ),
     "PAGE_SIZE": 25,
     "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
+    # Throttle scopes (rates указываются для конкретных классов через
+    # `scope` атрибут на классе throttle). На каждый endpoint можно
+    # навешать свой класс throttle, унаследованный от AnonRateThrottle/
+    # UserRateThrottle, и задать ему rate в этом dict'е.
+    "DEFAULT_THROTTLE_RATES": {
+        "landing-demo": "5/min",
+    },
 }
 
 SIMPLE_JWT = {
@@ -199,4 +206,29 @@ TELEGRAM_WEBHOOK_SECRET = env("TELEGRAM_WEBHOOK_SECRET", default="")
 # ── Landing / Demo leads ──────────────────────────────────────────────────────
 # Telegram chat_id через запятую — куда слать уведомления о новых заявках с лендинга
 DEMO_NOTIFY_CHAT_IDS = env.str("DEMO_NOTIFY_CHAT_IDS", default="")
+
+# ── Feed shrinkage ──────────────────────────────────────────────────────────
+# Если True — при первой партии новой номенклатуры (или нового рецепта корма)
+# автоматически создаётся дефолтный профиль усушки. Пользователь не настраивает
+# вручную, но может подкрутить или деактивировать после.
+FEED_AUTO_CREATE_SHRINKAGE_PROFILE = env.bool(
+    "FEED_AUTO_CREATE_SHRINKAGE_PROFILE", default=True,
+)
+
+# ── Feedlot KPI-алерты ──────────────────────────────────────────────────────
+# Пороги для ежедневной таски `apps.feedlot.kpi_alerts_task`. При превышении
+# в TG уходит уведомление пользователям с feedlot-доступом.
+FEEDLOT_MORTALITY_ALERT_PCT = env.float("FEEDLOT_MORTALITY_ALERT_PCT", default=5.0)
+FEEDLOT_FCR_ALERT_VALUE = env.float("FEEDLOT_FCR_ALERT_VALUE", default=2.0)
+FEEDLOT_FCR_ALERT_MIN_DAY = env.int("FEEDLOT_FCR_ALERT_MIN_DAY", default=14)
+
+# ── Incubation KPI-алерты ───────────────────────────────────────────────────
+# Hatch rate ниже этого % → TG-уведомление пользователям с incubation-доступом.
+INCUBATION_HATCH_RATE_ALERT_PCT = env.float(
+    "INCUBATION_HATCH_RATE_ALERT_PCT", default=80.0,
+)
+# На партиях меньше этого числа fertile_eggs не алертим — статистика шумная.
+INCUBATION_MIN_FERTILE_FOR_ALERT = env.int(
+    "INCUBATION_MIN_FERTILE_FOR_ALERT", default=100,
+)
 

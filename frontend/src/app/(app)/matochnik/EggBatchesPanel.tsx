@@ -10,6 +10,7 @@ import {
   useHerdEggBatches,
   useSendToIncubation,
 } from '@/hooks/useMatochnik';
+import { getFinancesVisible } from '@/lib/permissions';
 import type { Batch, BreedingHerd } from '@/types/auth';
 
 interface Props {
@@ -93,9 +94,11 @@ export default function EggBatchesPanel({ herd }: Props) {
                 </span>
               </>
             ) },
-          { key: 'cost', label: 'Себестоимость', align: 'right', mono: true,
+          ...(getFinancesVisible(batches) ? [{
+            key: 'cost', label: 'Себестоимость', align: 'right' as const, mono: true,
             cellStyle: { fontSize: 12 },
-            render: (b) => parseFloat(b.accumulated_cost_uzs).toLocaleString('ru-RU', { maximumFractionDigits: 0 }) },
+            render: (b: Batch) => parseFloat(b.accumulated_cost_uzs).toLocaleString('ru-RU', { maximumFractionDigits: 0 }),
+          }] : []),
           { key: 'module', label: 'Модуль', mono: true, muted: true,
             render: (b) => b.current_module_code ?? b.origin_module_code },
           { key: 'state', label: 'Статус',

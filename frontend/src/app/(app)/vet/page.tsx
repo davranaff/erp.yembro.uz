@@ -14,6 +14,7 @@ import Panel from '@/components/ui/Panel';
 import RowActions from '@/components/ui/RowActions';
 import Seg from '@/components/ui/Seg';
 import { useHasLevel } from '@/hooks/usePermissions';
+import { getFinancesVisible } from '@/lib/permissions';
 import {
   drugsCrud,
   stockBatchesCrud,
@@ -472,7 +473,11 @@ export default function VetPage() {
               },
               { k: 'Количество нач.', v: `${selStock.quantity} ${selStock.unit_code ?? ''}`, mono: true },
               { k: 'Остаток', v: `${selStock.current_quantity} ${selStock.unit_code ?? ''}`, mono: true },
-              { k: 'Цена за ед.', v: `${parseFloat(selStock.price_per_unit_uzs).toLocaleString('ru-RU')} UZS`, mono: true },
+              ...(getFinancesVisible(selStock) && selStock.price_per_unit_uzs ? [{
+                k: 'Цена за ед.',
+                v: `${parseFloat(selStock.price_per_unit_uzs).toLocaleString('ru-RU')} UZS`,
+                mono: true,
+              }] : []),
               { k: 'Статус', v: <Badge tone={STOCK_STATUS_TONE[selStock.status]}>{STOCK_STATUS_LABEL[selStock.status]}</Badge> },
               ...(selStock.quarantine_until ? [{ k: 'Карантин до', v: selStock.quarantine_until, mono: true }] : []),
               ...(selStock.recalled_at ? [

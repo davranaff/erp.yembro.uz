@@ -103,6 +103,7 @@ class StockMovement(UUIDModel, TimestampedModel):
         OUTGOING = "outgoing", "Расход"
         TRANSFER = "transfer", "Перемещение"
         WRITE_OFF = "write_off", "Списание"
+        SHRINKAGE = "shrinkage", "Усушка"
 
     organization = models.ForeignKey(
         "organizations.Organization",
@@ -211,6 +212,10 @@ class StockMovement(UUIDModel, TimestampedModel):
         if kind == self.Kind.WRITE_OFF and self.warehouse_from_id is None:
             raise ValidationError(
                 {"warehouse_from": "Для списания обязательно указать склад-источник."}
+            )
+        if kind == self.Kind.SHRINKAGE and self.warehouse_from_id is None:
+            raise ValidationError(
+                {"warehouse_from": "Для усушки обязательно указать склад-источник."}
             )
         if (
             self.organization_id

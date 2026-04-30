@@ -97,12 +97,17 @@ export default function DashboardPage() {
   const k = summary.kpis;
   const prod = summary.production;
   const cash = summary.cash;
+  // Backend ставит флаг false если у юзера нет ledger.r — финансовые
+  // KPI приходят как null, а cash может быть полностью null.
+  const financesVisible = (summary as { _finances_visible?: boolean })._finances_visible !== false;
 
-  const margin = parseFloat(k.sales_margin_uzs);
-  const marginPct = parseFloat(k.sales_revenue_uzs) > 0
+  const margin = financesVisible && k.sales_margin_uzs ? parseFloat(k.sales_margin_uzs) : 0;
+  const marginPct = financesVisible && k.sales_revenue_uzs && parseFloat(k.sales_revenue_uzs) > 0
     ? (margin / parseFloat(k.sales_revenue_uzs)) * 100
     : 0;
-  const netCash = parseFloat(k.payments_in_uzs) - parseFloat(k.payments_out_uzs);
+  const netCash = financesVisible && k.payments_in_uzs && k.payments_out_uzs
+    ? parseFloat(k.payments_in_uzs) - parseFloat(k.payments_out_uzs)
+    : 0;
 
   const totalDrafts = k.purchases_drafts + k.sales_drafts + k.payments_drafts;
 
@@ -134,84 +139,89 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* ───── Финансовые KPI (этот месяц) ───── */}
-      <div className="kpi-row" style={{ marginBottom: 12 }}>
-        <KpiCard
-          tone="green"
-          iconName="chart"
-          label="Выручка"
-          sub="продажи проведённые"
-          value={fmt(k.sales_revenue_uzs, { short: true })}
-          valueSuffix="UZS"
-          meta={`себест.: ${fmt(k.sales_cost_uzs, { short: true })}`}
-        />
-        <KpiCard
-          tone={margin >= 0 ? 'orange' : 'red'}
-          iconName="book"
-          label="Прибыль (валовая)"
-          sub={
-            parseFloat(k.sales_revenue_uzs) > 0
-              ? `маржа ${marginPct.toFixed(1)}%`
-              : 'нет продаж'
-          }
-          value={fmt(k.sales_margin_uzs, { short: true })}
-          valueSuffix="UZS"
-        />
-        <KpiCard
-          tone="red"
-          iconName="users"
-          label="Кредиторка"
-          sub="должны мы (всё время)"
-          value={fmt(k.creditor_balance_uzs, { short: true })}
-          valueSuffix="UZS"
-        />
-        <KpiCard
-          tone="blue"
-          iconName="users"
-          label="Дебиторка"
-          sub="должны нам (всё время)"
-          value={fmt(k.debtor_balance_uzs, { short: true })}
-          valueSuffix="UZS"
-        />
-      </div>
+      {/* ───── Финансовые KPI (этот месяц) — только при наличии ledger.r ───── */}
+      {financesVisible && (
+        <div className="kpi-row" style={{ marginBottom: 12 }}>
+          <KpiCard
+            tone="green"
+            iconName="chart"
+            label="Выручка"
+            sub="продажи проведённые"
+            value={fmt(k.sales_revenue_uzs, { short: true })}
+            valueSuffix="UZS"
+            meta={`себест.: ${fmt(k.sales_cost_uzs, { short: true })}`}
+          />
+          <KpiCard
+            tone={margin >= 0 ? 'orange' : 'red'}
+            iconName="book"
+            label="Прибыль (валовая)"
+            sub={
+              parseFloat(k.sales_revenue_uzs) > 0
+                ? `маржа ${marginPct.toFixed(1)}%`
+                : 'нет продаж'
+            }
+            value={fmt(k.sales_margin_uzs, { short: true })}
+            valueSuffix="UZS"
+          />
+          <KpiCard
+            tone="red"
+            iconName="users"
+            label="Кредиторка"
+            sub="должны мы (всё время)"
+            value={fmt(k.creditor_balance_uzs, { short: true })}
+            valueSuffix="UZS"
+          />
+          <KpiCard
+            tone="blue"
+            iconName="users"
+            label="Дебиторка"
+            sub="должны нам (всё время)"
+            value={fmt(k.debtor_balance_uzs, { short: true })}
+            valueSuffix="UZS"
+          />
+        </div>
+      )}
 
-      {/* ───── Денежные потоки + чистый поток ───── */}
-      <div className="kpi-row" style={{ marginBottom: 12 }}>
-        <KpiCard
-          tone="green"
-          iconName="download"
-          label="Поступления"
-          sub="за период"
-          value={fmt(k.payments_in_uzs, { short: true })}
-          valueSuffix="UZS"
-        />
-        <KpiCard
-          tone="red"
-          iconName="arrow-right"
-          label="Платежи исх."
-          sub="за период"
-          value={fmt(k.payments_out_uzs, { short: true })}
-          valueSuffix="UZS"
-        />
-        <KpiCard
-          tone={netCash >= 0 ? 'green' : 'red'}
-          iconName="chart"
-          label="Чистый денежный поток"
-          sub="in − out за период"
-          value={(netCash >= 0 ? '+' : '−') + fmt(Math.abs(netCash), { short: true })}
-          valueSuffix="UZS"
-        />
-        <KpiCard
-          tone="orange"
-          iconName="bag"
-          label="Касса всего"
-          sub="по каналам"
-          value={fmt(typeof cash._total_uzs === 'string' ? cash._total_uzs : '0', { short: true })}
-          valueSuffix="UZS"
-        />
-      </div>
+      {/* ───── Денежные потоки + чистый поток — только при ledger.r ───── */}
+      {financesVisible && cash && (
+        <div className="kpi-row" style={{ marginBottom: 12 }}>
+          <KpiCard
+            tone="green"
+            iconName="download"
+            label="Поступления"
+            sub="за период"
+            value={fmt(k.payments_in_uzs, { short: true })}
+            valueSuffix="UZS"
+          />
+          <KpiCard
+            tone="red"
+            iconName="arrow-right"
+            label="Платежи исх."
+            sub="за период"
+            value={fmt(k.payments_out_uzs, { short: true })}
+            valueSuffix="UZS"
+          />
+          <KpiCard
+            tone={netCash >= 0 ? 'green' : 'red'}
+            iconName="chart"
+            label="Чистый денежный поток"
+            sub="in − out за период"
+            value={(netCash >= 0 ? '+' : '−') + fmt(Math.abs(netCash), { short: true })}
+            valueSuffix="UZS"
+          />
+          <KpiCard
+            tone="orange"
+            iconName="bag"
+            label="Касса всего"
+            sub="по каналам"
+            value={fmt(typeof cash._total_uzs === 'string' ? cash._total_uzs : '0', { short: true })}
+            valueSuffix="UZS"
+          />
+        </div>
+      )}
 
-      {/* ───── Cashflow chart + side panels ───── */}
+      {/* ───── Cashflow chart + side panels — только при ledger.r ───── */}
+      {financesVisible && cash && (
       <div className="grid-main-side" style={{ marginBottom: 12 }}>
         <Panel
           title="Денежные потоки по дням"
@@ -292,6 +302,7 @@ export default function DashboardPage() {
           </div>
         </Panel>
       </div>
+      )}
 
       {/* ───── Производство «здесь и сейчас» ───── */}
       <Panel title="Производство · текущее состояние" style={{ marginBottom: 12 }}>

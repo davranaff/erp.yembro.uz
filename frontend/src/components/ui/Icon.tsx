@@ -60,6 +60,8 @@ export default function Icon({ name, size = 16, className, style }: IconProps) {
       return <svg viewBox="0 0 24 24" style={s} className={className} {...p}><path d="M5 12h14M13 5l7 7-7 7"/></svg>;
     case 'menu':
       return <svg viewBox="0 0 24 24" style={s} className={className} {...p}><path d="M4 6h16M4 12h16M4 18h16"/></svg>;
+    case 'edit':
+      return <svg viewBox="0 0 24 24" style={s} className={className} {...p}><path d="M12 20h9M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/></svg>;
     default:
       return null;
   }

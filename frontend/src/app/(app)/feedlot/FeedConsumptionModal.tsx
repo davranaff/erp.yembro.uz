@@ -1,12 +1,14 @@
 'use client';
 
 import { useMemo, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 
 import HelpHint from '@/components/ui/HelpHint';
 import Modal from '@/components/ui/Modal';
 import { feedBatchesCrud } from '@/hooks/useFeed';
-import { feedConsumptionCrud, usePostFeedConsumption } from '@/hooks/useFeedlot';
+import { feedConsumptionCrud } from '@/hooks/useFeedlot';
 import { ApiError } from '@/lib/api';
+import { enqueueOrSend } from '@/lib/offlineQueue';
 import type { FeedlotBatch } from '@/types/auth';
 
 interface Props {
@@ -30,7 +32,7 @@ function fmtNum(v: string | number, digits = 0): string {
  *   - считается per_head_g и period_fcr (если есть взвешивания на границах)
  */
 export default function FeedConsumptionModal({ batch, onClose }: Props) {
-  const post = usePostFeedConsumption();
+  const qc = useQueryClient();
   const { data: feedBatches } = feedBatchesCrud.useList({});
   // Существующие кормления — чтобы автоставить period_from = последний to + 1
   const { data: existingConsumptions } = feedConsumptionCrud.useList({
@@ -64,9 +66,11 @@ export default function FeedConsumptionModal({ batch, onClose }: Props) {
     todayDayOfAge < 14 ? 'start' : todayDayOfAge < 28 ? 'growth' : 'finish',
   );
   const [notes, setNotes] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [info, setInfo] = useState<string | null>(null);
+  const [error, setError] = useState<ApiError | null>(null);
 
-  const error = post.error;
-  const fieldErrors = error instanceof ApiError && error.status === 400
+  const fieldErrors = error?.status === 400
     ? ((error.data as Record<string, unknown>) ?? {})
     : {};
 
@@ -105,12 +109,15 @@ export default function FeedConsumptionModal({ batch, onClose }: Props) {
     && parseInt(toDay, 10) >= parseInt(fromDay, 10)
     && preview.total > 0
     && !overStock
-    && !post.isPending;
+    && !busy;
 
   const handleSubmit = async () => {
+    setError(null);
+    setInfo(null);
+    setBusy(true);
     try {
-      await post.mutateAsync({
-        id: batch.id,
+      const result = await enqueueOrSend({
+        path: `/api/feedlot/batches/${batch.id}/feed_consumption/`,
         body: {
           feed_batch: feedBatchId,
           total_kg: totalKg,
@@ -120,8 +127,19 @@ export default function FeedConsumptionModal({ batch, onClose }: Props) {
           notes,
         },
       });
-      onClose();
-    } catch { /* */ }
+      if (typeof result === 'object' && result !== null && 'queued' in result) {
+        setInfo('Нет сети. Запись сохранена локально и отправится автоматически.');
+        setTimeout(onClose, 2000);
+      } else {
+        qc.invalidateQueries({ queryKey: ['feedlot'] });
+        qc.invalidateQueries({ queryKey: ['feed', 'batches'] });
+        onClose();
+      }
+    } catch (e) {
+      setError(e as ApiError);
+    } finally {
+      setBusy(false);
+    }
   };
 
   const getErr = (k: string): string | null => {
@@ -137,17 +155,18 @@ export default function FeedConsumptionModal({ batch, onClose }: Props) {
       onClose={onClose}
       footer={
         <>
-          <button className="btn btn-ghost" onClick={onClose}>Отмена</button>
+          <button className="btn btn-ghost" onClick={onClose} disabled={busy}>Отмена</button>
           <button
             className="btn btn-primary"
             disabled={!canSubmit}
             onClick={handleSubmit}
           >
-            {post.isPending ? 'Списание…' : 'Списать корм'}
+            {busy ? 'Списание…' : 'Списать корм'}
           </button>
         </>
       }
     >
+      <div className="mobile-form">
       <div style={{ fontSize: 11, color: 'var(--fg-3)', marginBottom: 10 }}>
         Скармливание партии корма птице. Корм списывается со склада, создаётся
         проводка Дт 20.02 / Кт 10.05, стоимость накапливается на партии птицы.
@@ -297,7 +316,16 @@ export default function FeedConsumptionModal({ batch, onClose }: Props) {
         </div>
       )}
 
-      {error instanceof ApiError && error.status !== 400 && (
+      {info && (
+        <div style={{
+          marginTop: 10, padding: 10, fontSize: 13,
+          background: 'color-mix(in srgb, var(--brand-orange) 15%, transparent)',
+          color: 'var(--fg-1)', borderRadius: 6,
+        }}>
+          ⚡ {info}
+        </div>
+      )}
+      {error && error.status !== 400 && (
         <div style={{
           marginTop: 12, padding: 8,
           background: '#fef2f2', color: 'var(--danger)',
@@ -306,6 +334,7 @@ export default function FeedConsumptionModal({ batch, onClose }: Props) {
           {error.message}
         </div>
       )}
+      </div>
     </Modal>
   );
 }

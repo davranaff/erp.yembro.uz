@@ -1,5 +1,7 @@
 from rest_framework import serializers
 
+from apps.common.serializers import FinancialFieldsMixin
+
 from .models import (
     SellerDeviceToken,
     VaccinationSchedule,
@@ -46,7 +48,11 @@ class VetDrugSerializer(serializers.ModelSerializer):
         return obj.nomenclature.name if obj.nomenclature_id else None
 
 
-class VetStockBatchSerializer(serializers.ModelSerializer):
+class VetStockBatchSerializer(FinancialFieldsMixin, serializers.ModelSerializer):
+    # Закупочные цены вет-препаратов — деньги модуля vet
+    financial_fields = ("price_per_unit_uzs",)
+    finances_module = "vet"
+
     drug_sku = serializers.SerializerMethodField()
     drug_name = serializers.SerializerMethodField()
     drug_type = serializers.SerializerMethodField()

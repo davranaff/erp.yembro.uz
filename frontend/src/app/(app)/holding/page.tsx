@@ -52,6 +52,33 @@ export default function HoldingPage() {
     period_to: periodTo,
   });
 
+  // 403 от backend = пользователь не имеет ledger.r ни в одной из своих орг.
+  // Показываем понятное сообщение, не пугаем сырой ошибкой.
+  const isForbidden = (error as { status?: number } | null)?.status === 403;
+  if (isForbidden) {
+    return (
+      <div style={{ padding: 32, maxWidth: 520 }}>
+        <h1>Холдинг · консолидация</h1>
+        <div style={{
+          marginTop: 20, padding: 20,
+          background: 'var(--bg-soft)', borderRadius: 12,
+          border: '1px solid var(--border)',
+        }}>
+          <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 8 }}>
+            Нет доступа
+          </div>
+          <div style={{ fontSize: 14, color: 'var(--fg-2)', lineHeight: 1.5 }}>
+            Эта страница показывает консолидированные финансы по всем компаниям
+            холдинга. Доступ нужен только директору и бухгалтеру с уровнем{' '}
+            <code>ledger.r</code> хотя бы в одной из ваших организаций.
+            <br /><br />
+            Если вы должны это видеть — попросите администратора назначить роль.
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <>
       <div className="page-hdr">

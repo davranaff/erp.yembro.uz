@@ -63,6 +63,8 @@ export const NAV: NavEntry[] = [
   { group: 'Обеспечение' },
   { key: 'feed',       label: 'Корма',            icon: 'bag',       href: '/feed',       module: 'feed',
     aliases: ['комбикорм', 'рецепт'] },
+  { key: 'feed-shrinkage', label: 'Профили усушки', icon: 'settings', href: '/feed/shrinkage-profiles', module: 'feed',
+    aliases: ['усушка', 'shrinkage', 'потери', 'испарение'] },
   { key: 'vet', label: 'Вет. аптека', icon: 'pharma', href: '/vet', module: 'vet',
     aliases: ['ветеринар', 'препараты', 'лекарства'] },
   { key: 'vet-tokens', label: 'Токены продавцов', icon: 'users', href: '/vet/seller-tokens', module: 'vet',

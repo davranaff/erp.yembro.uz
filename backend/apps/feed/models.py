@@ -794,6 +794,197 @@ class FeedBatch(UUIDModel, TimestampedModel):
 # ─── Consumption planning ──────────────────────────────────────────────────
 
 
+class FeedShrinkageProfile(UUIDModel, TimestampedModel):
+    """Профиль периодической усушки сырья / готового корма.
+
+    Привязан либо к номенклатурной позиции сырья (target_type=INGREDIENT),
+    либо к рецептуре готового корма (target_type=FEED_TYPE — рецептура задаёт
+    «тип готового корма», профиль действует на все её версии и партии).
+
+    Опциональная привязка к складу: NULL = «для всех складов организации»,
+    конкретный склад побеждает общий.
+    """
+
+    class TargetType(models.TextChoices):
+        INGREDIENT = "ingredient", "Ингредиент (сырьё)"
+        FEED_TYPE = "feed_type", "Тип готового корма"
+
+    organization = models.ForeignKey(
+        "organizations.Organization",
+        on_delete=models.PROTECT,
+        related_name="feed_shrinkage_profiles",
+    )
+    target_type = models.CharField(
+        max_length=16, choices=TargetType.choices, db_index=True
+    )
+    nomenclature = models.ForeignKey(
+        "nomenclature.NomenclatureItem",
+        null=True,
+        blank=True,
+        on_delete=models.PROTECT,
+        related_name="feed_shrinkage_profiles",
+        help_text="Заполняется при target_type=ingredient.",
+    )
+    recipe = models.ForeignKey(
+        Recipe,
+        null=True,
+        blank=True,
+        on_delete=models.PROTECT,
+        related_name="feed_shrinkage_profiles",
+        help_text="Заполняется при target_type=feed_type. Один профиль действует "
+                  "на все версии рецепта и все партии готового корма по нему.",
+    )
+    warehouse = models.ForeignKey(
+        "warehouses.Warehouse",
+        null=True,
+        blank=True,
+        on_delete=models.PROTECT,
+        related_name="feed_shrinkage_profiles",
+        help_text="NULL = «для всех складов»; конкретный склад побеждает общий.",
+    )
+    period_days = models.PositiveSmallIntegerField(
+        help_text="Каждые сколько дней применяется процент усушки.",
+    )
+    percent_per_period = models.DecimalField(
+        max_digits=6,
+        decimal_places=3,
+        help_text="Сколько % от текущего остатка списывается за период (compound).",
+    )
+    max_total_percent = models.DecimalField(
+        max_digits=6, decimal_places=3, null=True, blank=True,
+        help_text="Верхний предел накопленной усушки на партию (% от initial). "
+                  "NULL = без предела.",
+    )
+    stop_after_days = models.PositiveSmallIntegerField(
+        null=True, blank=True,
+        help_text="Не списывать дольше N дней с поступления партии. NULL = без ограничения.",
+    )
+    starts_after_days = models.PositiveSmallIntegerField(
+        default=0,
+        help_text="Грейс-период: первые N дней после поступления усушка не считается.",
+    )
+    is_active = models.BooleanField(default=True, db_index=True)
+    note = models.TextField(blank=True)
+
+    class Meta:
+        ordering = ["organization", "target_type", "-updated_at"]
+        constraints = [
+            models.CheckConstraint(
+                name="feed_shrinkage_profile_target_xor",
+                check=(
+                    models.Q(target_type="ingredient", nomenclature__isnull=False, recipe__isnull=True)
+                    | models.Q(target_type="feed_type", recipe__isnull=False, nomenclature__isnull=True)
+                ),
+            ),
+            models.CheckConstraint(
+                name="feed_shrinkage_profile_period_positive",
+                check=models.Q(period_days__gt=0),
+            ),
+            models.CheckConstraint(
+                name="feed_shrinkage_profile_pct_range",
+                check=models.Q(percent_per_period__gte=0)
+                & models.Q(percent_per_period__lte=100),
+            ),
+            models.CheckConstraint(
+                name="feed_shrinkage_profile_max_pct_range",
+                check=models.Q(max_total_percent__isnull=True)
+                | (models.Q(max_total_percent__gte=0) & models.Q(max_total_percent__lte=100)),
+            ),
+        ]
+        indexes = [
+            models.Index(fields=["organization", "target_type", "is_active"]),
+            models.Index(fields=["nomenclature", "warehouse"]),
+            models.Index(fields=["recipe", "warehouse"]),
+        ]
+        verbose_name = "Профиль усушки"
+        verbose_name_plural = "Профили усушки"
+
+    def __str__(self) -> str:
+        target = self.nomenclature_id or self.recipe_id
+        return f"{self.get_target_type_display()} · {target} · {self.percent_per_period}%/{self.period_days}д"
+
+    def clean(self):
+        super().clean()
+        if self.target_type == self.TargetType.INGREDIENT:
+            if self.nomenclature_id is None:
+                raise ValidationError({"nomenclature": "Обязательно для target_type=ingredient."})
+            if self.recipe_id is not None:
+                raise ValidationError({"recipe": "Не должно быть заполнено при target_type=ingredient."})
+        elif self.target_type == self.TargetType.FEED_TYPE:
+            if self.recipe_id is None:
+                raise ValidationError({"recipe": "Обязательно для target_type=feed_type."})
+            if self.nomenclature_id is not None:
+                raise ValidationError({"nomenclature": "Не должно быть заполнено при target_type=feed_type."})
+        if self.recipe_id and self.organization_id:
+            if self.recipe.organization_id != self.organization_id:
+                raise ValidationError({"recipe": "Рецепт из другой организации."})
+        if self.warehouse_id and self.organization_id:
+            if self.warehouse.organization_id != self.organization_id:
+                raise ValidationError({"warehouse": "Склад из другой организации."})
+
+
+class FeedLotShrinkageState(UUIDModel, TimestampedModel):
+    """Состояние усушки конкретной партии.
+
+    Создаётся при первом срабатывании воркера для партии, обновляется на каждое
+    списание. Хранит накопленные потери и дату последнего цикла, чтобы алгоритм
+    мог считать «сколько полных периодов прошло с прошлого раза».
+    """
+
+    class LotType(models.TextChoices):
+        RAW_ARRIVAL = "raw_arrival", "Партия сырья"
+        PRODUCTION_BATCH = "production_batch", "Партия готового корма"
+
+    organization = models.ForeignKey(
+        "organizations.Organization",
+        on_delete=models.PROTECT,
+        related_name="feed_lot_shrinkage_states",
+    )
+    lot_type = models.CharField(max_length=24, choices=LotType.choices, db_index=True)
+    lot_id = models.UUIDField(db_index=True)
+
+    profile = models.ForeignKey(
+        FeedShrinkageProfile,
+        on_delete=models.PROTECT,
+        related_name="lot_states",
+    )
+    initial_quantity = models.DecimalField(max_digits=16, decimal_places=3)
+    accumulated_loss = models.DecimalField(
+        max_digits=16, decimal_places=3, default=0,
+    )
+    last_applied_on = models.DateField(
+        null=True, blank=True,
+        help_text="Дата последнего цикла списания. NULL до первого применения.",
+    )
+    is_frozen = models.BooleanField(
+        default=False, db_index=True,
+        help_text="True когда достигнут max_total_percent / stop_after_days / остаток исчерпан.",
+    )
+
+    class Meta:
+        ordering = ["-updated_at"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["lot_type", "lot_id"],
+                name="feed_lot_shrinkage_state_unique_lot",
+            ),
+            models.CheckConstraint(
+                name="feed_lot_shrinkage_state_loss_within_initial",
+                check=models.Q(accumulated_loss__gte=0)
+                & models.Q(accumulated_loss__lte=models.F("initial_quantity")),
+            ),
+        ]
+        indexes = [
+            models.Index(fields=["organization", "lot_type", "is_frozen"]),
+            models.Index(fields=["profile", "is_frozen"]),
+        ]
+        verbose_name = "Состояние усушки партии"
+        verbose_name_plural = "Состояния усушки партий"
+
+    def __str__(self) -> str:
+        return f"{self.get_lot_type_display()} {self.lot_id} · loss={self.accumulated_loss}"
+
+
 class FeedConsumptionPlan(UUIDModel, TimestampedModel):
     class Status(models.TextChoices):
         FORECAST = "forecast", "Прогноз"

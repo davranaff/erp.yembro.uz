@@ -1,11 +1,13 @@
 'use client';
 
 import { useMemo, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 
 import HelpHint from '@/components/ui/HelpHint';
 import Modal from '@/components/ui/Modal';
-import { useRecordWeighing, weighingsCrud } from '@/hooks/useFeedlot';
+import { weighingsCrud } from '@/hooks/useFeedlot';
 import { ApiError } from '@/lib/api';
+import { enqueueOrSend } from '@/lib/offlineQueue';
 import type { FeedlotBatch } from '@/types/auth';
 
 interface Props {
@@ -28,7 +30,7 @@ function fmtNum(v: string | number, digits = 3): string {
  *   - переводит status →READY_SLAUGHTER при достижении target_weight_kg
  */
 export default function WeighingModal({ batch, onClose }: Props) {
-  const record = useRecordWeighing();
+  const qc = useQueryClient();
   // Подтянем все взвешивания этой партии — для расчёта прироста и подсказок.
   const { data: weighings } = weighingsCrud.useList({ feedlot_batch: batch.id });
 
@@ -45,11 +47,18 @@ export default function WeighingModal({ batch, onClose }: Props) {
   const [sample, setSample] = useState('50');
   const [avg, setAvg] = useState('');
   const [notes, setNotes] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [info, setInfo] = useState<string | null>(null);
+  const [error, setError] = useState<ApiError | null>(null);
 
-  const error = record.error;
-  const fieldErrors = error instanceof ApiError && error.status === 400
+  const fieldErrors = error?.status === 400
     ? ((error.data as Record<string, unknown>) ?? {})
     : {};
+
+  const incSample = (delta: number) => () => {
+    const cur = parseInt(sample) || 0;
+    setSample(String(Math.max(0, cur + delta)));
+  };
 
   // Прошлое взвешивание (для подсчёта прироста на превью)
   const prev = useMemo(() => {
@@ -77,12 +86,15 @@ export default function WeighingModal({ batch, onClose }: Props) {
     return t > 0 && a >= t;
   })();
 
-  const canSubmit = date && day && sample && avg && !record.isPending;
+  const canSubmit = date && day && sample && avg && !busy;
 
   const handleSubmit = async () => {
+    setError(null);
+    setInfo(null);
+    setBusy(true);
     try {
-      await record.mutateAsync({
-        id: batch.id,
+      const result = await enqueueOrSend({
+        path: `/api/feedlot/batches/${batch.id}/weighing/`,
         body: {
           date,
           day_of_age: parseInt(day, 10),
@@ -91,8 +103,18 @@ export default function WeighingModal({ batch, onClose }: Props) {
           notes,
         },
       });
-      onClose();
-    } catch { /* */ }
+      if (typeof result === 'object' && result !== null && 'queued' in result) {
+        setInfo('Нет сети. Запись сохранена локально и отправится автоматически.');
+        setTimeout(onClose, 2000);
+      } else {
+        qc.invalidateQueries({ queryKey: ['feedlot'] });
+        onClose();
+      }
+    } catch (e) {
+      setError(e as ApiError);
+    } finally {
+      setBusy(false);
+    }
   };
 
   const getErr = (k: string): string | null => {
@@ -108,17 +130,18 @@ export default function WeighingModal({ batch, onClose }: Props) {
       onClose={onClose}
       footer={
         <>
-          <button className="btn btn-ghost" onClick={onClose}>Отмена</button>
+          <button className="btn btn-ghost" onClick={onClose} disabled={busy}>Отмена</button>
           <button
             className="btn btn-primary"
             disabled={!canSubmit}
             onClick={handleSubmit}
           >
-            {record.isPending ? 'Сохранение…' : 'Сохранить'}
+            {busy ? 'Сохранение…' : 'Сохранить'}
           </button>
         </>
       }
     >
+      <div className="mobile-form">
       <div style={{ fontSize: 11, color: 'var(--fg-3)', marginBottom: 10 }}>
         Контрольное взвешивание выборки птицы. Используется для расчёта
         прироста и FCR. Бэк автоматически переведёт статус партии (PLACED→GROWING
@@ -247,7 +270,16 @@ export default function WeighingModal({ batch, onClose }: Props) {
         </div>
       )}
 
-      {error instanceof ApiError && error.status !== 400 && (
+      {info && (
+        <div style={{
+          marginTop: 10, padding: 10, fontSize: 13,
+          background: 'color-mix(in srgb, var(--brand-orange) 15%, transparent)',
+          color: 'var(--fg-1)', borderRadius: 6,
+        }}>
+          ⚡ {info}
+        </div>
+      )}
+      {error && error.status !== 400 && (
         <div style={{
           marginTop: 12, padding: 8,
           background: '#fef2f2', color: 'var(--danger)',
@@ -256,6 +288,7 @@ export default function WeighingModal({ batch, onClose }: Props) {
           {error.message}
         </div>
       )}
+      </div>
     </Modal>
   );
 }

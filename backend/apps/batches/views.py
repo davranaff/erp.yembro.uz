@@ -161,11 +161,26 @@ class BatchViewSet(OrgReadOnlyViewSet):
             - chain_steps — timeline по модулям
             - cost_breakdown — затраты по категориям с долями
             - totals — сводка
+
+        Финансовые поля (`accumulated_cost_uzs`, `total_cost_uzs`, `unit_cost_uzs`,
+        `cost_breakdown.amount_uzs`) скрываются у пользователей без доступа к
+        модулю-владельцу партии (или к ledger). Структура response сохраняется,
+        просто поля = null + добавляется флаг `_finances_visible: bool`.
         """
         from collections import OrderedDict
         from decimal import Decimal
 
+        from apps.common.permissions import can_see_finances
+
         batch = self.get_object()
+        # Видимость денег = доступ к модулю где партия сейчас (или к ledger)
+        batch_module_code = (
+            batch.current_module.code if batch.current_module_id else None
+        )
+        finances_visible = can_see_finances(
+            request.user, batch.organization,
+            module_code=batch_module_code or "ledger",
+        )
 
         # 1. Chain steps
         steps = list(
@@ -194,7 +209,8 @@ class BatchViewSet(OrgReadOnlyViewSet):
             breakdown.append({
                 "category": cat,
                 "category_label": cat_labels.get(cat, cat),
-                "amount_uzs": str(amt),
+                # amount скрываем если нет доступа к финансам этого модуля
+                "amount_uzs": str(amt) if finances_visible else None,
                 "share_percent": str(share.quantize(Decimal("0.01"))),
             })
 
@@ -207,7 +223,9 @@ class BatchViewSet(OrgReadOnlyViewSet):
                 "doc_number": p.doc_number,
                 "nomenclature_sku": p.nomenclature.sku if p.nomenclature_id else None,
                 "current_quantity": str(p.current_quantity),
-                "accumulated_cost_uzs": str(p.accumulated_cost_uzs),
+                "accumulated_cost_uzs": (
+                    str(p.accumulated_cost_uzs) if finances_visible else None
+                ),
                 "state": p.state,
             }
 
@@ -220,7 +238,9 @@ class BatchViewSet(OrgReadOnlyViewSet):
                 "doc_number": c.doc_number,
                 "nomenclature_sku": c.nomenclature.sku if c.nomenclature_id else None,
                 "current_quantity": str(c.current_quantity),
-                "accumulated_cost_uzs": str(c.accumulated_cost_uzs),
+                "accumulated_cost_uzs": (
+                    str(c.accumulated_cost_uzs) if finances_visible else None
+                ),
                 "current_module": (
                     c.current_module.code if c.current_module_id else None
                 ),
@@ -234,19 +254,29 @@ class BatchViewSet(OrgReadOnlyViewSet):
             else Decimal("0")
         )
 
+        totals = {
+            "initial_quantity": str(batch.initial_quantity),
+            "current_quantity": str(batch.current_quantity),
+        }
+        if finances_visible:
+            totals["total_cost_uzs"] = str(total_cost)
+            totals["accumulated_cost_uzs"] = str(batch.accumulated_cost_uzs)
+            totals["unit_cost_uzs"] = str(unit_cost.quantize(Decimal("0.01")))
+        else:
+            totals["total_cost_uzs"] = None
+            totals["accumulated_cost_uzs"] = None
+            totals["unit_cost_uzs"] = None
+
         return Response({
-            "batch": BatchSerializer(batch).data,
+            "batch": BatchSerializer(batch, context={"request": request}).data,
             "parent": parent_data,
             "children": children,
-            "chain_steps": BatchChainStepSerializer(steps, many=True).data,
+            "chain_steps": BatchChainStepSerializer(
+                steps, many=True, context={"request": request},
+            ).data,
             "cost_breakdown": breakdown,
-            "totals": {
-                "total_cost_uzs": str(total_cost),
-                "accumulated_cost_uzs": str(batch.accumulated_cost_uzs),
-                "unit_cost_uzs": str(unit_cost.quantize(Decimal("0.01"))),
-                "initial_quantity": str(batch.initial_quantity),
-                "current_quantity": str(batch.current_quantity),
-            },
+            "totals": totals,
+            "_finances_visible": finances_visible,
         })
 
 

@@ -165,16 +165,29 @@ class OrganizationScopedMixin(OrganizationContextMixin, AuditMixin):
     Требует поле `organization` на модели (ForeignKey).
     Если модель имеет поле `created_by` — оно автоматически ставится в
     текущего пользователя.
+
+    Row-level scope (F0.5): viewset может задать `scope_field`, например
+    `scope_field = "warehouse_id"`. Тогда queryset дополнительно фильтруется
+    через `apps.common.scope.apply_scope()`. По умолчанию scope_field=None
+    (фильтр не применяется — поведение совместимо с prev. версией).
     """
 
     organization_field = "organization"
+    scope_field: str | None = None
 
     def get_queryset(self):
         qs = super().get_queryset()
         org = getattr(self.request, "organization", None)
         if org is None:
             return qs.none()
-        return qs.filter(**{self.organization_field: org})
+        qs = qs.filter(**{self.organization_field: org})
+
+        if self.scope_field:
+            from .scope import apply_scope, get_user_scope
+            user = getattr(self.request, "user", None)
+            scope = get_user_scope(user, org)
+            qs = apply_scope(qs, scope, scope_field=self.scope_field)
+        return qs
 
     def _save_kwargs_for_create(self, serializer) -> dict:
         """

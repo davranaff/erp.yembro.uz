@@ -5,6 +5,7 @@ import { useMemo, useState } from 'react';
 import DetailDrawer, { KV } from '@/components/DetailDrawer';
 import OpexButton from '@/components/OpexButton';
 import { OpenSaleFromModule } from '@/components/SellBatchButton';
+import ShrinkageWidget from '@/components/ShrinkageWidget';
 import DataTable from '@/components/ui/DataTable';
 import Badge from '@/components/ui/Badge';
 import EmptyState from '@/components/ui/EmptyState';
@@ -28,6 +29,7 @@ import {
   useReleaseQuarantine,
 } from '@/hooks/useFeed';
 import { useHasLevel } from '@/hooks/usePermissions';
+import { getFinancesVisible } from '@/lib/permissions';
 import type {
   FeedBatch,
   ProductionTask,
@@ -392,8 +394,11 @@ export default function FeedPage() {
                 render: (r) => r.shrinkage_pct ? r.shrinkage_pct + '%' : '—' },
               { key: 'remain', label: 'Остаток кг', align: 'right', mono: true,
                 render: (r) => fmtNum(r.current_quantity, 0) },
-              { key: 'price', label: 'Цена/кг', align: 'right', mono: true, cellStyle: { fontSize: 12 },
-                render: (r) => fmtNum(r.price_per_unit_uzs, 0) },
+              ...(getFinancesVisible(rawBatches) ? [{
+                key: 'price', label: 'Цена/кг', align: 'right' as const, mono: true,
+                cellStyle: { fontSize: 12 },
+                render: (r: RawMaterialBatch) => fmtNum(r.price_per_unit_uzs, 0),
+              }] : []),
               { key: 'status', label: 'Статус',
                 render: (r) => (
                   <Badge tone={RAW_STATUS_TONE[r.status]} dot>
@@ -543,8 +548,11 @@ export default function FeedPage() {
               { key: 'remain', label: 'Остаток кг', align: 'right', mono: true,
                 cellStyle: { fontWeight: 600 },
                 render: (b) => fmtNum(b.current_quantity_kg, 0) },
-              { key: 'unit_cost', label: 'Себест/кг', align: 'right', mono: true, cellStyle: { fontSize: 12 },
-                render: (b) => fmtNum(b.unit_cost_uzs, 2) + ' сум' },
+              ...(getFinancesVisible(feedBatches) ? [{
+                key: 'unit_cost', label: 'Себест/кг', align: 'right' as const, mono: true,
+                cellStyle: { fontSize: 12 },
+                render: (b: FeedBatch) => fmtNum(b.unit_cost_uzs, 2) + ' сум',
+              }] : []),
               { key: 'med', label: 'Мед.',
                 render: (b) => b.is_medicated ? <Badge tone="warn">мед</Badge> : '—' },
               { key: 'status', label: 'Статус', cellStyle: { fontSize: 12 },
@@ -990,9 +998,11 @@ export default function FeedPage() {
                       { k: 'Влажность база (snapshot)', v: selRaw.moisture_pct_base ? selRaw.moisture_pct_base + '%' : '—', mono: true },
                       { k: 'Сорность', v: selRaw.dockage_pct_actual ? selRaw.dockage_pct_actual + '%' : '—', mono: true },
                     ] : []),
-                    // Цены и финансы
-                    { k: 'Цена за кг', v: fmtNum(selRaw.price_per_unit_uzs, 2) + ' сум', mono: true },
-                    { k: 'Сумма закупа', v: fmtNum(selRaw.total_cost_uzs, 0) + ' сум', mono: true },
+                    // Цены и финансы — скрыты для пользователей без доступа к ledger
+                    ...(getFinancesVisible(selRaw) ? [
+                      { k: 'Цена за кг', v: fmtNum(selRaw.price_per_unit_uzs, 2) + ' сум', mono: true },
+                      { k: 'Сумма закупа', v: fmtNum(selRaw.total_cost_uzs, 0) + ' сум', mono: true },
+                    ] : []),
                     { k: 'Остаток на складе', v: `${fmtNum(selRaw.current_quantity, 3)} ${selRaw.unit_code ?? ''}`, mono: true },
                     { k: 'Карантин до', v: selRaw.quarantine_until ?? '—', mono: true },
                     ...(selRaw.rejection_reason ? [{ k: 'Причина отклонения', v: selRaw.rejection_reason }] : []),
@@ -1022,6 +1032,13 @@ export default function FeedPage() {
                     Лабораторных показателей для этой партии нет.
                   </div>
                 )}
+
+                <ShrinkageWidget
+                  lotType="raw_arrival"
+                  lotId={selRaw.id}
+                  initialKg={selRaw.quantity}
+                  unitLabel={selRaw.unit_code ?? 'кг'}
+                />
               </>
             );
           })()}
@@ -1283,24 +1300,26 @@ export default function FeedPage() {
               { k: 'Произведено', v: new Date(selBatch.produced_at).toLocaleString('ru'), mono: true },
               { k: 'Выпуск, кг', v: fmtNum(selBatch.quantity_kg, 3), mono: true },
               { k: 'Остаток, кг', v: fmtNum(selBatch.current_quantity_kg, 3), mono: true },
-              {
-                k: (
-                  <span style={{ display: 'inline-flex', alignItems: 'center' }}>
-                    Себестоимость / кг
-                    <HelpHint
-                      text="Стоимость 1 кг этой партии корма."
-                      details={
-                        'Считается автоматически при проведении замеса как: '
-                        + '(сумма стоимости израсходованного сырья) ÷ выпуск кг. '
-                        + 'Эта цена идёт в проводки и в расход на птицу/продажу.'
-                      }
-                    />
-                  </span>
-                ) as unknown as string,
-                v: fmtNum(selBatch.unit_cost_uzs, 2) + ' сум',
-                mono: true,
-              },
-              { k: 'Сумма', v: fmtNum(selBatch.total_cost_uzs, 0) + ' сум', mono: true },
+              ...(getFinancesVisible(selBatch) ? [
+                {
+                  k: (
+                    <span style={{ display: 'inline-flex', alignItems: 'center' }}>
+                      Себестоимость / кг
+                      <HelpHint
+                        text="Стоимость 1 кг этой партии корма."
+                        details={
+                          'Считается автоматически при проведении замеса как: '
+                          + '(сумма стоимости израсходованного сырья) ÷ выпуск кг. '
+                          + 'Эта цена идёт в проводки и в расход на птицу/продажу.'
+                        }
+                      />
+                    </span>
+                  ) as unknown as string,
+                  v: fmtNum(selBatch.unit_cost_uzs, 2) + ' сум',
+                  mono: true,
+                },
+                { k: 'Сумма', v: fmtNum(selBatch.total_cost_uzs, 0) + ' сум', mono: true },
+              ] : []),
               { k: 'Бункер', v: selBatch.storage_bin_code ?? '—', mono: true },
               { k: 'Медикаментозный', v: selBatch.is_medicated ? 'Да' : 'Нет' },
               ...(selBatch.withdrawal_period_ends ? [{
@@ -1341,6 +1360,13 @@ export default function FeedPage() {
                 v: selBatch.quality_passport_status,
               },
             ]}
+          />
+
+          <ShrinkageWidget
+            lotType="production_batch"
+            lotId={selBatch.id}
+            initialKg={selBatch.quantity_kg}
+            unitLabel="кг"
           />
         </DetailDrawer>
         );

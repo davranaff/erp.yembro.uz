@@ -1,13 +1,23 @@
 'use client';
 
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+
+import { ApiError, apiFetch } from '@/lib/api';
 import { makeCrud } from '@/lib/crudFactory';
 import type {
   FeedBatch,
+  FeedLotShrinkageState,
+  FeedShrinkageProfile,
+  FeedShrinkageProfileInput,
   ProductionTask,
   RawMaterialBatch,
   Recipe,
   RecipeComponent,
   RecipeVersion,
+  ShrinkageApplyResult,
+  ShrinkageApplySummary,
+  ShrinkageHistory,
+  ShrinkageReportResponse,
 } from '@/types/auth';
 
 export const recipesCrud = makeCrud<Recipe>({
@@ -112,3 +122,111 @@ export const useRejectQuarantine = rawBatchesCrud.makeAction<
   { reason: string },
   RawMaterialBatch
 >((id) => `/api/feed/raw-batches/${id}/reject_quarantine/`);
+
+
+// ─── Shrinkage profiles ────────────────────────────────────────────────
+
+export const shrinkageProfilesCrud = makeCrud<
+  FeedShrinkageProfile,
+  FeedShrinkageProfileInput,
+  Partial<FeedShrinkageProfileInput>
+>({
+  key: ['feed', 'shrinkage-profiles'],
+  path: '/api/feed/shrinkage-profiles/',
+  ordering: 'target_type',
+});
+
+// ─── Shrinkage state ───────────────────────────────────────────────────
+
+export const shrinkageStatesCrud = makeCrud<FeedLotShrinkageState>({
+  key: ['feed', 'shrinkage-states'],
+  path: '/api/feed/shrinkage-state/',
+  ordering: '-updated_at',
+});
+
+/**
+ * Прогон алгоритма усушки. Без аргументов — по всей организации (батч).
+ * С `lot_type`+`lot_id` — точечно на одну партию (например после правки профиля).
+ * С `on_date` — на конкретную дату (для catch-up при простое воркера).
+ */
+export function useApplyShrinkage() {
+  const qc = useQueryClient();
+  return useMutation<
+    ShrinkageApplySummary | ShrinkageApplyResult,
+    ApiError,
+    { on_date?: string; lot_type?: string; lot_id?: string } | undefined
+  >({
+    mutationFn: (body) =>
+      apiFetch('/api/feed/shrinkage-state/apply/', {
+        method: 'POST',
+        body: body ?? {},
+      }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['feed', 'shrinkage-states'] });
+      qc.invalidateQueries({ queryKey: ['feed', 'raw-batches'] });
+      qc.invalidateQueries({ queryKey: ['feed', 'batches'] });
+    },
+  });
+}
+
+/**
+ * Админский откат: удаляет все StockMovement(kind=shrinkage) этой партии,
+ * восстанавливает current_quantity, сбрасывает state.
+ */
+export function useResetShrinkage() {
+  const qc = useQueryClient();
+  return useMutation<
+    { ok: boolean; reverted_movements: number; restored_kg: string },
+    ApiError,
+    { id: string }
+  >({
+    mutationFn: ({ id }) =>
+      apiFetch(`/api/feed/shrinkage-state/${id}/reset/`, {
+        method: 'POST',
+        body: {},
+      }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['feed', 'shrinkage-states'] });
+      qc.invalidateQueries({ queryKey: ['feed', 'raw-batches'] });
+      qc.invalidateQueries({ queryKey: ['feed', 'batches'] });
+    },
+  });
+}
+
+// ─── Shrinkage report ──────────────────────────────────────────────────
+
+export interface ShrinkageReportFilter {
+  date_from?: string;
+  date_to?: string;
+  group_by?: 'ingredient' | 'warehouse';
+}
+
+export function useShrinkageReport(filter: ShrinkageReportFilter = {}) {
+  const params = new URLSearchParams();
+  if (filter.date_from) params.set('date_from', filter.date_from);
+  if (filter.date_to) params.set('date_to', filter.date_to);
+  if (filter.group_by) params.set('group_by', filter.group_by);
+  const qs = params.toString();
+
+  return useQuery<ShrinkageReportResponse, ApiError>({
+    queryKey: ['feed', 'shrinkage-report', qs],
+    queryFn: () =>
+      apiFetch<ShrinkageReportResponse>(
+        `/api/feed/shrinkage-report/${qs ? '?' + qs : ''}`,
+      ),
+    staleTime: 30_000,
+  });
+}
+
+/** История списаний усушки по конкретной партии (для sparkline). */
+export function useShrinkageHistory(stateId: string | null | undefined) {
+  return useQuery<ShrinkageHistory, ApiError>({
+    queryKey: ['feed', 'shrinkage-history', stateId ?? ''],
+    queryFn: () =>
+      apiFetch<ShrinkageHistory>(
+        `/api/feed/shrinkage-state/${stateId}/history/`,
+      ),
+    enabled: Boolean(stateId),
+    staleTime: 30_000,
+  });
+}

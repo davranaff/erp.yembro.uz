@@ -511,6 +511,8 @@ export type RawMaterialBatchStatus = 'quarantine' | 'available' | 'rejected' | '
 
 export interface RawMaterialBatch {
   id: string;
+  /** Field-level RBAC: false → у юзера нет доступа к ledger, цены скрыты в API */
+  _finances_visible?: boolean;
   doc_number: string;
   module: string;
   nomenclature: string;
@@ -840,6 +842,8 @@ export type FeedBatchPassportStatus = 'pending' | 'passed' | 'failed';
 
 export interface FeedBatch {
   id: string;
+  /** Field-level RBAC: false → cost-поля скрыты */
+  _finances_visible?: boolean;
   doc_number: string;
   module: string;
   produced_by_task: string;
@@ -1164,6 +1168,8 @@ export type VetStockStatus =
 
 export interface VetStockBatch {
   id: string;
+  /** Field-level RBAC: false → закупочная цена скрыта */
+  _finances_visible?: boolean;
   doc_number: string;
   module: string;
   drug: string;
@@ -1238,6 +1244,8 @@ export type BatchState = 'active' | 'in_transit' | 'completed' | 'rejected' | 'r
 
 export interface Batch {
   id: string;
+  /** Field-level RBAC: false → accumulated_cost_uzs скрыт */
+  _finances_visible?: boolean;
   doc_number: string;
   nomenclature: string;
   nomenclature_sku: string | null;
@@ -1278,6 +1286,7 @@ export type BatchCostCategory =
 
 export interface BatchChainStep {
   id: string;
+  _finances_visible?: boolean;
   batch: string;
   sequence: number;
   module: string;
@@ -1298,6 +1307,7 @@ export interface BatchChainStep {
 
 export interface BatchCostEntry {
   id: string;
+  _finances_visible?: boolean;
   batch: string;
   category: BatchCostCategory;
   amount_uzs: string;
@@ -1489,4 +1499,121 @@ export interface PurchaseOrder {
   notes: string;
   created_at: string;
   updated_at: string;
+}
+
+
+// ─── Feed shrinkage (профили + состояния партий + отчёт) ──────────────────
+
+export type ShrinkageTargetType = 'ingredient' | 'feed_type';
+export type ShrinkageLotType = 'raw_arrival' | 'production_batch';
+
+export interface FeedShrinkageProfile {
+  id: string;
+  target_type: ShrinkageTargetType;
+  nomenclature: string | null;
+  recipe: string | null;
+  warehouse: string | null;
+  period_days: number;
+  /** Decimal как строка: "0.800". */
+  percent_per_period: string;
+  max_total_percent: string | null;
+  stop_after_days: number | null;
+  starts_after_days: number;
+  is_active: boolean;
+  note: string;
+  // read-only enrichments
+  nomenclature_sku: string | null;
+  nomenclature_name: string | null;
+  recipe_code: string | null;
+  recipe_name: string | null;
+  warehouse_code: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface FeedShrinkageProfileInput {
+  target_type: ShrinkageTargetType;
+  nomenclature?: string | null;
+  recipe?: string | null;
+  warehouse?: string | null;
+  period_days: number;
+  percent_per_period: string;
+  max_total_percent?: string | null;
+  stop_after_days?: number | null;
+  starts_after_days?: number;
+  is_active?: boolean;
+  note?: string;
+}
+
+export interface FeedLotShrinkageState {
+  id: string;
+  lot_type: ShrinkageLotType;
+  lot_id: string;
+  profile: string;
+  profile_label: string;
+  initial_quantity: string;
+  accumulated_loss: string;
+  /** "0.00" - "100.00", может быть null если initial=0. */
+  accumulated_percent: string | null;
+  remaining_quantity: string;
+  last_applied_on: string | null;
+  is_frozen: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ShrinkageApplyResult {
+  lot_type: ShrinkageLotType;
+  lot_id: string;
+  skipped: boolean;
+  skipped_reason: string | null;
+  loss_kg: string;
+  periods_applied: number;
+  frozen: boolean;
+  state_id: string | null;
+  movement_id: string | null;
+}
+
+export interface ShrinkageApplySummary {
+  on_date: string;
+  lots_total: number;
+  lots_applied: number;
+  loss_kg: string;
+  movements: number;
+  results: ShrinkageApplyResult[];
+}
+
+export interface ShrinkageReportRow {
+  key: string | null;
+  label: string;
+  total_loss_kg: string;
+  total_loss_uzs: string;
+}
+
+export interface ShrinkageReportResponse {
+  date_from: string | null;
+  date_to: string | null;
+  group_by: 'ingredient' | 'warehouse';
+  rows: ShrinkageReportRow[];
+  summary: {
+    total_loss_kg: string;
+    total_loss_uzs: string;
+  };
+}
+
+export interface ShrinkageHistoryPoint {
+  movement_id: string;
+  date: string | null;
+  lost_kg: string;
+  lost_uzs: string;
+  cumulative_loss_kg: string;
+  remaining_kg: string;
+}
+
+export interface ShrinkageHistory {
+  state_id: string;
+  initial_quantity: string;
+  accumulated_loss: string;
+  is_frozen: boolean;
+  points: ShrinkageHistoryPoint[];
 }

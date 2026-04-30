@@ -491,6 +491,7 @@ export default function FeedlotPage() {
         <FeedlotTimelineModal batch={sel} onClose={() => setTimelineOpen(false)} />
       )}
       {placeOpen && <PlaceModal onClose={() => setPlaceOpen(false)} />}
+
       {confirmDelMortality && (
         <ConfirmDeleteWithReason
           title="Удалить запись падежа?"

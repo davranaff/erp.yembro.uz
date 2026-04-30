@@ -87,3 +87,36 @@ class HasModulePermission(BasePermission):
 
         actual = _effective_level(membership, module_code)
         return level_satisfies(actual, required)
+
+
+def can_see_finances(user, organization, module_code: str = "ledger") -> bool:
+    """Проверка: может ли пользователь видеть деньги указанного модуля?
+
+    Видит если есть `r`-доступ к этому модулю ИЛИ к ledger (общефинансовый
+    bypass). Используется в endpoint'ах которые отдают агрегированные
+    финансовые данные (dashboard summary, cashflow chart, holding consolidation,
+    traceability cost) и в `FinancialFieldsMixin` для serializer-уровня.
+
+    Если `module_code='ledger'` (default) — стандартная проверка «может ли
+    видеть финансы вообще». Для проверки «может ли видеть финансы конкретного
+    модуля» — передайте код этого модуля.
+    """
+    from apps.organizations.models import OrganizationMembership
+
+    if not user or not user.is_authenticated or not organization:
+        return False
+    membership = (
+        OrganizationMembership.objects.filter(
+            user=user, organization=organization, is_active=True,
+        ).first()
+    )
+    if membership is None:
+        return False
+
+    if module_code != "ledger":
+        own_lvl = _effective_level(membership, module_code)
+        if level_satisfies(own_lvl, "r"):
+            return True
+
+    ledger_lvl = _effective_level(membership, "ledger")
+    return level_satisfies(ledger_lvl, "r")

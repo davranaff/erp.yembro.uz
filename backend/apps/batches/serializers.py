@@ -3,11 +3,29 @@ from decimal import Decimal
 from django.db.models import Sum
 from rest_framework import serializers
 
+from apps.common.serializers import FinancialFieldsMixin
+
 from .models import Batch, BatchChainStep, BatchCostEntry
 
 
-class BatchCostEntrySerializer(serializers.ModelSerializer):
+class BatchCostEntrySerializer(FinancialFieldsMixin, serializers.ModelSerializer):
+    """Затраты, начисленные на партию (корм, ветпрепараты, опекс).
+
+    `amount_uzs` принадлежит **модулю-владельцу затраты** (`obj.module`).
+    Например: feed-расход на партию птицы → деньги модуля feed (видны
+    feed-менеджеру). Vet-обработка → vet. OPEX → ledger.
+
+    Без поля `module` — fallback на `ledger`.
+    """
+
+    financial_fields = ("amount_uzs",)
+    finances_module = None  # динамически из instance.module
     module_code = serializers.SerializerMethodField()
+
+    def get_finances_module(self, instance) -> str | None:
+        if instance and instance.module_id and instance.module:
+            return instance.module.code
+        return "ledger"
 
     class Meta:
         model = BatchCostEntry
@@ -30,8 +48,21 @@ class BatchCostEntrySerializer(serializers.ModelSerializer):
         return obj.module.code if obj.module_id else None
 
 
-class BatchChainStepSerializer(serializers.ModelSerializer):
+class BatchChainStepSerializer(FinancialFieldsMixin, serializers.ModelSerializer):
+    """Шаг партии в цепочке производства.
+
+    `accumulated_cost_at_exit` — деньги модуля, в котором партия была на
+    этом шаге (`step.module`). Видны менеджеру этого модуля или бухгалтеру.
+    """
+
+    financial_fields = ("accumulated_cost_at_exit",)
+    finances_module = None  # из step.module
     module_code = serializers.SerializerMethodField()
+
+    def get_finances_module(self, instance) -> str | None:
+        if instance and instance.module_id and instance.module:
+            return instance.module.code
+        return "ledger"
     block_code = serializers.SerializerMethodField()
     transfer_in_doc = serializers.SerializerMethodField()
     transfer_out_doc = serializers.SerializerMethodField()
@@ -72,7 +103,17 @@ class BatchChainStepSerializer(serializers.ModelSerializer):
         return obj.transfer_out.doc_number if obj.transfer_out_id else None
 
 
-class BatchSerializer(serializers.ModelSerializer):
+class BatchSerializer(FinancialFieldsMixin, serializers.ModelSerializer):
+    """Партия (универсальный батч сырья/птицы/корма).
+
+    `accumulated_cost_uzs` принадлежит модулю где партия **сейчас находится**
+    (`current_module`). Если она перешла из matochnik → incubation → feedlot,
+    то после перехода в feedlot её себестоимость = деньги модуля feedlot.
+    Это согласуется с принципом «деньги принадлежат модулю-владельцу».
+    """
+
+    financial_fields = ("accumulated_cost_uzs",)
+    finances_module = None  # из batch.current_module (или origin_module как fallback)
     nomenclature_sku = serializers.SerializerMethodField()
     nomenclature_name = serializers.SerializerMethodField()
     unit_code = serializers.SerializerMethodField()
@@ -135,6 +176,16 @@ class BatchSerializer(serializers.ModelSerializer):
 
     def get_origin_module_code(self, obj):
         return obj.origin_module.code if obj.origin_module_id else None
+
+    def get_finances_module(self, instance) -> str | None:
+        # Себестоимость принадлежит модулю где партия сейчас. Если её ещё нет
+        # (только что создана) — origin_module как fallback.
+        if instance:
+            if instance.current_module_id and instance.current_module:
+                return instance.current_module.code
+            if instance.origin_module_id and instance.origin_module:
+                return instance.origin_module.code
+        return "ledger"
 
     def get_parent_doc_number(self, obj):
         return obj.parent_batch.doc_number if obj.parent_batch_id else None

@@ -46,6 +46,10 @@ class SeedReport:
     blocks_updated: int = 0
     warehouses_created: int = 0
     warehouses_updated: int = 0
+    roles_created: int = 0
+    roles_updated: int = 0
+    role_permissions_created: int = 0
+    role_permissions_updated: int = 0
     skipped: list[str] = field(default_factory=list)
     errors: list[str] = field(default_factory=list)
 
@@ -134,6 +138,7 @@ class OrganizationSeeder:
                 self._seed_nomenclature()
                 self._seed_blocks()
                 self._seed_warehouses()
+                self._seed_roles()
 
                 if self.dry_run:
                     transaction.set_rollback(True)
@@ -503,3 +508,79 @@ class OrganizationSeeder:
                 self.report.warehouses_created += 1
             else:
                 self.report.warehouses_updated += 1
+
+    # ── Roles + RolePermission ────────────────────────────────────────
+
+    def _seed_roles(self) -> None:
+        """Применяет блок `roles:` из YAML.
+
+        Структура:
+            roles:
+              - code: HEAD_SLAUGHTER
+                name: "Главный убойни"
+                description: "..."
+                permissions:
+                  slaughter: admin
+                  feedlot: r
+                  ledger: none
+
+        Логика:
+          - `Role.objects.update_or_create(organization, code)` — name/description
+            обновляются.
+          - Для каждой пары `(role, module)` в permissions —
+            `RolePermission.objects.update_or_create` с указанным level.
+          - Модули, **не упомянутые** в YAML — НЕ трогаем (пользователь мог
+            настроить их через UI). Чтобы явно запретить — `level: none`.
+        """
+        rows = self.config.get("roles") or []
+        if not rows:
+            return
+
+        from apps.modules.models import Module
+        from apps.rbac.models import AccessLevel, Role, RolePermission
+
+        valid_levels = {choice[0] for choice in AccessLevel.choices}
+        all_modules = {m.code: m for m in Module.objects.all()}
+
+        for row in rows:
+            code = row.get("code")
+            if not code:
+                self.report.skipped.append(f"role without code: {row}")
+                continue
+
+            role, role_created = Role.objects.update_or_create(
+                organization=self.org,
+                code=code,
+                defaults={
+                    "name": row.get("name", code),
+                    "description": row.get("description", ""),
+                },
+            )
+            if role_created:
+                self.report.roles_created += 1
+            else:
+                self.report.roles_updated += 1
+
+            permissions = row.get("permissions") or {}
+            for module_code, level in permissions.items():
+                module = all_modules.get(module_code)
+                if module is None:
+                    self.report.skipped.append(
+                        f"role {code}: module '{module_code}' not in DB",
+                    )
+                    continue
+                if level not in valid_levels:
+                    self.report.skipped.append(
+                        f"role {code}.{module_code}: invalid level '{level}'",
+                    )
+                    continue
+
+                _, perm_created = RolePermission.objects.update_or_create(
+                    role=role,
+                    module=module,
+                    defaults={"level": level},
+                )
+                if perm_created:
+                    self.report.role_permissions_created += 1
+                else:
+                    self.report.role_permissions_updated += 1

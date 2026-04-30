@@ -11,7 +11,7 @@ HELP_TEXT = (
     "🤖 <b>Yembro ERP Bot</b>\n\n"
     "Доступные команды:\n"
     "/report — финансовый отчёт за месяц\n"
-    "/stock — остатки кассы и банка\n"
+    "/balance — остатки кассы и банка\n"
     "/cashflow — кэш-флоу за 30 дней\n"
     "/production — поголовье и партии\n"
     "/help — список команд"
@@ -45,9 +45,12 @@ def dispatch(update: dict) -> None:
             send_message(chat_id, "⛔ Нет доступа к модулю <b>Отчёты</b>.")
             return
         _handle_report(chat_id, org)
-    elif text == "/stock":
-        if not _has_module_access(link, "ledger"):
-            send_message(chat_id, "⛔ Нет доступа к модулю <b>Бухгалтерия</b>.")
+    elif text == "/balance" or text == "/stock":
+        # /stock — устаревший alias, остаётся для совместимости со старыми
+        # пользователями. Семантически команда про остатки касс/банка → finance,
+        # поэтому требуем доступ к модулю «Отчёты», а не к складу/проводкам.
+        if not _has_module_access(link, "reports"):
+            send_message(chat_id, "⛔ Нет доступа к модулю <b>Отчёты</b>.")
             return
         _handle_stock(chat_id, org)
     elif text == "/cashflow":

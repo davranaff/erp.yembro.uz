@@ -118,3 +118,67 @@ class UserModuleAccessOverride(UUIDModel, TimestampedModel):
 
     def __str__(self):
         return f"{self.membership} · {self.module.code} · {self.get_level_display()}"
+
+
+# ─── Row-level scope (F0.5) ───────────────────────────────────────────────
+
+
+class UserScopeAssignment(UUIDModel, TimestampedModel):
+    """Назначение пользователю доступа к **конкретным** объектам внутри
+    организации (отдел, склад, производственный блок).
+
+    Зачем: поверх module-level RBAC (`HasModulePermission`) нужно ещё
+    row-level фильтрование. Пример: финансист модуля `ledger` имеет доступ
+    к модулю целиком, но в большом холдинге должен видеть только кассы
+    своего отдела, а не все.
+
+    Без записей в этой таблице — поведение **по умолчанию**: пользователь
+    видит **всё** в рамках своего модульного доступа (для маленьких ферм
+    с одним отделом этого достаточно). Назначения нужны только при
+    разделении на отделы.
+
+    Примеры:
+      (user=Финансист_A, scope_type=warehouse, scope_id=warehouse_KASSA_otd1)
+      (user=Технолог_B,  scope_type=production_block, scope_id=block_PTICHNIK_3)
+
+    Применение в коде:
+      см. `apps.common.scope.get_user_scope(user, organization)` —
+      возвращает `UserScope` с allowed_warehouse_ids / allowed_block_ids,
+      которые viewset фильтрует автоматически.
+    """
+
+    class ScopeType(models.TextChoices):
+        WAREHOUSE = "warehouse", "Склад"
+        PRODUCTION_BLOCK = "production_block", "Производственный блок"
+
+    organization = models.ForeignKey(
+        "organizations.Organization",
+        on_delete=models.PROTECT,
+        related_name="scope_assignments",
+    )
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="scope_assignments",
+    )
+    scope_type = models.CharField(
+        max_length=24,
+        choices=ScopeType.choices,
+        db_index=True,
+    )
+    scope_id = models.UUIDField(
+        db_index=True,
+        help_text="UUID конкретного объекта (warehouse или production_block).",
+    )
+    note = models.CharField(max_length=255, blank=True)
+
+    class Meta:
+        unique_together = (("organization", "user", "scope_type", "scope_id"),)
+        indexes = [
+            models.Index(fields=["organization", "user", "scope_type"]),
+        ]
+        verbose_name = "Назначение row-level scope"
+        verbose_name_plural = "Назначения row-level scope"
+
+    def __str__(self) -> str:
+        return f"{self.user} · {self.get_scope_type_display()} {self.scope_id}"

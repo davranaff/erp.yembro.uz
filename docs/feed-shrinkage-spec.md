@@ -1,9 +1,66 @@
 # Усушка ингредиентов и готового корма (Feed Shrinkage)
 
-**Статус:** draft spec
+**Статус:** ✅ implemented (backend) — 2026-04-30
 **Автор:** Sukhrob + Claude
-**Дата:** 2026-04-23
+**Дата создания спеки:** 2026-04-23
 **Модуль:** `feed` (расширение)
+
+---
+
+## Адаптации под текущий Django-стек
+
+Изначальная спека была написана под FastAPI/SQLAlchemy/Alembic/Taskiq.
+После миграции `0786e85` (FastAPI→Django) маппинг выглядит так:
+
+| Спека | Реализация |
+|---|---|
+| таблица `feed_shrinkage_profiles` | модель `apps.feed.models.FeedShrinkageProfile` |
+| таблица `feed_lot_shrinkage_state` | модель `apps.feed.models.FeedLotShrinkageState` |
+| `feed_ingredient_id` | `nomenclature.NomenclatureItem` через FK `nomenclature` |
+| `feed_type_id` | `feed.Recipe` через FK `recipe` (рецепт = «тип готового корма», профиль действует на все версии и партии) |
+| `feed_raw_arrivals` | `feed.RawMaterialBatch` (status=AVAILABLE) |
+| `feed_production_batches` | `feed.FeedBatch` (status=APPROVED) |
+| `arrived_on` | `RawMaterialBatch.received_date` / `FeedBatch.produced_at.date()` |
+| `stock_movements.movement_kind='shrinkage'` | `StockMovement.Kind.SHRINKAGE` (новый choice) |
+| Alembic миграция | `feed/0004_shrinkage_profiles_and_states.py` + `warehouses/0006_stockmovement_shrinkage_kind.py` |
+| Taskiq cron `apply_feed_shrinkage_task` | Celery beat: `apps.feed.apply_feed_shrinkage_task`, расписание создаётся миграцией `feed/0005_seed_feed_shrinkage_beat.py` (`PeriodicTask` через `django_celery_beat`, ежедневно 02:00 Asia/Tashkent) |
+| Permissions `feed_shrinkage_profile.{...}` | RBAC через `HasModulePermission` с `module_code="feed"` (на уровне модулей, а не отдельных entities) |
+
+**Что отличается от спеки:**
+- `feed_type_id` стал `recipe_id` — у нас нет агрегатной сущности «тип корма» отдельно от рецепта. Если потребуется группировать рецепты в семьи (например stage-ы) — добавим отдельной задачей.
+- `FeedBatch` без `nomenclature` FK: у готовых партий нет прямой номенклатуры, поэтому при отсутствии — `StockMovement` для усушки не создаётся, остаток обновляется напрямую через `FeedBatch.current_quantity_kg`. См. `_create_shrinkage_movement` в `services/shrinkage_runner.py`.
+- `linear` calc_mode отложен на v2 (используется только compound, как и рекомендовала спека).
+- **§8.4 (баннер в формах расхода) не реализован** — в текущей архитектуре проекта партии для расхода выбираются автоматически по FIFO в сервисе `copy_components_from_version` при создании задания на замес, а не вручную в форме. Прогноз остатка с учётом усушки доступен через виджет `ShrinkageWidget` на странице партии (drawer показывает «через 30/60/90 дней останется ≈ X кг»).
+- **§B (типовые seed-значения) реализован как авто-создание профиля при первой партии** — спека рекомендовала «не создавать автоматически», но мы решили иначе: при первой приёмке партии новой номенклатуры (или первой партии готового корма по новому рецепту) `post_save` сигнал в `apps/feed/signals.py` создаёт дефолтный профиль (0.5%/7дн max 4% для сырья, 0.3%/7дн max 2% для готового корма). Пользователь не настраивает усушку вручную — она работает из коробки. Если профиль был соз­дан и потом soft-deleted — повторно не пересоздаётся (уважаем выбор). Отключается через env `FEED_AUTO_CREATE_SHRINKAGE_PROFILE=false`.
+
+**Backend файлы:**
+- `apps/feed/models.py` — `FeedShrinkageProfile`, `FeedLotShrinkageState`
+- `apps/feed/services/shrinkage_runner.py` — алгоритм 5.1
+- `apps/feed/signals.py` — авто-создание дефолтного профиля при первой партии (новинка)
+- `apps/feed/tasks.py` — `apply_feed_shrinkage_task`
+- `apps/feed/views.py` — `FeedShrinkageProfileViewSet`, `FeedLotShrinkageStateViewSet` (+ actions: apply / reset / history), `FeedShrinkageReportView` (с CSV-экспортом)
+- `apps/feed/tests/test_shrinkage_runner.py` — unit-тесты алгоритма
+- `apps/feed/tests/test_shrinkage_api.py` — API-тесты через DRF клиент
+- `apps/feed/tests/test_shrinkage_autocreate.py` — тесты сигнала автосоздания
+- `apps/warehouses/models.py` — расширение `StockMovement.Kind`
+- `apps/common/csv_export.py` — переиспользуемая утилита `wants_csv()` + `stream_csv()`
+- `config/settings.py` — флаг `FEED_AUTO_CREATE_SHRINKAGE_PROFILE`
+
+**Frontend файлы:**
+- `app/(app)/feed/shrinkage-profiles/page.tsx` — таблица профилей с кликом по строке, две таблицы партий (active/frozen)
+- `app/(app)/feed/shrinkage-profiles/ProfileModal.tsx` — CRUD-модалка с live-preview прогноза
+- `app/(app)/feed/shrinkage-profiles/ProfileDetailDrawer.tsx` — drawer с детальной информацией профиля + связанные партии
+- `app/(app)/feed/shrinkage-profiles/StateDetailDrawer.tsx` — drawer состояния партии: KV, прогресс-бар, sparkline, полная таблица движений
+- `app/(app)/reports/feed-shrinkage/page.tsx` — отчёт с фильтрами, KPI и CSV-экспортом
+- `components/ShrinkageWidget.tsx` — переиспользуемый блок (для drawer'ов в `/feed`): профиль, прогресс, sparkline, прогноз 30/60/90 дней
+- `hooks/useFeed.ts` — `shrinkageProfilesCrud`, `shrinkageStatesCrud`, `useApplyShrinkage`, `useResetShrinkage`, `useShrinkageHistory`, `useShrinkageReport`
+- `types/auth.ts`, `components/layout/nav.ts`, `components/ui/Icon.tsx` (добавлена иконка `edit`)
+
+**Тестовое покрытие (67 тестов):**
+- `tests/test_shrinkage_runner.py` (25) — алгоритм: компаунд, грейс, max%, stop, FeedBatch, multi-org, partial consumption, spec §A
+- `tests/test_shrinkage_api.py` (24) — DRF API + RBAC (r/rw/admin границы) + edge cases
+- `tests/test_shrinkage_autocreate.py` (7) — сигналы автосоздания (сырьё + корм + UI-маркер)
+- `tests/test_shrinkage_db_constraints.py` (11) — низкоуровневые `IntegrityError` от Postgres CHECK
 
 ---
 

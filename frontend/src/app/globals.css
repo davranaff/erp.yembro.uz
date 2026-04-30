@@ -2104,3 +2104,74 @@ html { scroll-behavior: smooth; }
   .lp-btn-lg { height: 44px; padding: 0 22px; font-size: 14px; }
 }
 /* ===== /Landing page ======================================================== */
+
+/* ===== Mobile-first daily-log form ========================================== */
+/* Класс .mobile-form применяется к контейнеру простой формы для оператора в
+   полях/курятниках. Большие тач-таргеты, увеличенные инпуты, упрощённый layout.
+   Для бухгалтерии / десктопных форм НЕ использовать — там обычные размеры. */
+
+.mobile-form .field {
+  margin-bottom: 16px;
+}
+.mobile-form .label {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--fg-1);
+  margin-bottom: 6px;
+}
+.mobile-form .input,
+.mobile-form select.input,
+.mobile-form textarea.input {
+  width: 100%;
+  min-height: 48px;            /* WCAG 2.5.5 рекомендует 44px+, ставим 48 */
+  padding: 12px 14px;
+  font-size: 16px;             /* 16px чтобы iOS не зумил при фокусе */
+  border-radius: 10px;
+  border: 1.5px solid var(--border);
+  background: var(--bg-card);
+}
+.mobile-form .input:focus {
+  border-color: var(--brand-orange);
+  outline: 2px solid var(--brand-orange-soft);
+}
+.mobile-form .btn {
+  min-height: 48px;
+  font-size: 16px;
+  padding: 12px 20px;
+  border-radius: 10px;
+}
+.mobile-form .btn-primary {
+  width: 100%;                  /* full-width primary action на мобильнике */
+}
+/* Числовые stepper'ы для веса/количества */
+.mobile-form .num-stepper {
+  display: flex;
+  align-items: stretch;
+  gap: 8px;
+}
+.mobile-form .num-stepper .stepper-btn {
+  flex: 0 0 56px;
+  font-size: 24px;
+  font-weight: 700;
+  background: var(--bg-soft);
+  border: 1.5px solid var(--border);
+  border-radius: 10px;
+  cursor: pointer;
+  user-select: none;
+}
+.mobile-form .num-stepper input {
+  flex: 1;
+  text-align: center;
+  font-family: var(--font-jetbrains, monospace);
+  font-size: 22px;
+  font-weight: 600;
+}
+
+/* Карточка-партия в выпадающем списке батч-селектора (мобильник) */
+@media (max-width: 640px) {
+  .mobile-form { padding: 16px; }
+  .mobile-form h1 { font-size: 22px; margin-bottom: 4px; }
+  .mobile-form .sub { font-size: 13px; color: var(--fg-3); margin-bottom: 20px; }
+}
+/* ===== /Mobile-first ======================================================== */

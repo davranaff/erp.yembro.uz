@@ -305,28 +305,34 @@ export default function TraceabilityPage() {
                 </div>
               </div>
 
-              {/* KPI: 4 финансовых + 4 операционных */}
+              {/* KPI: финансовые показываются только если у юзера есть доступ
+                  к финансам модуля партии (или к ledger).
+                  Backend ставит trace._finances_visible=false и обнуляет cost-поля. */}
               {kpi && (
                 <>
                   <div className="kpi-row" style={{ marginBottom: 12 }}>
-                    <KpiCard
-                      tone="red"
-                      iconName="bag"
-                      label="Накопл. себ-ть"
-                      sub="UZS"
-                      value={fmtUzs(kpi.cost, true)}
-                    />
-                    <KpiCard
-                      tone="orange"
-                      iconName="chart"
-                      label="Себ-ть единицы"
-                      sub={
-                        trace.batch.unit_code
-                          ? `за 1 ${trace.batch.unit_code}`
-                          : 'UZS / ед.'
-                      }
-                      value={fmtUzs(kpi.unitCost, true)}
-                    />
+                    {(trace as { _finances_visible?: boolean })._finances_visible !== false && (
+                      <>
+                        <KpiCard
+                          tone="red"
+                          iconName="bag"
+                          label="Накопл. себ-ть"
+                          sub="UZS"
+                          value={fmtUzs(kpi.cost, true)}
+                        />
+                        <KpiCard
+                          tone="orange"
+                          iconName="chart"
+                          label="Себ-ть единицы"
+                          sub={
+                            trace.batch.unit_code
+                              ? `за 1 ${trace.batch.unit_code}`
+                              : 'UZS / ед.'
+                          }
+                          value={fmtUzs(kpi.unitCost, true)}
+                        />
+                      </>
+                    )}
                     <KpiCard
                       tone={kpi.yieldPct !== null && kpi.yieldPct >= 90 ? 'green' : 'orange'}
                       iconName="check"

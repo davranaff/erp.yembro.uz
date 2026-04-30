@@ -3,6 +3,8 @@ import { Manrope, JetBrains_Mono } from 'next/font/google';
 import { Suspense } from 'react';
 
 import RouteProgress from '@/components/layout/RouteProgress';
+import OfflineIndicator from '@/components/OfflineIndicator';
+import ServiceWorkerRegistration from '@/components/ServiceWorkerRegistration';
 import { NavigationProvider } from '@/contexts/NavigationContext';
 import QueryProvider from '@/providers/QueryProvider';
 
@@ -23,12 +25,19 @@ const jetbrainsMono = JetBrains_Mono({
 export const metadata: Metadata = {
   title: 'YemBro ERP',
   description: 'Учётная система птицеводческого предприятия',
+  manifest: '/manifest.webmanifest',
+  appleWebApp: {
+    capable: true,
+    title: 'YemBro',
+    statusBarStyle: 'default',
+  },
 };
 
 export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
   maximumScale: 5,
+  themeColor: '#E8751A',
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
@@ -40,6 +49,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <RouteProgress />
           </Suspense>
           <QueryProvider>{children}</QueryProvider>
+          <OfflineIndicator />
+          <ServiceWorkerRegistration />
         </NavigationProvider>
       </body>
     </html>

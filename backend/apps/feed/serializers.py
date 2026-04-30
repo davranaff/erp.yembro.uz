@@ -1,9 +1,12 @@
 from rest_framework import serializers
 
+from apps.common.serializers import FinancialFieldsMixin
 from apps.modules.models import Module
 
 from .models import (
     FeedBatch,
+    FeedLotShrinkageState,
+    FeedShrinkageProfile,
     ProductionTask,
     ProductionTaskComponent,
     RawMaterialBatch,
@@ -118,7 +121,11 @@ class RecipeSerializer(serializers.ModelSerializer):
 # ─── Raw material batches ────────────────────────────────────────────────
 
 
-class RawMaterialBatchSerializer(serializers.ModelSerializer):
+class RawMaterialBatchSerializer(FinancialFieldsMixin, serializers.ModelSerializer):
+    # Деньги принадлежат модулю `feed` — видны feed-менеджеру или бухгалтеру (ledger)
+    financial_fields = ("price_per_unit_uzs", "total_cost_uzs")
+    finances_module = "feed"
+
     nomenclature_sku = serializers.SerializerMethodField()
     nomenclature_name = serializers.SerializerMethodField()
     supplier_name = serializers.SerializerMethodField()
@@ -273,7 +280,10 @@ class RawMaterialBatchSerializer(serializers.ModelSerializer):
 # ─── Production tasks ────────────────────────────────────────────────────
 
 
-class ProductionTaskComponentSerializer(serializers.ModelSerializer):
+class ProductionTaskComponentSerializer(FinancialFieldsMixin, serializers.ModelSerializer):
+    financial_fields = ("planned_price_per_unit_uzs", "actual_price_per_unit_uzs")
+    finances_module = "feed"
+
     nomenclature_sku = serializers.SerializerMethodField()
     nomenclature_name = serializers.SerializerMethodField()
     source_batch_doc_number = serializers.SerializerMethodField()
@@ -373,7 +383,11 @@ class ProductionTaskSerializer(serializers.ModelSerializer):
 # ─── Feed batches (read-only) ────────────────────────────────────────────
 
 
-class FeedBatchSerializer(serializers.ModelSerializer):
+class FeedBatchSerializer(FinancialFieldsMixin, serializers.ModelSerializer):
+    # Себестоимость готового корма — деньги модуля feed
+    financial_fields = ("unit_cost_uzs", "total_cost_uzs")
+    finances_module = "feed"
+
     recipe_code = serializers.SerializerMethodField()
     storage_bin_code = serializers.SerializerMethodField()
     task_doc_number = serializers.SerializerMethodField()
@@ -417,3 +431,150 @@ class FeedBatchSerializer(serializers.ModelSerializer):
 
     def get_task_doc_number(self, obj):
         return obj.produced_by_task.doc_number if obj.produced_by_task_id else None
+
+
+# ─── Shrinkage profiles & state ───────────────────────────────────────────
+
+
+class FeedShrinkageProfileSerializer(serializers.ModelSerializer):
+    """CRUD-сериализатор для профиля усушки.
+
+    Валидирует target_type ↔ (nomenclature|recipe) на уровне формы — то же,
+    что enforced CHECK-constraint в БД, но даёт чистое сообщение пользователю
+    до того, как Postgres вернёт IntegrityError.
+    """
+
+    nomenclature_sku = serializers.SerializerMethodField()
+    nomenclature_name = serializers.SerializerMethodField()
+    recipe_code = serializers.SerializerMethodField()
+    recipe_name = serializers.SerializerMethodField()
+    warehouse_code = serializers.SerializerMethodField()
+
+    class Meta:
+        model = FeedShrinkageProfile
+        fields = (
+            "id",
+            "target_type",
+            "nomenclature",
+            "recipe",
+            "warehouse",
+            "period_days",
+            "percent_per_period",
+            "max_total_percent",
+            "stop_after_days",
+            "starts_after_days",
+            "is_active",
+            "note",
+            "nomenclature_sku",
+            "nomenclature_name",
+            "recipe_code",
+            "recipe_name",
+            "warehouse_code",
+            "created_at",
+            "updated_at",
+        )
+        read_only_fields = (
+            "id",
+            "nomenclature_sku",
+            "nomenclature_name",
+            "recipe_code",
+            "recipe_name",
+            "warehouse_code",
+            "created_at",
+            "updated_at",
+        )
+
+    def validate(self, attrs):
+        # Поддерживаем PATCH: при partial берём существующее значение
+        target_type = attrs.get(
+            "target_type",
+            getattr(self.instance, "target_type", None),
+        )
+        nomenclature = attrs.get(
+            "nomenclature",
+            getattr(self.instance, "nomenclature", None) if self.instance else None,
+        )
+        recipe = attrs.get(
+            "recipe",
+            getattr(self.instance, "recipe", None) if self.instance else None,
+        )
+
+        if target_type == FeedShrinkageProfile.TargetType.INGREDIENT:
+            if nomenclature is None:
+                raise serializers.ValidationError(
+                    {"nomenclature": "Обязательно для target_type=ingredient."}
+                )
+            if recipe is not None:
+                raise serializers.ValidationError(
+                    {"recipe": "Заполняется только для target_type=feed_type."}
+                )
+        elif target_type == FeedShrinkageProfile.TargetType.FEED_TYPE:
+            if recipe is None:
+                raise serializers.ValidationError(
+                    {"recipe": "Обязательно для target_type=feed_type."}
+                )
+            if nomenclature is not None:
+                raise serializers.ValidationError(
+                    {"nomenclature": "Заполняется только для target_type=ingredient."}
+                )
+        return attrs
+
+    def get_nomenclature_sku(self, obj):
+        return obj.nomenclature.sku if obj.nomenclature_id else None
+
+    def get_nomenclature_name(self, obj):
+        return obj.nomenclature.name if obj.nomenclature_id else None
+
+    def get_recipe_code(self, obj):
+        return obj.recipe.code if obj.recipe_id else None
+
+    def get_recipe_name(self, obj):
+        return obj.recipe.name if obj.recipe_id else None
+
+    def get_warehouse_code(self, obj):
+        return obj.warehouse.code if obj.warehouse_id else None
+
+
+class FeedLotShrinkageStateSerializer(serializers.ModelSerializer):
+    """Read-only состояние усушки по партии."""
+
+    profile_label = serializers.SerializerMethodField()
+    accumulated_percent = serializers.SerializerMethodField()
+    remaining_quantity = serializers.SerializerMethodField()
+
+    class Meta:
+        model = FeedLotShrinkageState
+        fields = (
+            "id",
+            "lot_type",
+            "lot_id",
+            "profile",
+            "profile_label",
+            "initial_quantity",
+            "accumulated_loss",
+            "accumulated_percent",
+            "remaining_quantity",
+            "last_applied_on",
+            "is_frozen",
+            "created_at",
+            "updated_at",
+        )
+        read_only_fields = fields
+
+    def get_profile_label(self, obj):
+        p = obj.profile
+        if p.nomenclature_id:
+            return f"ingredient · {p.nomenclature.sku}"
+        if p.recipe_id:
+            return f"feed_type · {p.recipe.code}"
+        return ""
+
+    def get_accumulated_percent(self, obj):
+        if not obj.initial_quantity or obj.initial_quantity == 0:
+            return None
+        from decimal import Decimal, ROUND_HALF_UP
+        pct = (obj.accumulated_loss / obj.initial_quantity) * Decimal("100")
+        return str(pct.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP))
+
+    def get_remaining_quantity(self, obj):
+        return str(max(obj.initial_quantity - obj.accumulated_loss, 0))

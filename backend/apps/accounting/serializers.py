@@ -230,3 +230,71 @@ class JournalEntrySerializer(serializers.ModelSerializer):
 
     def get_batch_doc_number(self, obj):
         return obj.batch.doc_number if obj.batch_id else None
+
+
+# ─── Cash advance ─────────────────────────────────────────────────────────
+
+
+class CashAdvanceSerializer(serializers.ModelSerializer):
+    recipient_name = serializers.SerializerMethodField()
+    expense_article_code = serializers.SerializerMethodField()
+    expense_article_name = serializers.SerializerMethodField()
+    closing_je_doc = serializers.SerializerMethodField()
+
+    class Meta:
+        from .models import CashAdvance
+
+        model = CashAdvance
+        fields = (
+            "id",
+            "doc_number",
+            "issued_date",
+            "closed_date",
+            "recipient",
+            "recipient_name",
+            "purpose",
+            "amount_uzs",
+            "spent_amount_uzs",
+            "returned_amount_uzs",
+            "expense_article",
+            "expense_article_code",
+            "expense_article_name",
+            "status",
+            "issued_payment",
+            "closing_journal_entry",
+            "closing_je_doc",
+            "notes",
+            "created_at",
+            "updated_at",
+        )
+        read_only_fields = (
+            "id",
+            "doc_number",
+            "spent_amount_uzs",      # меняется через action /report/
+            "returned_amount_uzs",
+            "closed_date",
+            "status",                # меняется через actions
+            "issued_payment",
+            "closing_journal_entry",
+            "recipient_name",
+            "expense_article_code",
+            "expense_article_name",
+            "closing_je_doc",
+            "created_at",
+            "updated_at",
+        )
+
+    def get_recipient_name(self, obj):
+        u = obj.recipient
+        if not u:
+            return None
+        return u.full_name or u.email
+
+    def get_expense_article_code(self, obj):
+        return obj.expense_article.code if obj.expense_article_id else None
+
+    def get_expense_article_name(self, obj):
+        return obj.expense_article.name if obj.expense_article_id else None
+
+    def get_closing_je_doc(self, obj):
+        return obj.closing_journal_entry.doc_number if obj.closing_journal_entry_id else None

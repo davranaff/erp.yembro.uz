@@ -35,7 +35,7 @@ def _log_sync(*, status: str, stats: Optional[dict] = None,
     retry_backoff=True,
     retry_backoff_max=3600,
     max_retries=5,
-    name="apps.currency.sync_cbu_rates",
+    name="apps.currency.sync_cbu_rates_task",
 )
 def sync_cbu_rates_task(self, on_date: Optional[str] = None) -> dict:
     """

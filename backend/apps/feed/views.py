@@ -3,12 +3,21 @@ from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError as DRFValidationError
 from rest_framework.filters import OrderingFilter, SearchFilter
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
+from rest_framework.views import APIView
 
-from apps.common.viewsets import OrgReadOnlyViewSet, OrgScopedModelViewSet
+from apps.common.permissions import HasModulePermission
+from apps.common.viewsets import (
+    OrganizationContextMixin,
+    OrgReadOnlyViewSet,
+    OrgScopedModelViewSet,
+)
 
 from .models import (
     FeedBatch,
+    FeedLotShrinkageState,
+    FeedShrinkageProfile,
     ProductionTask,
     ProductionTaskComponent,
     RawMaterialBatch,
@@ -18,6 +27,8 @@ from .models import (
 )
 from .serializers import (
     FeedBatchSerializer,
+    FeedLotShrinkageStateSerializer,
+    FeedShrinkageProfileSerializer,
     ProductionTaskComponentSerializer,
     ProductionTaskSerializer,
     RawMaterialBatchSerializer,
@@ -393,3 +404,290 @@ class FeedBatchViewSet(OrgReadOnlyViewSet):
             action_verb=f"feed batch {batch.doc_number} passport rejected · {reason}",
         )
         return Response(self.get_serializer(batch).data)
+
+
+# ─── Shrinkage: profiles + state + report ─────────────────────────────────
+
+
+class FeedShrinkageProfileViewSet(OrgScopedModelViewSet):
+    """CRUD профилей усушки сырья / готового корма (spec §6).
+
+    DELETE мягкий: профиль помечается is_active=False, чтобы не сломать
+    ссылку с FeedLotShrinkageState. Жёсткое удаление через админку.
+    """
+
+    serializer_class = FeedShrinkageProfileSerializer
+    queryset = FeedShrinkageProfile.objects.select_related(
+        "nomenclature", "recipe", "warehouse"
+    )
+    module_code = "feed"
+    filter_backends = [DjangoFilterBackend, OrderingFilter]
+    filterset_fields = [
+        "target_type",
+        "nomenclature",
+        "recipe",
+        "warehouse",
+        "is_active",
+    ]
+    ordering = ["target_type", "-updated_at"]
+
+    def perform_destroy(self, instance):
+        # Soft delete — не ломаем ссылки из FeedLotShrinkageState
+        if instance.is_active:
+            instance.is_active = False
+            instance.save(update_fields=["is_active", "updated_at"])
+            from apps.audit.models import AuditLog
+            self._write_audit(AuditLog.Action.UPDATE, instance, verb="deactivate FeedShrinkageProfile")
+
+
+class FeedLotShrinkageStateViewSet(OrgReadOnlyViewSet):
+    """Read-only состояние усушки по партиям + админские actions:
+
+    - POST /apply         — прогон алгоритма (можно по дате и/или конкретной партии).
+    - POST /{id}/reset    — откат всех движений усушки этой партии и сброс state.
+    """
+
+    serializer_class = FeedLotShrinkageStateSerializer
+    queryset = FeedLotShrinkageState.objects.select_related(
+        "profile__nomenclature", "profile__recipe"
+    )
+    module_code = "feed"
+    filter_backends = [DjangoFilterBackend, OrderingFilter]
+    filterset_fields = ["lot_type", "lot_id", "profile", "is_frozen"]
+    ordering = ["-updated_at"]
+
+    @action(detail=False, methods=["post"], url_path="apply")
+    def apply_now(self, request):
+        """POST /api/feed/shrinkage-state/apply/
+
+        Body (все поля опциональны):
+            { "on_date": "YYYY-MM-DD", "lot_type": "raw_arrival|production_batch", "lot_id": "uuid" }
+
+        - без полей → прогон по всем партиям организации;
+        - с lot_type+lot_id → точечный прогон одной партии (для исправления после редактирования профиля).
+        """
+        from datetime import date as _date
+        from decimal import Decimal
+
+        from .services.shrinkage_runner import (
+            apply_for_organization,
+            apply_for_specific_lot,
+        )
+
+        on_date_str = request.data.get("on_date")
+        try:
+            on_date = _date.fromisoformat(on_date_str) if on_date_str else _date.today()
+        except (TypeError, ValueError):
+            raise DRFValidationError({"on_date": "Ожидается YYYY-MM-DD."})
+
+        lot_type = request.data.get("lot_type")
+        lot_id = request.data.get("lot_id")
+
+        if bool(lot_type) ^ bool(lot_id):
+            raise DRFValidationError(
+                {"detail": "lot_type и lot_id указываются вместе."}
+            )
+
+        if lot_type and lot_id:
+            valid = {c[0] for c in FeedLotShrinkageState.LotType.choices}
+            if lot_type not in valid:
+                raise DRFValidationError({"lot_type": f"Допустимо: {sorted(valid)}."})
+            res = apply_for_specific_lot(lot_type=lot_type, lot_id=lot_id, today=on_date)
+            return Response(_apply_result_to_dict(res))
+
+        results = apply_for_organization(request.organization, today=on_date)
+        applied = [r for r in results if not r.skipped]
+        return Response({
+            "on_date": on_date.isoformat(),
+            "lots_total": len(results),
+            "lots_applied": len(applied),
+            "loss_kg": str(sum((r.loss_kg for r in applied), Decimal("0"))),
+            "movements": sum(1 for r in applied if r.movement_id),
+            "results": [_apply_result_to_dict(r) for r in results],
+        })
+
+    @action(detail=True, methods=["get"], url_path="history")
+    def history(self, request, pk=None):
+        """GET /api/feed/shrinkage-state/{id}/history/
+
+        Возвращает хронологию списаний усушки по партии: каждое движение —
+        точка `{date, lost_kg, remaining_kg}`. Используется фронтом для
+        sparkline в виджете партии.
+        """
+        from decimal import Decimal
+
+        from django.contrib.contenttypes.models import ContentType
+
+        from apps.warehouses.models import StockMovement
+
+        state = self.get_object()
+        ct = ContentType.objects.get_for_model(FeedLotShrinkageState)
+        movements = (
+            StockMovement.objects.filter(
+                kind=StockMovement.Kind.SHRINKAGE,
+                source_content_type=ct,
+                source_object_id=state.id,
+            )
+            .order_by("date")
+            .values("id", "date", "quantity", "amount_uzs")
+        )
+
+        initial = Decimal(state.initial_quantity)
+        running_loss = Decimal("0")
+        points = []
+        for m in movements:
+            running_loss += Decimal(m["quantity"])
+            points.append({
+                "movement_id": str(m["id"]),
+                "date": m["date"].date().isoformat() if m["date"] else None,
+                "lost_kg": str(m["quantity"]),
+                "lost_uzs": str(m["amount_uzs"]),
+                "cumulative_loss_kg": str(running_loss),
+                "remaining_kg": str(max(initial - running_loss, Decimal("0"))),
+            })
+
+        return Response({
+            "state_id": str(state.id),
+            "initial_quantity": str(initial),
+            "accumulated_loss": str(state.accumulated_loss),
+            "is_frozen": state.is_frozen,
+            "points": points,
+        })
+
+    @action(detail=True, methods=["post"], url_path="reset")
+    def reset(self, request, pk=None):
+        """POST /api/feed/shrinkage-state/{id}/reset/ — админская операция.
+
+        Откатывает все StockMovement(kind=shrinkage) этой партии, восстанавливает
+        current_quantity и сбрасывает state в исходное состояние. Следующий цикл
+        алгоритма пересчитает усушку с нуля.
+        """
+        state = self.get_object()
+        from .services.shrinkage_runner import reset_lot_shrinkage
+
+        info = reset_lot_shrinkage(state)
+        from apps.audit.models import AuditLog
+        self._write_audit(
+            AuditLog.Action.UNPOST,
+            state,
+            verb=f"reset shrinkage state {state.id}: reverted={info['reverted_movements']}",
+        )
+        return Response({
+            "ok": True,
+            "reverted_movements": info["reverted_movements"],
+            "restored_kg": str(info["restored_kg"]),
+        })
+
+
+def _apply_result_to_dict(r):
+    return {
+        "lot_type": r.lot_type,
+        "lot_id": r.lot_id,
+        "skipped": r.skipped,
+        "skipped_reason": r.skipped_reason or None,
+        "loss_kg": str(r.loss_kg),
+        "periods_applied": r.periods_applied,
+        "frozen": r.frozen,
+        "state_id": r.state_id,
+        "movement_id": r.movement_id,
+    }
+
+
+class FeedShrinkageReportView(OrganizationContextMixin, APIView):
+    """GET /api/feed/shrinkage-report/ — агрегированный отчёт «Потери от усушки».
+
+    ?date_from=YYYY-MM-DD&date_to=YYYY-MM-DD&group_by=ingredient|warehouse
+
+    Возвращает: список строк {key, label, total_loss_kg, total_loss_uzs}
+    + summary {date_from, date_to, total_kg, total_uzs}.
+    """
+
+    module_code = "feed"
+    permission_classes = [IsAuthenticated, HasModulePermission]
+
+    def get(self, request, *args, **kwargs):
+        from datetime import date as _date
+        from decimal import Decimal
+        from django.db.models import Sum
+
+        from apps.warehouses.models import StockMovement
+
+        df = request.query_params.get("date_from")
+        dt = request.query_params.get("date_to")
+        group_by = request.query_params.get("group_by", "ingredient")
+        if group_by not in {"ingredient", "warehouse"}:
+            raise DRFValidationError({"group_by": "Допустимо: ingredient | warehouse."})
+
+        try:
+            df_d = _date.fromisoformat(df) if df else None
+            dt_d = _date.fromisoformat(dt) if dt else None
+        except ValueError:
+            raise DRFValidationError({"detail": "Даты ожидаются в формате YYYY-MM-DD."})
+
+        qs = StockMovement.objects.filter(
+            organization=request.organization,
+            kind=StockMovement.Kind.SHRINKAGE,
+        )
+        if df_d:
+            qs = qs.filter(date__date__gte=df_d)
+        if dt_d:
+            qs = qs.filter(date__date__lte=dt_d)
+
+        if group_by == "ingredient":
+            grouped = (
+                qs.values("nomenclature_id", "nomenclature__sku", "nomenclature__name")
+                .annotate(total_kg=Sum("quantity"), total_uzs=Sum("amount_uzs"))
+                .order_by("-total_kg")
+            )
+            rows = [
+                {
+                    "key": str(r["nomenclature_id"]),
+                    "label": f"{r['nomenclature__sku']} · {r['nomenclature__name']}",
+                    "total_loss_kg": str(r["total_kg"] or Decimal("0")),
+                    "total_loss_uzs": str(r["total_uzs"] or Decimal("0")),
+                }
+                for r in grouped
+            ]
+        else:
+            grouped = (
+                qs.values("warehouse_from_id", "warehouse_from__code", "warehouse_from__name")
+                .annotate(total_kg=Sum("quantity"), total_uzs=Sum("amount_uzs"))
+                .order_by("-total_kg")
+            )
+            rows = [
+                {
+                    "key": str(r["warehouse_from_id"]) if r["warehouse_from_id"] else None,
+                    "label": (
+                        f"{r['warehouse_from__code']} · {r['warehouse_from__name']}"
+                        if r["warehouse_from_id"]
+                        else "(без склада)"
+                    ),
+                    "total_loss_kg": str(r["total_kg"] or Decimal("0")),
+                    "total_loss_uzs": str(r["total_uzs"] or Decimal("0")),
+                }
+                for r in grouped
+            ]
+
+        agg = qs.aggregate(total_kg=Sum("quantity"), total_uzs=Sum("amount_uzs"))
+        total_kg = agg["total_kg"] or Decimal("0")
+        total_uzs = agg["total_uzs"] or Decimal("0")
+
+        from apps.common.csv_export import stream_csv, wants_csv
+        if wants_csv(request):
+            label_col = "Ингредиент" if group_by == "ingredient" else "Склад"
+            header = [label_col, "Списано (кг)", "Стоимость (UZS)"]
+            data_rows = [[r["label"], r["total_loss_kg"], r["total_loss_uzs"]] for r in rows]
+            data_rows.append(["Итого", str(total_kg), str(total_uzs)])
+            period = f"{df_d or 'all'}_{dt_d or 'all'}"
+            return stream_csv(f"feed-shrinkage_{group_by}_{period}.csv", header, data_rows)
+
+        return Response({
+            "date_from": df_d.isoformat() if df_d else None,
+            "date_to": dt_d.isoformat() if dt_d else None,
+            "group_by": group_by,
+            "rows": rows,
+            "summary": {
+                "total_loss_kg": str(total_kg),
+                "total_loss_uzs": str(total_uzs),
+            },
+        })

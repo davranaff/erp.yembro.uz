@@ -3,6 +3,8 @@ from django.contrib import admin
 from .models import (
     FeedBatch,
     FeedConsumptionPlan,
+    FeedLotShrinkageState,
+    FeedShrinkageProfile,
     LabResult,
     NomenclatureNutritionProfile,
     ProductionTask,
@@ -204,6 +206,51 @@ class FeedBatchAdmin(admin.ModelAdmin):
         "storage_bin",
         "storage_warehouse",
     )
+
+
+@admin.register(FeedShrinkageProfile)
+class FeedShrinkageProfileAdmin(admin.ModelAdmin):
+    list_display = (
+        "id",
+        "organization",
+        "target_type",
+        "nomenclature",
+        "recipe",
+        "warehouse",
+        "period_days",
+        "percent_per_period",
+        "max_total_percent",
+        "is_active",
+    )
+    list_filter = ("organization", "target_type", "is_active")
+    search_fields = ("nomenclature__sku", "recipe__code", "note")
+    autocomplete_fields = ("organization", "nomenclature", "recipe", "warehouse")
+
+
+@admin.register(FeedLotShrinkageState)
+class FeedLotShrinkageStateAdmin(admin.ModelAdmin):
+    list_display = (
+        "id",
+        "organization",
+        "lot_type",
+        "lot_id",
+        "profile",
+        "initial_quantity",
+        "accumulated_loss",
+        "last_applied_on",
+        "is_frozen",
+    )
+    list_filter = ("organization", "lot_type", "is_frozen")
+    search_fields = ("lot_id",)
+    readonly_fields = (
+        "lot_type",
+        "lot_id",
+        "initial_quantity",
+        "accumulated_loss",
+        "last_applied_on",
+        "is_frozen",
+    )
+    autocomplete_fields = ("organization", "profile")
 
 
 @admin.register(FeedConsumptionPlan)

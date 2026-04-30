@@ -2,6 +2,7 @@ from django.urls import path
 from rest_framework.routers import DefaultRouter
 
 from .views import (
+    CashAdvanceViewSet,
     ExpenseArticleViewSet,
     GLAccountViewSet,
     GLSubaccountViewSet,
@@ -15,6 +16,7 @@ router.register(r"accounts", GLAccountViewSet, basename="glaccount")
 router.register(r"subaccounts", GLSubaccountViewSet, basename="glsubaccount")
 router.register(r"entries", JournalEntryViewSet, basename="journalentry")
 router.register(r"expense-articles", ExpenseArticleViewSet, basename="expensearticle")
+router.register(r"cash-advances", CashAdvanceViewSet, basename="cashadvance")
 
 app_name = "accounting"
 

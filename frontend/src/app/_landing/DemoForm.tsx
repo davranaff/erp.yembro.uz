@@ -9,6 +9,9 @@ export default function DemoForm() {
   const [name, setName] = useState('');
   const [contact, setContact] = useState('');
   const [company, setCompany] = useState('');
+  // Honeypot — невидимое поле, реальный пользователь его не заполнит.
+  // Боты-автозаполнители часто хватают любой текстовый input → попадают.
+  const [website, setWebsite] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -38,7 +41,12 @@ export default function DemoForm() {
     try {
       await apiFetch('/api/landing/demo/', {
         method: 'POST',
-        body: { name: name.trim(), contact: contact.trim(), company: company.trim() },
+        body: {
+          name: name.trim(),
+          contact: contact.trim(),
+          company: company.trim(),
+          website,  // honeypot — обычно пусто, бот заполнит → backend отбросит
+        },
         skipAuth: true,
         skipOrg: true,
       });
@@ -89,6 +97,32 @@ export default function DemoForm() {
             onChange={e => setCompany(e.target.value)}
           />
         </div>
+
+        {/* Honeypot: невидимо для людей, заполняется только ботами.
+            Если поле пришло непустым — backend тихо отбрасывает заявку. */}
+        <div
+          aria-hidden="true"
+          style={{
+            position: 'absolute',
+            left: -9999,
+            width: 1,
+            height: 1,
+            overflow: 'hidden',
+          }}
+        >
+          <label>
+            Не заполняйте это поле:
+            <input
+              type="text"
+              name="website"
+              tabIndex={-1}
+              autoComplete="off"
+              value={website}
+              onChange={e => setWebsite(e.target.value)}
+            />
+          </label>
+        </div>
+
         {error && <div className="lp-form-error">{error}</div>}
         <button
           type="submit"

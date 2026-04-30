@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 
 import OrgSelector from '@/components/auth/OrgSelector';
@@ -23,6 +23,20 @@ export default function Sidebar() {
   // Закреплённые страницы (per-user, синк с бэкендом).
   // Список загружается лениво; пока не пришёл — секция не рендерится.
   const { data: favorites = [] } = useFavorites();
+
+  // Активный href = самый длинный из всех навигационных, который матчит pathname.
+  // Без этого «/feed» подсвечивался бы вместе с «/feed/shrinkage-profiles».
+  const activeHref = useMemo(() => {
+    const all = [...flatItems().map((i) => i.href), ...favorites.map((f) => f.href)];
+    let best = '';
+    for (const href of all) {
+      if (!href) continue;
+      const matches = pathname === href
+        || (href !== '/' && pathname.startsWith(href + '/'));
+      if (matches && href.length > best.length) best = href;
+    }
+    return best;
+  }, [pathname, favorites]);
 
   const go = (href: string) => {
     if (isNavigating) return;             // защита от двойного клика
@@ -113,10 +127,7 @@ export default function Sidebar() {
             {visibleFavorites.map((fav) => {
               const navItem = navByHref.get(fav.href);
               const icon = navItem?.icon ?? 'star';
-              const active = pathname === fav.href || (
-                fav.href !== '/' &&
-                pathname.startsWith(fav.href + '/')
-              );
+              const active = fav.href === activeHref;
               const isTarget = isNavigating && targetPath === fav.href;
               return (
                 <div
@@ -154,11 +165,10 @@ export default function Sidebar() {
             if (isGroup(entry)) {
               return <div key={`g-${i}`} className="nav-group">{entry.group}</div>;
             }
-            // Точное совпадение или вложенный подпуть.
-            // (Раньше брался только первый сегмент → /finance/cashbox и
-            // /finance/rates подсвечивались оба.)
-            const active = pathname === entry.href
-              || (entry.href !== '/' && pathname.startsWith(entry.href + '/'));
+            // Активным считаем только пункт с самым длинным матчащим href —
+            // иначе родительский «/feed» подсвечивался бы вместе с дочерним
+            // «/feed/shrinkage-profiles». Логика вычислена в activeHref выше.
+            const active = entry.href === activeHref;
             const isTarget = isNavigating && targetPath === entry.href;
             return (
               <div
