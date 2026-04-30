@@ -26,7 +26,7 @@ import { useNavigationStatus } from '@/contexts/NavigationContext';
 export default function RouteProgress() {
   const pathname = usePathname();
   const search = useSearchParams();
-  const { isNavigating, startNavigation, endNavigation } = useNavigationStatus();
+  const { isNavigating, targetPath, startNavigation, endNavigation } = useNavigationStatus();
   const [state, setState] = useState<'idle' | 'loading' | 'done'>('idle');
   const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const startTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
