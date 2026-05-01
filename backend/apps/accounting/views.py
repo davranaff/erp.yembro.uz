@@ -48,6 +48,11 @@ class GLSubaccountViewSet(OrgScopedModelViewSet):
     filterset_fields = ["account", "module"]
     search_fields = ["code", "name"]
     ordering = ["code"]
+    # Справочник плана счетов небольшой (десятки записей), но критичен для
+    # выпадающих списков (касса/банк, счёт расхода). Default-пагинация в 25
+    # записей резала 50.XX/51.XX за второй страницей и UI получал пустой
+    # select. Отключаем — отдаём весь справочник одним списком.
+    pagination_class = None
 
     def _save_kwargs_for_create(self, serializer) -> dict:
         """
