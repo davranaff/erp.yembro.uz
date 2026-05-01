@@ -379,3 +379,92 @@ def compute_pl_report(
         total_expense=total_expense,
         profit=total_revenue - total_expense,
     )
+
+
+# ─── P&L по модулям ─────────────────────────────────────────────────────
+
+
+@dataclass
+class PlModuleRow:
+    module_code: str          # "feedlot", "matочник", ..., "—" если без тэга
+    module_name: str          # human-readable
+    revenue: Decimal
+    expense: Decimal
+    profit: Decimal
+
+
+@dataclass
+class PlByModuleResult:
+    date_from: str
+    date_to: str
+    rows: list[PlModuleRow] = field(default_factory=list)
+    total_revenue: Decimal = Decimal("0")
+    total_expense: Decimal = Decimal("0")
+    total_profit: Decimal = Decimal("0")
+
+
+def compute_pl_by_module(
+    organization,
+    *,
+    date_from: date_cls,
+    date_to: date_cls,
+) -> PlByModuleResult:
+    """Прибыль/расход в разрезе модулей за период.
+
+    Транспонирование стандартного P&L: вместо «доходы по субсчётам» отдаём
+    «доходы по модулям». Тег модуля берётся из `JournalEntry.module`. Если
+    проводка без модуля — попадает в специальный код `—` (без привязки).
+
+    Используется для понимания рентабельности направлений (маточник vs
+    откорм vs убойня и т.д.) — тот же P&L, но сгруппированный иначе.
+    """
+    # Используем уже посчитанные by_module breakdown'ы из основного P&L —
+    # двойной проход не нужен, JE уже агрегированы по субсчётам.
+    base = compute_pl_report(
+        organization, date_from=date_from, date_to=date_to,
+    )
+
+    rev_by_module: dict[str, Decimal] = {}
+    exp_by_module: dict[str, Decimal] = {}
+
+    for r in base.revenue:
+        for code, amount in r.by_module.items():
+            rev_by_module[code] = rev_by_module.get(code, Decimal("0")) + amount
+    for r in base.expense:
+        for code, amount in r.by_module.items():
+            exp_by_module[code] = exp_by_module.get(code, Decimal("0")) + amount
+
+    all_codes = set(rev_by_module) | set(exp_by_module)
+
+    # Resolve module names в одном запросе.
+    from apps.modules.models import Module
+    name_map = dict(
+        Module.objects.filter(code__in=[c for c in all_codes if c != "—"])
+        .values_list("code", "name")
+    )
+
+    rows: list[PlModuleRow] = []
+    for code in sorted(all_codes):
+        rev = rev_by_module.get(code, Decimal("0"))
+        exp = exp_by_module.get(code, Decimal("0"))
+        rows.append(PlModuleRow(
+            module_code=code,
+            module_name=name_map.get(code, "Без модуля" if code == "—" else code),
+            revenue=rev,
+            expense=exp,
+            profit=rev - exp,
+        ))
+
+    # Сортировка: «Без модуля» в конец, остальные по убыванию прибыли.
+    rows.sort(
+        key=lambda r: (r.module_code == "—", -r.profit),
+    )
+
+    return PlByModuleResult(
+        date_from=date_from.isoformat(),
+        date_to=date_to.isoformat(),
+        rows=rows,
+        total_revenue=base.total_revenue,
+        total_expense=base.total_expense,
+        total_profit=base.profit,
+    )

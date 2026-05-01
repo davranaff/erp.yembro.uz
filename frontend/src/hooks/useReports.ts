@@ -141,3 +141,43 @@ export function usePlReport(params: {
     staleTime: 60_000,
   });
 }
+
+
+// ─── P&L по модулям ─────────────────────────────────────────────
+
+
+export interface PlModuleRow {
+  module_code: string;
+  module_name: string;
+  revenue: string;
+  expense: string;
+  profit: string;
+}
+
+export interface PlByModuleResponse {
+  date_from: string;
+  date_to: string;
+  rows: PlModuleRow[];
+  total_revenue: string;
+  total_expense: string;
+  total_profit: string;
+}
+
+export function usePlByModule(params: {
+  date_from: string;
+  date_to: string;
+  enabled?: boolean;
+}) {
+  const { date_from, date_to, enabled = true } = params;
+  const qs = new URLSearchParams();
+  qs.set('date_from', date_from);
+  qs.set('date_to', date_to);
+  return useQuery<PlByModuleResponse, ApiError>({
+    queryKey: ['reports', 'pl-by-module', qs.toString()],
+    enabled: enabled && Boolean(date_from && date_to),
+    queryFn: () => apiFetch<PlByModuleResponse>(
+      `/api/accounting/reports/pl-by-module/?${qs.toString()}`,
+    ),
+    staleTime: 60_000,
+  });
+}

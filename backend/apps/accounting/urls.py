@@ -8,7 +8,12 @@ from .views import (
     GLSubaccountViewSet,
     JournalEntryViewSet,
 )
-from .views_reports import GlLedgerView, PlReportView, TrialBalanceView
+from .views_reports import (
+    GlLedgerView,
+    PlByModuleReportView,
+    PlReportView,
+    TrialBalanceView,
+)
 
 
 router = DefaultRouter()
@@ -24,4 +29,9 @@ urlpatterns = router.urls + [
     path("reports/trial-balance/", TrialBalanceView.as_view(), name="report-trial-balance"),
     path("reports/gl-ledger/", GlLedgerView.as_view(), name="report-gl-ledger"),
     path("reports/pl/", PlReportView.as_view(), name="report-pl"),
+    path(
+        "reports/pl-by-module/",
+        PlByModuleReportView.as_view(),
+        name="report-pl-by-module",
+    ),
 ]

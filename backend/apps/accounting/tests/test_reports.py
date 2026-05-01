@@ -14,6 +14,7 @@ import pytest
 from apps.accounting.models import GLAccount, GLSubaccount, JournalEntry
 from apps.accounting.services.reports import (
     compute_gl_ledger,
+    compute_pl_by_module,
     compute_pl_report,
     compute_trial_balance,
 )
@@ -214,3 +215,92 @@ def test_pl_report_revenue_minus_expense_equals_profit(
     assert result.total_revenue == Decimal("70.00")
     assert result.total_expense == Decimal("0.00")
     assert result.profit == Decimal("70.00")
+
+
+# ─── P&L по модулям ───────────────────────────────────────────
+
+
+def test_pl_by_module_aggregates_revenue_expense_per_module(
+    org, sub_90_01, sub_90_02, sub_60_01, user,
+):
+    """Доход 100 на feedlot + 200 на slaughter, расход 30 на feedlot."""
+    if not (sub_90_01 and sub_90_02 and sub_60_01):
+        pytest.skip("Нужны субсчета 90.01, 90.02, 60.01")
+
+    m_feedlot = Module.objects.get(code="feedlot")
+    m_slaughter = Module.objects.get(code="slaughter")
+
+    JournalEntry.objects.create(
+        organization=org, module=m_feedlot,
+        doc_number="ПР-PM-1", entry_date=date(2026, 7, 5),
+        description="Выручка feedlot",
+        debit_subaccount=sub_60_01, credit_subaccount=sub_90_01,
+        amount_uzs=Decimal("100.00"), created_by=user,
+    )
+    JournalEntry.objects.create(
+        organization=org, module=m_slaughter,
+        doc_number="ПР-PM-2", entry_date=date(2026, 7, 5),
+        description="Выручка slaughter",
+        debit_subaccount=sub_60_01, credit_subaccount=sub_90_01,
+        amount_uzs=Decimal("200.00"), created_by=user,
+    )
+    JournalEntry.objects.create(
+        organization=org, module=m_feedlot,
+        doc_number="ПР-PM-3", entry_date=date(2026, 7, 5),
+        description="Себест feedlot",
+        debit_subaccount=sub_90_02, credit_subaccount=sub_60_01,
+        amount_uzs=Decimal("30.00"), created_by=user,
+    )
+
+    result = compute_pl_by_module(
+        org, date_from=date(2026, 7, 1), date_to=date(2026, 7, 31),
+    )
+
+    by_code = {r.module_code: r for r in result.rows}
+    assert "feedlot" in by_code and "slaughter" in by_code
+    # 90.01 (доход) минус 90.02 (себест) — оба попадают в revenue stream:
+    # feedlot: 100 (90.01) − 30 (90.02 кредит на закрытии нет, debit 30) =
+    #   (90.01 cred 100) + (90.02 cred 0 − debit 30) = 100 − 30 = 70
+    assert by_code["feedlot"].revenue == Decimal("70.00")
+    assert by_code["slaughter"].revenue == Decimal("200.00")
+    assert by_code["feedlot"].profit == Decimal("70.00")
+    assert by_code["slaughter"].profit == Decimal("200.00")
+    # totals
+    assert result.total_revenue == Decimal("270.00")
+    assert result.total_profit == Decimal("270.00")
+
+
+def test_pl_by_module_handles_entries_without_module(
+    org, sub_90_01, sub_60_01, user,
+):
+    """Проводка без module → попадает в строку '—'."""
+    if not (sub_90_01 and sub_60_01):
+        pytest.skip("Нужны субсчета 90.01, 60.01")
+
+    JournalEntry.objects.create(
+        organization=org, module=None,
+        doc_number="ПР-PM-NOMOD", entry_date=date(2026, 7, 5),
+        description="Без модуля",
+        debit_subaccount=sub_60_01, credit_subaccount=sub_90_01,
+        amount_uzs=Decimal("50.00"), created_by=user,
+    )
+
+    result = compute_pl_by_module(
+        org, date_from=date(2026, 7, 1), date_to=date(2026, 7, 31),
+    )
+    by_code = {r.module_code: r for r in result.rows}
+    assert "—" in by_code
+    assert by_code["—"].revenue == Decimal("50.00")
+    # Не-привязанные сортируются в конец.
+    assert result.rows[-1].module_code == "—"
+
+
+def test_pl_by_module_empty_period_returns_zero(org):
+    """Период без проводок → пустые rows + нулевые totals."""
+    result = compute_pl_by_module(
+        org, date_from=date(2026, 1, 1), date_to=date(2026, 1, 31),
+    )
+    assert result.rows == []
+    assert result.total_revenue == Decimal("0")
+    assert result.total_expense == Decimal("0")
+    assert result.total_profit == Decimal("0")

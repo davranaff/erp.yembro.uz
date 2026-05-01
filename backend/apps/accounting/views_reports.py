@@ -25,6 +25,7 @@ from apps.common.viewsets import OrganizationContextMixin
 from .models import GLSubaccount
 from .services.reports import (
     compute_gl_ledger,
+    compute_pl_by_module,
     compute_pl_report,
     compute_trial_balance,
 )
@@ -321,4 +322,59 @@ class PlReportView(_AccountingReadView):
             "total_revenue": str(result.total_revenue),
             "total_expense": str(result.total_expense),
             "profit": str(result.profit),
+        })
+
+
+class PlByModuleReportView(_AccountingReadView):
+    """
+    GET /api/accounting/reports/pl-by-module/?date_from=&date_to=&format=csv
+
+    Прибыль/расход в разрезе модулей. Использует JournalEntry.module как
+    аналитический тег. Транспонирование стандартного P&L.
+    """
+
+    def get(self, request):
+        date_from = _parse_date(request.query_params.get("date_from"), name="date_from")
+        date_to = _parse_date(request.query_params.get("date_to"), name="date_to")
+
+        result = compute_pl_by_module(
+            request.organization,
+            date_from=date_from, date_to=date_to,
+        )
+
+        if _wants_csv(request):
+            header = ["Модуль", "Код", "Доход", "Расход", "Прибыль"]
+            data_rows = [
+                [r.module_name, r.module_code,
+                 _decimal_str(r.revenue), _decimal_str(r.expense),
+                 _decimal_str(r.profit)]
+                for r in result.rows
+            ]
+            data_rows.append([
+                "Итого", "",
+                _decimal_str(result.total_revenue),
+                _decimal_str(result.total_expense),
+                _decimal_str(result.total_profit),
+            ])
+            return _stream_csv(
+                f"pl-by-module-{date_from}-{date_to}.csv",
+                header, data_rows,
+            )
+
+        return Response({
+            "date_from": result.date_from,
+            "date_to": result.date_to,
+            "rows": [
+                {
+                    "module_code": r.module_code,
+                    "module_name": r.module_name,
+                    "revenue": str(r.revenue),
+                    "expense": str(r.expense),
+                    "profit": str(r.profit),
+                }
+                for r in result.rows
+            ],
+            "total_revenue": str(result.total_revenue),
+            "total_expense": str(result.total_expense),
+            "total_profit": str(result.total_profit),
         })

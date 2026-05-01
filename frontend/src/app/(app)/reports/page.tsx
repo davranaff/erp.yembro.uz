@@ -108,6 +108,13 @@ export default function ReportsHomePage() {
           icon="chart"
         />
         <ReportCard
+          href={`/reports/pl-by-module?date_from=${dateFrom}&date_to=${dateTo}`}
+          title="Прибыль по модулям"
+          subtitle="Кто сколько заработал"
+          desc="Та же P&L, но в разрезе модулей: маточник, откорм, инкубация, убойня, корма, вет."
+          icon="chart"
+        />
+        <ReportCard
           href="/reports/feed-shrinkage"
           title="Потери от усушки"
           subtitle="Списания по корму"
