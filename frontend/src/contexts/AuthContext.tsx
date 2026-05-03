@@ -20,8 +20,17 @@ interface AuthContextValue {
   setOrg: (org: ActiveOrg) => void;
   permissions: Record<string, ModuleLevel>;
   hasLevel: (module: string, min?: ModuleLevel) => boolean;
+  /** Включён ли модуль для текущей организации (org-level toggle в /settings). */
+  isModuleEnabled: (module: string) => boolean;
+  /** Комбо-проверка для route/nav гейтов: модуль включён И есть RBAC-уровень. */
+  hasAccess: (module: string, min?: ModuleLevel) => boolean;
   logout: () => void;
 }
+
+// Системные модули, которые backend никогда не блокирует — даже если
+// /me не вернул `enabled_modules` (старая сессия), они всё равно считаются
+// включёнными. Должны совпадать с SYSTEM_MODULES в backend permissions.py.
+const SYSTEM_MODULES: ReadonlySet<string> = new Set(['admin', 'ledger', 'core']);
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
@@ -51,12 +60,44 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return m?.module_permissions ?? {};
   }, [user, org]);
 
+  // Set кодов включённых модулей. Если backend не вернул поле (старая
+  // сессия / старый бек) — fallback на «все включены», чтобы не сломать
+  // существующих пользователей.
+  const enabledModules = useMemo<ReadonlySet<string>>(() => {
+    if (!user || !org) return new Set();
+    const m = user.memberships.find((x) => x.organization.code === org.code);
+    if (!m?.enabled_modules) return new Set();
+    return new Set(m.enabled_modules);
+  }, [user, org]);
+
   const hasLevel = useCallback(
     (module: string, min: ModuleLevel = 'r'): boolean => {
       const actual = permissions[module] ?? 'none';
       return LEVEL_ORDER[actual] >= LEVEL_ORDER[min];
     },
     [permissions],
+  );
+
+  const isModuleEnabled = useCallback(
+    (module: string): boolean => {
+      // Системные модули — всегда включены (см. SYSTEM_MODULES в backend).
+      if (SYSTEM_MODULES.has(module)) return true;
+      // Back-compat: если backend вообще не отдал enabled_modules
+      // (пустой Set после загрузки me, но membership найден и valid) —
+      // считаем что модуль включён. Это покрывает старые сессии, где
+      // `enabled_modules` ещё не было в ответе.
+      const m = user?.memberships?.find((x) => x.organization.code === org?.code);
+      if (!m || m.enabled_modules === undefined) return true;
+      return enabledModules.has(module);
+    },
+    [enabledModules, user, org],
+  );
+
+  const hasAccess = useCallback(
+    (module: string, min: ModuleLevel = 'r'): boolean => {
+      return isModuleEnabled(module) && hasLevel(module, min);
+    },
+    [isModuleEnabled, hasLevel],
   );
 
   const logout = useCallback(() => {
@@ -75,6 +116,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setOrg,
     permissions,
     hasLevel,
+    isModuleEnabled,
+    hasAccess,
     logout,
   };
 

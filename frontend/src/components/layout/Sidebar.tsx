@@ -15,7 +15,7 @@ import { flatItems, NAV, NAV_FOOTER, isGroup, type NavEntry, type NavGroup, type
 export default function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
-  const { org, hasLevel, user } = useAuth();
+  const { org, hasAccess, user } = useAuth();
   const { isNavigating, targetPath, startNavigation } = useNavigationStatus();
   const { closeSidebar } = useLayout();
   const [orgPickerOpen, setOrgPickerOpen] = useState(false);
@@ -47,7 +47,9 @@ export default function Sidebar() {
 
   const allowed = (item: NavItem) => {
     if (!item.module) return true;
-    return hasLevel(item.module, item.min ?? 'r');
+    // hasAccess = модуль включён для орги (org-level toggle) И есть RBAC-уровень.
+    // Если владелец отключил модуль через /settings — пункт пропадает из nav.
+    return hasAccess(item.module, item.min ?? 'r');
   };
 
   // Карта nav-items по href — для проверки прав на закреплённую страницу

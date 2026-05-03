@@ -1,9 +1,11 @@
 from django.utils import timezone
 from django_filters.rest_framework import DjangoFilterBackend
+from rest_framework.exceptions import ValidationError as DRFValidationError
 from rest_framework.filters import OrderingFilter, SearchFilter
 
 from apps.audit.models import AuditLog
 from apps.audit.services.writer import audit_log
+from apps.common.permissions import SYSTEM_MODULES
 from apps.common.viewsets import GlobalReadOnlyViewSet, OrgScopedModelViewSet
 
 from .models import Module, OrganizationModule
@@ -47,6 +49,15 @@ class OrganizationModuleViewSet(OrgScopedModelViewSet):
         instance = serializer.instance
         was_enabled = instance.is_enabled
         new_enabled = serializer.validated_data.get("is_enabled", was_enabled)
+        # Блокируем выключение системных модулей — иначе owner залочит сам
+        # себя из админки/учёта/справочников. См. SYSTEM_MODULES.
+        if instance.module.code in SYSTEM_MODULES and not new_enabled:
+            raise DRFValidationError({
+                "is_enabled": (
+                    f"Модуль «{instance.module.code}» — системный, "
+                    f"его нельзя отключить."
+                ),
+            })
         if not was_enabled and new_enabled and not instance.enabled_at:
             serializer.validated_data.setdefault("enabled_at", timezone.now())
         updated = serializer.save()

@@ -54,6 +54,7 @@ class MembershipModulePermissionSerializer(serializers.Serializer):
 class MembershipSerializer(serializers.ModelSerializer):
     organization = MembershipOrgSerializer(read_only=True)
     module_permissions = serializers.SerializerMethodField()
+    enabled_modules = serializers.SerializerMethodField()
 
     class Meta:
         model = OrganizationMembership
@@ -66,10 +67,34 @@ class MembershipSerializer(serializers.ModelSerializer):
             "is_active",
             "joined_at",
             "module_permissions",
+            "enabled_modules",
         )
 
     def get_module_permissions(self, obj):
         return MembershipModulePermissionSerializer().to_representation(obj)
+
+    def get_enabled_modules(self, obj):
+        """Список кодов активных модулей для организации этого membership.
+
+        Default-allow: модули без записи в `OrganizationModule` считаются
+        включёнными (back-compat для орг, где не все строки посеяны).
+        Системные модули (admin/ledger/core) присутствуют всегда — даже
+        если кто-то выставил is_enabled=False напрямую через БД,
+        backend всё равно их пускает (см. SYSTEM_MODULES в permissions.py).
+        """
+        from apps.common.permissions import SYSTEM_MODULES
+        from apps.modules.models import Module, OrganizationModule
+
+        explicit = dict(
+            OrganizationModule.objects
+            .filter(organization=obj.organization)
+            .values_list("module__code", "is_enabled")
+        )
+        all_codes = Module.objects.filter(is_active=True).values_list("code", flat=True)
+        return sorted(
+            code for code in all_codes
+            if explicit.get(code, True) or code in SYSTEM_MODULES
+        )
 
 
 class UserSerializer(serializers.ModelSerializer):

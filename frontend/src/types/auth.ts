@@ -25,6 +25,10 @@ export interface Membership {
   is_active: boolean;
   joined_at: string;
   module_permissions: Record<string, ModuleLevel>;
+  /** Список codes модулей, включённых для организации (org-level toggle).
+   * Default-allow: если модуля нет в списке — считается включённым только
+   * для системных (admin/ledger/core), остальные — отключёнными. */
+  enabled_modules?: string[];
 }
 
 export interface User {

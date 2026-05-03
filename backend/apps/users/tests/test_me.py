@@ -46,6 +46,35 @@ def test_me_get_returns_user_with_memberships(client, user, org):
     assert m["organization"]["code"] == org.code
     assert "module_permissions" in m
     assert isinstance(m["module_permissions"], dict)
+    # Поле для org-level toggle модулей: список codes активных модулей.
+    assert "enabled_modules" in m
+    assert isinstance(m["enabled_modules"], list)
+
+
+def test_me_enabled_modules_excludes_disabled(client, user, org):
+    """OrganizationModule(is_enabled=False) → код пропадает из списка."""
+    from apps.modules.models import Module, OrganizationModule
+
+    feed = Module.objects.get(code="feed")
+    OrganizationModule.objects.update_or_create(
+        organization=org, module=feed, defaults={"is_enabled": False},
+    )
+    body = client.get("/api/users/me/").json()
+    enabled = body["memberships"][0]["enabled_modules"]
+    assert "feed" not in enabled
+
+
+def test_me_enabled_modules_keeps_system_even_if_marked_disabled(client, user, org):
+    """admin/ledger/core всегда отдаются как включённые (защита от self-lockout)."""
+    from apps.modules.models import Module, OrganizationModule
+
+    admin = Module.objects.get(code="admin")
+    OrganizationModule.objects.update_or_create(
+        organization=org, module=admin, defaults={"is_enabled": False},
+    )
+    body = client.get("/api/users/me/").json()
+    enabled = body["memberships"][0]["enabled_modules"]
+    assert "admin" in enabled
 
 
 def test_me_get_unauthenticated_rejected():

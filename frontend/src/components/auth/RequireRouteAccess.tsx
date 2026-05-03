@@ -78,11 +78,20 @@ interface Props {
  */
 export default function RequireRouteAccess({ children }: Props) {
   const pathname = usePathname();
-  const { hasLevel, permissions } = useAuth();
+  const { hasLevel, isModuleEnabled, permissions } = useAuth();
 
   const requirement = useMemo(() => resolveRequirement(pathname), [pathname]);
 
   if (!requirement) return <>{children}</>;
+
+  // Сначала проверяем org-level toggle: модуль может быть отключён
+  // владельцем через /settings. У такого юзера пермишны RBAC ещё могут
+  // быть (он раньше работал) — но мы должны показать «отключён», а
+  // не «нет прав», чтобы он не тыкал к админам зря.
+  if (!isModuleEnabled(requirement.module)) {
+    return <ModuleDisabled module={requirement.module} />;
+  }
+
   if (hasLevel(requirement.module, requirement.min)) return <>{children}</>;
 
   const userLevel = permissions[requirement.module] ?? 'none';
@@ -208,6 +217,67 @@ function NoAccess({ module, requiredLevel, currentLevel }: NoAccessProps) {
           >
             Назад
           </button>
+        </div>
+      </div>
+    </>
+  );
+}
+
+
+function ModuleDisabled({ module }: { module: string }) {
+  const moduleLabel = MODULE_LABEL[module] ?? module;
+  return (
+    <>
+      <div className="page-hdr">
+        <div>
+          <h1>Модуль отключён</h1>
+          <div className="sub">
+            Этот модуль выключен администратором организации
+          </div>
+        </div>
+      </div>
+      <div
+        style={{
+          maxWidth: 560,
+          margin: '40px auto 0',
+          padding: 24,
+          border: '1px solid var(--border)',
+          borderRadius: 8,
+          background: 'var(--bg-card)',
+          textAlign: 'center',
+        }}
+      >
+        <div
+          style={{
+            width: 56,
+            height: 56,
+            margin: '0 auto 14px',
+            borderRadius: '50%',
+            display: 'grid',
+            placeItems: 'center',
+            background: 'var(--brand-orange-soft, #FFF0E6)',
+            color: 'var(--brand-orange)',
+          }}
+        >
+          <Icon name="close" size={26} />
+        </div>
+        <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 6 }}>
+          Модуль «{moduleLabel}» отключён
+        </div>
+        <div style={{ fontSize: 13, color: 'var(--fg-2)', lineHeight: 1.6 }}>
+          Доступ к страницам и API этого модуля закрыт.
+          <br />
+          Чтобы включить его обратно, перейдите в{' '}
+          <b>Настройки → Модули</b> (если вы администратор) или попросите
+          владельца компании.
+        </div>
+        <div style={{ marginTop: 16, display: 'flex', gap: 8, justifyContent: 'center' }}>
+          <a href="/settings" className="btn btn-primary btn-sm">
+            Открыть настройки
+          </a>
+          <a href="/dashboard" className="btn btn-ghost btn-sm">
+            На сводку
+          </a>
         </div>
       </div>
     </>
