@@ -52,6 +52,11 @@ class TgLink(UUIDModel, TimestampedModel):
         on_delete=models.SET_NULL,
         related_name="+",
     )
+    # Подписка на ежедневный owner-digest (08:00 Asia/Tashkent). True для
+    # admin-link по умолчанию (юзер привязал бота → значит хочет видеть
+    # сводку). Counterparty-линки никогда не получают digest, для них
+    # есть только debt-reminders. См. tasks.owner_digest_task.
+    digest_enabled = models.BooleanField(default=True)
 
     class Meta:
         unique_together = [("organization", "chat_id")]

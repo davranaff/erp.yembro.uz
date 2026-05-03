@@ -166,3 +166,65 @@ def handle_tg_update_task(update: dict) -> None:
         dispatch(update)
     except Exception as exc:
         logger.error("handle_tg_update_task error: %s", exc, exc_info=True)
+
+
+@shared_task(name="apps.tgbot.owner_digest_task")
+def owner_digest_task() -> dict:
+    """Утренняя сводка для владельцев — 08:00 Asia/Tashkent ежедневно.
+
+    Для каждой активной организации (учитывая `module_enabled_for_org` для
+    её модулей) собираем `DigestData` за вчерашний день и отправляем во все
+    admin-линки с `digest_enabled=True`. Counterparty-линки игнорим — для
+    них существует только debt-reminder flow.
+
+    Beat schedule сидится в миграции `0005_seed_owner_digest_beat.py`.
+    """
+    from apps.organizations.models import Organization
+
+    from .bot import send_message
+    from .models import TgLink
+    from .services.digest import build_digest, format_digest
+
+    total_orgs = 0
+    total_sent = 0
+    for org in Organization.objects.filter(is_active=True).iterator():
+        # Линки этой организации с активной подпиской на digest.
+        # active_organization имеет приоритет (если юзер переключал /org),
+        # иначе — `organization`.
+        link_ids = list(
+            TgLink.objects.filter(
+                is_active=True, user__isnull=False, digest_enabled=True,
+            ).filter(
+                # либо явный active_organization == org,
+                # либо нет active + organization == org
+                models_q_active_or_default(org),
+            ).values_list("id", flat=True)
+        )
+        if not link_ids:
+            continue
+        total_orgs += 1
+        try:
+            data = build_digest(org)
+            text = format_digest(data, organization_name=org.name)
+        except Exception:  # noqa: BLE001
+            logger.exception("owner_digest: build failed for org=%s", org.id)
+            continue
+
+        for link_id in link_ids:
+            link = TgLink.objects.select_related("user").get(id=link_id)
+            ok = send_message(link.chat_id, text)
+            if ok:
+                total_sent += 1
+
+    payload = {"orgs_with_subs": total_orgs, "sent": total_sent}
+    logger.info("owner_digest_task: %s", payload)
+    return payload
+
+
+def models_q_active_or_default(org):
+    """Q-выражение «active_organization=org ИЛИ (active_organization IS NULL
+    AND organization=org)». Вынесено отдельно ради читаемости задачи выше."""
+    from django.db.models import Q
+    return Q(active_organization=org) | Q(
+        active_organization__isnull=True, organization=org,
+    )

@@ -94,8 +94,9 @@ def fake_send():
             help_cmd as _help,
             legacy as _leg,
             linking as _link,
+            digest as _dig,
         )
-        for mod in (_disp, _menu, _fin, _prod, _rep, _org, _help, _leg, _link):
+        for mod in (_disp, _menu, _fin, _prod, _rep, _org, _help, _leg, _link, _dig):
             if hasattr(mod, "send_message"):
                 mod.send_message = fake.send
             if hasattr(mod, "edit_message_text"):

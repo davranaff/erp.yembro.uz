@@ -11,3 +11,4 @@ from . import finance  # noqa: F401  — /sales /cash /debt /pnl + fin:* callbac
 from . import production  # noqa: F401  — /feedlot /batch /herd + prod:* callbacks
 from . import reports  # noqa: F401  — reports:* callbacks
 from . import org  # noqa: F401  — /org + org:* callbacks
+from . import digest  # noqa: F401  — /digest /digest_on /digest_off
