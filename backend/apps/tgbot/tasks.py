@@ -155,8 +155,13 @@ def debt_reminder_daily_task() -> dict:
 
 @shared_task(name="apps.tgbot.handle_tg_update_task")
 def handle_tg_update_task(update: dict) -> None:
-    """Обрабатывает входящий Telegram update."""
-    from .commands import dispatch
+    """Обрабатывает входящий Telegram update.
+
+    Сам dispatcher (`apps.tgbot.dispatcher.dispatch`) уже оборачивает все
+    handler'ы в try/except + logger.exception, так что эта обёртка только
+    логирует совсем фатальные исключения уровня импорта/registry.
+    """
+    from .dispatcher import dispatch
     try:
         dispatch(update)
     except Exception as exc:

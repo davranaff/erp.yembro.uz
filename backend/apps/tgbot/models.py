@@ -43,6 +43,15 @@ class TgLink(UUIDModel, TimestampedModel):
     chat_id = models.BigIntegerField()
     tg_username = models.CharField(max_length=100, blank=True)
     is_active = models.BooleanField(default=True)
+    # Если у юзера есть membership в нескольких организациях, он может через
+    # /org переключить активную. NULL → fallback на `organization` (ту, под
+    # которой он привязал бота). См. handlers/org.py.
+    active_organization = models.ForeignKey(
+        "organizations.Organization",
+        null=True, blank=True,
+        on_delete=models.SET_NULL,
+        related_name="+",
+    )
 
     class Meta:
         unique_together = [("organization", "chat_id")]

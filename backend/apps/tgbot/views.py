@@ -21,7 +21,10 @@ class TelegramWebhookView(APIView):
     """
     POST /api/tg/webhook/
     Принимает Telegram updates. Защита через X-Telegram-Bot-Api-Secret-Token.
-    Dispatch выполняется синхронно, чтобы не зависеть от Celery worker.
+
+    Dispatch отправляется в Celery (`handle_tg_update_task.delay`) — webhook
+    возвращает 200 OK моментально. Тяжёлые команды (P&L отчёт, mass batches)
+    могут считаться секунды; на синхронной обработке Telegram бы ретраил.
     """
     permission_classes = []
     authentication_classes = []
@@ -32,11 +35,11 @@ class TelegramWebhookView(APIView):
         if expected and secret != expected:
             return Response({"ok": False}, status=status.HTTP_403_FORBIDDEN)
         try:
-            from .commands import dispatch
-            dispatch(request.data)
+            from .tasks import handle_tg_update_task
+            handle_tg_update_task.delay(request.data)
         except Exception:
             import logging
-            logging.getLogger(__name__).exception("tg webhook dispatch error")
+            logging.getLogger(__name__).exception("tg webhook enqueue error")
         return Response({"ok": True})
 
 
