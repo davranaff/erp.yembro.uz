@@ -160,8 +160,13 @@ export default function ScanBarcodePage({
     );
   }
 
+  // Продажа разрешена для AVAILABLE и EXPIRING_SOON: лот за месяц до
+  // истечения остаётся пригодным товаром, блокировка превратила бы его
+  // в гарантированное списание. Истёкшие отдельно ловятся через is_expired.
+  const isSellableStatus =
+    lot.status === 'available' || lot.status === 'expiring_soon';
   const canSell =
-    lot.status === 'available'
+    isSellableStatus
     && !lot.is_expired
     && parseFloat(lot.current_quantity) > 0
     && hasToken;
@@ -337,6 +342,18 @@ export default function ScanBarcodePage({
             <div style={{ fontSize: 11, color: '#6B7280', marginTop: 6 }}>
               Сумма: <strong>{fmtMoney(parseFloat(qty || '0') * parseFloat(lot.price_per_unit_uzs))}</strong>
             </div>
+            {lot.status === 'expiring_soon' && (
+              <div style={{
+                marginTop: 10, padding: '8px 10px',
+                background: '#FFFBEB', borderRadius: 6,
+                border: '1px solid #F59E0B',
+                fontSize: 12, color: '#92400E',
+              }}>
+                ⚠ Скоро истекает{lot.days_to_expiry !== null && (
+                  <> — осталось <b>{lot.days_to_expiry} дн</b></>
+                )}. Продавайте в первую очередь.
+              </div>
+            )}
           </div>
         )}
 

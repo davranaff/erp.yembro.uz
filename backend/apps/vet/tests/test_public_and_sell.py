@@ -289,6 +289,51 @@ def test_sell_full_quantity_marks_depleted(org, m_vet, lot, user):
     assert lot.status == VetStockBatch.Status.DEPLETED
 
 
+def test_sell_expiring_soon_lot_succeeds(org, m_vet, lot, user):
+    """EXPIRING_SOON — это предупреждение, не блокировка. Продажа должна пройти."""
+    lot.status = VetStockBatch.Status.EXPIRING_SOON
+    lot.save(update_fields=["status"])
+    result = sell_vet_stock(
+        stock_batch=lot,
+        quantity=Decimal("3"),
+        seller_user=user,
+        organization=org,
+    )
+    lot.refresh_from_db()
+    assert lot.current_quantity == Decimal("97.000")
+    assert result.sale_order.status == "confirmed"
+
+
+def test_sell_expired_lot_blocked(org, m_vet, lot, user):
+    """Реально истёкший (date < today) — продажа запрещена."""
+    from apps.vet.services.sell import VetSellError
+
+    lot.expiration_date = date.today() - timedelta(days=1)
+    lot.save(update_fields=["expiration_date"])
+    with pytest.raises(VetSellError):
+        sell_vet_stock(
+            stock_batch=lot,
+            quantity=Decimal("1"),
+            seller_user=user,
+            organization=org,
+        )
+
+
+def test_sell_recalled_lot_still_blocked(org, m_vet, lot, user):
+    """RECALLED / QUARANTINE / DEPLETED — недоступны для продажи."""
+    from apps.vet.services.sell import VetSellError
+
+    lot.status = VetStockBatch.Status.RECALLED
+    lot.save(update_fields=["status"])
+    with pytest.raises(VetSellError):
+        sell_vet_stock(
+            stock_batch=lot,
+            quantity=Decimal("1"),
+            seller_user=user,
+            organization=org,
+        )
+
+
 def test_sell_more_than_available_raises(org, m_vet, lot, user):
     from apps.vet.services.sell import VetSellError
 

@@ -80,7 +80,15 @@ def sell_vet_stock(
     if stock_batch.organization_id != organization.id:
         raise VetSellError({"__all__": "Лот из другой организации."})
 
-    if stock_batch.status != VetStockBatch.Status.AVAILABLE:
+    # EXPIRING_SOON — это предупреждение «осталось ≤ 60 дней», а не блокировка:
+    # реальный коммерческий лот за ~месяц до истечения должен продаваться,
+    # иначе мы заставим списать товар. Блокируем только реально истёкшие
+    # (`is_expired` ниже), отозванные, на карантине, исчерпанные.
+    SELLABLE = {
+        VetStockBatch.Status.AVAILABLE,
+        VetStockBatch.Status.EXPIRING_SOON,
+    }
+    if stock_batch.status not in SELLABLE:
         raise VetSellError(
             {"stock_batch": (
                 f"Лот {stock_batch.doc_number} в статусе "
