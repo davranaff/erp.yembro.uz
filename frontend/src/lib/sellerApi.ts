@@ -74,12 +74,20 @@ export interface SellerSaleResponse {
   total_uzs: string;
   remaining_qty: string;
   lot_status: string;
+  customer_id: string;
+  customer_name: string;
 }
 
 /** Bearer: создание продажи через токен продавца. */
 export async function submitSellerSale(
   token: string,
-  body: { barcode: string; quantity: string; unit_price_uzs?: string },
+  body: {
+    barcode: string;
+    quantity: string;
+    unit_price_uzs?: string;
+    /** Опциональный id Counterparty. Если не задан — backend закрепит на «Розничный покупатель». */
+    customer_id?: string;
+  },
 ): Promise<SellerSaleResponse> {
   const res = await fetch(`${API_URL}/api/vet/public/sell/`, {
     method: 'POST',
@@ -96,6 +104,29 @@ export async function submitSellerSale(
         ? String((data as { detail: unknown }).detail)
         : `HTTP ${res.status}`;
     throw new PublicApiError(res.status, detail, data);
+  }
+  return await res.json();
+}
+
+
+export interface SellerCustomer {
+  id: string;
+  code: string;
+  name: string;
+  kind: 'buyer' | 'other';
+}
+
+/** Bearer: список покупателей орги (для select на форме продажи). */
+export async function fetchSellerCustomers(
+  token: string,
+): Promise<SellerCustomer[]> {
+  const res = await fetch(`${API_URL}/api/vet/public/customers/`, {
+    method: 'GET',
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) {
+    if (res.status === 401 || res.status === 403) return [];
+    throw new PublicApiError(res.status, `HTTP ${res.status}`);
   }
   return await res.json();
 }

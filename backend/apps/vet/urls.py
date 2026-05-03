@@ -9,7 +9,11 @@ from .views import (
     VetStockBatchViewSet,
     VetTreatmentLogViewSet,
 )
-from .views_public import VetPublicScanView, VetPublicSellView
+from .views_public import (
+    VetPublicCustomersView,
+    VetPublicScanView,
+    VetPublicSellView,
+)
 
 
 router = DefaultRouter()
@@ -34,5 +38,10 @@ urlpatterns = router.urls + [
         "public/sell/",
         VetPublicSellView.as_view(),
         name="public-sell",
+    ),
+    path(
+        "public/customers/",
+        VetPublicCustomersView.as_view(),
+        name="public-customers",
     ),
 ]

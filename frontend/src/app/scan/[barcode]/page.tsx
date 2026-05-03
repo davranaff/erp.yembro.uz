@@ -6,9 +6,11 @@ import { useRouter } from 'next/navigation';
 import {
   PublicApiError,
   fetchPublicLot,
+  fetchSellerCustomers,
   getSellerLabel,
   getSellerToken,
   submitSellerSale,
+  type SellerCustomer,
 } from '@/lib/sellerApi';
 import type { VetStockBatchPublic } from '@/types/auth';
 
@@ -55,11 +57,16 @@ export default function ScanBarcodePage({
   const [sellerLabel, setSellerLabel] = useState('');
 
   const [qty, setQty] = useState('1');
+  const [customerId, setCustomerId] = useState('');
+  const [customers, setCustomers] = useState<SellerCustomer[]>([]);
   const [submitting, setSubmitting] = useState(false);
-  const [success, setSuccess] = useState<{ doc: string; total: string } | null>(null);
+  const [success, setSuccess] = useState<
+    { doc: string; total: string; customer: string } | null
+  >(null);
 
   useEffect(() => {
-    setHasToken(Boolean(getSellerToken()));
+    const tok = getSellerToken();
+    setHasToken(Boolean(tok));
     setSellerLabel(getSellerLabel());
     setLoading(true);
     fetchPublicLot(barcode)
@@ -71,6 +78,12 @@ export default function ScanBarcodePage({
         setError(e instanceof Error ? e.message : 'Ошибка загрузки');
         setLoading(false);
       });
+    // Параллельно — список покупателей для select. Только если есть токен.
+    if (tok) {
+      fetchSellerCustomers(tok)
+        .then((list) => setCustomers(list))
+        .catch(() => setCustomers([]));
+    }
   }, [barcode]);
 
   const handleSell = async () => {
@@ -89,11 +102,19 @@ export default function ScanBarcodePage({
       const result = await submitSellerSale(tok, {
         barcode,
         quantity: qty,
+        // Не отправляем customer_id если не выбран — backend сам подставит «Розничный покупатель».
+        ...(customerId ? { customer_id: customerId } : {}),
       });
-      setSuccess({ doc: result.sale_order_doc, total: result.total_uzs });
+      setSuccess({
+        doc: result.sale_order_doc,
+        total: result.total_uzs,
+        customer: result.customer_name,
+      });
       // Перезагрузить лот, чтобы остаток обновился
       const updated = await fetchPublicLot(barcode);
       setLot(updated);
+      // Сбросим выбор клиента — следующая продажа по умолчанию опять «Розница».
+      setCustomerId('');
     } catch (e) {
       const msg = e instanceof PublicApiError ? e.message : 'Ошибка продажи';
       alert(msg);
@@ -252,6 +273,38 @@ export default function ScanBarcodePage({
             <div style={{ fontSize: 13, color: '#374151', marginBottom: 8 }}>
               Продать <span style={{ fontSize: 11, color: '#6B7280' }}>(в продажу со склада)</span>
             </div>
+
+            {/* Опциональный select клиента. Скрыт если в орге нет ни одного
+                покупателя кроме «Розничный покупатель». */}
+            {customers.length > 0 && (
+              <div style={{ marginBottom: 10 }}>
+                <label style={{
+                  display: 'block', fontSize: 11, color: '#6B7280',
+                  textTransform: 'uppercase', marginBottom: 4,
+                }}>
+                  Клиент <span style={{ textTransform: 'none' }}>(опционально)</span>
+                </label>
+                <select
+                  value={customerId}
+                  onChange={(e) => setCustomerId(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '10px 12px',
+                    fontSize: 14,
+                    border: '1px solid #D1D5DB', borderRadius: 6,
+                    background: '#fff',
+                  }}
+                >
+                  <option value="">— Розничный покупатель (по умолчанию) —</option>
+                  {customers.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name}{c.code ? ` · ${c.code}` : ''}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+
             <div style={{ display: 'flex', gap: 8 }}>
               <input
                 type="number"
@@ -325,6 +378,8 @@ export default function ScanBarcodePage({
             </div>
             <div style={{ fontSize: 13, color: '#374151', marginTop: 4 }}>
               Документ: <strong className="mono">{success.doc}</strong>
+              <br />
+              Клиент: <strong>{success.customer}</strong>
               <br />
               Сумма: <strong>{fmtMoney(success.total)}</strong>
             </div>

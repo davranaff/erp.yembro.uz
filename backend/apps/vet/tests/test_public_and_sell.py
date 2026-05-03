@@ -129,6 +129,98 @@ def test_seller_sale_with_valid_token_creates_sale_order(lot, seller_token):
     assert data["sale_order_doc"]
     assert Decimal(data["remaining_qty"]) == Decimal("95.000")
     assert data["lot_status"] == "available"
+    # Без customer_id — fallback на «Розничный покупатель»
+    assert "customer_id" in data
+    assert "customer_name" in data
+    assert "розничн" in data["customer_name"].lower()
+
+
+def test_seller_sale_with_explicit_customer(lot, seller_token, org):
+    """customer_id передан → SaleOrder.customer = переданный."""
+    cp = Counterparty.objects.create(
+        organization=org, code="К-ВИП-1", kind="buyer", name="Магазин ВИП",
+    )
+    client = APIClient()
+    resp = client.post(
+        "/api/vet/public/sell/",
+        {"barcode": lot.barcode, "quantity": "3", "customer_id": str(cp.id)},
+        format="json",
+        HTTP_AUTHORIZATION=f"Bearer {seller_token.token}",
+    )
+    assert resp.status_code == 201, resp.content
+    data = resp.data
+    assert data["customer_id"] == str(cp.id)
+    assert data["customer_name"] == "Магазин ВИП"
+
+
+def test_seller_sale_rejects_supplier_as_customer(lot, seller_token, base):
+    """customer_id=supplier → 400 (поставщику продавать нельзя)."""
+    client = APIClient()
+    resp = client.post(
+        "/api/vet/public/sell/",
+        {
+            "barcode": lot.barcode, "quantity": "1",
+            "customer_id": str(base["sup"].id),
+        },
+        format="json",
+        HTTP_AUTHORIZATION=f"Bearer {seller_token.token}",
+    )
+    assert resp.status_code == 400
+    assert "customer_id" in resp.data
+
+
+def test_seller_sale_rejects_customer_from_other_org(lot, seller_token):
+    """customer_id из другой орги → 400."""
+    other_org = Organization.objects.create(
+        code="OTHER-PUB", name="Другая орг",
+        accounting_currency=Organization.objects.get(code="DEFAULT").accounting_currency,
+    )
+    cp_other = Counterparty.objects.create(
+        organization=other_org, code="ВНЕ-ОРГ", kind="buyer", name="Чужой клиент",
+    )
+    client = APIClient()
+    resp = client.post(
+        "/api/vet/public/sell/",
+        {
+            "barcode": lot.barcode, "quantity": "1",
+            "customer_id": str(cp_other.id),
+        },
+        format="json",
+        HTTP_AUTHORIZATION=f"Bearer {seller_token.token}",
+    )
+    assert resp.status_code == 400
+
+
+# ─── /api/vet/public/customers/ ──────────────────────────────────
+
+
+def test_seller_customers_returns_list(seller_token, org):
+    Counterparty.objects.create(
+        organization=org, code="К-Б-1", kind="buyer", name="Покупатель А",
+    )
+    Counterparty.objects.create(
+        organization=org, code="К-Б-2", kind="buyer", name="Покупатель Б",
+    )
+    # Поставщики не должны попасть в список
+    Counterparty.objects.create(
+        organization=org, code="К-С-1", kind="supplier", name="Поставщик X",
+    )
+    client = APIClient()
+    resp = client.get(
+        "/api/vet/public/customers/",
+        HTTP_AUTHORIZATION=f"Bearer {seller_token.token}",
+    )
+    assert resp.status_code == 200, resp.content
+    names = [c["name"] for c in resp.data]
+    assert "Покупатель А" in names
+    assert "Покупатель Б" in names
+    assert "Поставщик X" not in names
+
+
+def test_seller_customers_requires_token():
+    client = APIClient()
+    resp = client.get("/api/vet/public/customers/")
+    assert resp.status_code in (401, 403)
 
 
 def test_seller_sale_without_token_returns_401(lot):

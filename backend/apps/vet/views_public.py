@@ -5,6 +5,8 @@ Public-эндпоинты вет.аптеки для розничного ска
 информации (organization, supplier, purchase). Может открыть любой человек.
 
 Bearer-only POST /api/vet/public/sell/ — продажа лота через токен продавца.
+Bearer-only GET /api/vet/public/customers/ — список покупателей орги для
+выпадающего списка в форме продажи (опциональная привязка клиента).
 """
 from __future__ import annotations
 
@@ -15,6 +17,8 @@ from rest_framework import permissions, status, views
 from rest_framework.authentication import SessionAuthentication
 from rest_framework.exceptions import ValidationError as DRFValidationError
 from rest_framework.response import Response
+
+from apps.counterparties.models import Counterparty
 
 from .authentication import SellerTokenAuthentication
 from .models import VetStockBatch
@@ -57,9 +61,16 @@ class VetPublicSellView(views.APIView):
     """
     POST /api/vet/public/sell/
 
-    Body: {"barcode": str, "quantity": str, "unit_price_uzs": str | null}
+    Body: {
+        "barcode": str,
+        "quantity": str,
+        "unit_price_uzs": str | null,
+        "customer_id": str | null,   # опционально: id Counterparty
+    }
 
     Требует Bearer-токен продавца (SellerDeviceToken).
+    Если `customer_id` не передан — продажа закрепляется на «Розничный покупатель»
+    (создаётся при необходимости).
     """
 
     permission_classes = [permissions.IsAuthenticated]
@@ -91,6 +102,22 @@ class VetPublicSellView(views.APIView):
         if organization is None:
             raise DRFValidationError({"__all__": "Не определена организация токена."})
 
+        # Опциональный явный клиент. Если не задан — sell_vet_stock сам
+        # фолбекнется на «Розничный покупатель».
+        customer = None
+        customer_id = request.data.get("customer_id")
+        if customer_id:
+            customer = (
+                Counterparty.objects
+                .filter(organization=organization, id=customer_id)
+                .exclude(kind=Counterparty.Kind.SUPPLIER)
+                .first()
+            )
+            if customer is None:
+                raise DRFValidationError({
+                    "customer_id": "Клиент не найден в организации токена.",
+                })
+
         batch = (
             VetStockBatch.objects
             .filter(organization=organization, barcode=barcode)
@@ -107,7 +134,7 @@ class VetPublicSellView(views.APIView):
                 quantity=qty,
                 seller_user=request.user,
                 organization=organization,
-                customer=None,
+                customer=customer,
                 unit_price_uzs=unit_price,
             )
         except VetSellError as exc:
@@ -121,4 +148,34 @@ class VetPublicSellView(views.APIView):
             "total_uzs": str(result.total_uzs),
             "remaining_qty": str(result.remaining_qty),
             "lot_status": result.stock_batch.status,
+            "customer_id": str(result.sale_order.customer_id),
+            "customer_name": result.sale_order.customer.name,
         }, status=status.HTTP_201_CREATED)
+
+
+class VetPublicCustomersView(views.APIView):
+    """
+    GET /api/vet/public/customers/
+
+    Список покупателей (не-supplier) орги для выпадающего списка в форме
+    продажи на /scan/<barcode>. Bearer-токен продавца обязателен.
+    """
+
+    permission_classes = [permissions.IsAuthenticated]
+    authentication_classes = [SellerTokenAuthentication]
+
+    def get(self, request):
+        organization = getattr(request, "organization", None)
+        if organization is None:
+            raise DRFValidationError({"__all__": "Не определена организация токена."})
+        qs = (
+            Counterparty.objects
+            .filter(organization=organization)
+            .exclude(kind=Counterparty.Kind.SUPPLIER)
+            .order_by("name")
+            .values("id", "code", "name", "kind")[:200]
+        )
+        return Response([
+            {"id": str(c["id"]), "code": c["code"], "name": c["name"], "kind": c["kind"]}
+            for c in qs
+        ])
