@@ -171,3 +171,95 @@ def test_per_request_cache_one_query_for_disabled_set(
         ]
     assert len(org_module_queries) == 1
     assert "feed" in result
+
+
+# ─── is_module_enabled_for_org helper (для celery tasks) ────────────────
+
+
+def test_is_module_enabled_for_org_default_allow(org, m_feed):
+    """Если строки нет — модуль считается включённым (back-compat)."""
+    from apps.common.permissions import is_module_enabled_for_org
+
+    OrganizationModule.objects.filter(organization=org, module=m_feed).delete()
+    assert is_module_enabled_for_org(org, "feed") is True
+
+
+def test_is_module_enabled_for_org_respects_disabled(org, m_feed):
+    from apps.common.permissions import is_module_enabled_for_org
+
+    OrganizationModule.objects.update_or_create(
+        organization=org, module=m_feed, defaults={"is_enabled": False},
+    )
+    assert is_module_enabled_for_org(org, "feed") is False
+
+
+def test_is_module_enabled_for_org_system_always_true(org, m_admin):
+    """Системные модули всегда True даже если в БД is_enabled=False."""
+    from apps.common.permissions import is_module_enabled_for_org
+
+    OrganizationModule.objects.update_or_create(
+        organization=org, module=m_admin, defaults={"is_enabled": False},
+    )
+    assert is_module_enabled_for_org(org, "admin") is True
+    assert is_module_enabled_for_org(org, "ledger") is True
+    assert is_module_enabled_for_org(org, "core") is True
+
+
+# ─── Celery beat tasks: skip disabled orgs ──────────────────────────────
+
+
+def test_feed_shrinkage_task_skips_disabled_org(org, m_feed):
+    """apply_feed_shrinkage_task видит org с feed=disabled → пропускает."""
+    from apps.feed.tasks import apply_feed_shrinkage_task
+
+    OrganizationModule.objects.update_or_create(
+        organization=org, module=m_feed, defaults={"is_enabled": False},
+    )
+    result = apply_feed_shrinkage_task()
+    org_result = result["per_org"].get(str(org.id))
+    assert org_result == {"skipped": "module_disabled"}
+
+
+def test_feedlot_kpi_alerts_task_skips_disabled_org(org):
+    """feedlot.kpi_alerts_task: org с feedlot=disabled → не считается."""
+    from unittest.mock import patch
+    from apps.feedlot.tasks import kpi_alerts_task
+
+    m_feedlot = Module.objects.get(code="feedlot")
+    OrganizationModule.objects.update_or_create(
+        organization=org, module=m_feedlot, defaults={"is_enabled": False},
+    )
+    with patch("apps.tgbot.tasks.notify_admins_task.delay") as notify:
+        result = kpi_alerts_task()
+    # этой org нет в checked_orgs (всех активных орг = 1)
+    assert result["checked_orgs"] == 0
+    notify.assert_not_called()
+
+
+def test_matochnik_daily_log_check_skips_disabled_org(org):
+    """matочник.daily_log_check_task: matочник=disabled → пропуск."""
+    from unittest.mock import patch
+    from apps.matochnik.tasks import daily_log_check_task
+
+    m_mat = Module.objects.get(code="matochnik")
+    OrganizationModule.objects.update_or_create(
+        organization=org, module=m_mat, defaults={"is_enabled": False},
+    )
+    with patch("apps.tgbot.tasks.notify_admins_task.delay") as notify:
+        result = daily_log_check_task()
+    assert result["checked_orgs"] == 0
+    notify.assert_not_called()
+
+
+def test_incubation_kpi_alerts_skips_disabled_org(org):
+    from unittest.mock import patch
+    from apps.incubation.tasks import kpi_alerts_task
+
+    m_inc = Module.objects.get(code="incubation")
+    OrganizationModule.objects.update_or_create(
+        organization=org, module=m_inc, defaults={"is_enabled": False},
+    )
+    with patch("apps.tgbot.tasks.notify_admins_task.delay") as notify:
+        result = kpi_alerts_task()
+    assert result["checked_orgs"] == 0
+    notify.assert_not_called()

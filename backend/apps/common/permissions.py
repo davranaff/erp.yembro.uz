@@ -67,6 +67,34 @@ def level_satisfies(actual: str, required: str) -> bool:
     return _LEVEL_ORDER.get(actual, 0) >= _LEVEL_ORDER.get(required, 0)
 
 
+def is_module_enabled_for_org(organization, module_code: str) -> bool:
+    """Включён ли модуль `module_code` для `organization`.
+
+    Используется celery beat-задачами и сервисами, у которых нет request
+    контекста (cron-обходы по всем активным орг). Для request-based
+    проверок используйте `_disabled_module_codes(request)` — он кеширует.
+
+    Поведение:
+        - системные модули (`SYSTEM_MODULES`) всегда True
+        - запись `OrganizationModule` отсутствует → True (default-allow,
+          back-compat для не-посеянных орг)
+        - `is_enabled=False` → False
+    """
+    if module_code in SYSTEM_MODULES:
+        return True
+    if organization is None:
+        return False
+    from apps.modules.models import OrganizationModule
+    enabled = (
+        OrganizationModule.objects
+        .filter(organization=organization, module__code=module_code)
+        .values_list("is_enabled", flat=True)
+        .first()
+    )
+    # None → строки нет → default-allow
+    return enabled is not False
+
+
 def _disabled_module_codes(request) -> frozenset:
     """Множество кодов модулей, отключённых для текущей организации.
 

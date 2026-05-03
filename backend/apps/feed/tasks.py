@@ -20,6 +20,7 @@ def apply_feed_shrinkage_task(on_date: Optional[str] = None) -> dict:
     Returns:
         dict со счётчиками per-org и итогом.
     """
+    from apps.common.permissions import is_module_enabled_for_org
     from apps.organizations.models import Organization
 
     from .services.shrinkage_runner import apply_for_organization
@@ -32,6 +33,11 @@ def apply_feed_shrinkage_task(on_date: Optional[str] = None) -> dict:
     per_org: dict[str, dict] = {}
 
     for org in Organization.objects.filter(is_active=True).iterator():
+        # Org-level toggle: владелец отключил feed → cron его не трогает.
+        if not is_module_enabled_for_org(org, "feed"):
+            per_org[str(org.id)] = {"skipped": "module_disabled"}
+            continue
+
         try:
             results = apply_for_organization(org, today=target)
         except Exception:  # noqa: BLE001

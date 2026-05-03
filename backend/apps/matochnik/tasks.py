@@ -21,6 +21,7 @@ def daily_log_check_task() -> dict:
     (DailyEggProduction / BreedingMortality / BreedingFeedConsumption) и
     шлёт TG-напоминание ответственным с matochnik-доступом.
     """
+    from apps.common.permissions import is_module_enabled_for_org
     from apps.organizations.models import Organization
     from apps.tgbot.tasks import notify_admins_task
 
@@ -42,6 +43,8 @@ def daily_log_check_task() -> dict:
     ]
 
     for org in Organization.objects.filter(is_active=True).iterator():
+        if not is_module_enabled_for_org(org, "matochnik"):
+            continue
         total_orgs += 1
         active = list(
             BreedingHerd.objects.filter(
@@ -120,6 +123,7 @@ def kpi_alerts_task() -> dict:
     """Проверяет KPI всех активных стад и шлёт TG-алерт при выходе за пороги
     (низкая яйценоскость / повышенный падёж за неделю).
     """
+    from apps.common.permissions import is_module_enabled_for_org
     from apps.organizations.models import Organization
     from apps.tgbot.tasks import notify_admins_task
 
@@ -130,6 +134,8 @@ def kpi_alerts_task() -> dict:
     notifications_queued = 0
 
     for org in Organization.objects.filter(is_active=True).iterator():
+        if not is_module_enabled_for_org(org, "matochnik"):
+            continue
         total_orgs += 1
         alerts = collect_org_alerts(org)
         if not alerts:

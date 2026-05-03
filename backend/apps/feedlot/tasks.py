@@ -27,6 +27,7 @@ def daily_log_check_task() -> dict:
     приёмки UAT «≥ 80% daily-log заполнено к 12:00», поэтому в 10:00 даём
     мягкое напоминание оставшимся.
     """
+    from apps.common.permissions import is_module_enabled_for_org
     from apps.organizations.models import Organization
     from apps.tgbot.tasks import notify_admins_task
 
@@ -44,6 +45,9 @@ def daily_log_check_task() -> dict:
     ]
 
     for org in Organization.objects.filter(is_active=True).iterator():
+        # Org-level toggle: feedlot отключён → не дёргаем людей.
+        if not is_module_enabled_for_org(org, "feedlot"):
+            continue
         total_orgs += 1
         active = list(
             FeedlotBatch.objects.filter(
@@ -129,6 +133,7 @@ def kpi_alerts_task() -> dict:
     Расписание: ежедневно 18:00 Asia/Tashkent — вечерний разбор полётов,
     к этому времени все daily-log должны быть в системе.
     """
+    from apps.common.permissions import is_module_enabled_for_org
     from apps.organizations.models import Organization
     from apps.tgbot.tasks import notify_admins_task
 
@@ -139,6 +144,8 @@ def kpi_alerts_task() -> dict:
     notifications_queued = 0
 
     for org in Organization.objects.filter(is_active=True).iterator():
+        if not is_module_enabled_for_org(org, "feedlot"):
+            continue
         total_orgs += 1
         alerts = collect_org_alerts(org)
         if not alerts:
