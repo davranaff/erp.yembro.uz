@@ -110,6 +110,18 @@ class SaleOrderViewSet(ImmutableStatusMixin, DeleteReasonMixin, OrgScopedModelVi
             )
 
         order.refresh_from_db()
+
+        # TG-уведомление админам с доступом к sales (parity с purchases.confirm).
+        # Без этого владелец не видит что продажа проведена — только в /sales.
+        try:
+            from apps.tgbot.notifications import fmt_sale_confirmed
+            from apps.tgbot.tasks import notify_admins_task
+            notify_admins_task.delay(
+                fmt_sale_confirmed(order), str(order.organization_id), "sales"
+            )
+        except Exception:
+            pass
+
         data = self.get_serializer(order).data
         data["_result"] = {
             "stock_movements_count": len(result.stock_movements),
@@ -224,6 +236,20 @@ class SaleOrderViewSet(ImmutableStatusMixin, DeleteReasonMixin, OrgScopedModelVi
             raise DRFValidationError(
                 exc.message_dict if hasattr(exc, "message_dict") else exc.messages
             )
+
+        # TG-уведомление о входящей оплате — service create_and_post_payment
+        # бэйпасит обычный POST /api/payments/{id}/post/, поэтому здесь
+        # вызываем notify явно, иначе админ не увидит cash inflow.
+        try:
+            from apps.tgbot.notifications import fmt_payment_posted
+            from apps.tgbot.tasks import notify_admins_task
+            notify_admins_task.delay(
+                fmt_payment_posted(result.payment),
+                str(result.payment.organization_id),
+                "sales",
+            )
+        except Exception:
+            pass
 
         order.refresh_from_db()
         data = self.get_serializer(order).data

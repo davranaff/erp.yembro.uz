@@ -11,6 +11,22 @@ def fmt_purchase_confirmed(order) -> str:
     )
 
 
+def fmt_sale_confirmed(order) -> str:
+    items_count = order.items.count() if hasattr(order, "items") else 0
+    due_block = ""
+    if order.due_date:
+        due_block = f"⏳ Срок оплаты: {order.due_date}\n"
+    return (
+        f"💼 <b>Продажа проведена</b>\n"
+        f"📄 Документ: <code>{order.doc_number}</code>\n"
+        f"👤 Клиент: {order.customer.name}\n"
+        f"📦 Позиций: {items_count}\n"
+        f"💰 Сумма: <b>{float(order.amount_uzs):,.0f} сум</b>\n"
+        f"📅 Дата: {order.date}\n"
+        f"{due_block}"
+    )
+
+
 def fmt_payment_posted(payment) -> str:
     if payment.direction == "out":
         icon, direction = "💸", "Выплата поставщику"
