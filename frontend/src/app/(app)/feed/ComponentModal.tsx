@@ -21,7 +21,13 @@ export default function ComponentModal({ version, initial, onClose }: Props) {
   const isEdit = Boolean(initial);
   const create = recipeComponentsCrud.useCreate();
   const update = recipeComponentsCrud.useUpdate();
-  const { data: items } = useNomenclatureItems({ is_active: 'true' });
+  // Только feed-номенклатура: иначе в выпадашке появятся тушки/яйца/цыплята —
+  // оператор может ошибочно положить мясо как ингредиент в рецепт корма.
+  // Backend фильтрует через category.module=feed.
+  const { data: items } = useNomenclatureItems({
+    module_code: 'feed',
+    is_active: 'true',
+  });
   // Подтягиваем все версии, чтобы найти актуальный список компонентов нашей.
   const { data: allVersions } = recipeVersionsCrud.useList();
   const fullVersion = useMemo(

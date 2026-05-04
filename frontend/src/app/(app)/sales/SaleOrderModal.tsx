@@ -92,7 +92,6 @@ export default function SaleOrderModal({ initial, preselect, onClose }: Props) {
   const { data: customers } = useCounterparties({ kind: 'buyer' });
   const { data: warehouses } = useWarehouses();
   const { data: currencies } = useCurrenciesSorted();
-  const { data: nomenclature } = useNomenclatureItems({ is_active: 'true' });
 
   // Справочники для vet/feed (ленивая загрузка по необходимости)
   const { data: vetLots } = stockBatchesCrud.useList({ status: 'available' });
@@ -100,6 +99,17 @@ export default function SaleOrderModal({ initial, preselect, onClose }: Props) {
 
   // Состояние формы
   const [moduleId, setModuleId] = useState(initial?.module ?? '');
+
+  // Номенклатура фильтруется по выбранному модулю (его выбирает оператор
+  // в шапке формы). Без фильтра в продаже от feedlot можно было бы выбрать
+  // мешок с кормом, что бессмысленно. moduleId резолвим в код через `modules`.
+  // Если модуль ещё не выбран — список пуст, чтобы оператор сначала выбрал
+  // источник (логичнее чем показывать ВСЁ).
+  const selectedModuleCode = modules?.find((m) => m.id === moduleId)?.code;
+  const { data: nomenclature } = useNomenclatureItems({
+    is_active: 'true',
+    ...(selectedModuleCode ? { module_code: selectedModuleCode } : {}),
+  });
   const [date, setDate] = useState(initial?.date ?? new Date().toISOString().slice(0, 10));
   const [customerId, setCustomerId] = useState(initial?.customer ?? '');
   const [warehouseId, setWarehouseId] = useState(initial?.warehouse ?? preselect?.warehouseId ?? '');
@@ -137,7 +147,6 @@ export default function SaleOrderModal({ initial, preselect, onClose }: Props) {
     }
   }, [preselect, modules, moduleId]);
 
-  const selectedModuleCode = modules?.find((m) => m.id === moduleId)?.code;
   const sourceKind: SaleSourceKind = sourceKindForModule(selectedModuleCode);
 
   // Код выбранной валюты

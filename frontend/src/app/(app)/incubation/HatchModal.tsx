@@ -14,7 +14,12 @@ interface Props {
 }
 
 export default function HatchModal({ run, onClose }: Props) {
-  const { data: items } = useNomenclatureItems({ is_active: 'true' });
+  // Только incubation-номенклатура (суточный цыпленок и т.п.) — иначе
+  // в выпадашке появятся тушки/яйца/корма.
+  const { data: items } = useNomenclatureItems({
+    module_code: 'incubation',
+    is_active: 'true',
+  });
   const hatch = useHatch();
 
   const [chickNom, setChickNom] = useState('');

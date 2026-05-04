@@ -45,9 +45,17 @@ export default function PurchaseOrderModal({ initial, onClose }: Props) {
   const { data: suppliers } = useCounterparties({ kind: 'supplier' });
   const { data: warehouses } = useWarehouses();
   const { data: currencies } = useCurrenciesSorted();
-  const { data: nomenclature } = useNomenclatureItems({ is_active: 'true' });
 
   const [moduleId, setModuleId] = useState(initial?.module ?? '');
+
+  // Номенклатура — фильтр по выбранному модулю-цели закупки. Без него
+  // покупка для feed выводила список всех SKU включая тушки/яйца, что
+  // бессмысленно.
+  const selectedModuleCode = modules?.find((m) => m.id === moduleId)?.code;
+  const { data: nomenclature } = useNomenclatureItems({
+    is_active: 'true',
+    ...(selectedModuleCode ? { module_code: selectedModuleCode } : {}),
+  });
   const [date, setDate] = useState(initial?.date ?? new Date().toISOString().slice(0, 10));
   const [supplierId, setSupplierId] = useState(initial?.counterparty ?? '');
   const [warehouseId, setWarehouseId] = useState(initial?.warehouse ?? '');

@@ -14,7 +14,11 @@ interface Props {
 }
 
 export default function CrystallizeModal({ herd, onClose }: Props) {
-  const { data: items } = useNomenclatureItems({ is_active: 'true' });
+  // Только matочник-номенклатура (яйца, ремонтный молодняк) — без слогаута/корма.
+  const { data: items } = useNomenclatureItems({
+    module_code: 'matochnik',
+    is_active: 'true',
+  });
   const crystallize = useCrystallizeEggs();
 
   const [nom, setNom] = useState('');

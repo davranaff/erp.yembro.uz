@@ -185,6 +185,16 @@ class RecipeComponent(UUIDModel, TimestampedModel):
         verbose_name = "Компонент рецептуры"
         verbose_name_plural = "Компоненты рецептур"
 
+    def clean(self):
+        super().clean()
+        # Защита: компонентом рецепта корма может быть только feed-номенклатура
+        # (зерно, шрот, премикс…), не тушка/яйцо/цыпленок. UI обычно фильтрует
+        # через ?module_code=feed, но через API/админку можно проскочить.
+        from apps.nomenclature.validators import validate_nomenclature_module
+        validate_nomenclature_module(
+            self.nomenclature, "feed", field_name="nomenclature",
+        )
+
     def __str__(self):
         return f"{self.recipe_version} · {self.nomenclature.sku} {self.share_percent}%"
 
@@ -376,6 +386,11 @@ class RawMaterialBatch(UUIDModel, TimestampedModel):
             raise ValidationError(
                 {"current_quantity": "Остаток не может превышать начальное количество."}
             )
+        # Принимаем как сырьё для кормов только feed-номенклатуру.
+        from apps.nomenclature.validators import validate_nomenclature_module
+        validate_nomenclature_module(
+            self.nomenclature, "feed", field_name="nomenclature",
+        )
 
 
 # ─── Lab results ───────────────────────────────────────────────────────────
