@@ -236,6 +236,84 @@ def cash_balances(organization) -> dict:
     return out
 
 
+def ar_summary(organization, *, days_for_dso: int = 90) -> dict:
+    """AR (дебиторка) — снимок для главной страницы и /reports.
+
+    Возвращает:
+      - aging buckets (current/0-30/31-60/61-90/90+) — totals
+      - dso (Days Sales Outstanding) — за последние `days_for_dso` дней
+      - top-3 должников по total
+      - overdue_customers_count
+      - total_ar
+      - total_overdue (всё кроме current)
+
+    DSO = (current_AR / revenue_за_период) * days
+    Если выручки в периоде нет → DSO = None.
+    """
+    from apps.sales.services.aging import compute_aging_report
+    from apps.sales.models import SaleOrder
+
+    report = compute_aging_report(organization)
+    summary = report.summary
+    rows = report.rows
+
+    total_overdue = (
+        Decimal(summary["b_0_30"])
+        + Decimal(summary["b_31_60"])
+        + Decimal(summary["b_61_90"])
+        + Decimal(summary["b_90_plus"])
+    )
+
+    # DSO: AR / средняя дневная выручка за `days_for_dso` дней.
+    today = date.today()
+    period_start = today - timedelta(days=days_for_dso)
+    revenue_in_period = (
+        SaleOrder.objects.filter(
+            organization=organization,
+            status=SaleOrder.Status.CONFIRMED,
+            date__gte=period_start, date__lte=today,
+        ).aggregate(s=Sum("amount_uzs"))["s"]
+        or Decimal("0")
+    )
+    if revenue_in_period > 0:
+        dso = (Decimal(summary["total"]) / revenue_in_period) * Decimal(
+            days_for_dso
+        )
+        dso_value = float(dso.quantize(Decimal("0.1")))
+    else:
+        dso_value = None
+
+    top_debtors = [
+        {
+            "counterparty_id": r.counterparty_id,
+            "code": r.code,
+            "name": r.name,
+            "total": str(r.total),
+            "oldest_overdue_days": r.oldest_overdue_days,
+        }
+        for r in rows[:3]
+    ]
+
+    return {
+        "as_of": today.isoformat(),
+        "buckets": {
+            "current": summary["current"],
+            "b_0_30": summary["b_0_30"],
+            "b_31_60": summary["b_31_60"],
+            "b_61_90": summary["b_61_90"],
+            "b_90_plus": summary["b_90_plus"],
+        },
+        "total_ar_uzs": summary["total"],
+        "total_overdue_uzs": str(total_overdue),
+        "customers_count": summary["customers_count"],
+        "overdue_customers_count": summary["overdue_customers_count"],
+        "dso_days": dso_value,
+        "dso_window_days": days_for_dso,
+        "revenue_in_window_uzs": str(revenue_in_period),
+        "top_debtors": top_debtors,
+    }
+
+
 def cashflow_chart(organization, *, days: int = 30) -> list[dict]:
     """
     Кэш-флоу за N дней: на каждую дату — суммы in/out POSTED платежей.

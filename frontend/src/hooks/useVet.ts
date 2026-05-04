@@ -131,3 +131,70 @@ export function useTreatmentsTimeline(opts: { batch?: string; herd?: string }) {
     staleTime: 30_000,
   });
 }
+
+/**
+ * GET /api/vet/treatments/incoming/?to_module=<code>
+ *
+ * Inbox менеджера модуля-цели: применённые но не подтверждённые ветлечения,
+ * чей target лежит в указанном модуле. Используется в `IncomingVetTreatmentsPanel`.
+ */
+export function useIncomingVetTreatments(moduleCode: string) {
+  return useQuery<VetTreatmentLog[], ApiError>({
+    queryKey: ['vet', 'treatments', 'incoming', moduleCode],
+    queryFn: () =>
+      apiFetch<VetTreatmentLog[]>(
+        `/api/vet/treatments/incoming/?to_module=${encodeURIComponent(moduleCode)}`,
+      ),
+    staleTime: 30_000,
+    retry: false,  // 403 не повторяем
+  });
+}
+
+/**
+ * POST /api/vet/treatments/{id}/acknowledge/ — менеджер модуля-цели
+ * подтверждает что видел запись о применении препарата.
+ *
+ * Soft-only: не отменяет, не реверсит. Просто снимает уведомление в inbox.
+ */
+export function useAcknowledgeTreatment() {
+  const qc = useQueryClient();
+  return useMutation<VetTreatmentLog, ApiError, { id: string }>({
+    mutationFn: ({ id }) =>
+      apiFetch<VetTreatmentLog>(`/api/vet/treatments/${id}/acknowledge/`, {
+        method: 'POST',
+      }),
+    onSuccess: async () => {
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: ['vet'], refetchType: 'all' }),
+        qc.invalidateQueries({ queryKey: ['batches'], refetchType: 'all' }),
+      ]);
+    },
+  });
+}
+
+/**
+ * POST /api/vet/treatments/{id}/cancel/  body={reason}
+ *
+ * «Отклонить» применение — менеджер модуля-цели нашёл ошибку (неверная
+ * доза/препарат/партия). Триггерит реверс JE + возврат остатка на лот +
+ * пересчёт каренции на партии.
+ *
+ * RBAC backend: rw к vet → можно всегда; rw к target_module → можно
+ * только в первые 24ч после apply (после — только vet/admin).
+ */
+export function useRejectTreatment() {
+  const qc = useQueryClient();
+  return useMutation<VetTreatmentLog, ApiError, { id: string; reason: string }>({
+    mutationFn: ({ id, reason }) =>
+      apiFetch<VetTreatmentLog>(`/api/vet/treatments/${id}/cancel/`, {
+        method: 'POST',
+        body: { reason },
+      }),
+    onSuccess: async () => {
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: ['vet'], refetchType: 'all' }),
+        qc.invalidateQueries({ queryKey: ['batches'], refetchType: 'all' }),
+      ]);
+    },
+  });
+}

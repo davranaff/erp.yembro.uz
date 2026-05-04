@@ -21,7 +21,13 @@ export interface TgLinkToken {
   token: string;
   expires_at: string;
   used: boolean;
-  bot_url: string;
+  /**
+   * Полная deep-link на бота вида `https://t.me/<bot>?start=<token>`.
+   * NULL если backend не смог определить username бота (см. `bot_configured`).
+   */
+  bot_url: string | null;
+  /** false если TELEGRAM_BOT_TOKEN не задан или getMe упал — UI показывает warning. */
+  bot_configured: boolean;
 }
 
 export function useTgMyLink() {

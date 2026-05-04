@@ -16,6 +16,7 @@ from apps.common.permissions import can_see_finances
 from apps.common.viewsets import OrganizationContextMixin
 
 from .services import (
+    ar_summary,
     cash_balances,
     cashflow_chart,
     kpi_summary,
@@ -64,8 +65,33 @@ class DashboardSummaryView(OrganizationContextMixin, APIView):
             "kpis": kpis,
             "production": production_summary(org),
             "cash": cash_balances(org) if finances_visible else None,
+            "ar": ar_summary(org) if finances_visible else None,
             "_finances_visible": finances_visible,
         })
+
+
+class DashboardArSummaryView(OrganizationContextMixin, APIView):
+    """
+    GET /api/dashboard/ar-summary/[?dso_window=90]
+
+    Снимок дебиторки для виджета на /dashboard и страницы /reports:
+    aging buckets, DSO, top-3 должников. Только для ledger.r+.
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        if not can_see_finances(request.user, request.organization):
+            return Response(
+                {"detail": "Нет доступа к финансовым отчётам организации."},
+                status=403,
+            )
+        try:
+            window = int(request.query_params.get("dso_window", "90"))
+        except ValueError:
+            window = 90
+        window = max(7, min(window, 365))
+        return Response(ar_summary(request.organization, days_for_dso=window))
 
 
 class DashboardCashflowView(OrganizationContextMixin, APIView):

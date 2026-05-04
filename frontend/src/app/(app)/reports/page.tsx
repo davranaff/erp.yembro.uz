@@ -7,6 +7,7 @@ import DateRangeFilter from '@/components/DateRangeFilter';
 import Icon from '@/components/ui/Icon';
 import KpiCard from '@/components/ui/KpiCard';
 import Panel from '@/components/ui/Panel';
+import { useDashboardArSummary } from '@/hooks/useDashboard';
 import { usePlReport } from '@/hooks/useReports';
 
 
@@ -31,6 +32,7 @@ export default function ReportsHomePage() {
   const [dateTo, setDateTo] = useState(isoToday());
 
   const { data: pl } = usePlReport({ date_from: dateFrom, date_to: dateTo });
+  const { data: ar } = useDashboardArSummary(90);
 
   return (
     <>
@@ -85,6 +87,40 @@ export default function ReportsHomePage() {
         />
       </div>
 
+      {/* ── AR snapshot row ──────────────────────────────── */}
+      {ar && (
+        <div className="kpi-row" style={{ marginTop: 8 }}>
+          <KpiCard
+            tone={parseFloat(ar.total_overdue_uzs) > 0 ? 'red' : 'green'}
+            iconName="bag"
+            label="Дебиторка"
+            sub={`${ar.customers_count} клиентов`}
+            value={fmtMoney(ar.total_ar_uzs)}
+          />
+          <KpiCard
+            tone="red"
+            iconName="bag"
+            label="Просрочено"
+            sub={`${ar.overdue_customers_count} клиентов с просрочкой`}
+            value={fmtMoney(ar.total_overdue_uzs)}
+          />
+          <KpiCard
+            tone="blue"
+            iconName="chart"
+            label={`DSO (${ar.dso_window_days} дн)`}
+            sub="средний срок инкассации"
+            value={ar.dso_days != null ? `${ar.dso_days} дн` : '—'}
+          />
+          <KpiCard
+            tone="orange"
+            iconName="bag"
+            label="Топ-должник"
+            sub={ar.top_debtors[0]?.name ?? '—'}
+            value={ar.top_debtors[0] ? fmtMoney(ar.top_debtors[0].total) : '—'}
+          />
+        </div>
+      )}
+
       <div className="grid-3" style={{ marginTop: 14 }}>
         <ReportCard
           href={`/reports/trial-balance?date_from=${dateFrom}&date_to=${dateTo}`}
@@ -119,6 +155,13 @@ export default function ReportsHomePage() {
           title="Потери от усушки"
           subtitle="Списания по корму"
           desc="Сколько сырья и готового корма потеряно от усушки за период. Разрезы по ингредиенту или складу."
+          icon="bag"
+        />
+        <ReportCard
+          href="/reports/aging"
+          title="Старение дебиторки"
+          subtitle="AR aging — кто сколько должен"
+          desc="Непогашенные продажи разбиты по бакетам просрочки: 0-30 / 31-60 / 61-90 / 90+ дней. Топ должников и сводка."
           icon="bag"
         />
       </div>

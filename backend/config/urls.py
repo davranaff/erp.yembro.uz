@@ -1,6 +1,8 @@
+from django.conf import settings
 from django.contrib import admin
 from django.http import JsonResponse
-from django.urls import include, path
+from django.urls import include, path, re_path
+from django.views.static import serve as static_serve
 from drf_spectacular.views import (
     SpectacularAPIView,
     SpectacularSwaggerView,
@@ -129,4 +131,13 @@ urlpatterns = [
     ),
     path("api/tg/", include("apps.tgbot.urls")),
     path("api/landing/", include("apps.landing.urls", namespace="landing")),
+    # Media-файлы (загруженные приложения к закупам и т.п.). Caddy уже
+    # проксирует /media/* на backend, поэтому Django должен сам их отдавать.
+    # Для production-инструмента внутри одной орг это ок; для public-роутов
+    # с массой пользователей лучше переключить Caddy на прямой статик.
+    re_path(
+        r"^media/(?P<path>.*)$",
+        static_serve,
+        {"document_root": settings.MEDIA_ROOT},
+    ),
 ]

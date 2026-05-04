@@ -435,10 +435,39 @@ export interface DashboardCash {
   [channel: string]: DashboardCashChannel | string;
 }
 
+export interface DashboardArSummary {
+  as_of: string;
+  buckets: {
+    current: string;
+    b_0_30: string;
+    b_31_60: string;
+    b_61_90: string;
+    b_90_plus: string;
+  };
+  total_ar_uzs: string;
+  total_overdue_uzs: string;
+  customers_count: number;
+  overdue_customers_count: number;
+  /** Days Sales Outstanding. NULL если в окне выручки не было. */
+  dso_days: number | null;
+  dso_window_days: number;
+  revenue_in_window_uzs: string;
+  top_debtors: Array<{
+    counterparty_id: string;
+    code: string;
+    name: string;
+    total: string;
+    oldest_overdue_days: number;
+  }>;
+}
+
 export interface DashboardSummary {
   kpis: DashboardKpis;
   production: DashboardProduction;
   cash: DashboardCash;
+  /** AR snapshot (NULL если у пользователя нет ledger.r). */
+  ar?: DashboardArSummary | null;
+  _finances_visible?: boolean;
 }
 
 export interface CashflowPoint {
@@ -467,10 +496,26 @@ export interface Counterparty {
   email: string;
   address: string;
   balance_uzs: string;
+  /** Кредитный лимит покупателя в сумах. NULL = без ограничения. */
+  credit_limit_uzs: string | null;
+  /** Макс. допустимая просрочка в днях. NULL = без ограничения. */
+  max_overdue_days: number | null;
   is_active: boolean;
   notes: string;
   created_at: string;
   updated_at: string;
+}
+
+/** Превью /api/sales/orders/{id}/credit_check/ */
+export interface CreditCheckResult {
+  ok: boolean;
+  reasons: string[];
+  current_debt_uzs: string;
+  oldest_overdue_days: number;
+  limit_uzs: string | null;
+  max_overdue_days: number | null;
+  new_sale_uzs: string;
+  projected_debt_uzs: string;
 }
 
 export interface Unit {
@@ -1290,6 +1335,18 @@ export interface Batch {
     to_module_name: string | null;
     state: 'awaiting_acceptance' | 'under_review';
   } | null;
+  /**
+   * Самое свежее проведённое (есть JE) и не подтверждённое менеджером
+   * модуля-цели ветлечение по этой партии. UI рендерит оранжевый бейдж
+   * «🩺 vet: <препарат>, каренция до DD.MM».
+   */
+  pending_vet_acknowledgement?: {
+    id: string;
+    doc_number: string;
+    drug_name: string | null;
+    treatment_date: string;
+    withdrawal_period_ends: string | null;
+  } | null;
   created_at: string;
   updated_at: string;
 }
@@ -1398,6 +1455,13 @@ export interface VetTreatmentLog {
   cancelled_at: string | null;
   cancel_reason: string;
   cancelled_by: string | null;
+  acknowledged_at: string | null;
+  acknowledged_by: string | null;
+  drug_name?: string | null;
+  target_module_code?: string | null;
+  target_module_name?: string | null;
+  veterinarian_name?: string | null;
+  unit_code?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -1469,6 +1533,39 @@ export interface SaleOrder {
   updated_at: string;
 }
 
+export type SaleCommunicationMethod =
+  | 'call' | 'visit' | 'whatsapp' | 'telegram' | 'sms' | 'email' | 'other';
+
+export type SaleCommunicationOutcome =
+  | 'promised' | 'refused' | 'no_answer' | 'wrong_number' | 'asked_defer' | 'other';
+
+export interface SaleCommunication {
+  id: string;
+  order: string;
+  contacted_at: string;
+  method: SaleCommunicationMethod;
+  method_display: string;
+  outcome: SaleCommunicationOutcome;
+  outcome_display: string;
+  /** Слова клиента (что сказал на звонке/в сообщении). */
+  customer_response: string;
+  /** Внутренняя заметка менеджера. Не уходит клиенту. */
+  internal_note: string;
+  /** Дата которую обещал САМ клиент. */
+  promised_pay_date: string | null;
+  /**
+   * Внутренний прогноз менеджера: когда оплата реально придёт.
+   * Тоже триггерит задачу-напоминание.
+   */
+  expected_pay_date: string | null;
+  /** Когда сотруднику перезвонить. */
+  next_action_date: string | null;
+  contacted_by: string;
+  contacted_by_name: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 // ─── Purchases (apps/purchases) ──────────────────────────────────────────
 
 export type PurchaseStatus = 'draft' | 'confirmed' | 'paid' | 'cancelled';
@@ -1515,6 +1612,20 @@ export interface PurchaseOrder {
   notes: string;
   created_at: string;
   updated_at: string;
+}
+
+export interface PurchaseAttachment {
+  id: string;
+  purchase: string;
+  file_url: string | null;
+  original_name: string;
+  size_bytes: number;
+  size_human: string;
+  content_type: string;
+  description: string;
+  uploaded_by: string;
+  uploaded_by_name: string | null;
+  created_at: string;
 }
 
 

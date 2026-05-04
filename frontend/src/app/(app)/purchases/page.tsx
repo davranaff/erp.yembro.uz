@@ -22,6 +22,7 @@ import type {
 } from '@/types/auth';
 
 import PayPurchaseModal from './PayPurchaseModal';
+import PurchaseAttachmentsModal from './PurchaseAttachmentsModal';
 import PurchaseOrderModal from './PurchaseOrderModal';
 
 const STATUS_LABEL: Record<PurchaseStatus, string> = {
@@ -64,6 +65,7 @@ export default function PurchasesPage() {
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<PurchaseOrder | null>(null);
   const [payingOrder, setPayingOrder] = useState<PurchaseOrder | null>(null);
+  const [filesFor, setFilesFor] = useState<PurchaseOrder | null>(null);
 
   const hasLevel = useHasLevel();
   const canEdit = hasLevel('purchases', 'rw');
@@ -243,6 +245,10 @@ export default function PurchasesPage() {
                       onClick: () => setPayingOrder(o),
                     },
                     {
+                      label: 'Файлы',
+                      onClick: () => setFilesFor(o),
+                    },
+                    {
                       label: 'Сторно',
                       danger: true,
                       hidden: !(o.status === 'confirmed' && parseFloat(o.paid_amount_uzs || '0') === 0),
@@ -267,6 +273,12 @@ export default function PurchasesPage() {
         <PayPurchaseModal
           order={payingOrder}
           onClose={() => setPayingOrder(null)}
+        />
+      )}
+      {filesFor && (
+        <PurchaseAttachmentsModal
+          purchase={filesFor}
+          onClose={() => setFilesFor(null)}
         />
       )}
     </>

@@ -54,8 +54,11 @@ export default function TgConnectModal(props: Props) {
   };
 
   const handleCopy = () => {
-    if (!token) return;
-    navigator.clipboard.writeText(token.token);
+    if (!token?.bot_url) return;
+    // Копируем именно полную ссылку на бота, а не сырой токен — клиент
+    // должен получить кликабельный URL вида `https://t.me/<bot>?start=<token>`,
+    // который сразу откроет диалог с ботом и нажмёт Start.
+    navigator.clipboard.writeText(token.bot_url);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
@@ -123,35 +126,56 @@ export default function TgConnectModal(props: Props) {
             </div>
           </div>
 
-          <a
-            href={token.bot_url}
-            target="_blank"
-            rel="noreferrer"
-            style={{
-              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-              background: TG_BLUE, color: '#fff', borderRadius: 8,
-              padding: '11px 16px', fontWeight: 600, fontSize: 14,
-              textDecoration: 'none', marginBottom: 12,
-            }}
-          >
-            <TgIcon size={20} />
-            Открыть Telegram бот
-          </a>
+          {token.bot_url ? (
+            <>
+              <a
+                href={token.bot_url}
+                target="_blank"
+                rel="noreferrer"
+                style={{
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                  background: TG_BLUE, color: '#fff', borderRadius: 8,
+                  padding: '11px 16px', fontWeight: 600, fontSize: 14,
+                  textDecoration: 'none', marginBottom: 12,
+                }}
+              >
+                <TgIcon size={20} />
+                Открыть Telegram бот
+              </a>
 
-          <div style={{
-            background: 'var(--bg-soft)', borderRadius: 6, padding: '10px 12px',
-            display: 'flex', alignItems: 'center', gap: 8,
-          }}>
-            <code style={{ flex: 1, fontSize: 11, wordBreak: 'break-all', color: 'var(--fg-2)' }}>
-              {token.token}
-            </code>
-            <button className="btn btn-ghost btn-sm" onClick={handleCopy} style={{ flexShrink: 0 }}>
-              {copied ? '✓' : 'Копировать'}
-            </button>
-          </div>
-          <div style={{ fontSize: 11, color: 'var(--fg-3)', marginTop: 6, textAlign: 'center' }}>
-            Токен действителен 30 минут
-          </div>
+              <div style={{
+                background: 'var(--bg-soft)', borderRadius: 6, padding: '10px 12px',
+                display: 'flex', alignItems: 'center', gap: 8,
+              }}>
+                <code style={{ flex: 1, fontSize: 11, wordBreak: 'break-all', color: 'var(--fg-2)' }}>
+                  {token.bot_url}
+                </code>
+                <button className="btn btn-ghost btn-sm" onClick={handleCopy} style={{ flexShrink: 0 }}>
+                  {copied ? '✓ Скопировано' : 'Копировать ссылку'}
+                </button>
+              </div>
+              <div style={{ fontSize: 11, color: 'var(--fg-3)', marginTop: 6, textAlign: 'center' }}>
+                Ссылка действительна 30 минут — клиент откроет её и нажмёт Start
+              </div>
+            </>
+          ) : (
+            <div style={{
+              padding: 12, borderRadius: 6,
+              background: '#fef2f2', border: '1px solid var(--danger)',
+              fontSize: 12, color: 'var(--danger)',
+            }}>
+              <div style={{ fontWeight: 600, marginBottom: 4 }}>
+                ⚠ Бот не настроен
+              </div>
+              Не удалось определить username бота. Проверьте, что в окружении
+              задан <code>TELEGRAM_BOT_TOKEN</code> и Telegram getMe доступен,
+              либо явно задайте <code>TELEGRAM_BOT_USERNAME</code>.
+              <div style={{ marginTop: 8 }}>
+                Сырой токен (если хотите передать вручную):{' '}
+                <code style={{ wordBreak: 'break-all' }}>{token.token}</code>
+              </div>
+            </div>
+          )}
         </div>
       ) : (
         /* ── Initial state ── */

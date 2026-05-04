@@ -38,6 +38,10 @@ export default function CounterpartyModal({ initial, onClose, onSaved }: Props) 
   const [email, setEmail] = useState(initial?.email ?? '');
   const [address, setAddress] = useState(initial?.address ?? '');
   const [isActive, setIsActive] = useState(initial?.is_active ?? true);
+  const [creditLimit, setCreditLimit] = useState(initial?.credit_limit_uzs ?? '');
+  const [maxOverdue, setMaxOverdue] = useState(
+    initial?.max_overdue_days != null ? String(initial.max_overdue_days) : '',
+  );
 
   useEffect(() => {
     if (!initial) return;
@@ -50,6 +54,10 @@ export default function CounterpartyModal({ initial, onClose, onSaved }: Props) 
     setEmail(initial.email ?? '');
     setAddress(initial.address ?? '');
     setIsActive(initial.is_active);
+    setCreditLimit(initial.credit_limit_uzs ?? '');
+    setMaxOverdue(
+      initial.max_overdue_days != null ? String(initial.max_overdue_days) : '',
+    );
   }, [initial]);
 
   const fieldErrors =
@@ -68,6 +76,8 @@ export default function CounterpartyModal({ initial, onClose, onSaved }: Props) 
       email,
       address,
       is_active: isActive,
+      credit_limit_uzs: creditLimit.trim() ? creditLimit.trim() : null,
+      max_overdue_days: maxOverdue.trim() ? Number(maxOverdue.trim()) : null,
     };
     try {
       if (isEdit && initial) {
@@ -205,6 +215,56 @@ export default function CounterpartyModal({ initial, onClose, onSaved }: Props) 
             onChange={(e) => setAddress(e.target.value)}
           />
         </div>
+
+        {kind === 'buyer' && (
+          <>
+            <div style={{
+              gridColumn: '1/3', marginTop: 8, paddingTop: 12,
+              borderTop: '1px solid var(--border)',
+            }}>
+              <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 4 }}>
+                Кредитная политика
+              </div>
+              <div style={{ fontSize: 11, color: 'var(--fg-3)' }}>
+                Если задано — система автоматически блокирует confirm новых
+                продаж при превышении лимита или просрочке. Пусто = без
+                ограничения. sales:admin может обойти блок при confirm.
+              </div>
+            </div>
+            <div className="field">
+              <label>Кредитный лимит, сум</label>
+              <input
+                className="input mono"
+                type="number"
+                value={creditLimit}
+                onChange={(e) => setCreditLimit(e.target.value)}
+                placeholder="например 50000000"
+                min={0}
+              />
+              {fieldErrors.credit_limit_uzs && (
+                <div style={{ fontSize: 11, color: 'var(--danger)' }}>
+                  {fieldErrors.credit_limit_uzs.join(' · ')}
+                </div>
+              )}
+            </div>
+            <div className="field">
+              <label>Макс. просрочка, дн</label>
+              <input
+                className="input mono"
+                type="number"
+                value={maxOverdue}
+                onChange={(e) => setMaxOverdue(e.target.value)}
+                placeholder="например 30"
+                min={0}
+              />
+              {fieldErrors.max_overdue_days && (
+                <div style={{ fontSize: 11, color: 'var(--danger)' }}>
+                  {fieldErrors.max_overdue_days.join(' · ')}
+                </div>
+              )}
+            </div>
+          </>
+        )}
       </div>
 
       {error && error.status !== 400 && (

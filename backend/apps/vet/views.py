@@ -207,13 +207,18 @@ class VetTreatmentLogViewSet(OrgScopedModelViewSet):
     /api/vet/treatments/ — журнал применения препаратов.
     POST /api/vet/treatments/{id}/apply/ — провести (сервис).
     POST /api/vet/treatments/{id}/cancel/ — отменить (с reverse JE).
+    POST /api/vet/treatments/{id}/acknowledge/ — менеджер модуля-цели подтвердил.
+    GET  /api/vet/treatments/incoming/?to_module=<code> — inbox для модуля-цели.
     GET  /api/vet/treatments/timeline/?batch=<uuid>|herd=<uuid> — хронология.
     """
 
     serializer_class = VetTreatmentLogSerializer
     queryset = VetTreatmentLog.objects.select_related(
         "drug__nomenclature", "stock_batch", "target_block",
-        "target_batch", "target_herd", "unit", "veterinarian",
+        "target_block__module",
+        "target_batch", "target_batch__current_module",
+        "target_herd", "target_herd__module",
+        "unit", "veterinarian",
     )
     module_code = "vet"
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
@@ -230,7 +235,13 @@ class VetTreatmentLogViewSet(OrgScopedModelViewSet):
 
     @action(detail=True, methods=["post"])
     def apply(self, request, pk=None):
-        """Провести лечение (декремент лота + withdrawal + JE)."""
+        """Провести лечение (декремент лота + withdrawal + JE).
+
+        После проведения уведомляет менеджеров модуля-цели через TG
+        (`apps.tgbot.notify_admins_task`) — soft-acknowledgement: они
+        увидят нотификацию + запись в inbox `/incoming/?to_module=...`.
+        Применение не блокируется acknowledgement-ом.
+        """
         treatment = self.get_object()
         try:
             result = apply_vet_treatment(treatment, user=request.user)
@@ -240,6 +251,7 @@ class VetTreatmentLogViewSet(OrgScopedModelViewSet):
             )
 
         treatment.refresh_from_db()
+        self._notify_target_module(treatment, result)
         data = self.get_serializer(treatment).data
         data["_result"] = {
             "stock_movement": {
@@ -271,11 +283,53 @@ class VetTreatmentLogViewSet(OrgScopedModelViewSet):
         }
         return Response(data)
 
+    # Окно, в течение которого менеджер модуля-цели может отклонить
+    # применение препарата (после этого — только vet/admin). 24ч даёт
+    # owner'у партии шанс заметить ошибку до того как птица «уехала»
+    # дальше по цепочке (продажа/убой), где реверс ломает учёт.
+    REJECT_WINDOW_HOURS = 24
+
+    def get_permissions(self):
+        # `incoming` + `cancel` + `acknowledge` — особый RBAC: разрешаем
+        # менеджерам модуля-цели (не только vet) с дополнительной валидацией
+        # внутри action-а. См. `_can_user_cancel`.
+        if getattr(self, "action", None) in ("incoming", "cancel", "acknowledge"):
+            from rest_framework.permissions import IsAuthenticated
+            return [IsAuthenticated()]
+        return super().get_permissions()
+
     @action(detail=True, methods=["post"])
     def cancel(self, request, pk=None):
-        """POST /api/vet/treatments/{id}/cancel/  body={reason}"""
+        """POST /api/vet/treatments/{id}/cancel/  body={reason}
+
+        RBAC: разрешено если у пользователя есть rw-доступ к одному из:
+          - vet (обычный кейс — ветеринар сам откатывает свою ошибку,
+            доступно всегда)
+          - target_module (feedlot/matochnik/...) — owner партии видит
+            ошибку и хочет отклонить применение к своим птицам.
+            Окно: только в первые `REJECT_WINDOW_HOURS` часов после
+            apply (после этого птица уже могла быть продана/убита,
+            реверс ломает учёт ниже по цепочке).
+
+        Без rw ни к одному — 403.
+        """
+        from datetime import timedelta
+        from django.utils import timezone
+        from rest_framework.exceptions import PermissionDenied
+
         treatment = self.get_object()
         reason = request.data.get("reason", "")
+
+        # RBAC поверх стандартного OrgScopedModelViewSet
+        membership = getattr(request, "membership", None)
+        if membership is None:
+            raise PermissionDenied({"detail": "Нет членства в организации."})
+
+        target_module = self._resolve_target_module(treatment)
+        gate = self._can_user_cancel(membership, treatment, target_module)
+        if not gate["allowed"]:
+            raise PermissionDenied({"detail": gate["reason"]})
+
         try:
             result = cancel_vet_treatment(treatment, reason=reason, user=request.user)
         except VetTreatmentCancelError as exc:
@@ -296,6 +350,234 @@ class VetTreatmentLogViewSet(OrgScopedModelViewSet):
             ),
         }
         return Response(data)
+
+    def _can_user_cancel(self, membership, treatment, target_module):
+        """Проверяем кому разрешено отменять treatment.
+
+        Возвращает {"allowed": bool, "reason": str}.
+
+        Логика:
+          - vet rw → можно всегда (ветеринар откатывает свою ошибку)
+          - target_module rw → можно только в окно REJECT_WINDOW_HOURS
+            после created_at (apply timestamp)
+        """
+        from datetime import timedelta
+        from django.utils import timezone
+
+        from apps.common.permissions import _effective_level, level_satisfies
+
+        # 1. Vet rw → carte blanche
+        if level_satisfies(_effective_level(membership, "vet"), "rw"):
+            return {"allowed": True, "reason": ""}
+
+        # 2. Target module rw → только в окно
+        if target_module is not None and level_satisfies(
+            _effective_level(membership, target_module.code), "rw"
+        ):
+            window_end = treatment.created_at + timedelta(
+                hours=self.REJECT_WINDOW_HOURS
+            )
+            if timezone.now() <= window_end:
+                return {"allowed": True, "reason": ""}
+            return {
+                "allowed": False,
+                "reason": (
+                    f"Окно отклонения истекло "
+                    f"({self.REJECT_WINDOW_HOURS}ч после применения). "
+                    f"Обратитесь к ветеринару для отмены."
+                ),
+            }
+
+        return {
+            "allowed": False,
+            "reason": (
+                "Нет прав на отмену: требуется rw к модулю vet "
+                "или к модулю-цели применения."
+            ),
+        }
+
+    @action(detail=True, methods=["post"])
+    def acknowledge(self, request, pk=None):
+        """POST /api/vet/treatments/{id}/acknowledge/
+
+        Менеджер модуля-цели подтверждает, что видел запись о применении
+        препарата. Soft-only — не отменяет, не реверсит проводки. Просто
+        снимает уведомление в inbox.
+
+        RBAC: пользователь должен иметь r+ доступ к target_module
+        (feedlot/matochnik/incubation). Без этого — 403.
+        """
+        from django.utils import timezone
+        from rest_framework.exceptions import PermissionDenied
+
+        from apps.audit.models import AuditLog
+        from apps.audit.services.writer import audit_log
+        from apps.common.permissions import _effective_level, level_satisfies
+
+        treatment = self.get_object()
+        if treatment.acknowledged_at is not None:
+            return Response(self.get_serializer(treatment).data)
+
+        target_module = self._resolve_target_module(treatment)
+        if target_module is None:
+            raise DRFValidationError(
+                {"__all__": "Не удалось определить модуль-цель для подтверждения."}
+            )
+
+        membership = getattr(request, "membership", None)
+        if membership is None or not level_satisfies(
+            _effective_level(membership, target_module.code), "r"
+        ):
+            raise PermissionDenied(
+                {"detail": f"Нет доступа к модулю '{target_module.code}'."}
+            )
+
+        treatment.acknowledged_at = timezone.now()
+        treatment.acknowledged_by = request.user
+        treatment.save(
+            update_fields=["acknowledged_at", "acknowledged_by", "updated_at"]
+        )
+        audit_log(
+            organization=treatment.organization,
+            module=target_module,
+            actor=request.user,
+            action=AuditLog.Action.UPDATE,
+            entity=treatment,
+            action_verb=f"acknowledged vet treatment {treatment.doc_number}",
+        )
+        return Response(self.get_serializer(treatment).data)
+
+    @action(detail=False, methods=["get"], url_path="incoming")
+    def incoming(self, request):
+        """GET /api/vet/treatments/incoming/?to_module=<code>
+
+        Inbox менеджера модуля-цели: применённые (есть proведённый JE)
+        и ещё не подтверждённые (`acknowledged_at IS NULL`) treatment'ы,
+        чей target лежит в указанном модуле.
+
+        RBAC:
+          - user должен иметь r+ к запрошенному `to_module`
+          - без `to_module` — отдаём по всем модулям где есть r+
+        """
+        from django.contrib.contenttypes.models import ContentType
+
+        from apps.accounting.models import JournalEntry
+        from apps.common.permissions import _effective_level, level_satisfies
+        from apps.modules.models import Module
+        from rest_framework.exceptions import PermissionDenied
+
+        org = getattr(request, "organization", None)
+        membership = getattr(request, "membership", None)
+        if org is None or membership is None:
+            return Response([])
+
+        to_module_code = request.query_params.get("to_module", "").strip()
+
+        # Только проведённые (есть JournalEntry) и не отменённые лечения
+        ct = ContentType.objects.get_for_model(VetTreatmentLog)
+        applied_ids = JournalEntry.objects.filter(
+            organization=org,
+            source_content_type=ct,
+        ).values_list("source_object_id", flat=True)
+
+        qs = (
+            self.get_queryset()
+            .filter(
+                organization=org,
+                id__in=list(applied_ids),
+                acknowledged_at__isnull=True,
+                cancelled_at__isnull=True,
+            )
+        )
+
+        # Фильтр по target_module — определяем по нескольким источникам:
+        # target_block.module / target_batch.current_module / target_herd.module
+        if to_module_code:
+            if not level_satisfies(
+                _effective_level(membership, to_module_code), "r"
+            ):
+                raise PermissionDenied(
+                    {"detail": f"Нет доступа к модулю '{to_module_code}'."}
+                )
+            from django.db.models import Q
+            qs = qs.filter(
+                Q(target_block__module__code=to_module_code)
+                | Q(target_batch__current_module__code=to_module_code)
+                | Q(target_herd__module__code=to_module_code)
+            )
+        else:
+            allowed_codes = [
+                code
+                for code in Module.objects.values_list("code", flat=True)
+                if level_satisfies(_effective_level(membership, code), "r")
+            ]
+            from django.db.models import Q
+            qs = qs.filter(
+                Q(target_block__module__code__in=allowed_codes)
+                | Q(target_batch__current_module__code__in=allowed_codes)
+                | Q(target_herd__module__code__in=allowed_codes)
+            )
+
+        qs = qs.order_by("-treatment_date", "-created_at")
+        return Response(self.get_serializer(qs, many=True).data)
+
+    @staticmethod
+    def _resolve_target_module(treatment):
+        """Тот же resolve что в apply_treatment — модуль куда применили."""
+        if treatment.target_block_id and treatment.target_block.module_id:
+            return treatment.target_block.module
+        if treatment.target_batch_id and treatment.target_batch.current_module_id:
+            return treatment.target_batch.current_module
+        if treatment.target_herd_id and treatment.target_herd.module_id:
+            return treatment.target_herd.module
+        return None
+
+    @staticmethod
+    def _notify_target_module(treatment, result) -> None:
+        """TG-уведомление менеджерам модуля-цели после apply."""
+        target_module = VetTreatmentLogViewSet._resolve_target_module(treatment)
+        if target_module is None:
+            return
+        try:
+            from apps.tgbot.tasks import notify_admins_task
+        except Exception:
+            return
+
+        drug_name = (
+            treatment.drug.nomenclature.name
+            if treatment.drug_id and treatment.drug.nomenclature_id
+            else "—"
+        )
+        target_label = (
+            f"партия {treatment.target_batch.doc_number}"
+            if treatment.target_batch_id
+            else (
+                f"стадо {treatment.target_herd.doc_number}"
+                if treatment.target_herd_id
+                else "—"
+            )
+        )
+        withdrawal = (
+            f"\nКаренция до {result.new_withdrawal_end.isoformat()}"
+            if result.new_withdrawal_end
+            else ""
+        )
+        text = (
+            f"🩺 Ветобработка в модуле {target_module.name}\n"
+            f"{target_label}\n"
+            f"Препарат: {drug_name} ({treatment.dose_quantity} {treatment.unit.code})"
+            f"{withdrawal}\n\n"
+            f"Подтвердить можно в разделе модуля «Входящие ветобработки»."
+        )
+        try:
+            notify_admins_task.delay(
+                text=text,
+                organization_id=str(treatment.organization_id),
+                module_code=target_module.code,
+            )
+        except Exception:
+            # Бот/celery недоступен — не валим apply
+            pass
 
     @action(detail=False, methods=["get"])
     def timeline(self, request):

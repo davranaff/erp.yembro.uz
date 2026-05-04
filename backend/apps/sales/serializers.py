@@ -6,7 +6,7 @@ from rest_framework import serializers
 
 from apps.currency.serializers import ExchangeRateNestedSerializer
 
-from .models import SaleItem, SaleOrder
+from .models import SaleCommunication, SaleItem, SaleOrder
 
 
 class SaleItemSerializer(serializers.ModelSerializer):
@@ -43,6 +43,56 @@ class SaleItemSerializer(serializers.ModelSerializer):
 
     def get_nomenclature_name(self, obj):
         return obj.nomenclature.name if obj.nomenclature_id else None
+
+
+class SaleCommunicationSerializer(serializers.ModelSerializer):
+    contacted_by_name = serializers.SerializerMethodField()
+    method_display = serializers.CharField(source="get_method_display", read_only=True)
+    outcome_display = serializers.CharField(source="get_outcome_display", read_only=True)
+
+    class Meta:
+        model = SaleCommunication
+        fields = (
+            "id",
+            "order",
+            "contacted_at",
+            "method",
+            "method_display",
+            "outcome",
+            "outcome_display",
+            "customer_response",
+            "internal_note",
+            "promised_pay_date",
+            "expected_pay_date",
+            "next_action_date",
+            "contacted_by",
+            "contacted_by_name",
+            "created_at",
+            "updated_at",
+        )
+        read_only_fields = (
+            "id",
+            "contacted_by",
+            "contacted_by_name",
+            "method_display",
+            "outcome_display",
+            "created_at",
+            "updated_at",
+        )
+
+    def get_contacted_by_name(self, obj):
+        if not obj.contacted_by_id:
+            return None
+        u = obj.contacted_by
+        return getattr(u, "full_name", None) or getattr(u, "email", None) or str(u)
+
+    def validate_customer_response(self, value):
+        v = (value or "").strip()
+        if len(v) < 3:
+            raise serializers.ValidationError(
+                "Опишите ответ клиента (минимум 3 символа)."
+            )
+        return v
 
 
 class SaleOrderSerializer(serializers.ModelSerializer):

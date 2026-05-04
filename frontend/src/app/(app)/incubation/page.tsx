@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react';
 
 import DetailDrawer, { KV } from '@/components/DetailDrawer';
 import IncomingTransfersPanel from '@/components/IncomingTransfersPanel';
+import IncomingVetTreatmentsPanel from '@/components/IncomingVetTreatmentsPanel';
 import OpexButton from '@/components/OpexButton';
 import { OpenSaleFromModule } from '@/components/SellBatchButton';
 import DataTable from '@/components/ui/DataTable';
@@ -155,6 +156,8 @@ export default function IncubationPage() {
         subtitle="ждут приёма из маточника"
         invalidateKeys={[['incubation']]}
       />
+
+      <IncomingVetTreatmentsPanel module="incubation" />
 
       <div className="kpi-row">
         <KpiCard tone="orange" iconName="incubator" label="Партий" sub="всего" value={String(runs?.length ?? 0)} />

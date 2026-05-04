@@ -137,20 +137,156 @@ def send_debt_reminder_task(sale_order_id: str) -> dict:
 
 @shared_task(name="apps.tgbot.debt_reminder_daily_task")
 def debt_reminder_daily_task() -> dict:
-    """Celery Beat: каждый день в 09:00 — напоминания всем должникам."""
+    """Celery Beat: каждый день в 09:00 — таргетированные напоминания.
+
+    Старая логика спамила всем должникам каждый день, что приучало
+    клиентов игнорировать. Новая логика — точечная по `due_date`:
+      - T-3: первое предупреждение «через 3 дня срок»
+      - T-1: «завтра срок»
+      - T-0: «сегодня срок»
+      - T+N: каждые 7 дней просрочки (T+1, T+8, T+15, …)
+      - без due_date: раз в неделю по понедельникам (мягкое напоминание)
+
+    Это даёт клиенту 3 чётких касания до срока + еженедельный пинок
+    при просрочке, без раздражения.
+    """
+    from datetime import date as _date
+
     from apps.sales.models import SaleOrder
 
-    overdue = SaleOrder.objects.filter(
+    today = _date.today()
+    qs = SaleOrder.objects.filter(
         status=SaleOrder.Status.CONFIRMED,
     ).exclude(payment_status=SaleOrder.PaymentStatus.PAID)
 
-    count = 0
-    for order in overdue:
+    queued = 0
+    skipped = 0
+    for order in qs:
+        if not _should_remind_today(order, today):
+            skipped += 1
+            continue
         send_debt_reminder_task.delay(str(order.id))
-        count += 1
+        queued += 1
 
-    logger.info("debt_reminder_daily_task: queued=%d", count)
-    return {"queued": count}
+    logger.info(
+        "debt_reminder_daily_task: queued=%d skipped=%d", queued, skipped
+    )
+    return {"queued": queued, "skipped": skipped}
+
+
+def _should_remind_today(order, today) -> bool:
+    """Решает, надо ли сегодня дёргать напоминание по этому заказу.
+
+    См. docstring `debt_reminder_daily_task` для расписания.
+    """
+    if order.due_date is None:
+        # Без срока — только по понедельникам (weekday 0), не каждый день
+        return today.weekday() == 0
+
+    delta_days = (today - order.due_date).days
+    if delta_days < 0:
+        # Ещё до срока: T-3 и T-1
+        days_until = -delta_days
+        return days_until in (3, 1)
+    if delta_days == 0:
+        # День X
+        return True
+    # После срока: T+1, потом каждые 7 дней (T+8, T+15, ...)
+    return delta_days == 1 or delta_days % 7 == 1
+
+
+@shared_task(name="apps.tgbot.daily_collection_alerts_task")
+def daily_collection_alerts_task() -> dict:
+    """Celery Beat: каждый день в 09:00 (после debt-reminders) — алерт
+    владельцу/админам по задачам сборщика дебиторки.
+
+    Если есть эскалации (long overdue без касаний) или сорванные обещания —
+    шлём в TG сводку: «Сегодня 3 эскалации (12.5М сум) и 7 нарушенных
+    обещаний». Это позволяет владельцу не открывать /tasks вручную каждый
+    день — пинок придёт сам когда есть что разбирать.
+    """
+    from apps.organizations.models import Organization
+    from apps.sales.services.collection_tasks import compute_collection_tasks
+
+    queued = 0
+    skipped = 0
+    for org in Organization.objects.all():
+        report = compute_collection_tasks(org)
+        # Шлём только если есть «горячие» категории. Низкоприоритетные
+        # callback-планы — это рутина, не повод отвлекать владельца.
+        if not (
+            report.escalation
+            or report.promise_broken
+            or report.forecast_due
+        ):
+            skipped += 1
+            continue
+
+        text = _fmt_collection_alert(report)
+        try:
+            notify_admins_task.delay(
+                text=text,
+                organization_id=str(org.id),
+                module_code="sales",
+            )
+            queued += 1
+        except Exception:
+            logger.exception(
+                "daily_collection_alerts_task: failed for org %s", org.code
+            )
+
+    logger.info(
+        "daily_collection_alerts_task: queued=%d skipped=%d", queued, skipped
+    )
+    return {"queued": queued, "skipped": skipped}
+
+
+def _fmt_collection_alert(report) -> str:
+    """Текст для TG-алерта по задачам дебиторки."""
+    from decimal import Decimal
+
+    def _sum(tasks) -> Decimal:
+        return sum((Decimal(t.outstanding_uzs) for t in tasks), Decimal("0"))
+
+    lines = ["📋 <b>Задачи по долгам на сегодня</b>\n"]
+
+    if report.escalation:
+        total = _sum(report.escalation)
+        lines.append(
+            f"🚨 <b>Эскалация:</b> {len(report.escalation)} клиент(ов) · "
+            f"{float(total):,.0f} сум"
+        )
+        for t in report.escalation[:3]:
+            lines.append(
+                f"  • {t.customer_name} — {float(t.outstanding_uzs):,.0f} сум, "
+                f"{t.days_overdue} дн просрочки"
+            )
+
+    if report.promise_broken:
+        total = _sum(report.promise_broken)
+        lines.append(
+            f"\n⚠️ <b>Не сдержали обещание:</b> {len(report.promise_broken)} · "
+            f"{float(total):,.0f} сум"
+        )
+        for t in report.promise_broken[:3]:
+            lines.append(
+                f"  • {t.customer_name} — обещал {t.promised_date}, не заплатил"
+            )
+
+    if report.forecast_due:
+        total = _sum(report.forecast_due)
+        lines.append(
+            f"\n🎯 <b>Не сбылся прогноз:</b> {len(report.forecast_due)} · "
+            f"{float(total):,.0f} сум"
+        )
+
+    if report.callback_due:
+        lines.append(
+            f"\n📞 Запланированных обзвонов: {len(report.callback_due)}"
+        )
+
+    lines.append("\nОткрыть: /tasks")
+    return "\n".join(lines)
 
 
 @shared_task(name="apps.tgbot.handle_tg_update_task")

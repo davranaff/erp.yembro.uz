@@ -28,6 +28,29 @@ class Counterparty(UUIDModel, TimestampedModel):
     is_active = models.BooleanField(default=True)
     notes = models.TextField(blank=True)
 
+    # Кредитная политика для покупателей (kind=buyer). Для других kind
+    # поля игнорируются. NULL = ограничение не задано.
+    credit_limit_uzs = models.DecimalField(
+        max_digits=18,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        help_text=(
+            "Максимальный совокупный долг покупателя. Если непогашенная "
+            "сумма confirmed-продаж + новая продажа > лимита — confirm_sale "
+            "блокируется. NULL = без ограничения."
+        ),
+    )
+    max_overdue_days = models.PositiveSmallIntegerField(
+        null=True,
+        blank=True,
+        help_text=(
+            "Максимальная допустимая просрочка по самому старому "
+            "непогашенному счёту. Если есть счёт с просрочкой > этого "
+            "значения — confirm_sale блокируется. NULL = без ограничения."
+        ),
+    )
+
     class Meta:
         ordering = ["code"]
         unique_together = (("organization", "code"),)

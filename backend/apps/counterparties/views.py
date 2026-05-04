@@ -12,6 +12,113 @@ from .models import Counterparty
 from .serializers import CounterpartySerializer
 
 
+def _build_debt_summary(counterparty, organization) -> dict:
+    """Свод по долгу одного клиента: aging, лимит, открытые счета, касания.
+
+    Используется в карточке клиента (FE drawer/page).
+    Дёргает существующие сервисы (compute_aging_report, check_customer_credit)
+    чтобы не дублировать логику.
+    """
+    from apps.sales.models import SaleCommunication, SaleOrder
+    from apps.sales.services.aging import compute_aging_report
+    from apps.sales.services.credit_check import check_customer_credit
+
+    aging = compute_aging_report(organization, customer_id=str(counterparty.id))
+    aging_row = aging.rows[0].to_dict() if aging.rows else None
+
+    credit = check_customer_credit(
+        organization=organization, customer=counterparty,
+    ).to_dict()
+
+    # Открытые продажи (CONFIRMED, не PAID)
+    open_orders_qs = (
+        SaleOrder.objects
+        .filter(
+            organization=organization,
+            customer=counterparty,
+            status=SaleOrder.Status.CONFIRMED,
+        )
+        .exclude(payment_status=SaleOrder.PaymentStatus.PAID)
+        .order_by("-date")
+    )
+    open_orders = [
+        {
+            "id": str(o.id),
+            "doc_number": o.doc_number,
+            "date": o.date.isoformat(),
+            "due_date": o.due_date.isoformat() if o.due_date else None,
+            "amount_uzs": str(o.amount_uzs),
+            "paid_amount_uzs": str(o.paid_amount_uzs or 0),
+            "outstanding_uzs": str(
+                Decimal(o.amount_uzs) - Decimal(o.paid_amount_uzs or 0)
+            ),
+            "payment_status": o.payment_status,
+        }
+        for o in open_orders_qs
+    ]
+
+    # Все касания этого клиента (через order__customer)
+    comms_qs = (
+        SaleCommunication.objects
+        .filter(order__customer=counterparty,
+                order__organization=organization)
+        .select_related("contacted_by", "order")
+        .order_by("-contacted_at")[:50]
+    )
+    comms = [
+        {
+            "id": str(c.id),
+            "order_id": str(c.order_id),
+            "order_doc": c.order.doc_number,
+            "contacted_at": c.contacted_at.isoformat(),
+            "method": c.method,
+            "method_display": c.get_method_display(),
+            "outcome": c.outcome,
+            "outcome_display": c.get_outcome_display(),
+            "customer_response": c.customer_response,
+            "internal_note": c.internal_note,
+            "promised_pay_date": (
+                c.promised_pay_date.isoformat() if c.promised_pay_date else None
+            ),
+            "expected_pay_date": (
+                c.expected_pay_date.isoformat() if c.expected_pay_date else None
+            ),
+            "next_action_date": (
+                c.next_action_date.isoformat() if c.next_action_date else None
+            ),
+            "contacted_by": str(c.contacted_by_id) if c.contacted_by_id else None,
+            "contacted_by_name": (
+                getattr(c.contacted_by, "full_name", None)
+                or getattr(c.contacted_by, "email", None)
+                if c.contacted_by_id else None
+            ),
+            "created_at": c.created_at.isoformat(),
+            "updated_at": c.updated_at.isoformat(),
+        }
+        for c in comms_qs
+    ]
+
+    # Утилизация лимита (% от лимита, занятый текущим долгом)
+    limit_uzs = counterparty.credit_limit_uzs
+    current_debt = Decimal(credit["current_debt_uzs"])
+    if limit_uzs and limit_uzs > 0:
+        utilization_pct = round(float(current_debt / limit_uzs * 100), 1)
+    else:
+        utilization_pct = None
+
+    return {
+        "counterparty": CounterpartySerializer(counterparty).data,
+        "aging": aging_row,
+        "aging_as_of": aging.as_of.isoformat(),
+        "credit": credit,
+        "credit_utilization_pct": utilization_pct,
+        "open_orders": open_orders,
+        "open_orders_count": len(open_orders),
+        "communications": comms,
+        "communications_count": len(comms),
+    }
+
+
 class CounterpartyViewSet(OrgScopedModelViewSet):
     """
     CRUD контрагентов для текущей организации.
@@ -138,3 +245,20 @@ class CounterpartyViewSet(OrgScopedModelViewSet):
                 "counterparties_count": len(result),
             },
         })
+
+    @action(detail=True, methods=["get"], url_path="debt_summary")
+    def debt_summary(self, request, pk=None):
+        """GET /api/counterparties/{id}/debt_summary/
+
+        Сводный отчёт по клиенту для карточки должника:
+          - реквизиты
+          - aging (бакеты просрочки)
+          - кредитный лимит + утилизация %
+          - открытые счета (CONFIRMED, не PAID)
+          - последние 50 касаний (cross-order)
+
+        Использует существующие сервисы compute_aging_report и
+        check_customer_credit — не дублирует логику.
+        """
+        cp = self.get_object()
+        return Response(_build_debt_summary(cp, request.organization))

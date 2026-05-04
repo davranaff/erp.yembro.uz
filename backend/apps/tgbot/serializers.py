@@ -27,18 +27,30 @@ class TgLinkSerializer(serializers.ModelSerializer):
 
 class TgLinkTokenSerializer(serializers.ModelSerializer):
     bot_url = serializers.SerializerMethodField()
+    bot_configured = serializers.SerializerMethodField()
 
     class Meta:
         model = TgLinkToken
-        fields = ("id", "token", "expires_at", "used", "bot_url")
-        read_only_fields = ("id", "token", "expires_at", "used", "bot_url")
+        fields = ("id", "token", "expires_at", "used", "bot_url", "bot_configured")
+        read_only_fields = (
+            "id", "token", "expires_at", "used", "bot_url", "bot_configured",
+        )
 
-    def get_bot_url(self, obj) -> str:
-        from django.conf import settings
-        bot_username = getattr(settings, "TELEGRAM_BOT_USERNAME", "")
-        if bot_username:
-            return f"https://t.me/{bot_username}?start={obj.token}"
-        return f"https://t.me/?start={obj.token}"
+    def get_bot_url(self, obj) -> str | None:
+        from .bot import get_bot_username
+
+        bot_username = get_bot_username()
+        if not bot_username:
+            # Возвращаем None вместо ломаной ссылки `https://t.me/?start=...`,
+            # чтобы UI мог показать «бот не настроен» вместо неработающей
+            # кнопки.
+            return None
+        return f"https://t.me/{bot_username}?start={obj.token}"
+
+    def get_bot_configured(self, obj) -> bool:
+        from .bot import get_bot_username
+
+        return bool(get_bot_username())
 
 
 class TgLinkTokenCreateSerializer(serializers.Serializer):

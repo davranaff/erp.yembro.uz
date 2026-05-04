@@ -222,9 +222,18 @@ def _check_and_decrement_source(item: SaleItem, qty: Decimal):
 
 
 @transaction.atomic
-def confirm_sale(order: SaleOrder, *, user=None) -> SaleConfirmResult:
+def confirm_sale(
+    order: SaleOrder,
+    *,
+    user=None,
+    force_credit_override: bool = False,
+) -> SaleConfirmResult:
     """
     Провести продажу. Идемпотентен по статусу: повторный → ValidationError.
+
+    `force_credit_override` пропускает проверку кредитного лимита/просрочки
+    клиента (используется sales:admin при осознанном превышении лимита).
+    Override логируется в audit log как POST с пометкой `credit_override`.
     """
     # 1. Lock + reload
     order = SaleOrder.objects.select_for_update().get(pk=order.pk)
@@ -249,6 +258,29 @@ def confirm_sale(order: SaleOrder, *, user=None) -> SaleConfirmResult:
     )
     if not items:
         raise SaleConfirmError({"items": "Нельзя провести продажу без позиций."})
+
+    # 1.5 Кредитный гейт — до любых движений. Сумма новой продажи берётся
+    # из draft-аггрегата (sum qty*unit_price). На этом этапе amount_uzs
+    # ещё пуст (заполняется ниже), поэтому считаем здесь.
+    from .credit_check import check_customer_credit
+    new_sale_uzs = sum(
+        (Decimal(it.quantity) * Decimal(it.unit_price_uzs) for it in items),
+        Decimal("0"),
+    )
+    credit = check_customer_credit(
+        organization=order.organization,
+        customer=order.customer,
+        new_sale_uzs=new_sale_uzs,
+    )
+    if not credit.ok and not force_credit_override:
+        raise SaleConfirmError({
+            "customer": (
+                "Продажа заблокирована кредитной политикой клиента: "
+                + " · ".join(credit.reasons)
+                + " Передайте `force_credit_override=true` если у вас есть "
+                "право на overrides (sales:admin)."
+            ),
+        })
 
     # 2. FX-snapshot
     #    Приоритет: exchange_rate_override (ручной) → get_rate_for (CBU).

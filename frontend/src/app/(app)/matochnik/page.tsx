@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react';
 
 import DetailDrawer, { KV } from '@/components/DetailDrawer';
 import IncomingTransfersPanel from '@/components/IncomingTransfersPanel';
+import IncomingVetTreatmentsPanel from '@/components/IncomingVetTreatmentsPanel';
 import OpexButton from '@/components/OpexButton';
 import { OpenSaleFromModule } from '@/components/SellBatchButton';
 import Badge from '@/components/ui/Badge';
@@ -146,6 +147,8 @@ export default function MatochnikPage() {
         subtitle="ждут приёма"
         invalidateKeys={[['matochnik']]}
       />
+
+      <IncomingVetTreatmentsPanel module="matochnik" />
 
       <div className="kpi-row">
         <KpiCard

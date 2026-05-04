@@ -8,8 +8,9 @@ from apps.common.lifecycle import DeleteReasonMixin, ImmutableStatusMixin
 from apps.common.services.numbering import next_doc_number
 from apps.common.viewsets import OrgScopedModelViewSet
 
-from .models import SaleOrder
-from .serializers import SaleOrderSerializer
+from .models import SaleCommunication, SaleOrder
+from .serializers import SaleCommunicationSerializer, SaleOrderSerializer
+from .services.aging import compute_aging_report
 from .services.confirm import SaleConfirmError, confirm_sale
 from .services.reverse import SaleReverseError, reverse_sale
 
@@ -63,12 +64,49 @@ class SaleOrderViewSet(ImmutableStatusMixin, DeleteReasonMixin, OrgScopedModelVi
 
     @action(detail=True, methods=["post"])
     def confirm(self, request, pk=None):
+        """POST /api/sales/orders/{id}/confirm/
+
+        Body (опционально):
+            {"force_credit_override": true}
+
+        Override доступен только sales:admin. Логируется в audit как
+        обычный POST + помечается verb-ом 'credit_override'.
+        """
+        from apps.common.permissions import _effective_level, level_satisfies
+
         order = self.get_object()
+
+        force = bool(request.data.get("force_credit_override"))
+        if force:
+            membership = getattr(request, "membership", None)
+            if not (membership and level_satisfies(
+                _effective_level(membership, "sales"), "admin"
+            )):
+                raise DRFValidationError({
+                    "force_credit_override": (
+                        "Override кредитного лимита доступен только sales:admin."
+                    ),
+                })
+
         try:
-            result = confirm_sale(order, user=request.user)
+            result = confirm_sale(
+                order, user=request.user, force_credit_override=force,
+            )
         except SaleConfirmError as exc:
             raise DRFValidationError(
                 exc.message_dict if hasattr(exc, "message_dict") else exc.messages
+            )
+
+        if force:
+            from apps.audit.models import AuditLog
+            from apps.audit.services.writer import audit_log
+            audit_log(
+                organization=order.organization,
+                module=order.module,
+                actor=request.user,
+                action=AuditLog.Action.UPDATE,
+                entity=order,
+                action_verb=f"credit_override on confirm of {order.doc_number}",
             )
 
         order.refresh_from_db()
@@ -202,6 +240,69 @@ class SaleOrderViewSet(ImmutableStatusMixin, DeleteReasonMixin, OrgScopedModelVi
         }
         return Response(data)
 
+    @action(detail=True, methods=["get"], url_path="credit_check")
+    def credit_check(self, request, pk=None):
+        """GET /api/sales/orders/{id}/credit_check/
+
+        Превью кредитной проверки для draft-продажи. FE дёргает перед
+        кнопкой confirm, чтобы показать warning «у клиента долг X, лимит Y»
+        ещё до клика. Не делает никаких изменений.
+        """
+        from decimal import Decimal
+
+        from .services.credit_check import check_customer_credit
+
+        order = self.get_object()
+        new_sale_uzs = sum(
+            (Decimal(it.quantity) * Decimal(it.unit_price_uzs)
+             for it in order.items.all()),
+            Decimal("0"),
+        )
+        result = check_customer_credit(
+            organization=order.organization,
+            customer=order.customer,
+            new_sale_uzs=new_sale_uzs,
+        )
+        return Response(result.to_dict())
+
+    @action(detail=False, methods=["get"], url_path="tasks")
+    def tasks(self, request):
+        """GET /api/sales/orders/tasks/[?mine=true]
+
+        Workflow задач по сбору дебиторки. Категории:
+          - callback_due  : запланированный обзвон
+          - promise_broken: клиент не сдержал обещание
+          - forecast_due  : не пришла прогнозная оплата
+          - escalation    : долг 60+ дней без касаний за 7+ дней
+
+        `?mine=true` — фильтр на касания текущего пользователя
+        (escalation остаётся глобальной — её делает руководитель).
+        """
+        from .services.collection_tasks import compute_collection_tasks
+
+        mine = request.query_params.get("mine") in ("1", "true", "True")
+        contacted_by = request.user if mine else None
+        report = compute_collection_tasks(
+            request.organization, contacted_by=contacted_by,
+        )
+        return Response(report.to_dict())
+
+    @action(detail=False, methods=["get"], url_path="aging")
+    def aging(self, request):
+        """GET /api/sales/orders/aging/[?customer=<uuid>]
+
+        AR aging report — старение дебиторки. Группирует непогашенные
+        confirmed-продажи по бакетам просрочки (current / 0-30 / 31-60 /
+        61-90 / 90+) для каждого клиента.
+
+        Параметр `?customer=<uuid>` сужает отчёт до одного клиента
+        (используется в карточке должника).
+        """
+        org = request.organization
+        customer_id = request.query_params.get("customer")
+        report = compute_aging_report(org, customer_id=customer_id)
+        return Response(report.to_dict())
+
     @action(detail=True, methods=["get"])
     def timeline(self, request, pk=None):
         """GET /api/sales/orders/{id}/timeline/
@@ -219,3 +320,44 @@ class SaleOrderViewSet(ImmutableStatusMixin, DeleteReasonMixin, OrgScopedModelVi
             extra_events=get_payment_events_for_order(order),
         )
         return Response({"events": events, "count": len(events)})
+
+
+class SaleCommunicationViewSet(OrgScopedModelViewSet):
+    """
+    /api/sales/communications/ — история общения с клиентом по продаже.
+
+    Список фильтруется по `?order=<uuid>` для drawer-а конкретной продажи.
+    Создание: тот, кто звонил/писал, фиксирует ответ клиента + (опционально)
+    обещанную дату оплаты + дату следующего касания.
+
+    Доступ — те же кто работает с продажами (`sales` модуль).
+    """
+
+    serializer_class = SaleCommunicationSerializer
+    queryset = SaleCommunication.objects.select_related("order", "contacted_by")
+    organization_field = "order__organization"
+
+    module_code = "sales"
+    required_level = "r"
+    write_level = "rw"
+
+    filter_backends = [DjangoFilterBackend, OrderingFilter]
+    filterset_fields = ["order", "method", "outcome"]
+    ordering_fields = ["contacted_at", "promised_pay_date", "created_at"]
+    ordering = ["-contacted_at"]
+
+    def perform_create(self, serializer):
+        """`contacted_by` всегда = request.user; не разрешаем подделать.
+        Cross-org защита: order должен принадлежать current org."""
+        from apps.audit.models import AuditLog
+        from rest_framework.exceptions import PermissionDenied
+
+        org = getattr(self.request, "organization", None)
+        order = serializer.validated_data.get("order")
+        if order is not None and org is not None and order.organization_id != org.id:
+            raise PermissionDenied(
+                {"order": "Продажа из другой организации."}
+            )
+
+        instance = serializer.save(contacted_by=self.request.user)
+        self._write_audit(AuditLog.Action.CREATE, instance)

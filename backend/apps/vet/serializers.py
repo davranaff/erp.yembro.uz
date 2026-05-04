@@ -184,10 +184,15 @@ class VaccinationScheduleSerializer(serializers.ModelSerializer):
 
 class VetTreatmentLogSerializer(serializers.ModelSerializer):
     drug_sku = serializers.SerializerMethodField()
+    drug_name = serializers.SerializerMethodField()
     stock_batch_lot = serializers.SerializerMethodField()
     target_batch_doc = serializers.SerializerMethodField()
     target_herd_doc = serializers.SerializerMethodField()
     target_block_code = serializers.SerializerMethodField()
+    target_module_code = serializers.SerializerMethodField()
+    target_module_name = serializers.SerializerMethodField()
+    veterinarian_name = serializers.SerializerMethodField()
+    unit_code = serializers.SerializerMethodField()
 
     class Meta:
         model = VetTreatmentLog
@@ -214,11 +219,18 @@ class VetTreatmentLogSerializer(serializers.ModelSerializer):
             "cancelled_at",
             "cancel_reason",
             "cancelled_by",
+            "acknowledged_at",
+            "acknowledged_by",
             "drug_sku",
+            "drug_name",
             "stock_batch_lot",
             "target_batch_doc",
             "target_herd_doc",
             "target_block_code",
+            "target_module_code",
+            "target_module_name",
+            "veterinarian_name",
+            "unit_code",
             "created_at",
             "updated_at",
         )
@@ -227,19 +239,40 @@ class VetTreatmentLogSerializer(serializers.ModelSerializer):
             "cancelled_at",
             "cancel_reason",
             "cancelled_by",
+            "acknowledged_at",
+            "acknowledged_by",
             "drug_sku",
+            "drug_name",
             "stock_batch_lot",
             "target_batch_doc",
             "target_herd_doc",
             "target_block_code",
+            "target_module_code",
+            "target_module_name",
+            "veterinarian_name",
+            "unit_code",
             "created_at",
             "updated_at",
         )
+
+    def _target_module(self, obj):
+        if obj.target_block_id and obj.target_block.module_id:
+            return obj.target_block.module
+        if obj.target_batch_id and obj.target_batch.current_module_id:
+            return obj.target_batch.current_module
+        if obj.target_herd_id and obj.target_herd.module_id:
+            return obj.target_herd.module
+        return None
 
     def get_drug_sku(self, obj):
         if not obj.drug_id:
             return None
         return obj.drug.nomenclature.sku if obj.drug.nomenclature_id else None
+
+    def get_drug_name(self, obj):
+        if not obj.drug_id:
+            return None
+        return obj.drug.nomenclature.name if obj.drug.nomenclature_id else None
 
     def get_stock_batch_lot(self, obj):
         return obj.stock_batch.lot_number if obj.stock_batch_id else None
@@ -252,6 +285,23 @@ class VetTreatmentLogSerializer(serializers.ModelSerializer):
 
     def get_target_block_code(self, obj):
         return obj.target_block.code if obj.target_block_id else None
+
+    def get_target_module_code(self, obj):
+        m = self._target_module(obj)
+        return m.code if m else None
+
+    def get_target_module_name(self, obj):
+        m = self._target_module(obj)
+        return m.name if m else None
+
+    def get_veterinarian_name(self, obj):
+        if not obj.veterinarian_id:
+            return None
+        u = obj.veterinarian
+        return getattr(u, "full_name", None) or getattr(u, "email", None) or str(u)
+
+    def get_unit_code(self, obj):
+        return obj.unit.code if obj.unit_id else None
 
 
 class VetStockBatchPublicSerializer(serializers.ModelSerializer):

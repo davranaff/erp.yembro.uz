@@ -17,6 +17,8 @@ class CounterpartySerializer(serializers.ModelSerializer):
             "email",
             "address",
             "balance_uzs",
+            "credit_limit_uzs",
+            "max_overdue_days",
             "is_active",
             "notes",
             "created_at",

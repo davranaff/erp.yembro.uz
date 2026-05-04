@@ -409,6 +409,19 @@ class VetTreatmentLog(UUIDModel, TimestampedModel):
         on_delete=models.SET_NULL,
         related_name="+",
     )
+    acknowledged_at = models.DateTimeField(null=True, blank=True, db_index=True)
+    acknowledged_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="vet_treatments_acknowledged",
+        help_text=(
+            "Менеджер модуля-цели (feedlot/matochnik/...) подтвердил, что видел запись о "
+            "применении препарата. Soft-acknowledgement: не блокирует применение, "
+            "только снимает уведомление."
+        ),
+    )
     created_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         null=True,
@@ -427,6 +440,7 @@ class VetTreatmentLog(UUIDModel, TimestampedModel):
             models.Index(fields=["drug", "-treatment_date"]),
             models.Index(fields=["stock_batch"]),
             models.Index(fields=["organization", "indication"]),
+            models.Index(fields=["organization", "acknowledged_at"]),
         ]
         verbose_name = "Журнал применения"
         verbose_name_plural = "Журнал применений"

@@ -77,6 +77,8 @@ export const NAV: NavEntry[] = [
     aliases: ['закуп', 'поставка', 'po'] },
   { key: 'sales',     label: 'Продажи',          icon: 'bag',   href: '/sales',           module: 'sales',
     aliases: ['продажа', 'отгрузка', 'so'] },
+  { key: 'tasks',     label: 'Задачи по долгам', icon: 'bag',   href: '/tasks',           module: 'sales',
+    aliases: ['обзвон', 'напоминание', 'collection', 'follow-up'] },
   { key: 'cashbox',   label: 'Касса и банк',     icon: 'book',  href: '/finance/cashbox', module: 'ledger',
     aliases: ['платёж', 'оплата', 'банк', 'касса'] },
   { key: 'ledger',    label: 'Проводки',         icon: 'book',  href: '/ledger',          module: 'ledger',

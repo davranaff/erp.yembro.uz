@@ -124,6 +124,7 @@ class BatchSerializer(FinancialFieldsMixin, serializers.ModelSerializer):
     reserved_quantity = serializers.SerializerMethodField()
     available_quantity = serializers.SerializerMethodField()
     pending_transfer = serializers.SerializerMethodField()
+    pending_vet_acknowledgement = serializers.SerializerMethodField()
 
     class Meta:
         model = Batch
@@ -156,6 +157,7 @@ class BatchSerializer(FinancialFieldsMixin, serializers.ModelSerializer):
             "origin_module_code",
             "parent_doc_number",
             "pending_transfer",
+            "pending_vet_acknowledgement",
             "created_at",
             "updated_at",
         )
@@ -251,4 +253,51 @@ class BatchSerializer(FinancialFieldsMixin, serializers.ModelSerializer):
             "to_module_code": t.to_module.code if t.to_module_id else None,
             "to_module_name": t.to_module.name if t.to_module_id else None,
             "state": t.state,
+        }
+
+    def get_pending_vet_acknowledgement(self, obj):
+        """Самое свежее проведённое (есть JE) и не acknowledged ветлечение
+        по этой партии. Используется FE для рендеринга оранжевого бейджа
+        «🩺 vet: <препарат>, каренция до DD.MM» на карточке партии.
+
+        Возвращаем None если все ветлечения подтверждены или их нет.
+        """
+        from django.contrib.contenttypes.models import ContentType
+
+        from apps.accounting.models import JournalEntry
+        from apps.vet.models import VetTreatmentLog
+
+        ct = ContentType.objects.get_for_model(VetTreatmentLog)
+        applied_ids = JournalEntry.objects.filter(
+            organization_id=obj.organization_id,
+            source_content_type=ct,
+        ).values_list("source_object_id", flat=True)
+
+        t = (
+            VetTreatmentLog.objects.filter(
+                target_batch=obj,
+                id__in=list(applied_ids),
+                acknowledged_at__isnull=True,
+                cancelled_at__isnull=True,
+            )
+            .select_related("drug__nomenclature")
+            .order_by("-treatment_date", "-created_at")
+            .first()
+        )
+        if t is None:
+            return None
+        return {
+            "id": str(t.id),
+            "doc_number": t.doc_number,
+            "drug_name": (
+                t.drug.nomenclature.name
+                if t.drug_id and t.drug.nomenclature_id
+                else None
+            ),
+            "treatment_date": t.treatment_date.isoformat(),
+            "withdrawal_period_ends": (
+                obj.withdrawal_period_ends.isoformat()
+                if obj.withdrawal_period_ends
+                else None
+            ),
         }

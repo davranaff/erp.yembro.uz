@@ -3,7 +3,12 @@ from rest_framework import serializers
 
 from apps.currency.serializers import ExchangeRateNestedSerializer
 
-from .models import PurchaseItem, PurchaseOrder
+from .models import (
+    MAX_PURCHASE_ATTACHMENT_BYTES,
+    PurchaseAttachment,
+    PurchaseItem,
+    PurchaseOrder,
+)
 
 
 class PurchaseItemSerializer(serializers.ModelSerializer):
@@ -110,3 +115,76 @@ class PurchaseOrderSerializer(serializers.ModelSerializer):
             for item in items_data:
                 PurchaseItem.objects.create(order=instance, **item)
         return instance
+
+
+class PurchaseAttachmentSerializer(serializers.ModelSerializer):
+    """Файл-приложение к закупу.
+
+    Read: возвращает URL файла + метаданные.
+    Write: принимает multipart `file` поле, остальные поля автозаполняются
+    в perform_create вьюсета (uploaded_by, original_name, size_bytes).
+    """
+
+    file_url = serializers.SerializerMethodField()
+    uploaded_by_name = serializers.SerializerMethodField()
+    size_human = serializers.SerializerMethodField()
+
+    class Meta:
+        model = PurchaseAttachment
+        fields = (
+            "id",
+            "purchase",
+            "file",
+            "file_url",
+            "original_name",
+            "size_bytes",
+            "size_human",
+            "content_type",
+            "description",
+            "uploaded_by",
+            "uploaded_by_name",
+            "created_at",
+        )
+        read_only_fields = (
+            "id",
+            "file_url",
+            "original_name",
+            "size_bytes",
+            "size_human",
+            "content_type",
+            "uploaded_by",
+            "uploaded_by_name",
+            "created_at",
+        )
+        extra_kwargs = {"file": {"write_only": True}}
+
+    def get_file_url(self, obj):
+        if not obj.file:
+            return None
+        request = self.context.get("request")
+        url = obj.file.url
+        return request.build_absolute_uri(url) if request else url
+
+    def get_uploaded_by_name(self, obj):
+        if not obj.uploaded_by_id:
+            return None
+        u = obj.uploaded_by
+        return getattr(u, "full_name", None) or getattr(u, "email", None) or str(u)
+
+    def get_size_human(self, obj):
+        n = obj.size_bytes or 0
+        if n < 1024:
+            return f"{n} Б"
+        if n < 1024 * 1024:
+            return f"{n / 1024:.1f} КБ"
+        return f"{n / (1024 * 1024):.1f} МБ"
+
+    def validate_file(self, value):
+        # Дублируем проверку размера здесь (не только в clean()) — чтобы
+        # отдать клиенту понятную 400-ошибку с полем.
+        if value.size > MAX_PURCHASE_ATTACHMENT_BYTES:
+            mb = MAX_PURCHASE_ATTACHMENT_BYTES // (1024 * 1024)
+            raise serializers.ValidationError(
+                f"Файл больше {mb} МБ. Размер: {value.size / (1024 * 1024):.1f} МБ."
+            )
+        return value

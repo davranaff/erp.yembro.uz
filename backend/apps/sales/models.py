@@ -157,6 +157,103 @@ class SaleOrder(UUIDModel, TimestampedModel):
         return (self.amount_uzs or 0) - (self.cost_uzs or 0)
 
 
+class SaleCommunication(UUIDModel, TimestampedModel):
+    """История общения с клиентом по конкретной продаже.
+
+    Используется когда сотрудник звонит/пишет должнику и фиксирует
+    ответ клиента: «обещал заплатить такого-то числа», «отказался»,
+    «сменил номер», «перезвоните завтра». Это превращает продажу из
+    статичного документа в живую CRM-карточку с таймлайном касаний.
+
+    Видна на drawer-е продажи (FE), доступна для отчёта «должники без
+    касаний за N дней» и подмешивается в TG-сводку для владельца.
+    """
+
+    class Method(models.TextChoices):
+        CALL = "call", "Звонок"
+        VISIT = "visit", "Личная встреча"
+        WHATSAPP = "whatsapp", "WhatsApp"
+        TELEGRAM = "telegram", "Telegram"
+        SMS = "sms", "SMS"
+        EMAIL = "email", "Email"
+        OTHER = "other", "Другое"
+
+    class Outcome(models.TextChoices):
+        PROMISED = "promised", "Обещал оплатить"
+        REFUSED = "refused", "Отказался платить"
+        NO_ANSWER = "no_answer", "Не ответил"
+        WRONG_NUMBER = "wrong_number", "Неверный номер"
+        ASKED_DEFER = "asked_defer", "Попросил отсрочку"
+        OTHER = "other", "Другое"
+
+    order = models.ForeignKey(
+        SaleOrder,
+        on_delete=models.CASCADE,
+        related_name="communications",
+    )
+    contacted_at = models.DateTimeField(
+        db_index=True,
+        help_text="Когда сотрудник связался с клиентом.",
+    )
+    method = models.CharField(max_length=16, choices=Method.choices)
+    outcome = models.CharField(max_length=16, choices=Outcome.choices)
+    customer_response = models.TextField(
+        help_text="Что ответил клиент дословно — для CRM-истории и аудита.",
+    )
+    promised_pay_date = models.DateField(
+        null=True,
+        blank=True,
+        db_index=True,
+        help_text=(
+            "Что обещал САМ клиент (его слова). Используется для "
+            "follow-up напоминаний если клиент не сдержал слово."
+        ),
+    )
+    expected_pay_date = models.DateField(
+        null=True,
+        blank=True,
+        db_index=True,
+        help_text=(
+            "Внутренний прогноз менеджера: когда оплата реально придёт. "
+            "Может отличаться от promised_pay_date (например, клиент обещал "
+            "пятницу, но менеджер по опыту знает что заплатит понедельник). "
+            "Тоже триггерит задачу-напоминание после прохождения даты."
+        ),
+    )
+    next_action_date = models.DateField(
+        null=True,
+        blank=True,
+        db_index=True,
+        help_text="Когда сотруднику перезвонить (если no_answer / отсрочка).",
+    )
+    internal_note = models.TextField(
+        blank=True,
+        help_text=(
+            "Заметка менеджера для внутреннего пользования (не попадает "
+            "в TG/email клиенту). Например «скандалил», «жалуется на качество», "
+            "«просил скидку 5%»."
+        ),
+    )
+    contacted_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="sale_communications",
+        help_text="Сотрудник, выполнивший касание.",
+    )
+
+    class Meta:
+        ordering = ["-contacted_at"]
+        indexes = [
+            models.Index(fields=["order", "-contacted_at"]),
+            models.Index(fields=["promised_pay_date"]),
+        ]
+        verbose_name = "Касание клиента"
+        verbose_name_plural = "Касания клиента"
+
+    def __str__(self):
+        return f"{self.order.doc_number} · {self.contacted_at:%Y-%m-%d} · {self.get_method_display()}"
+
+
 class SaleItem(UUIDModel, TimestampedModel):
     """
     Позиция продажи. Партия указывается ровно через одну из трёх FK

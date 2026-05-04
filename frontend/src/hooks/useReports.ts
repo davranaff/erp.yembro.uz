@@ -181,3 +181,54 @@ export function usePlByModule(params: {
     staleTime: 60_000,
   });
 }
+
+
+// ─── AR Aging report ─────────────────────────────────────────
+
+
+export interface AgingRow {
+  counterparty_id: string;
+  code: string;
+  name: string;
+  current: string;
+  b_0_30: string;
+  b_31_60: string;
+  b_61_90: string;
+  b_90_plus: string;
+  total: string;
+  oldest_overdue_days: number;
+  orders_count: number;
+  has_overdue: boolean;
+}
+
+export interface AgingSummary {
+  current: string;
+  b_0_30: string;
+  b_31_60: string;
+  b_61_90: string;
+  b_90_plus: string;
+  total: string;
+  customers_count: number;
+  overdue_customers_count: number;
+}
+
+export interface AgingResponse {
+  rows: AgingRow[];
+  summary: AgingSummary;
+  as_of: string;
+}
+
+/**
+ * GET /api/sales/orders/aging/[?customer=<uuid>]
+ *
+ * Если `customerId` задан — отчёт по одному клиенту (используется в
+ * карточке должника).
+ */
+export function useAgingReport(customerId?: string | null) {
+  const qs = customerId ? `?customer=${encodeURIComponent(customerId)}` : '';
+  return useQuery<AgingResponse, ApiError>({
+    queryKey: ['reports', 'aging', customerId ?? 'all'],
+    queryFn: () => apiFetch<AgingResponse>(`/api/sales/orders/aging/${qs}`),
+    staleTime: 30_000,
+  });
+}

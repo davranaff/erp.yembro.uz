@@ -1,6 +1,7 @@
 'use client';
 
 import PendingTransferBadge from '@/components/PendingTransferBadge';
+import PendingVetTreatmentBadge from '@/components/PendingVetTreatmentBadge';
 import Badge from '@/components/ui/Badge';
 import DataTable from '@/components/ui/DataTable';
 import EmptyState from '@/components/ui/EmptyState';
@@ -111,6 +112,7 @@ export default function EggBatchesPanel({ herd }: Props) {
                   {STATE_LABEL[b.state] ?? b.state}
                 </Badge>
                 <PendingTransferBadge batch={b} />
+                <PendingVetTreatmentBadge batch={b} />
               </span>
             ) },
           { key: 'actions', label: '', align: 'right', width: 60,

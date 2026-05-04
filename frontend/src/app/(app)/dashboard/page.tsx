@@ -9,7 +9,7 @@ import KpiCard from '@/components/ui/KpiCard';
 import Panel from '@/components/ui/Panel';
 import Seg from '@/components/ui/Seg';
 import { useDashboardCashflow, useDashboardSummary } from '@/hooks/useDashboard';
-import type { DashboardCashChannel } from '@/types/auth';
+import type { DashboardArSummary, DashboardCashChannel } from '@/types/auth';
 
 import PurchaseOrderModal from '../purchases/PurchaseOrderModal';
 import CashflowChart from './CashflowChart';
@@ -218,6 +218,11 @@ export default function DashboardPage() {
             valueSuffix="UZS"
           />
         </div>
+      )}
+
+      {/* ───── AR snapshot — дебиторка с aging + DSO + топ должников ───── */}
+      {financesVisible && summary.ar && (
+        <ArSnapshotPanel ar={summary.ar} />
       )}
 
       {/* ───── Cashflow chart + side panels — только при ledger.r ───── */}
@@ -476,6 +481,133 @@ function ProductionTile({ label, value, unit, tone, href }: ProductionTileProps)
       </div>
       <div style={{ fontSize: 11, color: 'var(--fg-3)', marginTop: 2 }}>{unit}</div>
     </a>
+  );
+}
+
+function ArSnapshotPanel({ ar }: { ar: DashboardArSummary }) {
+  const totalAr = parseFloat(ar.total_ar_uzs);
+  const totalOverdue = parseFloat(ar.total_overdue_uzs);
+  const overduePct = totalAr > 0 ? Math.round(totalOverdue / totalAr * 100) : 0;
+
+  return (
+    <div style={{ marginBottom: 12 }}>
+      <Panel
+        title="Дебиторка — снимок"
+        tools={
+          <a
+            href="/reports/aging"
+            style={{
+              fontSize: 12, color: 'var(--brand-orange)',
+              textDecoration: 'none',
+            }}
+          >
+            Полный отчёт →
+          </a>
+        }
+      >
+        <div style={{
+          padding: 12, display: 'grid',
+          gridTemplateColumns: '1fr 1fr 1fr', gap: 12,
+        }}>
+          {/* Левая колонка: KPI */}
+          <div>
+            <div style={{ fontSize: 11, color: 'var(--fg-3)', marginBottom: 2 }}>Всего долгов</div>
+            <div className="mono" style={{ fontSize: 20, fontWeight: 600 }}>
+              {fmt(ar.total_ar_uzs, { short: true })}{' '}
+              <span style={{ fontSize: 11, color: 'var(--fg-3)' }}>UZS</span>
+            </div>
+            <div style={{ fontSize: 11, color: 'var(--fg-3)', marginTop: 2 }}>
+              {ar.customers_count} клиент(ов), из них{' '}
+              <strong style={{ color: 'var(--brand-orange)' }}>
+                {ar.overdue_customers_count}
+              </strong>{' '}
+              с просрочкой
+            </div>
+          </div>
+
+          {/* Средняя: aging buckets как mini-bars */}
+          <div>
+            <div style={{ fontSize: 11, color: 'var(--fg-3)', marginBottom: 4 }}>
+              Просрочено: <strong style={{ color: overduePct > 30 ? 'var(--danger)' : 'var(--fg-2)' }}>
+                {fmt(ar.total_overdue_uzs, { short: true })} UZS
+              </strong> ({overduePct}%)
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+              <ArMiniBar label="Текущие" total={totalAr} value={ar.buckets.current} color="var(--success, #10b981)" />
+              <ArMiniBar label="0-30" total={totalAr} value={ar.buckets.b_0_30} color="var(--brand-orange)" />
+              <ArMiniBar label="31-60" total={totalAr} value={ar.buckets.b_31_60} color="var(--brand-orange)" />
+              <ArMiniBar label="61-90" total={totalAr} value={ar.buckets.b_61_90} color="var(--danger)" />
+              <ArMiniBar label="90+" total={totalAr} value={ar.buckets.b_90_plus} color="var(--danger)" />
+            </div>
+          </div>
+
+          {/* Правая: DSO + топ-3 */}
+          <div>
+            <div style={{ fontSize: 11, color: 'var(--fg-3)', marginBottom: 2 }}>
+              DSO ({ar.dso_window_days} дн)
+            </div>
+            <div className="mono" style={{ fontSize: 20, fontWeight: 600, marginBottom: 8 }}>
+              {ar.dso_days != null ? `${ar.dso_days} дн` : '—'}
+              <div style={{ fontSize: 10, color: 'var(--fg-3)', fontWeight: 400 }}>
+                Days Sales Outstanding
+              </div>
+            </div>
+
+            <div style={{ fontSize: 11, color: 'var(--fg-3)', marginBottom: 4 }}>Топ-3 должников</div>
+            {ar.top_debtors.length === 0 ? (
+              <div style={{ fontSize: 11, color: 'var(--fg-3)' }}>Долгов нет</div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                {ar.top_debtors.map((d) => (
+                  <a
+                    key={d.counterparty_id}
+                    href={`/counterparties/${d.counterparty_id}`}
+                    style={{
+                      fontSize: 12, padding: '4px 6px',
+                      background: 'var(--bg-soft)', borderRadius: 4,
+                      textDecoration: 'none', color: 'inherit',
+                      display: 'flex', justifyContent: 'space-between',
+                      gap: 8,
+                    }}
+                  >
+                    <span style={{
+                      overflow: 'hidden', textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap', flex: 1,
+                    }}>
+                      {d.name}
+                    </span>
+                    <span className="mono" style={{
+                      fontWeight: 600,
+                      color: d.oldest_overdue_days > 30 ? 'var(--danger)' : 'var(--fg-1)',
+                    }}>
+                      {fmt(d.total, { short: true })}
+                    </span>
+                  </a>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      </Panel>
+    </div>
+  );
+}
+
+function ArMiniBar({
+  label, total, value, color,
+}: { label: string; total: number; value: string; color: string }) {
+  const v = parseFloat(value);
+  const pct = total > 0 ? (v / total) * 100 : 0;
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11 }}>
+      <span style={{ width: 50, color: 'var(--fg-3)' }}>{label}</span>
+      <div style={{ flex: 1, height: 8, background: 'var(--bg-soft)', borderRadius: 2, overflow: 'hidden' }}>
+        <div style={{ width: `${pct}%`, height: '100%', background: color }} />
+      </div>
+      <span className="mono" style={{ width: 70, textAlign: 'right' }}>
+        {v === 0 ? '—' : fmt(value, { short: true })}
+      </span>
+    </div>
   );
 }
 

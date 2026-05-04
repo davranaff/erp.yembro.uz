@@ -15,6 +15,8 @@ import { salesCrud, useConfirmSale, useReverseSale } from '@/hooks/useSales';
 import type { SaleOrder, SalePaymentStatus, SaleStatus } from '@/types/auth';
 
 import RecordPaymentModal from './RecordPaymentModal';
+import SaleCommunicationsModal from './SaleCommunicationsModal';
+import SaleConfirmGuardModal from './SaleConfirmGuardModal';
 import SaleOrderModal from './SaleOrderModal';
 
 const STATUS_LABEL: Record<SaleStatus, string> = {
@@ -55,6 +57,8 @@ export default function SalesPage() {
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<SaleOrder | null>(null);
   const [payFor, setPayFor] = useState<SaleOrder | null>(null);
+  const [commsFor, setCommsFor] = useState<SaleOrder | null>(null);
+  const [confirmingFor, setConfirmingFor] = useState<SaleOrder | null>(null);
 
   const hasLevel = useHasLevel();
   const canEdit = hasLevel('sales', 'rw');
@@ -84,11 +88,10 @@ export default function SalesPage() {
     };
   }, [orders]);
 
+  // Confirm теперь идёт через модалку с превью кредитного гейта
+  // (SaleConfirmGuardModal). window.confirm заменён на нормальный UX.
   const handleConfirm = (o: SaleOrder) => {
-    if (!window.confirm('Провести продажу ' + o.doc_number + '? Списание со склада и проводки в ГК.')) return;
-    confirmMutation.mutate({ id: o.id }, {
-      onError: (err) => alert('Не удалось провести: ' + err.message),
-    });
+    setConfirmingFor(o);
   };
 
   const handleReverse = (o: SaleOrder) => {
@@ -200,7 +203,30 @@ export default function SalesPage() {
             {
               key: 'pay', label: 'Оплата',
               render: (o) => o.status === 'confirmed' ? (
-                <Badge tone={PAY_TONE[o.payment_status]}>{PAY_LABEL[o.payment_status]}</Badge>
+                <span style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }}>
+                  <Badge tone={PAY_TONE[o.payment_status]}>{PAY_LABEL[o.payment_status]}</Badge>
+                  {o.payment_status !== 'paid' && o.due_date && (() => {
+                    const today = new Date();
+                    today.setHours(0, 0, 0, 0);
+                    const due = new Date(o.due_date);
+                    const days = Math.round((due.getTime() - today.getTime()) / 86400000);
+                    if (days < 0) {
+                      return (
+                        <Badge tone="danger">
+                          просрочено {Math.abs(days)} дн
+                        </Badge>
+                      );
+                    }
+                    if (days <= 3) {
+                      return (
+                        <Badge tone="warn">
+                          {days === 0 ? 'сегодня срок' : `до срока ${days} дн`}
+                        </Badge>
+                      );
+                    }
+                    return null;
+                  })()}
+                </span>
               ) : '—',
             },
             {
@@ -237,6 +263,11 @@ export default function SalesPage() {
                       ),
                     },
                     {
+                      label: 'Касания клиента',
+                      hidden: o.status !== 'confirmed',
+                      onClick: () => setCommsFor(o),
+                    },
+                    {
                       label: 'Сторно',
                       danger: true,
                       hidden: !(o.status === 'confirmed' && parseFloat(o.paid_amount_uzs || '0') === 0),
@@ -261,6 +292,18 @@ export default function SalesPage() {
         <RecordPaymentModal
           order={payFor}
           onClose={() => setPayFor(null)}
+        />
+      )}
+      {commsFor && (
+        <SaleCommunicationsModal
+          order={commsFor}
+          onClose={() => setCommsFor(null)}
+        />
+      )}
+      {confirmingFor && (
+        <SaleConfirmGuardModal
+          order={confirmingFor}
+          onClose={() => setConfirmingFor(null)}
         />
       )}
     </>

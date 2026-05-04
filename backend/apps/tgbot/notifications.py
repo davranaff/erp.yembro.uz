@@ -29,12 +29,38 @@ def fmt_payment_posted(payment) -> str:
 
 
 def fmt_debt_reminder_uz(sale_order, counterparty) -> str:
+    """Сообщение клиенту о долге.
+
+    Если у заказа есть `due_date`, показываем «осталось N дней» либо
+    «просрочено на N дней» — это даёт клиенту понятный сигнал срочности.
+    Без due_date — старый формат (мягкое напоминание).
+    """
+    from datetime import date as _date
+
     remaining = float(sale_order.amount_uzs or 0) - float(sale_order.paid_amount_uzs or 0)
+
+    deadline_block = ""
+    if sale_order.due_date:
+        delta = (sale_order.due_date - _date.today()).days
+        if delta > 0:
+            deadline_block = (
+                f"⏳ To'lov muddati: <b>{sale_order.due_date}</b> "
+                f"({delta} kun qoldi)\n"
+            )
+        elif delta == 0:
+            deadline_block = f"⚠️ <b>Bugun to'lov kuni!</b> ({sale_order.due_date})\n"
+        else:
+            deadline_block = (
+                f"🚨 <b>{abs(delta)} kun kechikkan!</b> "
+                f"(muddati: {sale_order.due_date})\n"
+            )
+
     return (
         f"📢 <b>Hurmatli {counterparty.name}!</b>\n\n"
         f"Sizda <code>{sale_order.doc_number}</code> raqamli buyurtma bo'yicha\n"
         f"<b>{remaining:,.0f} so'm</b> qarzdorlik mavjud.\n\n"
         f"📅 Buyurtma sanasi: {sale_order.date}\n"
+        f"{deadline_block}"
         f"💳 Iltimos, to'lovni o'z vaqtida amalga oshiring.\n\n"
         f"❓ Savol bo'lsa, biz bilan bog'laning."
     )

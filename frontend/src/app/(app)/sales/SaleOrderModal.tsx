@@ -115,6 +115,7 @@ export default function SaleOrderModal({ initial, preselect, onClose }: Props) {
   const [warehouseId, setWarehouseId] = useState(initial?.warehouse ?? preselect?.warehouseId ?? '');
   const [currencyId, setCurrencyId] = useState(initial?.currency ?? '');
   const [notes, setNotes] = useState(initial?.notes ?? '');
+  const [dueDate, setDueDate] = useState(initial?.due_date ?? '');
 
   const [items, setItems] = useState<ItemDraft[]>(() => {
     if (initial?.items && initial.items.length > 0) {
@@ -241,6 +242,7 @@ export default function SaleOrderModal({ initial, preselect, onClose }: Props) {
       warehouse: warehouseId,
       currency: currencyId || null,
       notes,
+      due_date: dueDate || null,
       items: items.map((it) => ({
         nomenclature: it.nomenclature,
         batch: it.batch || null,
@@ -394,6 +396,19 @@ export default function SaleOrderModal({ initial, preselect, onClose }: Props) {
               )}
             </div>
           )}
+        </div>
+
+        <div className="field">
+          <label>Срок оплаты (для напоминаний)</label>
+          <input
+            className="input"
+            type="date"
+            value={dueDate}
+            onChange={(e) => setDueDate(e.target.value)}
+          />
+          <div style={{ fontSize: 11, color: 'var(--fg-3)', marginTop: 4 }}>
+            TG-бот будет напоминать клиенту за 3 дня, в день срока и при просрочке.
+          </div>
         </div>
 
         <div className="field">

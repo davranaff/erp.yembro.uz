@@ -8,8 +8,11 @@ from apps.common.lifecycle import DeleteReasonMixin, ImmutableStatusMixin
 from apps.common.services.numbering import next_doc_number
 from apps.common.viewsets import OrgScopedModelViewSet
 
-from .models import PurchaseOrder
-from .serializers import PurchaseOrderSerializer
+from .models import PurchaseAttachment, PurchaseOrder
+from .serializers import (
+    PurchaseAttachmentSerializer,
+    PurchaseOrderSerializer,
+)
 from .services.confirm import PurchaseConfirmError, confirm_purchase
 from .services.reverse import PurchaseReverseError, reverse_purchase
 
@@ -133,3 +136,69 @@ class PurchaseOrderViewSet(ImmutableStatusMixin, DeleteReasonMixin, OrgScopedMod
             extra_events=get_payment_events_for_order(order),
         )
         return Response({"events": events, "count": len(events)})
+
+
+class PurchaseAttachmentViewSet(OrgScopedModelViewSet):
+    """
+    /api/purchases/attachments/ — файл-приложения к закупам.
+
+    GET /?purchase=<uuid> — список файлов конкретного закупа.
+    POST (multipart/form-data) — загрузить файл (поля: purchase, file,
+        description?). uploaded_by, original_name, size_bytes,
+        content_type заполняются автоматически.
+    DELETE /{id}/ — удалить файл (включая физический файл с диска).
+    Лимит 50МБ, валидируется в serializer + model.clean().
+    """
+
+    serializer_class = PurchaseAttachmentSerializer
+    queryset = PurchaseAttachment.objects.select_related("purchase", "uploaded_by")
+    organization_field = "purchase__organization"
+
+    module_code = "purchases"
+    required_level = "r"
+    write_level = "rw"
+
+    filter_backends = [DjangoFilterBackend, OrderingFilter]
+    filterset_fields = ["purchase"]
+    ordering = ["-created_at"]
+
+    # Multipart парсер для file-uploads. JSONParser оставляем — без него
+    # PATCH/PUT description без файла отдают 415.
+    from rest_framework.parsers import (  # noqa: E402
+        FormParser,
+        JSONParser,
+        MultiPartParser,
+    )
+    parser_classes = [MultiPartParser, FormParser, JSONParser]
+
+    def perform_create(self, serializer):
+        from apps.audit.models import AuditLog
+        from rest_framework.exceptions import PermissionDenied
+
+        org = getattr(self.request, "organization", None)
+        purchase = serializer.validated_data.get("purchase")
+        if purchase is not None and org is not None and purchase.organization_id != org.id:
+            raise PermissionDenied(
+                {"purchase": "Закуп из другой организации."}
+            )
+
+        f = serializer.validated_data["file"]
+        instance = serializer.save(
+            uploaded_by=self.request.user,
+            original_name=f.name,
+            size_bytes=f.size,
+            content_type=getattr(f, "content_type", "") or "",
+        )
+        # Дополнительная защита через model.clean() — на случай обхода
+        # serializer-level валидации.
+        instance.full_clean()
+        self._write_audit(AuditLog.Action.CREATE, instance)
+
+    def perform_destroy(self, instance):
+        from apps.audit.models import AuditLog
+
+        # Удаляем физический файл с диска перед удалением записи.
+        if instance.file:
+            instance.file.delete(save=False)
+        self._write_audit(AuditLog.Action.DELETE, instance)
+        instance.delete()

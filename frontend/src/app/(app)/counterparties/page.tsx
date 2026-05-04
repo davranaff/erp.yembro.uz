@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
+import { useRouter } from 'next/navigation';
 
 import DetailDrawer, { KV } from '@/components/DetailDrawer';
 import Badge from '@/components/ui/Badge';
@@ -70,6 +71,7 @@ function fmtBalance(v: string): { text: string; color: string } {
 }
 
 export default function CounterpartiesPage() {
+  const router = useRouter();
   const [kind, setKind] = useState('');
   const [search, setSearch] = useState('');
   const [draftSearch, setDraftSearch] = useState('');
@@ -227,19 +229,25 @@ export default function CounterpartiesPage() {
                 ? <Badge tone="success" dot>Активен</Badge>
                 : <Badge tone="neutral" dot>Заблокирован</Badge> },
             { key: 'actions', label: '', width: 60, align: 'right',
-              render: (r) => canEdit ? (
+              render: (r) => (
                 <RowActions
                   actions={[
-                    { label: 'Редактировать', onClick: () => handleEdit(r) },
                     {
-                      label: 'Удалить',
-                      danger: true,
-                      disabled: del.isPending,
-                      onClick: () => handleDelete(r),
+                      label: 'Открыть карточку',
+                      onClick: () => router.push(`/counterparties/${r.id}`),
                     },
+                    ...(canEdit ? [
+                      { label: 'Редактировать', onClick: () => handleEdit(r) },
+                      {
+                        label: 'Удалить',
+                        danger: true,
+                        disabled: del.isPending,
+                        onClick: () => handleDelete(r),
+                      },
+                    ] : []),
                   ]}
                 />
-              ) : null },
+              ) },
           ]}
         />
       </Panel>
