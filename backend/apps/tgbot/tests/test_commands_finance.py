@@ -1,0 +1,133 @@
+"""
+Финансовые команды: /cash /debt /pnl /sales — на минимальных DB-фикстурах.
+Проверяем что хендлеры не падают и структура текста корректна.
+"""
+from __future__ import annotations
+
+from datetime import date, timedelta
+from decimal import Decimal
+
+import pytest
+
+from apps.tgbot.dispatcher import dispatch_message
+
+
+pytestmark = pytest.mark.django_db
+
+
+def _msg(chat_id, text):
+    return {"chat": {"id": chat_id}, "text": text, "from": {"id": chat_id}}
+
+
+def test_cash_command_renders(tg_link, fake_send):
+    dispatch_message(_msg(tg_link.chat_id, "/cash"))
+    text = fake_send.calls[0][1]
+    assert "Касса и банк" in text
+    assert "Всего" in text
+
+
+def test_debt_command_empty_state(tg_link, fake_send):
+    """Если нет неоплаченных заказов — выводится «✅ Все продажи оплачены»."""
+    dispatch_message(_msg(tg_link.chat_id, "/debt"))
+    text = fake_send.calls[0][1]
+    assert "Дебиторка" in text
+    assert "Все продажи оплачены" in text
+
+
+def test_debt_command_lists_top_debtor(tg_link, fake_send, org):
+    from apps.counterparties.models import Counterparty
+    from apps.modules.models import Module
+    from apps.sales.models import SaleOrder
+    from apps.warehouses.models import Warehouse
+
+    cp = Counterparty.objects.create(
+        organization=org, code="К-DEBT", kind="buyer", name="Должник 1",
+    )
+    wh = Warehouse.objects.create(
+        organization=org, module=Module.objects.get(code="vet"),
+        code="СК-DEBT", name="СкДолг",
+    )
+    SaleOrder.objects.create(
+        organization=org, module=Module.objects.get(code="vet"),
+        doc_number="ПР-DEBT-1", date=date.today() - timedelta(days=20),
+        customer=cp, warehouse=wh,
+        amount_uzs=Decimal("10000000"),
+        paid_amount_uzs=Decimal("0"),
+        status=SaleOrder.Status.CONFIRMED,
+        payment_status=SaleOrder.PaymentStatus.UNPAID,
+        due_date=date.today() - timedelta(days=10),
+    )
+    dispatch_message(_msg(tg_link.chat_id, "/debt"))
+    text = fake_send.calls[0][1]
+    assert "Должник 1" in text
+    assert "ПР-DEBT-1" in text
+    assert "просрочка" in text
+
+
+def test_pnl_command_renders_for_week(tg_link, fake_send):
+    dispatch_message(_msg(tg_link.chat_id, "/pnl week"))
+    text = fake_send.calls[0][1]
+    # «&amp;» из-за HTML-эскейпа в "P&L"
+    assert "P&amp;L" in text or "P&L" in text
+    assert "Доходы" in text and "Расходы" in text and "Прибыль" in text
+
+
+def test_sales_command_empty_state(tg_link, fake_send):
+    dispatch_message(_msg(tg_link.chat_id, "/sales today"))
+    text = fake_send.calls[0][1]
+    assert "Продажи" in text
+    assert "Документов:" in text
+
+
+# ─── /cred — регрессия на FieldError(supplier→counterparty) ─────────────
+
+
+def test_cred_callback_renders_without_crash(tg_link, fake_send, org):
+    """Регрессия: PurchaseOrder.supplier не существует — было FieldError.
+    Поле называется counterparty. Колбек не должен падать."""
+    from apps.tgbot.dispatcher import dispatch_callback
+    dispatch_callback({
+        "id": "cbq-cred",
+        "data": "fin:cred",
+        "message": {"chat": {"id": tg_link.chat_id}, "message_id": 42},
+    })
+    all_text = " ".join(t for _, _, t, _ in fake_send.edits) + " ".join(
+        t for _, t, _ in fake_send.calls
+    )
+    assert "Кредиторка" in all_text
+    # Не падает = главное; пустой БД отдаст «Все закупки оплачены».
+
+
+def test_cred_callback_lists_top_supplier(tg_link, fake_send, org):
+    from apps.counterparties.models import Counterparty
+    from apps.modules.models import Module
+    from apps.purchases.models import PurchaseOrder
+    from apps.warehouses.models import Warehouse
+
+    m_vet = Module.objects.get(code="vet")
+    cp = Counterparty.objects.create(
+        organization=org, code="К-CRED", kind="supplier", name="Поставщик-CRED",
+    )
+    wh = Warehouse.objects.create(
+        organization=org, module=m_vet, code="СК-CRED", name="Скл CRED",
+    )
+    PurchaseOrder.objects.create(
+        organization=org, module=m_vet,
+        doc_number="ПЛ-CRED-1", date=date.today(),
+        counterparty=cp, warehouse=wh,
+        amount_uzs=Decimal("12000000"),
+        paid_amount_uzs=Decimal("0"),
+        status=PurchaseOrder.Status.CONFIRMED,
+        payment_status=PurchaseOrder.PaymentStatus.UNPAID,
+    )
+    from apps.tgbot.dispatcher import dispatch_callback
+    dispatch_callback({
+        "id": "cbq-cred-2",
+        "data": "fin:cred",
+        "message": {"chat": {"id": tg_link.chat_id}, "message_id": 99},
+    })
+    all_text = " ".join(t for _, _, t, _ in fake_send.edits) + " ".join(
+        t for _, t, _ in fake_send.calls
+    )
+    assert "Поставщик-CRED" in all_text
+    assert "ПЛ-CRED-1" in all_text

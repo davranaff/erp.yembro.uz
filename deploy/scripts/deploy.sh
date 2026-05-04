@@ -77,13 +77,32 @@ if [[ "${RUN_MIGRATIONS}" == "1" ]]; then
 fi
 docker compose "${compose_args[@]}" up -d api worker scheduler frontend
 
+if [[ "${RUN_MIGRATIONS}" == "1" ]]; then
+  # Optional Django post-migrate hook. Define a custom management command
+  # `bootstrap_roles` (or any other one-shot task) if you need to seed data
+  # after every deploy. Failure is logged but does not abort the deploy.
+  if docker compose "${compose_args[@]}" exec -T api python manage.py help bootstrap_roles >/dev/null 2>&1; then
+    docker compose "${compose_args[@]}" exec -T api python manage.py bootstrap_roles || \
+      echo "WARN: bootstrap_roles failed (existing orgs may lack default roles)" >&2
+  fi
+fi
+
 if [[ -f "${EDGE_DIR}/compose.edge.yml" && -f "${EDGE_DIR}/.env" ]]; then
+  # Sync Caddyfile so the proxy always uses the version from the repo.
+  REPO_CADDYFILE="$(cd "$(dirname "$0")/../.." && pwd)/deploy/caddy/Caddyfile"
+  if [[ -f "${REPO_CADDYFILE}" ]]; then
+    mkdir -p "${EDGE_DIR}/deploy/caddy"
+    cp "${REPO_CADDYFILE}" "${EDGE_DIR}/deploy/caddy/Caddyfile"
+  fi
+
   edge_compose_args=(
     --env-file "${EDGE_DIR}/.env"
     -f "${EDGE_DIR}/compose.edge.yml"
   )
   COMPOSE_PROJECT_NAME="${edge_compose_project_name:-yembro-edge}" \
     docker compose "${edge_compose_args[@]}" up -d proxy
+  COMPOSE_PROJECT_NAME="${edge_compose_project_name:-yembro-edge}" \
+    docker compose "${edge_compose_args[@]}" exec -T proxy caddy reload --config /etc/caddy/Caddyfile 2>&1 || true
 fi
 
 service_is_ready() {

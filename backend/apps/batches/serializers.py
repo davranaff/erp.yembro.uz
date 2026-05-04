@@ -1,0 +1,303 @@
+from decimal import Decimal
+
+from django.db.models import Sum
+from rest_framework import serializers
+
+from apps.common.serializers import FinancialFieldsMixin
+
+from .models import Batch, BatchChainStep, BatchCostEntry
+
+
+class BatchCostEntrySerializer(FinancialFieldsMixin, serializers.ModelSerializer):
+    """Затраты, начисленные на партию (корм, ветпрепараты, опекс).
+
+    `amount_uzs` принадлежит **модулю-владельцу затраты** (`obj.module`).
+    Например: feed-расход на партию птицы → деньги модуля feed (видны
+    feed-менеджеру). Vet-обработка → vet. OPEX → ledger.
+
+    Без поля `module` — fallback на `ledger`.
+    """
+
+    financial_fields = ("amount_uzs",)
+    finances_module = None  # динамически из instance.module
+    module_code = serializers.SerializerMethodField()
+
+    def get_finances_module(self, instance) -> str | None:
+        if instance and instance.module_id and instance.module:
+            return instance.module.code
+        return "ledger"
+
+    class Meta:
+        model = BatchCostEntry
+        fields = (
+            "id",
+            "batch",
+            "category",
+            "amount_uzs",
+            "description",
+            "occurred_at",
+            "module",
+            "module_code",
+            "source_content_type",
+            "source_object_id",
+            "created_at",
+        )
+        read_only_fields = fields
+
+    def get_module_code(self, obj):
+        return obj.module.code if obj.module_id else None
+
+
+class BatchChainStepSerializer(FinancialFieldsMixin, serializers.ModelSerializer):
+    """Шаг партии в цепочке производства.
+
+    `accumulated_cost_at_exit` — деньги модуля, в котором партия была на
+    этом шаге (`step.module`). Видны менеджеру этого модуля или бухгалтеру.
+    """
+
+    financial_fields = ("accumulated_cost_at_exit",)
+    finances_module = None  # из step.module
+    module_code = serializers.SerializerMethodField()
+
+    def get_finances_module(self, instance) -> str | None:
+        if instance and instance.module_id and instance.module:
+            return instance.module.code
+        return "ledger"
+    block_code = serializers.SerializerMethodField()
+    transfer_in_doc = serializers.SerializerMethodField()
+    transfer_out_doc = serializers.SerializerMethodField()
+
+    class Meta:
+        model = BatchChainStep
+        fields = (
+            "id",
+            "batch",
+            "sequence",
+            "module",
+            "block",
+            "entered_at",
+            "exited_at",
+            "quantity_in",
+            "quantity_out",
+            "accumulated_cost_at_exit",
+            "transfer_in",
+            "transfer_out",
+            "note",
+            "module_code",
+            "block_code",
+            "transfer_in_doc",
+            "transfer_out_doc",
+        )
+        read_only_fields = fields
+
+    def get_module_code(self, obj):
+        return obj.module.code if obj.module_id else None
+
+    def get_block_code(self, obj):
+        return obj.block.code if obj.block_id else None
+
+    def get_transfer_in_doc(self, obj):
+        return obj.transfer_in.doc_number if obj.transfer_in_id else None
+
+    def get_transfer_out_doc(self, obj):
+        return obj.transfer_out.doc_number if obj.transfer_out_id else None
+
+
+class BatchSerializer(FinancialFieldsMixin, serializers.ModelSerializer):
+    """Партия (универсальный батч сырья/птицы/корма).
+
+    `accumulated_cost_uzs` принадлежит модулю где партия **сейчас находится**
+    (`current_module`). Если она перешла из matochnik → incubation → feedlot,
+    то после перехода в feedlot её себестоимость = деньги модуля feedlot.
+    Это согласуется с принципом «деньги принадлежат модулю-владельцу».
+    """
+
+    financial_fields = ("accumulated_cost_uzs",)
+    finances_module = None  # из batch.current_module (или origin_module как fallback)
+    nomenclature_sku = serializers.SerializerMethodField()
+    nomenclature_name = serializers.SerializerMethodField()
+    unit_code = serializers.SerializerMethodField()
+    current_module_code = serializers.SerializerMethodField()
+    current_block_code = serializers.SerializerMethodField()
+    origin_module_code = serializers.SerializerMethodField()
+    parent_doc_number = serializers.SerializerMethodField()
+    reserved_quantity = serializers.SerializerMethodField()
+    available_quantity = serializers.SerializerMethodField()
+    pending_transfer = serializers.SerializerMethodField()
+    pending_vet_acknowledgement = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Batch
+        fields = (
+            "id",
+            "doc_number",
+            "nomenclature",
+            "unit",
+            "origin_module",
+            "current_module",
+            "current_block",
+            "current_quantity",
+            "initial_quantity",
+            "reserved_quantity",
+            "available_quantity",
+            "accumulated_cost_uzs",
+            "state",
+            "started_at",
+            "completed_at",
+            "withdrawal_period_ends",
+            "parent_batch",
+            "origin_purchase",
+            "origin_counterparty",
+            "notes",
+            "nomenclature_sku",
+            "nomenclature_name",
+            "unit_code",
+            "current_module_code",
+            "current_block_code",
+            "origin_module_code",
+            "parent_doc_number",
+            "pending_transfer",
+            "pending_vet_acknowledgement",
+            "created_at",
+            "updated_at",
+        )
+        read_only_fields = fields  # партии создаются только сервисами
+
+    def get_nomenclature_sku(self, obj):
+        return obj.nomenclature.sku if obj.nomenclature_id else None
+
+    def get_nomenclature_name(self, obj):
+        return obj.nomenclature.name if obj.nomenclature_id else None
+
+    def get_unit_code(self, obj):
+        return obj.unit.code if obj.unit_id else None
+
+    def get_current_module_code(self, obj):
+        return obj.current_module.code if obj.current_module_id else None
+
+    def get_current_block_code(self, obj):
+        return obj.current_block.code if obj.current_block_id else None
+
+    def get_origin_module_code(self, obj):
+        return obj.origin_module.code if obj.origin_module_id else None
+
+    def get_finances_module(self, instance) -> str | None:
+        # Себестоимость принадлежит модулю где партия сейчас. Если её ещё нет
+        # (только что создана) — origin_module как fallback.
+        if instance:
+            if instance.current_module_id and instance.current_module:
+                return instance.current_module.code
+            if instance.origin_module_id and instance.origin_module:
+                return instance.origin_module.code
+        return "ledger"
+
+    def get_parent_doc_number(self, obj):
+        return obj.parent_batch.doc_number if obj.parent_batch_id else None
+
+    def _reserved_in_drafts(self, obj) -> Decimal:
+        """
+        Сколько единиц партии «зарезервировано» в DRAFT-продажах.
+
+        Считаем сумму quantity по всем SaleItem чьи order.status=DRAFT
+        и order.organization=organization. Это not-yet-listed reservation:
+        пока продажа не проведена, остаток батча не уменьшается, но другая
+        продажа уже не должна это количество перепродать.
+        """
+        from apps.sales.models import SaleItem, SaleOrder
+
+        agg = SaleItem.objects.filter(
+            batch_id=obj.id,
+            order__status=SaleOrder.Status.DRAFT,
+        ).aggregate(s=Sum("quantity"))
+        return Decimal(agg["s"] or 0)
+
+    def get_reserved_quantity(self, obj):
+        return str(self._reserved_in_drafts(obj))
+
+    def get_available_quantity(self, obj):
+        """current_quantity − зарезервированное в DRAFT-продажах. Не меньше 0."""
+        cur = Decimal(obj.current_quantity or 0)
+        reserved = self._reserved_in_drafts(obj)
+        avail = cur - reserved
+        if avail < 0:
+            avail = Decimal("0")
+        return str(avail)
+
+    def get_pending_transfer(self, obj):
+        """Если по этой партии есть InterModuleTransfer в AWAITING_ACCEPTANCE
+        или UNDER_REVIEW — отдаём краткую инфу для FE-бейджа «в пути».
+
+        UI рендерит «→ <to_module> · <doc>» в карточке/строке партии,
+        чтобы оператор-отправитель видел: партия ушла, ждёт приёма
+        (а не «исчезла» как раньше при auto-accept).
+        """
+        from apps.transfers.models import InterModuleTransfer
+        t = (
+            InterModuleTransfer.objects
+            .filter(
+                batch=obj,
+                state__in=[
+                    InterModuleTransfer.State.AWAITING_ACCEPTANCE,
+                    InterModuleTransfer.State.UNDER_REVIEW,
+                ],
+            )
+            .select_related("to_module")
+            .order_by("-created_at")
+            .first()
+        )
+        if t is None:
+            return None
+        return {
+            "id": str(t.id),
+            "doc_number": t.doc_number,
+            "to_module_code": t.to_module.code if t.to_module_id else None,
+            "to_module_name": t.to_module.name if t.to_module_id else None,
+            "state": t.state,
+        }
+
+    def get_pending_vet_acknowledgement(self, obj):
+        """Самое свежее проведённое (есть JE) и не acknowledged ветлечение
+        по этой партии. Используется FE для рендеринга оранжевого бейджа
+        «🩺 vet: <препарат>, каренция до DD.MM» на карточке партии.
+
+        Возвращаем None если все ветлечения подтверждены или их нет.
+        """
+        from django.contrib.contenttypes.models import ContentType
+
+        from apps.accounting.models import JournalEntry
+        from apps.vet.models import VetTreatmentLog
+
+        ct = ContentType.objects.get_for_model(VetTreatmentLog)
+        applied_ids = JournalEntry.objects.filter(
+            organization_id=obj.organization_id,
+            source_content_type=ct,
+        ).values_list("source_object_id", flat=True)
+
+        t = (
+            VetTreatmentLog.objects.filter(
+                target_batch=obj,
+                id__in=list(applied_ids),
+                acknowledged_at__isnull=True,
+                cancelled_at__isnull=True,
+            )
+            .select_related("drug__nomenclature")
+            .order_by("-treatment_date", "-created_at")
+            .first()
+        )
+        if t is None:
+            return None
+        return {
+            "id": str(t.id),
+            "doc_number": t.doc_number,
+            "drug_name": (
+                t.drug.nomenclature.name
+                if t.drug_id and t.drug.nomenclature_id
+                else None
+            ),
+            "treatment_date": t.treatment_date.isoformat(),
+            "withdrawal_period_ends": (
+                obj.withdrawal_period_ends.isoformat()
+                if obj.withdrawal_period_ends
+                else None
+            ),
+        }

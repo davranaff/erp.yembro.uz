@@ -1,0 +1,204 @@
+from django_filters.rest_framework import DjangoFilterBackend
+from rest_framework.decorators import action
+from rest_framework.exceptions import ValidationError as DRFValidationError
+from rest_framework.filters import OrderingFilter, SearchFilter
+from rest_framework.response import Response
+
+from apps.common.lifecycle import DeleteReasonMixin, ImmutableStatusMixin
+from apps.common.services.numbering import next_doc_number
+from apps.common.viewsets import OrgScopedModelViewSet
+
+from .models import PurchaseAttachment, PurchaseOrder
+from .serializers import (
+    PurchaseAttachmentSerializer,
+    PurchaseOrderSerializer,
+)
+from .services.confirm import PurchaseConfirmError, confirm_purchase
+from .services.reverse import PurchaseReverseError, reverse_purchase
+
+
+class PurchaseOrderViewSet(ImmutableStatusMixin, DeleteReasonMixin, OrgScopedModelViewSet):
+    """
+    /api/purchases/orders/ — закупы.
+
+    Список/создание/правка/удаление черновика (DRAFT). Проведение —
+    через `POST .../{id}/confirm/`.
+    """
+
+    serializer_class = PurchaseOrderSerializer
+    queryset = PurchaseOrder.objects.select_related(
+        "counterparty", "warehouse", "currency", "exchange_rate_source"
+    ).prefetch_related("items")
+
+    module_code = "purchases"
+    required_level = "r"
+    write_level = "rw"
+
+    # После confirm/paid/cancel закуп иммутабелен. Для отмены — reverse-action.
+    immutable_statuses = ("confirmed", "paid", "cancelled")
+    status_field = "status"
+
+    filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
+    filterset_fields = ["status", "payment_status", "counterparty", "currency"]
+    search_fields = ["doc_number", "counterparty__name", "counterparty__code", "notes"]
+    ordering_fields = ["date", "doc_number", "amount_uzs", "created_at"]
+    ordering = ["-date"]
+
+    def perform_create(self, serializer):
+        """
+        Генерируем doc_number сразу при create — иначе unique_together
+        (organization, doc_number) ругается на повторную пустую строку.
+        Префикс «ЗК» (закуп). Формат: ЗК-YYYY-NNNNN.
+        """
+        org = getattr(self.request, "organization", None)
+        kwargs = self._save_kwargs_for_create(serializer)
+        if org is not None and not serializer.validated_data.get("doc_number"):
+            kwargs["doc_number"] = next_doc_number(
+                PurchaseOrder,
+                organization=org,
+                prefix="ЗК",
+                on_date=serializer.validated_data.get("date"),
+            )
+        instance = serializer.save(**kwargs)
+        from apps.audit.models import AuditLog
+        self._write_audit(AuditLog.Action.CREATE, instance)
+
+    @action(detail=True, methods=["post"])
+    def confirm(self, request, pk=None):
+        """
+        POST /api/purchases/orders/{id}/confirm/
+        Провести закуп (DRAFT → CONFIRMED) с FX-snapshot.
+        """
+        order = self.get_object()
+        try:
+            result = confirm_purchase(order, user=request.user)
+        except PurchaseConfirmError as exc:
+            raise DRFValidationError(exc.message_dict if hasattr(exc, "message_dict") else exc.messages)
+
+        order.refresh_from_db()
+
+        try:
+            from apps.tgbot.notifications import fmt_purchase_confirmed
+            from apps.tgbot.tasks import notify_admins_task
+            notify_admins_task.delay(
+                fmt_purchase_confirmed(order), str(order.organization_id), "purchases"
+            )
+        except Exception:
+            pass
+
+        data = self.get_serializer(order).data
+        data["_result"] = {
+            "stock_movement": {
+                "id": str(result.stock_movement.id),
+                "doc_number": result.stock_movement.doc_number,
+            },
+            "journal_entry": {
+                "id": str(result.journal_entry.id),
+                "doc_number": result.journal_entry.doc_number,
+            },
+            "rate_snapshot": str(result.rate_snapshot) if result.rate_snapshot else None,
+        }
+        return Response(data)
+
+    @action(detail=True, methods=["post"])
+    def reverse(self, request, pk=None):
+        """POST /api/purchases/orders/{id}/reverse/ — сторно закупа."""
+        order = self.get_object()
+        reason = request.data.get("reason", "")
+        try:
+            result = reverse_purchase(order, reason=reason, user=request.user)
+        except PurchaseReverseError as exc:
+            raise DRFValidationError(
+                exc.message_dict if hasattr(exc, "message_dict") else exc.messages
+            )
+        order.refresh_from_db()
+        data = self.get_serializer(order).data
+        data["_result"] = {
+            "reverse_journal": {
+                "id": str(result.reverse_journal.id),
+                "doc_number": result.reverse_journal.doc_number,
+            },
+            "reverse_movements_count": len(result.reverse_movements),
+        }
+        return Response(data)
+
+    @action(detail=True, methods=["get"])
+    def timeline(self, request, pk=None):
+        """GET /api/purchases/orders/{id}/timeline/"""
+        from apps.common.services.document_timeline import (
+            build_document_timeline,
+            get_payment_events_for_order,
+        )
+
+        order = self.get_object()
+        events = build_document_timeline(
+            order,
+            extra_events=get_payment_events_for_order(order),
+        )
+        return Response({"events": events, "count": len(events)})
+
+
+class PurchaseAttachmentViewSet(OrgScopedModelViewSet):
+    """
+    /api/purchases/attachments/ — файл-приложения к закупам.
+
+    GET /?purchase=<uuid> — список файлов конкретного закупа.
+    POST (multipart/form-data) — загрузить файл (поля: purchase, file,
+        description?). uploaded_by, original_name, size_bytes,
+        content_type заполняются автоматически.
+    DELETE /{id}/ — удалить файл (включая физический файл с диска).
+    Лимит 50МБ, валидируется в serializer + model.clean().
+    """
+
+    serializer_class = PurchaseAttachmentSerializer
+    queryset = PurchaseAttachment.objects.select_related("purchase", "uploaded_by")
+    organization_field = "purchase__organization"
+
+    module_code = "purchases"
+    required_level = "r"
+    write_level = "rw"
+
+    filter_backends = [DjangoFilterBackend, OrderingFilter]
+    filterset_fields = ["purchase"]
+    ordering = ["-created_at"]
+
+    # Multipart парсер для file-uploads. JSONParser оставляем — без него
+    # PATCH/PUT description без файла отдают 415.
+    from rest_framework.parsers import (  # noqa: E402
+        FormParser,
+        JSONParser,
+        MultiPartParser,
+    )
+    parser_classes = [MultiPartParser, FormParser, JSONParser]
+
+    def perform_create(self, serializer):
+        from apps.audit.models import AuditLog
+        from rest_framework.exceptions import PermissionDenied
+
+        org = getattr(self.request, "organization", None)
+        purchase = serializer.validated_data.get("purchase")
+        if purchase is not None and org is not None and purchase.organization_id != org.id:
+            raise PermissionDenied(
+                {"purchase": "Закуп из другой организации."}
+            )
+
+        f = serializer.validated_data["file"]
+        instance = serializer.save(
+            uploaded_by=self.request.user,
+            original_name=f.name,
+            size_bytes=f.size,
+            content_type=getattr(f, "content_type", "") or "",
+        )
+        # Дополнительная защита через model.clean() — на случай обхода
+        # serializer-level валидации.
+        instance.full_clean()
+        self._write_audit(AuditLog.Action.CREATE, instance)
+
+    def perform_destroy(self, instance):
+        from apps.audit.models import AuditLog
+
+        # Удаляем физический файл с диска перед удалением записи.
+        if instance.file:
+            instance.file.delete(save=False)
+        self._write_audit(AuditLog.Action.DELETE, instance)
+        instance.delete()

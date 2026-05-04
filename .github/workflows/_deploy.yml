@@ -207,10 +207,10 @@ jobs:
           file: ./frontend/Dockerfile
           push: true
           build-args: |
-            VITE_API_BASE_URL=${{ inputs.frontend_api_base_url }}
-            VITE_AUTH_LOGIN_ENDPOINT=/auth/login
-            VITE_REQUEST_TIMEOUT_MS=15000
-            VITE_APP_NAME=Yembro
+            NEXT_PUBLIC_API_URL=${{ inputs.frontend_api_base_url }}
+            NEXT_PUBLIC_AUTH_LOGIN_ENDPOINT=${{ inputs.frontend_api_base_url }}/auth/token/
+            NEXT_PUBLIC_REQUEST_TIMEOUT_MS=15000
+            NEXT_PUBLIC_APP_NAME=Yembro
           tags: |
             ${{ steps.meta.outputs.frontend_image }}:${{ steps.meta.outputs.sha_tag }}
             ${{ steps.meta.outputs.frontend_image }}:${{ steps.meta.outputs.alias_tag }}

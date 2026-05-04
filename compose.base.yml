@@ -4,12 +4,16 @@ services:
     env_file:
       - ./.env
     command:
-      - uvicorn
-      - app.main:app
-      - --host
-      - 0.0.0.0
-      - --port
-      - "30000"
+      - gunicorn
+      - config.wsgi:application
+      - --bind
+      - 0.0.0.0:30000
+      - --workers
+      - "3"
+      - --access-logfile
+      - "-"
+      - --error-logfile
+      - "-"
     depends_on:
       postgres:
         condition: service_healthy
@@ -38,11 +42,9 @@ services:
     env_file:
       - ./.env
     command:
-      - python
-      - -m
-      - alembic
-      - upgrade
-      - head
+      - sh
+      - -c
+      - "python manage.py migrate --noinput && python manage.py collectstatic --noinput"
     depends_on:
       postgres:
         condition: service_healthy
@@ -57,10 +59,12 @@ services:
     env_file:
       - ./.env
     command:
-      - taskiq
+      - celery
+      - -A
+      - config
       - worker
-      - app.taskiq_app:broker
-      - --fs-discover
+      - -l
+      - info
     depends_on:
       postgres:
         condition: service_healthy
@@ -75,21 +79,25 @@ services:
     healthcheck:
       test:
         - CMD-SHELL
-        - "tr '\\000' ' ' </proc/1/cmdline | grep -q 'taskiq worker'"
+        - "celery -A config inspect ping -d celery@$$HOSTNAME >/dev/null 2>&1"
       interval: 30s
-      timeout: 5s
+      timeout: 10s
       retries: 5
-      start_period: 20s
+      start_period: 30s
 
   scheduler:
     image: ${BACKEND_IMAGE}
     env_file:
       - ./.env
     command:
-      - taskiq
-      - scheduler
-      - app.tasks.scheduler:scheduler
-      - app.tasks.jobs
+      - celery
+      - -A
+      - config
+      - beat
+      - -l
+      - info
+      - --scheduler
+      - django_celery_beat.schedulers:DatabaseScheduler
     depends_on:
       postgres:
         condition: service_healthy
@@ -104,7 +112,7 @@ services:
     healthcheck:
       test:
         - CMD-SHELL
-        - "tr '\\000' ' ' </proc/1/cmdline | grep -q 'taskiq scheduler'"
+        - "tr '\\000' ' ' </proc/1/cmdline | grep -q 'celery .* beat'"
       interval: 30s
       timeout: 5s
       retries: 5
@@ -118,11 +126,11 @@ services:
     healthcheck:
       test:
         - CMD-SHELL
-        - "wget -qO- http://127.0.0.1/ >/dev/null 2>&1 || exit 1"
+        - "wget -qO- http://127.0.0.1:3000/ >/dev/null 2>&1 || exit 1"
       interval: 15s
       timeout: 5s
       retries: 10
-      start_period: 10s
+      start_period: 15s
 
   postgres:
     image: postgres:16-alpine
