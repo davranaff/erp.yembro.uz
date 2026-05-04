@@ -913,6 +913,13 @@ export interface FeedBatch {
   withdrawal_period_ends: string | null;
   quality_passport_status: string | null;
   task_doc_number: string | null;
+  /**
+   * Резолвится бэкендом через recipe.code → NomenclatureItem.sku.
+   * Используется фронтом для автоподстановки в позицию продажи.
+   */
+  nomenclature: string | null;
+  nomenclature_sku: string | null;
+  nomenclature_name: string | null;
   notes: string;
   created_at: string;
   updated_at: string;
@@ -1231,6 +1238,8 @@ export interface VetStockBatch {
   drug_sku: string | null;
   drug_name: string | null;
   drug_type: DrugType | null;
+  /** = drug.nomenclature_id, для автоподстановки в позицию продажи. */
+  nomenclature: string | null;
   lot_number: string;
   warehouse: string;
   warehouse_code: string | null;

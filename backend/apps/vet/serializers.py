@@ -64,6 +64,9 @@ class VetStockBatchSerializer(FinancialFieldsMixin, serializers.ModelSerializer)
     days_to_expiry = serializers.IntegerField(read_only=True)
     is_expired = serializers.BooleanField(read_only=True)
     is_expiring_soon = serializers.BooleanField(read_only=True)
+    # Номенклатура препарата = drug.nomenclature. Нужна на фронте для
+    # автоподстановки в позицию продажи (вместо ручного выбора).
+    nomenclature = serializers.SerializerMethodField()
 
     class Meta:
         model = VetStockBatch
@@ -94,6 +97,7 @@ class VetStockBatchSerializer(FinancialFieldsMixin, serializers.ModelSerializer)
             "warehouse_code",
             "supplier_name",
             "unit_code",
+            "nomenclature",
             "days_to_expiry",
             "is_expired",
             "is_expiring_soon",
@@ -111,12 +115,18 @@ class VetStockBatchSerializer(FinancialFieldsMixin, serializers.ModelSerializer)
             "warehouse_code",
             "supplier_name",
             "unit_code",
+            "nomenclature",
             "days_to_expiry",
             "is_expired",
             "is_expiring_soon",
             "created_at",
             "updated_at",
         )
+
+    def get_nomenclature(self, obj):
+        if not obj.drug_id or not obj.drug.nomenclature_id:
+            return None
+        return str(obj.drug.nomenclature_id)
 
     def get_drug_type(self, obj):
         return obj.drug.drug_type if obj.drug_id else None

@@ -1,5 +1,6 @@
 'use client';
 
+import { useQueryClient } from '@tanstack/react-query';
 import { useMemo, useState } from 'react';
 
 import DetailDrawer, { KV } from '@/components/DetailDrawer';
@@ -95,6 +96,7 @@ export default function FeedPage() {
 
   const hasLevel = useHasLevel();
   const canEdit = hasLevel('feed', 'rw');
+  const qc = useQueryClient();
 
   const { data: recipes, isLoading: recipesLoading } = recipesCrud.useList();
   const { data: versions } = recipeVersionsCrud.useList();
@@ -855,6 +857,7 @@ export default function FeedPage() {
                                                   `Удалить компонент «${c.nomenclature_name ?? c.nomenclature_sku}» из версии v${v.version_number}?`,
                                                 )) return;
                                                 componentDel.mutate(c.id, {
+                                                  onSuccess: () => qc.invalidateQueries({ queryKey: ['feed', 'recipe-versions'] }),
                                                   onError: (err) => alert('Не удалось: ' + err.message),
                                                 });
                                               },

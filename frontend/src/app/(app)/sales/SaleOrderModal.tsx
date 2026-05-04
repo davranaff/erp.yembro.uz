@@ -9,7 +9,6 @@ import { useCounterparties } from '@/hooks/useCounterparties';
 import { POPULAR_CURRENCY_CODES, useCurrenciesSorted, useRateOnDate } from '@/hooks/useCurrencyRates';
 import { feedBatchesCrud } from '@/hooks/useFeed';
 import { useModules } from '@/hooks/useModules';
-import { useNomenclatureItems } from '@/hooks/useNomenclature';
 import { salesCrud } from '@/hooks/useSales';
 import { useWarehouses } from '@/hooks/useStockMovements';
 import { accessoriesCrud, stockBatchesCrud } from '@/hooks/useVet';
@@ -109,16 +108,10 @@ export default function SaleOrderModal({ initial, preselect, onClose }: Props) {
   // Состояние формы
   const [moduleId, setModuleId] = useState(initial?.module ?? '');
 
-  // Номенклатура фильтруется по выбранному модулю (его выбирает оператор
-  // в шапке формы). Без фильтра в продаже от feedlot можно было бы выбрать
-  // мешок с кормом, что бессмысленно. moduleId резолвим в код через `modules`.
-  // Если модуль ещё не выбран — список пуст, чтобы оператор сначала выбрал
-  // источник (логичнее чем показывать ВСЁ).
+  // Код модуля используется для резолва типа партии (sourceKindForModule).
+  // Сама номенклатура автоподставляется из выбранной партии — отдельный
+  // селект номенклатуры в форме больше не показывается.
   const selectedModuleCode = modules?.find((m) => m.id === moduleId)?.code;
-  const { data: nomenclature } = useNomenclatureItems({
-    is_active: 'true',
-    ...(selectedModuleCode ? { module_code: selectedModuleCode } : {}),
-  });
   const [date, setDate] = useState(initial?.date ?? new Date().toISOString().slice(0, 10));
   const [customerId, setCustomerId] = useState(initial?.customer ?? '');
   const [warehouseId, setWarehouseId] = useState(initial?.warehouse ?? preselect?.warehouseId ?? '');
@@ -474,20 +467,6 @@ export default function SaleOrderModal({ initial, preselect, onClose }: Props) {
                 gap: 8,
               }}
             >
-              <div className="field" style={{ gridColumn: '1/3' }}>
-                <label>Номенклатура *</label>
-                <select
-                  className="input"
-                  value={it.nomenclature}
-                  onChange={(e) => updateItem(it.key, { nomenclature: e.target.value })}
-                >
-                  <option value="">—</option>
-                  {nomenclature?.map((n) => (
-                    <option key={n.id} value={n.id}>{n.sku} · {n.name}</option>
-                  ))}
-                </select>
-              </div>
-
               <div style={{ gridColumn: '1/3' }}>
                 {sourceKind === 'batch' && (
                   <BatchSelector
@@ -553,7 +532,17 @@ export default function SaleOrderModal({ initial, preselect, onClose }: Props) {
                         <select
                           className="input"
                           value={it.vet_stock_batch}
-                          onChange={(e) => updateItem(it.key, { vet_stock_batch: e.target.value })}
+                          onChange={(e) => {
+                            const lot = (vetLots ?? []).find((v) => v.id === e.target.value);
+                            updateItem(it.key, {
+                              vet_stock_batch: e.target.value,
+                              nomenclature: lot?.nomenclature ?? '',
+                              quantity: it.quantity || lot?.current_quantity || '',
+                              available_quantity: lot?.current_quantity,
+                              batch_doc: lot?.doc_number,
+                              unit_code: lot?.unit_code ?? '',
+                            });
+                          }}
                         >
                           <option value="">— выберите лот —</option>
                           {vetLots?.map((v) => (
@@ -563,6 +552,11 @@ export default function SaleOrderModal({ initial, preselect, onClose }: Props) {
                             </option>
                           ))}
                         </select>
+                        {it.vet_stock_batch && !it.nomenclature && (
+                          <div style={{ fontSize: 11, color: 'var(--danger)', marginTop: 4 }}>
+                            У препарата не привязана номенклатура — продажа не пройдёт. Откройте /vet → препарат и привяжите номенклатуру.
+                          </div>
+                        )}
                       </div>
                     )}
 
@@ -580,6 +574,7 @@ export default function SaleOrderModal({ initial, preselect, onClose }: Props) {
                               const acc = sellable.find((a) => a.id === e.target.value);
                               updateItem(it.key, {
                                 vet_accessory: e.target.value,
+                                nomenclature: acc?.nomenclature ?? '',
                                 quantity: it.quantity || '1',
                                 available_quantity: acc?.current_quantity,
                                 batch_doc: acc?.nomenclature_sku ?? undefined,
@@ -624,7 +619,9 @@ export default function SaleOrderModal({ initial, preselect, onClose }: Props) {
                           const fb = sellable.find((f) => f.id === e.target.value);
                           updateItem(it.key, {
                             feed_batch: e.target.value,
-                            // Автозаполнение из выбранной партии
+                            // Автозаполнение из выбранной партии (включая номенклатуру —
+                            // она резолвится бэком через recipe.code → NomenclatureItem)
+                            nomenclature: fb?.nomenclature ?? '',
                             quantity: it.quantity || fb?.current_quantity_kg || '',
                             available_quantity: fb?.current_quantity_kg,
                             batch_doc: fb?.doc_number,
@@ -635,12 +632,20 @@ export default function SaleOrderModal({ initial, preselect, onClose }: Props) {
                         <option value="">— выберите партию —</option>
                         {sellable.map((f) => (
                           <option key={f.id} value={f.id}>
-                            {f.doc_number} · {f.recipe_code ?? ''} ·
+                            {f.doc_number} · {f.recipe_code ?? ''}
+                            {f.nomenclature_name ? ` · ${f.nomenclature_name}` : ''} ·
                             {' '}остаток {parseFloat(f.current_quantity_kg).toLocaleString('ru-RU')} кг
                             {' '}· {parseFloat(f.unit_cost_uzs).toLocaleString('ru-RU', { maximumFractionDigits: 0 })} сум/кг
                           </option>
                         ))}
                       </select>
+                      {it.feed_batch && !it.nomenclature && (
+                        <div style={{ fontSize: 11, color: 'var(--danger)', marginTop: 4 }}>
+                          В справочнике номенклатуры нет позиции с SKU = коду рецептуры.
+                          Создайте её в /nomenclature (модуль «Корма», SKU = код рецепта),
+                          либо выпустите партию по другой рецептуре.
+                        </div>
+                      )}
                       {sellable.length === 0 && (
                         <div style={{ fontSize: 11, color: 'var(--warning)', marginTop: 4 }}>
                           Нет одобренных партий комбикорма с остатком. Партии становятся

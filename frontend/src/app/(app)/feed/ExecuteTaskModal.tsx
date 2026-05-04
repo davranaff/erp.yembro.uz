@@ -139,6 +139,17 @@ export default function ExecuteTaskModal({ task, onClose }: Props) {
         )}
         {fieldErrors.actual_quantity_kg && <div style={{ fontSize: 11, color: 'var(--danger)' }}>{fieldErrors.actual_quantity_kg.join(' · ')}</div>}
       </div>
+      {error && error.status === 400 && Object.entries(fieldErrors)
+        .filter(([k]) => k !== 'actual_quantity_kg')
+        .map(([k, msgs]) => (
+          <div key={k} style={{
+            fontSize: 12, color: 'var(--danger)', marginTop: 8,
+            padding: '8px 10px', background: 'rgba(220,38,38,0.06)', borderRadius: 4,
+          }}>
+            <b style={{ textTransform: 'uppercase', fontSize: 10, letterSpacing: 0.4 }}>{k}: </b>
+            {Array.isArray(msgs) ? msgs.join(' · ') : String(msgs)}
+          </div>
+        ))}
       {error && error.status !== 400 && (
         <div style={{ fontSize: 12, color: 'var(--danger)', marginTop: 12 }}>Ошибка: {error.message}</div>
       )}

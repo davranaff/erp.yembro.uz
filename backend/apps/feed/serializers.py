@@ -391,6 +391,14 @@ class FeedBatchSerializer(FinancialFieldsMixin, serializers.ModelSerializer):
     recipe_code = serializers.SerializerMethodField()
     storage_bin_code = serializers.SerializerMethodField()
     task_doc_number = serializers.SerializerMethodField()
+    # Номенклатура готового корма резолвится через recipe.code → NomenclatureItem.sku
+    # (та же связь, что использует execute_task для INCOMING StockMovement).
+    # Нужна на фронте чтобы автоподставить позицию в продажу — без этого
+    # оператор обязан выбирать номенклатуру руками и может ошибиться (выбрать
+    # сырьё вместо готового комбикорма).
+    nomenclature = serializers.SerializerMethodField()
+    nomenclature_sku = serializers.SerializerMethodField()
+    nomenclature_name = serializers.SerializerMethodField()
 
     class Meta:
         model = FeedBatch
@@ -416,6 +424,9 @@ class FeedBatchSerializer(FinancialFieldsMixin, serializers.ModelSerializer):
             "recipe_code",
             "storage_bin_code",
             "task_doc_number",
+            "nomenclature",
+            "nomenclature_sku",
+            "nomenclature_name",
             "created_at",
             "updated_at",
         )
@@ -431,6 +442,27 @@ class FeedBatchSerializer(FinancialFieldsMixin, serializers.ModelSerializer):
 
     def get_task_doc_number(self, obj):
         return obj.produced_by_task.doc_number if obj.produced_by_task_id else None
+
+    def _resolve_feed_nomenclature(self, obj):
+        if not obj.recipe_version_id:
+            return None
+        from apps.nomenclature.models import NomenclatureItem
+        return NomenclatureItem.objects.filter(
+            organization=obj.organization_id,
+            sku=obj.recipe_version.recipe.code,
+        ).first()
+
+    def get_nomenclature(self, obj):
+        nom = self._resolve_feed_nomenclature(obj)
+        return str(nom.id) if nom else None
+
+    def get_nomenclature_sku(self, obj):
+        nom = self._resolve_feed_nomenclature(obj)
+        return nom.sku if nom else None
+
+    def get_nomenclature_name(self, obj):
+        nom = self._resolve_feed_nomenclature(obj)
+        return nom.name if nom else None
 
 
 # ─── Shrinkage profiles & state ───────────────────────────────────────────
