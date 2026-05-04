@@ -144,6 +144,11 @@ def _compute_cost_per_unit(item: SaleItem) -> Decimal:
         # У VetAccessory cost_per_unit_uzs хранится прямо на карточке
         # (weighted-avg, обновляется при receive).
         return _quantize_money(Decimal(item.vet_accessory.cost_per_unit_uzs or 0))
+    if item.feed_bag_lot_id:
+        # FeedBagLot.unit_cost_uzs — себестоимость одного мешка
+        # (наследуется при фасовке = source.unit_cost_uzs × bag_weight_kg).
+        bl = item.feed_bag_lot
+        return _quantize_money(Decimal(bl.unit_cost_uzs or 0))
     return Decimal("0.00")
 
 
@@ -250,6 +255,44 @@ def _check_and_decrement_source(item: SaleItem, qty: Decimal):
         )
         va.refresh_from_db(fields=["current_quantity"])
         return va
+
+    if item.feed_bag_lot_id:
+        # qty здесь — кол-во мешков (целое), не кг.
+        from apps.feed.models import FeedBagLot
+        bl = FeedBagLot.objects.select_for_update().get(pk=item.feed_bag_lot_id)
+        if bl.status != FeedBagLot.Status.ACTIVE:
+            raise SaleConfirmError(
+                {"items": (
+                    f"Партия мешков {bl.doc_number} в статусе "
+                    f"{bl.get_status_display()} — продажа возможна только из "
+                    f"«В наличии»."
+                )}
+            )
+        # qty приходит как Decimal — для целого кол-ва мешков допустим
+        # хранить в quantity (DecimalField), но проверим что целое.
+        bags_needed = int(qty)
+        if Decimal(bags_needed) != qty:
+            raise SaleConfirmError(
+                {"items": (
+                    f"Партия мешков {bl.doc_number}: количество должно быть "
+                    f"целым числом мешков (получено {qty})."
+                )}
+            )
+        if bl.bags_remaining < bags_needed:
+            raise SaleConfirmError(
+                {"items": (
+                    f"Партия мешков {bl.doc_number}: запрошено "
+                    f"{bags_needed} шт, доступно {bl.bags_remaining} шт."
+                )}
+            )
+        FeedBagLot.objects.filter(pk=bl.pk).update(
+            bags_remaining=F("bags_remaining") - bags_needed
+        )
+        bl.refresh_from_db(fields=["bags_remaining"])
+        if bl.bags_remaining == 0 and bl.status == FeedBagLot.Status.ACTIVE:
+            bl.status = FeedBagLot.Status.DEPLETED
+            bl.save(update_fields=["status", "updated_at"])
+        return bl
 
     raise SaleConfirmError({"items": "Item без указания источника партии."})
 
@@ -377,6 +420,25 @@ def confirm_sale(
         # Списание из источника
         _check_and_decrement_source(item, qty)
 
+        # Для FeedBagLot StockMovement пишем в кг (а не в шт), чтобы отчёты
+        # остатков по nomenclature были консистентны с FeedBatch (одна
+        # nomenclature на насыпь и фасовку). qty=мешки → kg, цена=сум/кг.
+        if item.feed_bag_lot_id:
+            # Decimal-умножение сохраняет decimals обоих множителей (5.000 ×
+            # 50.000 = 250.000000) — нужно явно квантизировать до 0.001 чтобы
+            # уложиться в StockMovement.quantity (decimal_places=3).
+            bag_weight = Decimal(item.feed_bag_lot.bag_weight_kg)
+            sm_quantity = (qty * bag_weight).quantize(
+                Decimal("0.001"), rounding=ROUND_HALF_UP
+            )
+            sm_unit_price = (
+                cost_per_unit / bag_weight
+                if bag_weight > 0 else Decimal("0")
+            ).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+        else:
+            sm_quantity = qty
+            sm_unit_price = cost_per_unit
+
         # StockMovement OUTGOING
         sm = StockMovement(
             organization=order.organization,
@@ -388,8 +450,8 @@ def confirm_sale(
             kind=StockMovement.Kind.OUTGOING,
             date=now,
             nomenclature=item.nomenclature,
-            quantity=qty,
-            unit_price_uzs=cost_per_unit,
+            quantity=sm_quantity,
+            unit_price_uzs=sm_unit_price,
             amount_uzs=item.line_cost_uzs,
             warehouse_from=order.warehouse,
             warehouse_to=None,

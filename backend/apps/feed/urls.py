@@ -2,6 +2,7 @@ from django.urls import path
 from rest_framework.routers import DefaultRouter
 
 from .views import (
+    FeedBagLotViewSet,
     FeedBatchViewSet,
     FeedLotShrinkageStateViewSet,
     FeedShrinkageProfileViewSet,
@@ -21,6 +22,7 @@ router.register(r"recipe-components", RecipeComponentViewSet, basename="recipeco
 router.register(r"raw-batches", RawMaterialBatchViewSet, basename="rawbatch")
 router.register(r"production-tasks", ProductionTaskViewSet, basename="productiontask")
 router.register(r"feed-batches", FeedBatchViewSet, basename="feedbatch")
+router.register(r"feed-bag-lots", FeedBagLotViewSet, basename="feedbaglot")
 router.register(
     r"shrinkage-profiles",
     FeedShrinkageProfileViewSet,

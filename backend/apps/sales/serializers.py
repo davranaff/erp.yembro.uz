@@ -24,6 +24,7 @@ class SaleItemSerializer(serializers.ModelSerializer):
             "vet_stock_batch",
             "vet_accessory",
             "feed_batch",
+            "feed_bag_lot",
             "quantity",
             "unit_price_uzs",
             "cost_per_unit_uzs",
@@ -328,6 +329,52 @@ class SaleOrderSerializer(serializers.ModelSerializer):
                         f"Партия комбикорма {fb.doc_number}: запрошено "
                         f"{requested_qty} кг, доступно {available} кг "
                         f"(остаток {fb.current_quantity_kg}, "
+                        f"зарезервировано в черновиках {reserved})."
+                    )}
+                )
+
+        # ── Валидация FeedBagLot (фасованные мешки) ────────────────────────
+        # Учёт в штуках мешков, а не в кг — quantity это кол-во мешков.
+        from apps.feed.models import FeedBagLot
+
+        qty_by_bag_lot: dict = defaultdict(lambda: Decimal("0"))
+        for item in items_data:
+            bl = item.get("feed_bag_lot")
+            if not bl:
+                continue
+            qty_by_bag_lot[bl.id] += Decimal(str(item["quantity"]))
+
+        for bl_id, requested_qty in qty_by_bag_lot.items():
+            bl = FeedBagLot.objects.filter(pk=bl_id).first()
+            if bl is None:
+                raise serializers.ValidationError(
+                    {"items": f"Партия мешков {bl_id} не найдена."}
+                )
+            if bl.status != FeedBagLot.Status.ACTIVE:
+                raise serializers.ValidationError(
+                    {"items": (
+                        f"Партия мешков {bl.doc_number} в статусе "
+                        f"«{bl.get_status_display()}» — продавать можно только "
+                        f"активные."
+                    )}
+                )
+
+            reserve_qs = SaleItem.objects.filter(
+                feed_bag_lot_id=bl_id,
+                order__status=SaleOrder.Status.DRAFT,
+            )
+            if instance_id:
+                reserve_qs = reserve_qs.exclude(order_id=instance_id)
+            reserved = Decimal(reserve_qs.aggregate(s=Sum("quantity"))["s"] or 0)
+            available = Decimal(bl.bags_remaining or 0) - reserved
+            if available < 0:
+                available = Decimal("0")
+            if requested_qty > available:
+                raise serializers.ValidationError(
+                    {"items": (
+                        f"Партия мешков {bl.doc_number}: запрошено "
+                        f"{requested_qty} шт, доступно {available} шт "
+                        f"(остаток {bl.bags_remaining}, "
                         f"зарезервировано в черновиках {reserved})."
                     )}
                 )

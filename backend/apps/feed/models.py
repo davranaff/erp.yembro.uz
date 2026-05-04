@@ -806,6 +806,188 @@ class FeedBatch(UUIDModel, TimestampedModel):
             )
 
 
+# ─── Bag packaging ─────────────────────────────────────────────────────────
+
+
+class FeedBagLot(UUIDModel, TimestampedModel):
+    """Партия комбикорма, расфасованная в мешки.
+
+    Создаётся через сервис ``package_feed_batch`` из `FeedBatch` (насыпь).
+    Учёт ведётся в **штуках мешков** (`bags_remaining`), а не в кг — этого
+    хочет физинвентарь склада: оператор пересчитывает мешки и сверяет с
+    системой. Стоимость наследуется от исходного замеса.
+
+    Жизненный цикл::
+
+        FeedBatch (4000 кг, approved) ──[package]──▶ FeedBagLot (80×50кг)
+                                                         │
+                                                         └──[sale]──▶ SaleItem(bags=N)
+    """
+
+    class Status(models.TextChoices):
+        ACTIVE = "active", "В наличии"
+        DEPLETED = "depleted", "Исчерпана"
+        RECALLED = "recalled", "Отозвана"
+
+    organization = models.ForeignKey(
+        "organizations.Organization",
+        on_delete=models.PROTECT,
+        related_name="feed_bag_lots",
+    )
+    module = models.ForeignKey(
+        "modules.Module",
+        on_delete=models.PROTECT,
+        related_name="feed_bag_lots",
+    )
+    doc_number = models.CharField(max_length=64, db_index=True)
+
+    # Источник — замес (для трассировки и наследования cost). Один FeedBatch
+    # может породить несколько FeedBagLot (разные смены фасовки, разный вес
+    # мешка), поэтому ForeignKey, а не OneToOne.
+    source_feed_batch = models.ForeignKey(
+        FeedBatch,
+        on_delete=models.PROTECT,
+        related_name="bag_lots",
+    )
+    # Денормализация — для удобства фильтрации/отчётов без джойнов через
+    # source_feed_batch.recipe_version.
+    recipe_version = models.ForeignKey(
+        RecipeVersion,
+        on_delete=models.PROTECT,
+        related_name="bag_lots",
+    )
+
+    bag_weight_kg = models.DecimalField(
+        max_digits=8,
+        decimal_places=3,
+        help_text="Вес одного мешка в кг (типично 50.000).",
+    )
+    bags_initial = models.PositiveIntegerField(
+        help_text="Сколько мешков расфасовано при создании партии.",
+    )
+    bags_remaining = models.PositiveIntegerField(
+        help_text="Текущий остаток в мешках (декрементируется при продаже).",
+    )
+
+    # Себестоимость наследуется: unit_cost = source.unit_cost_uzs × bag_weight.
+    # Денормализуем чтобы продажа не пересчитывала.
+    unit_cost_uzs = models.DecimalField(
+        max_digits=18,
+        decimal_places=2,
+        help_text="Себестоимость одного мешка (UZS).",
+    )
+    total_cost_uzs = models.DecimalField(
+        max_digits=18,
+        decimal_places=2,
+        help_text="Итого стоимость партии = bags_initial × unit_cost.",
+    )
+
+    storage_warehouse = models.ForeignKey(
+        "warehouses.Warehouse",
+        on_delete=models.PROTECT,
+        related_name="feed_bag_lots",
+        help_text="Склад мешков (отдельный от склада замесов).",
+    )
+    storage_bin = models.ForeignKey(
+        "warehouses.ProductionBlock",
+        null=True,
+        blank=True,
+        on_delete=models.PROTECT,
+        related_name="stored_feed_bag_lots",
+        help_text="Опциональный бункер/зона хранения внутри склада.",
+    )
+
+    packaged_at = models.DateTimeField(db_index=True)
+
+    # Mед-флаги наследуем от source (если source медикаментозный — мешки тоже).
+    is_medicated = models.BooleanField(default=False)
+    withdrawal_period_days = models.PositiveSmallIntegerField(default=0)
+    withdrawal_period_ends = models.DateField(null=True, blank=True, db_index=True)
+
+    status = models.CharField(
+        max_length=16,
+        choices=Status.choices,
+        default=Status.ACTIVE,
+        db_index=True,
+    )
+    notes = models.TextField(blank=True)
+
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="+",
+    )
+
+    class Meta:
+        ordering = ["-packaged_at", "doc_number"]
+        unique_together = (("organization", "doc_number"),)
+        indexes = [
+            models.Index(fields=["organization", "status"]),
+            models.Index(fields=["source_feed_batch", "status"]),
+            models.Index(fields=["recipe_version", "status"]),
+            models.Index(fields=["storage_warehouse", "status"]),
+        ]
+        verbose_name = "Партия фасованного корма"
+        verbose_name_plural = "Партии фасованного корма"
+
+    def __str__(self):
+        return f"{self.doc_number} · {self.bags_remaining}/{self.bags_initial} мешков"
+
+    @property
+    def remaining_kg(self):
+        """Оставшийся вес в кг (для отчётов и сверки)."""
+        from decimal import Decimal
+        return Decimal(self.bags_remaining) * Decimal(self.bag_weight_kg)
+
+    def clean(self):
+        super().clean()
+        org_id = self.organization_id
+        if not org_id:
+            return
+        if self.bag_weight_kg is not None and self.bag_weight_kg <= 0:
+            raise ValidationError(
+                {"bag_weight_kg": "Вес мешка должен быть > 0."}
+            )
+        if self.bags_initial is not None and self.bags_initial <= 0:
+            raise ValidationError(
+                {"bags_initial": "Должно быть хотя бы 1 мешок."}
+            )
+        if (
+            self.bags_initial is not None
+            and self.bags_remaining is not None
+            and self.bags_remaining > self.bags_initial
+        ):
+            raise ValidationError(
+                {"bags_remaining": "Остаток не может превышать выпуск."}
+            )
+        if (
+            self.source_feed_batch_id
+            and self.source_feed_batch.organization_id != org_id
+        ):
+            raise ValidationError(
+                {"source_feed_batch": "Замес из другой организации."}
+            )
+        if self.storage_warehouse_id:
+            if self.storage_warehouse.organization_id != org_id:
+                raise ValidationError(
+                    {"storage_warehouse": "Склад из другой организации."}
+                )
+            if (
+                self.module_id
+                and self.storage_warehouse.module_id != self.module_id
+            ):
+                raise ValidationError(
+                    {"storage_warehouse": "Склад не принадлежит модулю."}
+                )
+        if self.storage_bin_id:
+            if self.storage_bin.organization_id != org_id:
+                raise ValidationError(
+                    {"storage_bin": "Бункер из другой организации."}
+                )
+
+
 # ─── Consumption planning ──────────────────────────────────────────────────
 
 

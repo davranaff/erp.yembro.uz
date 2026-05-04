@@ -7,7 +7,7 @@ import Icon from '@/components/ui/Icon';
 import Modal from '@/components/ui/Modal';
 import { useCounterparties } from '@/hooks/useCounterparties';
 import { POPULAR_CURRENCY_CODES, useCurrenciesSorted, useRateOnDate } from '@/hooks/useCurrencyRates';
-import { feedBatchesCrud } from '@/hooks/useFeed';
+import { feedBagLotsCrud, feedBatchesCrud } from '@/hooks/useFeed';
 import { useModules } from '@/hooks/useModules';
 import { salesCrud } from '@/hooks/useSales';
 import { useWarehouses } from '@/hooks/useStockMovements';
@@ -15,7 +15,12 @@ import { accessoriesCrud, stockBatchesCrud } from '@/hooks/useVet';
 import { ApiError } from '@/lib/api';
 import type { SaleOrder } from '@/types/auth';
 
-export type SaleSourceKind = 'batch' | 'vet_stock_batch' | 'vet_accessory' | 'feed_batch';
+export type SaleSourceKind =
+  | 'batch'
+  | 'vet_stock_batch'
+  | 'vet_accessory'
+  | 'feed_batch'
+  | 'feed_bag_lot';
 
 /**
  * Preselect из drawer любой партии: "открыть модалку продаж с уже выбранным
@@ -40,15 +45,15 @@ interface Props {
 interface ItemDraft {
   key: string;
   nomenclature: string;
-  /** Источник — один из четырёх. Остальные null. */
+  /** Источник — один из пяти. Остальные null. */
   batch: string;
   vet_stock_batch: string;
   vet_accessory: string;
   feed_batch: string;
+  feed_bag_lot: string;
   /**
-   * Per-item kind override. Используется в vet-модуле для выбора между
-   * препаратом-лотом и аксессуаром (оба доступны внутри vet). Для других
-   * модулей резолвится через `sourceKindForModule`.
+   * Per-item kind override. Используется в vet-модуле (препарат vs аксессуар)
+   * и в feed (насыпь vs мешки).
    */
   kindOverride?: SaleSourceKind;
   quantity: string;
@@ -72,6 +77,7 @@ function makeItemDraft(overrides: Partial<ItemDraft> = {}): ItemDraft {
     vet_stock_batch: '',
     vet_accessory: '',
     feed_batch: '',
+    feed_bag_lot: '',
     quantity: '',
     unit_price_uzs: '',
     ...overrides,
@@ -104,6 +110,7 @@ export default function SaleOrderModal({ initial, preselect, onClose }: Props) {
   const { data: vetLots } = stockBatchesCrud.useList({ status: 'available' });
   const { data: vetAccessories } = accessoriesCrud.useList({ is_active: 'true' });
   const { data: feedLots } = feedBatchesCrud.useList();
+  const { data: feedBagLots } = feedBagLotsCrud.useList({ status: 'active' });
 
   // Состояние формы
   const [moduleId, setModuleId] = useState(initial?.module ?? '');
@@ -121,19 +128,25 @@ export default function SaleOrderModal({ initial, preselect, onClose }: Props) {
 
   const [items, setItems] = useState<ItemDraft[]>(() => {
     if (initial?.items && initial.items.length > 0) {
-      return initial.items.map((it) => ({
-        key: it.id,
-        nomenclature: it.nomenclature,
-        batch: it.batch ?? '',
-        vet_stock_batch: it.vet_stock_batch ?? '',
-        vet_accessory: (it as { vet_accessory?: string | null }).vet_accessory ?? '',
-        feed_batch: it.feed_batch ?? '',
-        kindOverride: (it as { vet_accessory?: string | null }).vet_accessory
-          ? 'vet_accessory' as const
-          : undefined,
-        quantity: it.quantity,
-        unit_price_uzs: it.unit_price_uzs,
-      }));
+      return initial.items.map((it): ItemDraft => {
+        const vetAcc = (it as { vet_accessory?: string | null }).vet_accessory ?? '';
+        const bagLot = (it as { feed_bag_lot?: string | null }).feed_bag_lot ?? '';
+        let kindOverride: SaleSourceKind | undefined;
+        if (vetAcc) kindOverride = 'vet_accessory';
+        else if (bagLot) kindOverride = 'feed_bag_lot';
+        return {
+          key: it.id,
+          nomenclature: it.nomenclature,
+          batch: it.batch ?? '',
+          vet_stock_batch: it.vet_stock_batch ?? '',
+          vet_accessory: vetAcc,
+          feed_batch: it.feed_batch ?? '',
+          feed_bag_lot: bagLot,
+          kindOverride,
+          quantity: it.quantity,
+          unit_price_uzs: it.unit_price_uzs,
+        };
+      });
     }
     // Preselect: одна строка с уже выбранной партией (если batchId задан)
     if (preselect && preselect.batchId) {
@@ -145,6 +158,10 @@ export default function SaleOrderModal({ initial, preselect, onClose }: Props) {
         draft.kindOverride = 'vet_accessory';
       }
       if (preselect.sourceKind === 'feed_batch') draft.feed_batch = preselect.batchId;
+      if (preselect.sourceKind === 'feed_bag_lot') {
+        draft.feed_bag_lot = preselect.batchId;
+        draft.kindOverride = 'feed_bag_lot';
+      }
       return [draft];
     }
     return [makeItemDraft()];
@@ -218,7 +235,8 @@ export default function SaleOrderModal({ initial, preselect, onClose }: Props) {
   const handleModuleChange = (newId: string) => {
     setModuleId(newId);
     setItems((prev) => prev.map((it) => ({
-      ...it, batch: '', vet_stock_batch: '', vet_accessory: '', feed_batch: '',
+      ...it, batch: '', vet_stock_batch: '', vet_accessory: '',
+      feed_batch: '', feed_bag_lot: '',
       kindOverride: undefined,
     })));
   };
@@ -229,6 +247,7 @@ export default function SaleOrderModal({ initial, preselect, onClose }: Props) {
     if (k === 'vet_stock_batch') return Boolean(it.vet_stock_batch);
     if (k === 'vet_accessory') return Boolean(it.vet_accessory);
     if (k === 'feed_batch') return Boolean(it.feed_batch);
+    if (k === 'feed_bag_lot') return Boolean(it.feed_bag_lot);
     return false;
   };
 
@@ -236,6 +255,8 @@ export default function SaleOrderModal({ initial, preselect, onClose }: Props) {
     if (!it.quantity) return false;
     const q = parseFloat(it.quantity);
     if (!isFinite(q) || q <= 0) return false;
+    // feed_bag_lot — целое число мешков (бэк отбрасывает .5)
+    if (itemSourceKind(it) === 'feed_bag_lot' && !Number.isInteger(q)) return false;
     if (it.available_quantity) {
       const av = parseFloat(it.available_quantity);
       if (q > av) return false;
@@ -267,6 +288,7 @@ export default function SaleOrderModal({ initial, preselect, onClose }: Props) {
         vet_stock_batch: it.vet_stock_batch || null,
         vet_accessory: it.vet_accessory || null,
         feed_batch: it.feed_batch || null,
+        feed_bag_lot: it.feed_bag_lot || null,
         quantity: it.quantity,
         unit_price_uzs: it.unit_price_uzs,
       })),
@@ -603,58 +625,145 @@ export default function SaleOrderModal({ initial, preselect, onClose }: Props) {
                     })()}
                   </>
                 )}
-                {sourceKind === 'feed_batch' && (() => {
-                  // Только одобренные партии с положительным остатком
-                  const sellable = (feedLots ?? []).filter(
-                    (f) => f.status === 'approved'
-                      && parseFloat(f.current_quantity_kg) > 0,
-                  );
-                  return (
+                {moduleSourceKind === 'feed_batch' && (
+                  <>
                     <div className="field">
-                      <label>Партия комбикорма *</label>
-                      <select
-                        className="input"
-                        value={it.feed_batch}
-                        onChange={(e) => {
-                          const fb = sellable.find((f) => f.id === e.target.value);
-                          updateItem(it.key, {
-                            feed_batch: e.target.value,
-                            // Автозаполнение из выбранной партии (включая номенклатуру —
-                            // она резолвится бэком через recipe.code → NomenclatureItem)
-                            nomenclature: fb?.nomenclature ?? '',
-                            quantity: it.quantity || fb?.current_quantity_kg || '',
-                            available_quantity: fb?.current_quantity_kg,
-                            batch_doc: fb?.doc_number,
-                            unit_code: 'кг',
-                          });
-                        }}
-                      >
-                        <option value="">— выберите партию —</option>
-                        {sellable.map((f) => (
-                          <option key={f.id} value={f.id}>
-                            {f.doc_number} · {f.recipe_code ?? ''}
-                            {f.nomenclature_name ? ` · ${f.nomenclature_name}` : ''} ·
-                            {' '}остаток {parseFloat(f.current_quantity_kg).toLocaleString('ru-RU')} кг
-                            {' '}· {parseFloat(f.unit_cost_uzs).toLocaleString('ru-RU', { maximumFractionDigits: 0 })} сум/кг
-                          </option>
-                        ))}
-                      </select>
-                      {it.feed_batch && !it.nomenclature && (
-                        <div style={{ fontSize: 11, color: 'var(--danger)', marginTop: 4 }}>
-                          В справочнике номенклатуры нет позиции с SKU = коду рецептуры.
-                          Создайте её в /nomenclature (модуль «Корма», SKU = код рецепта),
-                          либо выпустите партию по другой рецептуре.
-                        </div>
-                      )}
-                      {sellable.length === 0 && (
-                        <div style={{ fontSize: 11, color: 'var(--warning)', marginTop: 4 }}>
-                          Нет одобренных партий комбикорма с остатком. Партии становятся
-                          продаваемыми после контроля качества (статус «Одобрена»).
-                        </div>
-                      )}
+                      <label>Тип отгрузки</label>
+                      <div style={{ display: 'flex', gap: 12, fontSize: 12 }}>
+                        <label style={{ display: 'flex', gap: 4, alignItems: 'center', cursor: 'pointer' }}>
+                          <input
+                            type="radio"
+                            name={`feedkind-${it.key}`}
+                            checked={itemSourceKind(it) === 'feed_batch'}
+                            onChange={() => updateItem(it.key, {
+                              kindOverride: undefined,
+                              feed_bag_lot: '',
+                              nomenclature: '', quantity: '', available_quantity: undefined,
+                              unit_code: '', batch_doc: undefined,
+                            })}
+                          />
+                          Насыпью (кг)
+                        </label>
+                        <label style={{ display: 'flex', gap: 4, alignItems: 'center', cursor: 'pointer' }}>
+                          <input
+                            type="radio"
+                            name={`feedkind-${it.key}`}
+                            checked={itemSourceKind(it) === 'feed_bag_lot'}
+                            onChange={() => updateItem(it.key, {
+                              kindOverride: 'feed_bag_lot',
+                              feed_batch: '',
+                              nomenclature: '', quantity: '', available_quantity: undefined,
+                              unit_code: '', batch_doc: undefined,
+                            })}
+                          />
+                          В мешках (шт)
+                        </label>
+                      </div>
                     </div>
-                  );
-                })()}
+
+                    {itemSourceKind(it) === 'feed_batch' && (() => {
+                      // Только одобренные партии с положительным остатком
+                      const sellable = (feedLots ?? []).filter(
+                        (f) => f.status === 'approved'
+                          && parseFloat(f.current_quantity_kg) > 0,
+                      );
+                      return (
+                        <div className="field">
+                          <label>Партия комбикорма (насыпь) *</label>
+                          <select
+                            className="input"
+                            value={it.feed_batch}
+                            onChange={(e) => {
+                              const fb = sellable.find((f) => f.id === e.target.value);
+                              updateItem(it.key, {
+                                feed_batch: e.target.value,
+                                nomenclature: fb?.nomenclature ?? '',
+                                quantity: it.quantity || fb?.current_quantity_kg || '',
+                                available_quantity: fb?.current_quantity_kg,
+                                batch_doc: fb?.doc_number,
+                                unit_code: 'кг',
+                              });
+                            }}
+                          >
+                            <option value="">— выберите партию —</option>
+                            {sellable.map((f) => (
+                              <option key={f.id} value={f.id}>
+                                {f.doc_number} · {f.recipe_code ?? ''}
+                                {f.nomenclature_name ? ` · ${f.nomenclature_name}` : ''} ·
+                                {' '}остаток {parseFloat(f.current_quantity_kg).toLocaleString('ru-RU')} кг
+                                {' '}· {parseFloat(f.unit_cost_uzs).toLocaleString('ru-RU', { maximumFractionDigits: 0 })} сум/кг
+                              </option>
+                            ))}
+                          </select>
+                          {it.feed_batch && !it.nomenclature && (
+                            <div style={{ fontSize: 11, color: 'var(--danger)', marginTop: 4 }}>
+                              В справочнике номенклатуры нет позиции с SKU = коду рецептуры.
+                              Создайте её в /nomenclature (модуль «Корма», SKU = код рецепта).
+                            </div>
+                          )}
+                          {sellable.length === 0 && (
+                            <div style={{ fontSize: 11, color: 'var(--warning)', marginTop: 4 }}>
+                              Нет одобренных партий насыпью. Партии становятся
+                              продаваемыми после контроля качества (статус «Одобрена»).
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })()}
+
+                    {itemSourceKind(it) === 'feed_bag_lot' && (() => {
+                      const sellable = (feedBagLots ?? []).filter(
+                        (b) => b.status === 'active' && b.bags_remaining > 0,
+                      );
+                      return (
+                        <div className="field">
+                          <label>Партия мешков *</label>
+                          <select
+                            className="input"
+                            value={it.feed_bag_lot}
+                            onChange={(e) => {
+                              const bl = sellable.find((b) => b.id === e.target.value);
+                              updateItem(it.key, {
+                                feed_bag_lot: e.target.value,
+                                nomenclature: bl?.nomenclature ?? '',
+                                // qty в штуках мешков
+                                quantity: it.quantity || (bl ? String(bl.bags_remaining) : ''),
+                                available_quantity: bl ? String(bl.bags_remaining) : undefined,
+                                batch_doc: bl?.doc_number,
+                                unit_code: 'мешок',
+                                // Дефолтная цена = себест × 1 (наценку оператор поставит сам);
+                                // оставляем пусто чтобы оператор явно ввёл sale-цену.
+                              });
+                            }}
+                          >
+                            <option value="">— выберите партию —</option>
+                            {sellable.map((b) => (
+                              <option key={b.id} value={b.id}>
+                                {b.doc_number} · {b.recipe_code ?? ''}
+                                {b.nomenclature_name ? ` · ${b.nomenclature_name}` : ''} ·
+                                {' '}остаток {b.bags_remaining} шт ×{' '}
+                                {parseFloat(b.bag_weight_kg).toLocaleString('ru-RU')} кг
+                                {' '}· {parseFloat(b.unit_cost_uzs).toLocaleString('ru-RU', { maximumFractionDigits: 0 })} сум/мешок
+                              </option>
+                            ))}
+                          </select>
+                          {it.feed_bag_lot && !it.nomenclature && (
+                            <div style={{ fontSize: 11, color: 'var(--danger)', marginTop: 4 }}>
+                              В справочнике номенклатуры нет позиции с SKU = коду рецептуры —
+                              продажа партии мешков невозможна без неё.
+                            </div>
+                          )}
+                          {sellable.length === 0 && (
+                            <div style={{ fontSize: 11, color: 'var(--warning)', marginTop: 4 }}>
+                              Нет активных партий мешков. Расфасуйте готовый
+                              корм в /feed → таб «Готовые партии» → «Расфасовать в мешки».
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })()}
+                  </>
+                )}
               </div>
 
               <div className="field">
