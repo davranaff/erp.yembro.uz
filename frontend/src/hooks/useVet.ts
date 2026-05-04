@@ -5,6 +5,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ApiError, apiFetch } from '@/lib/api';
 import { makeCrud } from '@/lib/crudFactory';
 import type {
+  VetAccessory,
   VetDrug,
   VetStockBatch,
   VetTreatmentLog,
@@ -27,6 +28,37 @@ export const treatmentsCrud = makeCrud<VetTreatmentLog>({
   path: '/api/vet/treatments/',
   ordering: '-treatment_date',
 });
+
+export const accessoriesCrud = makeCrud<VetAccessory>({
+  key: ['vet', 'accessories'],
+  path: '/api/vet/accessories/',
+  ordering: 'nomenclature__sku',
+});
+
+/**
+ * POST /api/vet/accessories/{id}/receive/ — приход аксессуара.
+ * Пересчитывает avg-cost если задан unit_cost_uzs, иначе только +qty.
+ */
+export function useReceiveAccessory() {
+  const qc = useQueryClient();
+  return useMutation<
+    VetAccessory,
+    ApiError,
+    { id: string; quantity: string; unit_cost_uzs?: string; notes?: string }
+  >({
+    mutationFn: ({ id, quantity, unit_cost_uzs, notes }) =>
+      apiFetch<VetAccessory>(`/api/vet/accessories/${id}/receive/`, {
+        method: 'POST',
+        body: {
+          quantity,
+          ...(unit_cost_uzs ? { unit_cost_uzs } : {}),
+          ...(notes ? { notes } : {}),
+        },
+      }),
+    onSuccess: () =>
+      qc.invalidateQueries({ queryKey: ['vet', 'accessories'] }),
+  });
+}
 
 // POST /api/vet/stock-batches/receive/ (detail=False)
 export function useReceiveVetStock() {

@@ -5,7 +5,7 @@
  * X-Organization-Code, которых на public-странице нет. Здесь свой fetch
  * с поддержкой Bearer-токена продавца (в localStorage).
  */
-import type { VetStockBatchPublic } from '@/types/auth';
+import type { ScanResult } from '@/types/auth';
 
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000';
@@ -51,10 +51,13 @@ export function clearSellerToken() {
 }
 
 
-/** Анонимно: данные лота по barcode (read-only). */
+/**
+ * Анонимно: данные лота/аксессуара по barcode (read-only).
+ * Backend ищет в обоих местах и отдаёт discriminated union с `source_kind`.
+ */
 export async function fetchPublicLot(
   barcode: string,
-): Promise<VetStockBatchPublic | null> {
+): Promise<ScanResult | null> {
   const res = await fetch(
     `${API_URL}/api/vet/public/scan/${encodeURIComponent(barcode)}/`,
     { method: 'GET' },

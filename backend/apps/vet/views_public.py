@@ -21,9 +21,10 @@ from rest_framework.response import Response
 from apps.counterparties.models import Counterparty
 
 from .authentication import SellerTokenAuthentication
-from .models import VetStockBatch
-from .serializers import VetStockBatchPublicSerializer
+from .models import VetAccessory, VetStockBatch
+from .serializers import VetAccessoryPublicSerializer, VetStockBatchPublicSerializer
 from .services.sell import VetSellError, sell_vet_stock
+from .services.sell_accessory import VetAccessorySellError, sell_vet_accessory
 
 
 class VetPublicScanView(views.APIView):
@@ -39,22 +40,34 @@ class VetPublicScanView(views.APIView):
 
     def get(self, request, barcode: str):
         # Поиск без фильтра по organization — barcode уникален в рамках org,
-        # но мы хотим работать кросс-орг для public. Если несколько orgs
-        # имеют одинаковый barcode (теоретически возможно из-за per-org
-        # уникальности) — берём первый. На практике barcode авто-генерится
-        # с case-sensitive токеном, коллизия маловероятна.
+        # но мы хотим работать кросс-орг для public. Сначала ищем среди
+        # лотов препаратов (VetStockBatch), потом среди аксессуаров.
         batch = (
             VetStockBatch.objects
             .select_related("drug__nomenclature", "unit")
             .filter(barcode=barcode)
             .first()
         )
-        if batch is None:
-            return Response(
-                {"detail": "Лот с таким штрих-кодом не найден."},
-                status=status.HTTP_404_NOT_FOUND,
-            )
-        return Response(VetStockBatchPublicSerializer(batch).data)
+        if batch is not None:
+            data = VetStockBatchPublicSerializer(batch).data
+            data["source_kind"] = "drug_lot"
+            return Response(data)
+
+        accessory = (
+            VetAccessory.objects
+            .select_related("nomenclature", "nomenclature__unit")
+            .filter(barcode=barcode)
+            .first()
+        )
+        if accessory is not None:
+            data = VetAccessoryPublicSerializer(accessory).data
+            data["source_kind"] = "accessory"
+            return Response(data)
+
+        return Response(
+            {"detail": "Товар с таким штрих-кодом не найден."},
+            status=status.HTTP_404_NOT_FOUND,
+        )
 
 
 class VetPublicSellView(views.APIView):
@@ -118,39 +131,69 @@ class VetPublicSellView(views.APIView):
                     "customer_id": "Клиент не найден в организации токена.",
                 })
 
+        # Сначала ищем препарат-лот, если не нашли — аксессуар.
         batch = (
             VetStockBatch.objects
             .filter(organization=organization, barcode=barcode)
             .first()
         )
-        if batch is None:
-            raise DRFValidationError(
-                {"barcode": "Лот не найден в организации токена."}
-            )
+        if batch is not None:
+            try:
+                result = sell_vet_stock(
+                    stock_batch=batch,
+                    quantity=qty,
+                    seller_user=request.user,
+                    organization=organization,
+                    customer=customer,
+                    unit_price_uzs=unit_price,
+                )
+            except VetSellError as exc:
+                raise DRFValidationError(
+                    exc.message_dict if hasattr(exc, "message_dict") else exc.messages
+                )
+            return Response({
+                "source_kind": "drug_lot",
+                "sale_order_id": str(result.sale_order.id),
+                "sale_order_doc": result.sale_order.doc_number,
+                "total_uzs": str(result.total_uzs),
+                "remaining_qty": str(result.remaining_qty),
+                "lot_status": result.stock_batch.status,
+                "customer_id": str(result.sale_order.customer_id),
+                "customer_name": result.sale_order.customer.name,
+            }, status=status.HTTP_201_CREATED)
 
-        try:
-            result = sell_vet_stock(
-                stock_batch=batch,
-                quantity=qty,
-                seller_user=request.user,
-                organization=organization,
-                customer=customer,
-                unit_price_uzs=unit_price,
-            )
-        except VetSellError as exc:
-            raise DRFValidationError(
-                exc.message_dict if hasattr(exc, "message_dict") else exc.messages
-            )
+        accessory = (
+            VetAccessory.objects
+            .filter(organization=organization, barcode=barcode)
+            .first()
+        )
+        if accessory is not None:
+            try:
+                result = sell_vet_accessory(
+                    accessory=accessory,
+                    quantity=qty,
+                    seller_user=request.user,
+                    organization=organization,
+                    customer=customer,
+                    unit_price_uzs=unit_price,
+                )
+            except VetAccessorySellError as exc:
+                raise DRFValidationError(
+                    exc.message_dict if hasattr(exc, "message_dict") else exc.messages
+                )
+            return Response({
+                "source_kind": "accessory",
+                "sale_order_id": str(result.sale_order.id),
+                "sale_order_doc": result.sale_order.doc_number,
+                "total_uzs": str(result.total_uzs),
+                "remaining_qty": str(result.remaining_qty),
+                "customer_id": str(result.sale_order.customer_id),
+                "customer_name": result.sale_order.customer.name,
+            }, status=status.HTTP_201_CREATED)
 
-        return Response({
-            "sale_order_id": str(result.sale_order.id),
-            "sale_order_doc": result.sale_order.doc_number,
-            "total_uzs": str(result.total_uzs),
-            "remaining_qty": str(result.remaining_qty),
-            "lot_status": result.stock_batch.status,
-            "customer_id": str(result.sale_order.customer_id),
-            "customer_name": result.sale_order.customer.name,
-        }, status=status.HTTP_201_CREATED)
+        raise DRFValidationError(
+            {"barcode": "Товар не найден в организации токена."}
+        )
 
 
 class VetPublicCustomersView(views.APIView):

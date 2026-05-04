@@ -12,11 +12,11 @@ import { useModules } from '@/hooks/useModules';
 import { useNomenclatureItems } from '@/hooks/useNomenclature';
 import { salesCrud } from '@/hooks/useSales';
 import { useWarehouses } from '@/hooks/useStockMovements';
-import { stockBatchesCrud } from '@/hooks/useVet';
+import { accessoriesCrud, stockBatchesCrud } from '@/hooks/useVet';
 import { ApiError } from '@/lib/api';
 import type { SaleOrder } from '@/types/auth';
 
-export type SaleSourceKind = 'batch' | 'vet_stock_batch' | 'feed_batch';
+export type SaleSourceKind = 'batch' | 'vet_stock_batch' | 'vet_accessory' | 'feed_batch';
 
 /**
  * Preselect из drawer любой партии: "открыть модалку продаж с уже выбранным
@@ -41,10 +41,17 @@ interface Props {
 interface ItemDraft {
   key: string;
   nomenclature: string;
-  /** Источник — один из трёх. Остальные null. */
+  /** Источник — один из четырёх. Остальные null. */
   batch: string;
   vet_stock_batch: string;
+  vet_accessory: string;
   feed_batch: string;
+  /**
+   * Per-item kind override. Используется в vet-модуле для выбора между
+   * препаратом-лотом и аксессуаром (оба доступны внутри vet). Для других
+   * модулей резолвится через `sourceKindForModule`.
+   */
+  kindOverride?: SaleSourceKind;
   quantity: string;
   unit_price_uzs: string;
   /**
@@ -64,6 +71,7 @@ function makeItemDraft(overrides: Partial<ItemDraft> = {}): ItemDraft {
     nomenclature: '',
     batch: '',
     vet_stock_batch: '',
+    vet_accessory: '',
     feed_batch: '',
     quantity: '',
     unit_price_uzs: '',
@@ -95,6 +103,7 @@ export default function SaleOrderModal({ initial, preselect, onClose }: Props) {
 
   // Справочники для vet/feed (ленивая загрузка по необходимости)
   const { data: vetLots } = stockBatchesCrud.useList({ status: 'available' });
+  const { data: vetAccessories } = accessoriesCrud.useList({ is_active: 'true' });
   const { data: feedLots } = feedBatchesCrud.useList();
 
   // Состояние формы
@@ -124,7 +133,11 @@ export default function SaleOrderModal({ initial, preselect, onClose }: Props) {
         nomenclature: it.nomenclature,
         batch: it.batch ?? '',
         vet_stock_batch: it.vet_stock_batch ?? '',
+        vet_accessory: (it as { vet_accessory?: string | null }).vet_accessory ?? '',
         feed_batch: it.feed_batch ?? '',
+        kindOverride: (it as { vet_accessory?: string | null }).vet_accessory
+          ? 'vet_accessory' as const
+          : undefined,
         quantity: it.quantity,
         unit_price_uzs: it.unit_price_uzs,
       }));
@@ -134,6 +147,10 @@ export default function SaleOrderModal({ initial, preselect, onClose }: Props) {
       const draft = makeItemDraft({ nomenclature: preselect.nomenclatureId ?? '' });
       if (preselect.sourceKind === 'batch') draft.batch = preselect.batchId;
       if (preselect.sourceKind === 'vet_stock_batch') draft.vet_stock_batch = preselect.batchId;
+      if (preselect.sourceKind === 'vet_accessory') {
+        draft.vet_accessory = preselect.batchId;
+        draft.kindOverride = 'vet_accessory';
+      }
       if (preselect.sourceKind === 'feed_batch') draft.feed_batch = preselect.batchId;
       return [draft];
     }
@@ -148,7 +165,12 @@ export default function SaleOrderModal({ initial, preselect, onClose }: Props) {
     }
   }, [preselect, modules, moduleId]);
 
-  const sourceKind: SaleSourceKind = sourceKindForModule(selectedModuleCode);
+  const moduleSourceKind: SaleSourceKind = sourceKindForModule(selectedModuleCode);
+  // Per-item kind: для vet оператор может переключиться на vet_accessory.
+  const itemSourceKind = (it: ItemDraft): SaleSourceKind =>
+    it.kindOverride ?? moduleSourceKind;
+  // Глобальный sourceKind для подсказки в шапке (не per-item)
+  const sourceKind = moduleSourceKind;
 
   // Код выбранной валюты
   const currencyCode = useMemo(() => {
@@ -203,14 +225,17 @@ export default function SaleOrderModal({ initial, preselect, onClose }: Props) {
   const handleModuleChange = (newId: string) => {
     setModuleId(newId);
     setItems((prev) => prev.map((it) => ({
-      ...it, batch: '', vet_stock_batch: '', feed_batch: '',
+      ...it, batch: '', vet_stock_batch: '', vet_accessory: '', feed_batch: '',
+      kindOverride: undefined,
     })));
   };
 
   const itemSourceFilled = (it: ItemDraft): boolean => {
-    if (sourceKind === 'batch') return Boolean(it.batch);
-    if (sourceKind === 'vet_stock_batch') return Boolean(it.vet_stock_batch);
-    if (sourceKind === 'feed_batch') return Boolean(it.feed_batch);
+    const k = itemSourceKind(it);
+    if (k === 'batch') return Boolean(it.batch);
+    if (k === 'vet_stock_batch') return Boolean(it.vet_stock_batch);
+    if (k === 'vet_accessory') return Boolean(it.vet_accessory);
+    if (k === 'feed_batch') return Boolean(it.feed_batch);
     return false;
   };
 
@@ -247,6 +272,7 @@ export default function SaleOrderModal({ initial, preselect, onClose }: Props) {
         nomenclature: it.nomenclature,
         batch: it.batch || null,
         vet_stock_batch: it.vet_stock_batch || null,
+        vet_accessory: it.vet_accessory || null,
         feed_batch: it.feed_batch || null,
         quantity: it.quantity,
         unit_price_uzs: it.unit_price_uzs,
@@ -489,23 +515,98 @@ export default function SaleOrderModal({ initial, preselect, onClose }: Props) {
                     }
                   />
                 )}
-                {sourceKind === 'vet_stock_batch' && (
-                  <div className="field">
-                    <label>Лот препарата *</label>
-                    <select
-                      className="input"
-                      value={it.vet_stock_batch}
-                      onChange={(e) => updateItem(it.key, { vet_stock_batch: e.target.value })}
-                    >
-                      <option value="">— выберите лот —</option>
-                      {vetLots?.map((v) => (
-                        <option key={v.id} value={v.id}>
-                          {v.doc_number} · {v.lot_number} · {v.drug_name ?? ''} ·
-                          {' '}остаток {parseFloat(v.current_quantity).toLocaleString('ru-RU')} {v.unit_code ?? ''}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
+                {moduleSourceKind === 'vet_stock_batch' && (
+                  <>
+                    <div className="field">
+                      <label>Тип товара</label>
+                      <div style={{ display: 'flex', gap: 12, fontSize: 12 }}>
+                        <label style={{ display: 'flex', gap: 4, alignItems: 'center', cursor: 'pointer' }}>
+                          <input
+                            type="radio"
+                            name={`kind-${it.key}`}
+                            checked={itemSourceKind(it) === 'vet_stock_batch'}
+                            onChange={() => updateItem(it.key, {
+                              kindOverride: 'vet_stock_batch',
+                              vet_accessory: '',
+                            })}
+                          />
+                          Препарат (лот)
+                        </label>
+                        <label style={{ display: 'flex', gap: 4, alignItems: 'center', cursor: 'pointer' }}>
+                          <input
+                            type="radio"
+                            name={`kind-${it.key}`}
+                            checked={itemSourceKind(it) === 'vet_accessory'}
+                            onChange={() => updateItem(it.key, {
+                              kindOverride: 'vet_accessory',
+                              vet_stock_batch: '',
+                            })}
+                          />
+                          Аксессуар
+                        </label>
+                      </div>
+                    </div>
+
+                    {itemSourceKind(it) === 'vet_stock_batch' && (
+                      <div className="field">
+                        <label>Лот препарата *</label>
+                        <select
+                          className="input"
+                          value={it.vet_stock_batch}
+                          onChange={(e) => updateItem(it.key, { vet_stock_batch: e.target.value })}
+                        >
+                          <option value="">— выберите лот —</option>
+                          {vetLots?.map((v) => (
+                            <option key={v.id} value={v.id}>
+                              {v.doc_number} · {v.lot_number} · {v.drug_name ?? ''} ·
+                              {' '}остаток {parseFloat(v.current_quantity).toLocaleString('ru-RU')} {v.unit_code ?? ''}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
+
+                    {itemSourceKind(it) === 'vet_accessory' && (() => {
+                      const sellable = (vetAccessories ?? []).filter(
+                        (a) => parseFloat(a.current_quantity) > 0,
+                      );
+                      return (
+                        <div className="field">
+                          <label>Аксессуар *</label>
+                          <select
+                            className="input"
+                            value={it.vet_accessory}
+                            onChange={(e) => {
+                              const acc = sellable.find((a) => a.id === e.target.value);
+                              updateItem(it.key, {
+                                vet_accessory: e.target.value,
+                                quantity: it.quantity || '1',
+                                available_quantity: acc?.current_quantity,
+                                batch_doc: acc?.nomenclature_sku ?? undefined,
+                                unit_code: acc?.unit_code ?? undefined,
+                                unit_price_uzs: it.unit_price_uzs || acc?.sale_price_uzs || '',
+                              });
+                            }}
+                          >
+                            <option value="">— выберите аксессуар —</option>
+                            {sellable.map((a) => (
+                              <option key={a.id} value={a.id}>
+                                {a.nomenclature_sku} · {a.nomenclature_name} ·
+                                {' '}остаток {parseFloat(a.current_quantity).toLocaleString('ru-RU')} {a.unit_code ?? ''}
+                                {' '}· {parseFloat(a.sale_price_uzs).toLocaleString('ru-RU', { maximumFractionDigits: 0 })} сум/шт
+                              </option>
+                            ))}
+                          </select>
+                          {sellable.length === 0 && (
+                            <div style={{ fontSize: 11, color: 'var(--warning)', marginTop: 4 }}>
+                              Нет аксессуаров с положительным остатком — добавьте через
+                              {' '}/vet → «Аксессуары» → «Приёмка».
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })()}
+                  </>
                 )}
                 {sourceKind === 'feed_batch' && (() => {
                   // Только одобренные партии с положительным остатком

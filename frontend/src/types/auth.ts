@@ -1207,6 +1207,11 @@ export interface VetDrug {
   administration_route: DrugRoute;
   default_withdrawal_days: number;
   storage_conditions: string;
+  /**
+   * Штрих-код SKU (shelf-tag) — ставится на полку, отдельный от
+   * lot-barcode-ов в VetStockBatch.
+   */
+  barcode: string | null;
   is_active: boolean;
   notes: string;
   created_at: string;
@@ -1254,10 +1259,12 @@ export interface VetStockBatch {
 }
 
 /**
- * Public-данные лота для сканера (без чувствительной информации).
- * Возвращается из /api/vet/public/scan/<barcode>/.
+ * Public-данные лота препарата для сканера.
+ * Возвращается из /api/vet/public/scan/<barcode>/ когда в barcode-индексе
+ * нашёлся VetStockBatch.
  */
 export interface VetStockBatchPublic {
+  source_kind: 'drug_lot';
   id: string;
   barcode: string;
   drug_sku: string | null;
@@ -1274,6 +1281,26 @@ export interface VetStockBatchPublic {
   is_expired: boolean;
   is_expiring_soon: boolean;
 }
+
+/**
+ * Public-данные аксессуара для сканера.
+ * Возвращается из /api/vet/public/scan/<barcode>/ когда в barcode-индексе
+ * нашёлся VetAccessory (миска/поилка и т.п. без партионного учёта).
+ */
+export interface VetAccessoryPublic {
+  source_kind: 'accessory';
+  id: string;
+  barcode: string;
+  nomenclature_sku: string | null;
+  nomenclature_name: string | null;
+  unit_code: string | null;
+  current_quantity: string;
+  sale_price_uzs: string;
+  is_active: boolean;
+}
+
+/** Discriminated union — что отдаёт public scan. */
+export type ScanResult = VetStockBatchPublic | VetAccessoryPublic;
 
 export interface SellerDeviceToken {
   id: string;
@@ -1425,6 +1452,26 @@ export interface BatchTrace {
   chain_steps: BatchChainStep[];
   cost_breakdown: BatchCostBreakdownItem[];
   totals: BatchTraceTotals;
+}
+
+export interface VetAccessory {
+  id: string;
+  module: string;
+  nomenclature: string;
+  nomenclature_sku: string | null;
+  nomenclature_name: string | null;
+  unit_code: string | null;
+  warehouse: string;
+  warehouse_code: string | null;
+  current_quantity: string;
+  /** Может быть null для пользователей без vet.r (FinancialFieldsMixin). */
+  cost_per_unit_uzs: string | null;
+  sale_price_uzs: string;
+  barcode: string | null;
+  is_active: boolean;
+  notes: string;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface VetTreatmentLog {

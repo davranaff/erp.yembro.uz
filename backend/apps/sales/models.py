@@ -256,8 +256,11 @@ class SaleCommunication(UUIDModel, TimestampedModel):
 
 class SaleItem(UUIDModel, TimestampedModel):
     """
-    Позиция продажи. Партия указывается ровно через одну из трёх FK
-    (batch / vet_stock_batch / feed_batch) — XOR-проверка в clean().
+    Позиция продажи. Источник указывается ровно через одну из четырёх FK
+    (batch / vet_stock_batch / vet_accessory / feed_batch) — XOR в clean().
+
+    `vet_accessory` — для аксессуаров вет-аптеки (миски, поилки и т.п.):
+    нет партионного учёта, себестоимость weighted-avg, проводки через 41.01.
     """
 
     order = models.ForeignKey(
@@ -278,6 +281,13 @@ class SaleItem(UUIDModel, TimestampedModel):
     )
     vet_stock_batch = models.ForeignKey(
         "vet.VetStockBatch",
+        null=True,
+        blank=True,
+        on_delete=models.PROTECT,
+        related_name="sale_items",
+    )
+    vet_accessory = models.ForeignKey(
+        "vet.VetAccessory",
         null=True,
         blank=True,
         on_delete=models.PROTECT,
@@ -319,14 +329,17 @@ class SaleItem(UUIDModel, TimestampedModel):
 
     def clean(self):
         super().clean()
-        sources = [self.batch_id, self.vet_stock_batch_id, self.feed_batch_id]
+        sources = [
+            self.batch_id, self.vet_stock_batch_id,
+            self.vet_accessory_id, self.feed_batch_id,
+        ]
         non_null = [s for s in sources if s]
         if len(non_null) != 1:
             raise ValidationError(
                 {
                     "__all__": (
-                        "Должна быть указана ровно одна партия: "
-                        "batch, vet_stock_batch или feed_batch."
+                        "Должен быть указан ровно один источник: "
+                        "batch, vet_stock_batch, vet_accessory или feed_batch."
                     )
                 }
             )

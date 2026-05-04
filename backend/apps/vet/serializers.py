@@ -6,6 +6,7 @@ from .models import (
     SellerDeviceToken,
     VaccinationSchedule,
     VaccinationScheduleItem,
+    VetAccessory,
     VetDrug,
     VetStockBatch,
     VetTreatmentLog,
@@ -26,6 +27,7 @@ class VetDrugSerializer(serializers.ModelSerializer):
             "administration_route",
             "default_withdrawal_days",
             "storage_conditions",
+            "barcode",
             "is_active",
             "notes",
             "nomenclature_sku",
@@ -397,3 +399,102 @@ class SellerDeviceTokenCreateSerializer(serializers.ModelSerializer):
             "created_at",
         )
         read_only_fields = ("id", "token", "is_active", "created_at")
+
+
+class VetAccessorySerializer(FinancialFieldsMixin, serializers.ModelSerializer):
+    """Аксессуар вет-аптеки (миска / поилка / переноска и т.п.).
+
+    Финансовые поля (`cost_per_unit_uzs`, `sale_price_uzs`) — деньги модуля vet,
+    скрываются у пользователей без vet.r доступа через FinancialFieldsMixin.
+    """
+
+    financial_fields = ("cost_per_unit_uzs",)
+    finances_module = "vet"
+
+    nomenclature_sku = serializers.SerializerMethodField()
+    nomenclature_name = serializers.SerializerMethodField()
+    unit_code = serializers.SerializerMethodField()
+    warehouse_code = serializers.SerializerMethodField()
+
+    class Meta:
+        model = VetAccessory
+        fields = (
+            "id",
+            "module",
+            "nomenclature",
+            "nomenclature_sku",
+            "nomenclature_name",
+            "unit_code",
+            "warehouse",
+            "warehouse_code",
+            "current_quantity",
+            "cost_per_unit_uzs",
+            "sale_price_uzs",
+            "barcode",
+            "is_active",
+            "notes",
+            "created_at",
+            "updated_at",
+        )
+        read_only_fields = (
+            "id",
+            # current_quantity меняется ТОЛЬКO через receive — иначе теряем
+            # audit-trail (StockMovement) и весь учёт расходится.
+            "current_quantity",
+            # cost_per_unit_uzs — editable: при create задаёт стартовую
+            # себестоимость, при update это manual override avg-cost (для
+            # корректировки оценки склада). receive всё равно пересчитает
+            # через weighted-avg по новой формуле.
+            "nomenclature_sku",
+            "nomenclature_name",
+            "unit_code",
+            "warehouse_code",
+            "created_at",
+            "updated_at",
+        )
+
+    def get_nomenclature_sku(self, obj):
+        return obj.nomenclature.sku if obj.nomenclature_id else None
+
+    def get_nomenclature_name(self, obj):
+        return obj.nomenclature.name if obj.nomenclature_id else None
+
+    def get_unit_code(self, obj):
+        if not obj.nomenclature_id or not obj.nomenclature.unit_id:
+            return None
+        return obj.nomenclature.unit.code
+
+    def get_warehouse_code(self, obj):
+        return obj.warehouse.code if obj.warehouse_id else None
+
+
+class VetAccessoryPublicSerializer(serializers.ModelSerializer):
+    """Public-вариант для розничного scan-by-barcode (без cost_per_unit)."""
+
+    nomenclature_sku = serializers.SerializerMethodField()
+    nomenclature_name = serializers.SerializerMethodField()
+    unit_code = serializers.SerializerMethodField()
+
+    class Meta:
+        model = VetAccessory
+        fields = (
+            "id",
+            "barcode",
+            "nomenclature_sku",
+            "nomenclature_name",
+            "unit_code",
+            "current_quantity",
+            "sale_price_uzs",
+            "is_active",
+        )
+
+    def get_nomenclature_sku(self, obj):
+        return obj.nomenclature.sku if obj.nomenclature_id else None
+
+    def get_nomenclature_name(self, obj):
+        return obj.nomenclature.name if obj.nomenclature_id else None
+
+    def get_unit_code(self, obj):
+        if not obj.nomenclature_id or not obj.nomenclature.unit_id:
+            return None
+        return obj.nomenclature.unit.code

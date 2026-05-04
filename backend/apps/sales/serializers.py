@@ -22,6 +22,7 @@ class SaleItemSerializer(serializers.ModelSerializer):
             "nomenclature_name",
             "batch",
             "vet_stock_batch",
+            "vet_accessory",
             "feed_batch",
             "quantity",
             "unit_price_uzs",

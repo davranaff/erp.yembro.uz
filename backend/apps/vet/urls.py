@@ -5,6 +5,7 @@ from .views import (
     SellerDeviceTokenViewSet,
     VaccinationScheduleItemViewSet,
     VaccinationScheduleViewSet,
+    VetAccessoryViewSet,
     VetDrugViewSet,
     VetStockBatchViewSet,
     VetTreatmentLogViewSet,
@@ -24,6 +25,7 @@ router.register(
     r"schedule-items", VaccinationScheduleItemViewSet, basename="vaccscheduleitem"
 )
 router.register(r"treatments", VetTreatmentLogViewSet, basename="vettreatment")
+router.register(r"accessories", VetAccessoryViewSet, basename="vetaccessory")
 router.register(r"seller-tokens", SellerDeviceTokenViewSet, basename="sellertoken")
 
 app_name = "vet"

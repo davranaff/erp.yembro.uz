@@ -12,12 +12,13 @@ import {
   submitSellerSale,
   type SellerCustomer,
 } from '@/lib/sellerApi';
-import type { VetStockBatchPublic } from '@/types/auth';
+import type { ScanResult, VetStockBatchPublic } from '@/types/auth';
 
 
-function fmtMoney(uzs: string | number): string {
+function fmtMoney(uzs: string | number | null | undefined): string {
+  if (uzs == null || uzs === '') return '—';
   const n = typeof uzs === 'string' ? parseFloat(uzs) : uzs;
-  if (Number.isNaN(n)) return '—';
+  if (!Number.isFinite(n)) return '—';
   return n.toLocaleString('ru-RU', { maximumFractionDigits: 0 }) + ' сум';
 }
 
@@ -50,7 +51,7 @@ export default function ScanBarcodePage({
 }) {
   const { barcode } = use(params);
   const router = useRouter();
-  const [lot, setLot] = useState<VetStockBatchPublic | null>(null);
+  const [item, setItem] = useState<ScanResult | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [hasToken, setHasToken] = useState(false);
@@ -71,14 +72,13 @@ export default function ScanBarcodePage({
     setLoading(true);
     fetchPublicLot(barcode)
       .then((data) => {
-        setLot(data);
+        setItem(data);
         setLoading(false);
       })
       .catch((e) => {
         setError(e instanceof Error ? e.message : 'Ошибка загрузки');
         setLoading(false);
       });
-    // Параллельно — список покупателей для select. Только если есть токен.
     if (tok) {
       fetchSellerCustomers(tok)
         .then((list) => setCustomers(list))
@@ -102,7 +102,6 @@ export default function ScanBarcodePage({
       const result = await submitSellerSale(tok, {
         barcode,
         quantity: qty,
-        // Не отправляем customer_id если не выбран — backend сам подставит «Розничный покупатель».
         ...(customerId ? { customer_id: customerId } : {}),
       });
       setSuccess({
@@ -110,10 +109,8 @@ export default function ScanBarcodePage({
         total: result.total_uzs,
         customer: result.customer_name,
       });
-      // Перезагрузить лот, чтобы остаток обновился
       const updated = await fetchPublicLot(barcode);
-      setLot(updated);
-      // Сбросим выбор клиента — следующая продажа по умолчанию опять «Розница».
+      setItem(updated);
       setCustomerId('');
     } catch (e) {
       const msg = e instanceof PublicApiError ? e.message : 'Ошибка продажи';
@@ -131,7 +128,7 @@ export default function ScanBarcodePage({
     );
   }
 
-  if (error || !lot) {
+  if (error || !item) {
     return (
       <div style={{
         minHeight: '100vh', padding: 20,
@@ -144,10 +141,9 @@ export default function ScanBarcodePage({
           background: '#fff', borderRadius: 12,
           border: '1px solid #FCA5A5', padding: 24,
         }}>
-          <h2 style={{ margin: 0, color: '#EF4444' }}>Лот не найден</h2>
+          <h2 style={{ margin: 0, color: '#EF4444' }}>Товар не найден</h2>
           <p style={{ fontSize: 13, color: '#6B7280', marginTop: 8 }}>
-            Штрих-код <code>{barcode}</code> не зарегистрирован
-            в системе или препарат не существует.
+            Штрих-код <code>{barcode}</code> не зарегистрирован в системе.
           </p>
           <a href="/scan" style={{
             display: 'inline-block', marginTop: 16,
@@ -160,16 +156,21 @@ export default function ScanBarcodePage({
     );
   }
 
-  // Продажа разрешена для AVAILABLE и EXPIRING_SOON: лот за месяц до
-  // истечения остаётся пригодным товаром, блокировка превратила бы его
-  // в гарантированное списание. Истёкшие отдельно ловятся через is_expired.
-  const isSellableStatus =
-    lot.status === 'available' || lot.status === 'expiring_soon';
-  const canSell =
-    isSellableStatus
-    && !lot.is_expired
-    && parseFloat(lot.current_quantity) > 0
-    && hasToken;
+  const isAccessory = item.source_kind === 'accessory';
+
+  const title = isAccessory
+    ? (item.nomenclature_name ?? '—')
+    : (item.drug_name ?? '—');
+  const subtitleSku = isAccessory ? item.nomenclature_sku : item.drug_sku;
+  const unitPrice = isAccessory ? item.sale_price_uzs : item.price_per_unit_uzs;
+
+  const canSell = (() => {
+    if (parseFloat(item.current_quantity) <= 0) return false;
+    if (!hasToken) return false;
+    if (isAccessory) return item.is_active;
+    const sellableStatus = item.status === 'available' || item.status === 'expiring_soon';
+    return sellableStatus && !item.is_expired;
+  })();
 
   return (
     <div style={{
@@ -182,29 +183,30 @@ export default function ScanBarcodePage({
         border: '1px solid #E5E7EB',
         padding: 20,
       }}>
-        {/* Status badge */}
         <div style={{
           display: 'inline-block',
           padding: '4px 12px',
           borderRadius: 20,
-          background: statusColor(lot.status),
+          background: isAccessory
+            ? (item.is_active ? '#10B981' : '#6B7280')
+            : statusColor(item.status),
           color: '#fff',
           fontSize: 12, fontWeight: 600,
           marginBottom: 12,
         }}>
-          {STATUS_LABEL[lot.status]}
+          {isAccessory
+            ? (item.is_active ? 'Аксессуар · в продаже' : 'Аксессуар · отключён')
+            : STATUS_LABEL[item.status]}
         </div>
 
-        {/* Drug name */}
         <h1 style={{ margin: 0, fontSize: 22, color: '#111827' }}>
-          {lot.drug_name ?? '—'}
+          {title}
         </h1>
         <div style={{ fontSize: 13, color: '#6B7280', marginTop: 4 }}>
-          <strong className="mono">{lot.drug_sku}</strong>
-          {lot.drug_type_display && <> · {lot.drug_type_display}</>}
+          <strong className="mono">{subtitleSku ?? '—'}</strong>
+          {!isAccessory && item.drug_type_display && <> · {item.drug_type_display}</>}
         </div>
 
-        {/* Big numbers */}
         <div style={{
           marginTop: 20,
           display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12,
@@ -217,9 +219,9 @@ export default function ScanBarcodePage({
               Остаток
             </div>
             <div style={{ fontSize: 24, fontWeight: 700, fontFamily: 'monospace' }}>
-              {parseFloat(lot.current_quantity).toLocaleString('ru-RU')}
+              {parseFloat(item.current_quantity).toLocaleString('ru-RU')}
               <span style={{ fontSize: 14, color: '#6B7280', marginLeft: 4 }}>
-                {lot.unit_code ?? ''}
+                {item.unit_code ?? ''}
               </span>
             </div>
           </div>
@@ -231,44 +233,53 @@ export default function ScanBarcodePage({
               Цена за ед.
             </div>
             <div style={{ fontSize: 18, fontWeight: 700, fontFamily: 'monospace' }}>
-              {fmtMoney(lot.price_per_unit_uzs)}
+              {fmtMoney(unitPrice)}
             </div>
           </div>
         </div>
 
-        {/* Detail */}
-        <div style={{ marginTop: 16, fontSize: 13 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0' }}>
-            <span style={{ color: '#6B7280' }}>Lot №</span>
-            <span className="mono">{lot.lot_number}</span>
+        {!isAccessory && (
+          <div style={{ marginTop: 16, fontSize: 13 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0' }}>
+              <span style={{ color: '#6B7280' }}>Lot №</span>
+              <span className="mono">{item.lot_number}</span>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0' }}>
+              <span style={{ color: '#6B7280' }}>Годен до</span>
+              <span style={{
+                color: item.is_expired
+                  ? '#EF4444'
+                  : item.is_expiring_soon
+                  ? '#F59E0B'
+                  : '#111827',
+                fontWeight: item.is_expired || item.is_expiring_soon ? 600 : 400,
+              }}>
+                {item.expiration_date}
+                {item.days_to_expiry !== null && (
+                  <span style={{ fontSize: 11, marginLeft: 6 }}>
+                    ({item.days_to_expiry < 0
+                      ? `истёк ${Math.abs(item.days_to_expiry)} дн назад`
+                      : `${item.days_to_expiry} дн`})
+                  </span>
+                )}
+              </span>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0' }}>
+              <span style={{ color: '#6B7280' }}>Штрих-код</span>
+              <span className="mono" style={{ fontSize: 11 }}>{item.barcode}</span>
+            </div>
           </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0' }}>
-            <span style={{ color: '#6B7280' }}>Годен до</span>
-            <span style={{
-              color: lot.is_expired
-                ? '#EF4444'
-                : lot.is_expiring_soon
-                ? '#F59E0B'
-                : '#111827',
-              fontWeight: lot.is_expired || lot.is_expiring_soon ? 600 : 400,
-            }}>
-              {lot.expiration_date}
-              {lot.days_to_expiry !== null && (
-                <span style={{ fontSize: 11, marginLeft: 6 }}>
-                  ({lot.days_to_expiry < 0
-                    ? `истёк ${Math.abs(lot.days_to_expiry)} дн назад`
-                    : `${lot.days_to_expiry} дн`})
-                </span>
-              )}
-            </span>
-          </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0' }}>
-            <span style={{ color: '#6B7280' }}>Штрих-код</span>
-            <span className="mono" style={{ fontSize: 11 }}>{lot.barcode}</span>
-          </div>
-        </div>
+        )}
 
-        {/* Sell area */}
+        {isAccessory && (
+          <div style={{ marginTop: 16, fontSize: 13 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0' }}>
+              <span style={{ color: '#6B7280' }}>Штрих-код</span>
+              <span className="mono" style={{ fontSize: 11 }}>{item.barcode}</span>
+            </div>
+          </div>
+        )}
+
         {canSell && !success && (
           <div style={{
             marginTop: 24, padding: 16,
@@ -279,8 +290,6 @@ export default function ScanBarcodePage({
               Продать <span style={{ fontSize: 11, color: '#6B7280' }}>(в продажу со склада)</span>
             </div>
 
-            {/* Опциональный select клиента. Скрыт если в орге нет ни одного
-                покупателя кроме «Розничный покупатель». */}
             {customers.length > 0 && (
               <div style={{ marginBottom: 10 }}>
                 <label style={{
@@ -340,17 +349,17 @@ export default function ScanBarcodePage({
               </button>
             </div>
             <div style={{ fontSize: 11, color: '#6B7280', marginTop: 6 }}>
-              Сумма: <strong>{fmtMoney(parseFloat(qty || '0') * parseFloat(lot.price_per_unit_uzs))}</strong>
+              Сумма: <strong>{fmtMoney(parseFloat(qty || '0') * parseFloat(unitPrice || '0'))}</strong>
             </div>
-            {lot.status === 'expiring_soon' && (
+            {!isAccessory && item.status === 'expiring_soon' && (
               <div style={{
                 marginTop: 10, padding: '8px 10px',
                 background: '#FFFBEB', borderRadius: 6,
                 border: '1px solid #F59E0B',
                 fontSize: 12, color: '#92400E',
               }}>
-                ⚠ Скоро истекает{lot.days_to_expiry !== null && (
-                  <> — осталось <b>{lot.days_to_expiry} дн</b></>
+                ⚠ Скоро истекает{item.days_to_expiry !== null && (
+                  <> — осталось <b>{item.days_to_expiry} дн</b></>
                 )}. Продавайте в первую очередь.
               </div>
             )}
@@ -371,14 +380,25 @@ export default function ScanBarcodePage({
           </div>
         )}
 
-        {!canSell && hasToken && lot.status !== 'available' && (
+        {!canSell && hasToken && !isAccessory && item.status !== 'available' && (
           <div style={{
             marginTop: 20, padding: 14,
             background: '#FEF2F2', borderRadius: 8,
             border: '1px solid #EF4444',
             fontSize: 13, color: '#991B1B',
           }}>
-            Продажа невозможна: {STATUS_LABEL[lot.status].toLowerCase()}.
+            Продажа невозможна: {STATUS_LABEL[item.status].toLowerCase()}.
+          </div>
+        )}
+
+        {!canSell && hasToken && isAccessory && (
+          <div style={{
+            marginTop: 20, padding: 14,
+            background: '#FEF2F2', borderRadius: 8,
+            border: '1px solid #EF4444',
+            fontSize: 13, color: '#991B1B',
+          }}>
+            Продажа невозможна: {!item.is_active ? 'товар отключён' : 'нулевой остаток'}.
           </div>
         )}
 

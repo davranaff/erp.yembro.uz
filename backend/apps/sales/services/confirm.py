@@ -98,9 +98,16 @@ def _resolve_inventory_subaccount(item: SaleItem, org) -> GLSubaccount:
     """
     Кредит для проводки себестоимости (Dr 90.02 / Cr X).
 
-    Источник:
-        nomenclature.default_gl_subaccount → category.default_gl_subaccount → 10.01
+    Приоритет источника:
+        1. vet_accessory → 41.01 «Товары для перепродажи» (фиксировано —
+           аксессуары не идут через category default чтобы не путать с
+           ветпрепаратами 10.03 у того же клиента)
+        2. nomenclature.default_gl_subaccount
+        3. category.default_gl_subaccount
+        4. 10.01 (fallback)
     """
+    if item.vet_accessory_id:
+        return _get_subaccount(org, "41.01")
     nom = item.nomenclature
     if nom.default_gl_subaccount_id:
         return nom.default_gl_subaccount
@@ -133,6 +140,10 @@ def _compute_cost_per_unit(item: SaleItem) -> Decimal:
         vsb = item.vet_stock_batch
         # У VetStockBatch уже есть price_per_unit_uzs (закупочная цена при приёмке).
         return _quantize_money(Decimal(vsb.price_per_unit_uzs or 0))
+    if item.vet_accessory_id:
+        # У VetAccessory cost_per_unit_uzs хранится прямо на карточке
+        # (weighted-avg, обновляется при receive).
+        return _quantize_money(Decimal(item.vet_accessory.cost_per_unit_uzs or 0))
     return Decimal("0.00")
 
 
@@ -217,6 +228,28 @@ def _check_and_decrement_source(item: SaleItem, qty: Decimal):
             vsb.status = VetStockBatch.Status.DEPLETED
             vsb.save(update_fields=["status", "updated_at"])
         return vsb
+
+    if item.vet_accessory_id:
+        from apps.vet.models import VetAccessory
+        va = VetAccessory.objects.select_for_update().get(pk=item.vet_accessory_id)
+        if not va.is_active:
+            raise SaleConfirmError(
+                {"items": (
+                    f"Аксессуар {va.nomenclature.sku} отключён — продажа невозможна."
+                )}
+            )
+        if Decimal(va.current_quantity) < qty:
+            raise SaleConfirmError(
+                {"items": (
+                    f"Недостаточно остатка аксессуара {va.nomenclature.sku}: "
+                    f"требуется {qty}, доступно {va.current_quantity}."
+                )}
+            )
+        VetAccessory.objects.filter(pk=va.pk).update(
+            current_quantity=F("current_quantity") - qty
+        )
+        va.refresh_from_db(fields=["current_quantity"])
+        return va
 
     raise SaleConfirmError({"items": "Item без указания источника партии."})
 
