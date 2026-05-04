@@ -5,7 +5,6 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ApiError, apiFetch } from '@/lib/api';
 import { makeCrud } from '@/lib/crudFactory';
 import type {
-  InterModuleTransfer,
   SlaughterLabTest,
   SlaughterQualityCheck,
   SlaughterShift,
@@ -102,30 +101,9 @@ export function useSlaughterTimeline(shiftId: string | null | undefined) {
   });
 }
 
-// ── Incoming transfers ────────────────────────────────────────────────
-
-export function useIncomingTransfers() {
-  return useQuery<InterModuleTransfer[], ApiError>({
-    queryKey: ['slaughter', 'incoming'],
-    queryFn: () =>
-      apiFetch<InterModuleTransfer[]>('/api/slaughter/shifts/incoming/'),
-    staleTime: 30_000,
-  });
-}
-
-export function useAcceptTransfer() {
-  const qc = useQueryClient();
-  return useMutation<unknown, ApiError, string>({
-    mutationFn: (transferId) =>
-      apiFetch(`/api/transfers/${transferId}/accept/`, { method: 'POST' }),
-    onSuccess: async () => {
-      // Принудительно перезапрашиваем все связанные данные.
-      // refetchType: 'all' — заставляет даже неактивные запросы обновиться.
-      await Promise.all([
-        qc.invalidateQueries({ queryKey: ['slaughter'], refetchType: 'all' }),
-        qc.invalidateQueries({ queryKey: ['transfers'], refetchType: 'all' }),
-        qc.invalidateQueries({ queryKey: ['batches'], refetchType: 'all' }),
-      ]);
-    },
-  });
-}
+// ── Incoming transfers (legacy) ────────────────────────────────────────
+//
+// Раньше slaughter имел свой endpoint `/api/slaughter/shifts/incoming/`
+// и локальную IncomingTransfersPanel. Теперь страница использует общий
+// компонент `@/components/IncomingTransfersPanel` с универсальным
+// endpoint `/api/transfers/incoming/?to_module=slaughter`. Хуки удалены.

@@ -1,12 +1,14 @@
 """
-Сервис `send_eggs_to_incubation` — переместить партию яиц из маточника
-в инкубацию за один клик.
+Сервис `send_eggs_to_incubation` — оператор маточника отправляет партию
+яиц в инкубацию.
 
 Создаёт `InterModuleTransfer` (matochnik → incubation) в состоянии
-AWAITING_ACCEPTANCE и сразу вызывает `accept_transfer`, который делает:
+AWAITING_ACCEPTANCE. **Не проводит** — это сделает оператор-приёмщик
+в инкубации через панель «Входящие партии» с явным выбором склада
+приёмки. После accept_transfer:
   - Парные StockMovement / JournalEntry (Dr 79.01 / Cr 10.02, ...).
   - Закрытие BatchChainStep маточника, открытие нового в инкубации.
-  - Обновление Batch.current_module=incubation.
+  - Обновление Batch.current_module=incubation, current_block=выбранный.
 
 Guards:
   - batch.origin_module.code == 'matochnik'
@@ -29,10 +31,6 @@ from apps.batches.models import Batch
 from apps.common.services.numbering import next_doc_number
 from apps.modules.models import Module
 from apps.transfers.models import InterModuleTransfer
-from apps.transfers.services.accept import (
-    accept_transfer,
-    TransferAcceptError,
-)
 from apps.warehouses.models import Warehouse
 
 
@@ -90,6 +88,25 @@ def send_eggs_to_incubation(
             )}
         )
 
+    # Защита от двойной отправки: если уже есть transfer в AWAITING/UNDER_REVIEW
+    # для этой партии — нельзя создавать второй. Раньше сервис сам делал
+    # accept, и батч уезжал в incubation за один шаг — теперь между send и
+    # accept есть «окно», в котором юзер мог нажать «Отправить» снова.
+    pending = InterModuleTransfer.objects.filter(
+        batch=batch,
+        state__in=[
+            InterModuleTransfer.State.AWAITING_ACCEPTANCE,
+            InterModuleTransfer.State.UNDER_REVIEW,
+        ],
+    ).exists()
+    if pending:
+        raise SendToIncubationError({
+            "__all__": (
+                "По этой партии уже есть передача, ожидающая приёма. "
+                "Дождитесь приёмки в инкубации или отмените текущую."
+            ),
+        })
+
     try:
         incubation_mod = Module.objects.get(code="incubation")
     except Module.DoesNotExist as exc:
@@ -99,16 +116,14 @@ def send_eggs_to_incubation(
 
     matochnik_mod = batch.origin_module  # уже matochnik
 
-    # Нужны warehouse-ы для StockMovement (accept_transfer).
+    # Источник нужен (StockMovement OUT при accept_transfer списывает с него).
+    # Целевой склад инкубации НЕ выбираем здесь — это решение оператора-
+    # приёмщика. После send_to_incubation transfer уходит в AWAITING_ACCEPTANCE,
+    # инкубатор увидит его в своей панели «Входящие», выберет склад приёмки
+    # из своих и нажмёт «Принять» (тогда уже сработает accept_transfer).
     from_wh = (
         Warehouse.objects
         .filter(organization=batch.organization, module=matochnik_mod, is_active=True)
-        .order_by("code")
-        .first()
-    )
-    to_wh = (
-        Warehouse.objects
-        .filter(organization=batch.organization, module=incubation_mod, is_active=True)
         .order_by("code")
         .first()
     )
@@ -116,13 +131,6 @@ def send_eggs_to_incubation(
         raise SendToIncubationError(
             {"__all__": (
                 "Не найден активный склад модуля 'matochnik'. "
-                "Создайте его в разделе Склады."
-            )}
-        )
-    if to_wh is None:
-        raise SendToIncubationError(
-            {"__all__": (
-                "Не найден активный склад модуля 'incubation'. "
                 "Создайте его в разделе Склады."
             )}
         )
@@ -134,7 +142,8 @@ def send_eggs_to_incubation(
         prefix="ММ",
     )
 
-    # Создаём transfer в AWAITING_ACCEPTANCE, чтобы accept_transfer принял.
+    # Создаём transfer в AWAITING_ACCEPTANCE — инкубация увидит его
+    # в панели «Входящие» и сама примет с выбором склада.
     transfer = InterModuleTransfer(
         organization=batch.organization,
         doc_number=doc_number,
@@ -142,9 +151,9 @@ def send_eggs_to_incubation(
         from_module=matochnik_mod,
         to_module=incubation_mod,
         from_block=batch.current_block,
-        to_block=None,  # инкубация сама определит
+        to_block=None,        # выберет приёмщик
         from_warehouse=from_wh,
-        to_warehouse=to_wh,
+        to_warehouse=None,    # выберет приёмщик
         nomenclature=batch.nomenclature,
         unit=batch.unit,
         quantity=batch.current_quantity,
@@ -158,15 +167,6 @@ def send_eggs_to_incubation(
     transfer.full_clean(exclude=None)
     transfer.save()
 
-    # Сразу проводим
-    try:
-        accept_transfer(transfer, user=user)
-    except TransferAcceptError as exc:
-        # Переупаковываем в нашу ошибку чтобы не ломать API-контракт
-        raise SendToIncubationError(
-            exc.message_dict if hasattr(exc, "message_dict") else exc.messages
-        ) from exc
-
     transfer.refresh_from_db()
     batch.refresh_from_db()
 
@@ -177,7 +177,7 @@ def send_eggs_to_incubation(
         action=AuditLog.Action.POST,
         entity=batch,
         action_verb=(
-            f"eggs {batch.doc_number} sent to incubation · "
+            f"eggs {batch.doc_number} sent to incubation (awaiting acceptance) · "
             f"transfer {transfer.doc_number}"
         ),
     )

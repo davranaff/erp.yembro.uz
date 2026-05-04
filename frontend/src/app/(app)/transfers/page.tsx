@@ -184,8 +184,19 @@ export default function TransfersPage() {
     catch (err) { alert(`Submit: ${err instanceof Error ? err.message : 'ошибка'}`); }
   };
   const handleAccept = async (t: InterModuleTransfer) => {
+    // На странице /transfers (админский журнал) accept без выбора склада —
+    // если to_warehouse уже задан в transfer, бэкенд проведёт. Если нет —
+    // вернёт 400 «не указан склад приёмки», админ откроет передачу
+    // в принимающем модуле через панель «Входящие» и выберет склад там.
     try { await accept.mutateAsync({ id: t.id }); setSel(null); }
-    catch (err) { alert(`Accept: ${err instanceof Error ? err.message : 'ошибка'}`); }
+    catch (err) {
+      const msg = err instanceof Error ? err.message : 'ошибка';
+      alert(
+        `Accept: ${msg}\n\n` +
+        `Если ошибка про склад — откройте модуль-приёмник (incubation/feedlot/...) → ` +
+        `панель «Входящие партии» → выберите склад при приёме.`,
+      );
+    }
   };
 
   const handleReview = async (t: InterModuleTransfer) => {

@@ -106,19 +106,25 @@ def batch(org, m_matochnik, egg_nomenclature, unit_kg, block):
     )
 
 
-def test_happy_path_creates_transfer_and_moves_batch(batch, m_incubation):
+def test_happy_path_creates_transfer_in_awaiting(batch, m_incubation, m_matochnik):
+    """После send_to_incubation: transfer создан в AWAITING_ACCEPTANCE,
+    партия ВСЁ ЕЩЁ в matочнике (не переехала). Переезд произойдёт когда
+    приёмщик инкубации нажмёт «Принять» в своей панели «Входящие» с
+    выбором склада.
+    """
     result = send_eggs_to_incubation(batch)
     batch.refresh_from_db()
-    assert batch.current_module_id == m_incubation.id
-    assert result.transfer.state == InterModuleTransfer.State.POSTED
-    # Есть BatchChainStep для incubation
-    steps = BatchChainStep.objects.filter(batch=batch).order_by("sequence")
-    assert steps.count() >= 1
-    last = steps.last()
-    assert last.module_id == m_incubation.id
+    # Партия ещё в matочнике — переезд только после accept_transfer.
+    assert batch.current_module_id == m_matochnik.id
+    assert result.transfer.state == InterModuleTransfer.State.AWAITING_ACCEPTANCE
+    # to_warehouse должен быть NULL — приёмщик выберет.
+    assert result.transfer.to_warehouse_id is None
+    assert result.transfer.from_warehouse_id is not None  # source задан
 
 
 def test_second_call_after_move_raises(batch, m_incubation):
+    """Повторная отправка той же партии — должна упасть, т.к. уже есть
+    активный transfer в AWAITING_ACCEPTANCE."""
     send_eggs_to_incubation(batch)
     with pytest.raises(ValidationError):
         send_eggs_to_incubation(batch)

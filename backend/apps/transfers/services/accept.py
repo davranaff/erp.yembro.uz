@@ -197,6 +197,19 @@ def accept_transfer(
             }
         )
 
+    # 2.1 to_warehouse обязателен. Раньше при NULL мы fallback'или на
+    # from_warehouse — партия физически переезжала в новый модуль, но
+    # числилась на складе отправителя. Теперь требуем явный выбор:
+    # FE показывает оператору-приёмщику модалку с selector складов
+    # своего модуля при нажатии «Принять».
+    if transfer.to_warehouse_id is None:
+        raise TransferAcceptError({
+            "to_warehouse": (
+                "Не указан склад приёмки. Откройте передачу и выберите "
+                "склад в модуле-приёмнике перед проводкой."
+            ),
+        })
+
     # 3. doc_number — до full_clean, т.к. поле NOT BLANK
     if not transfer.doc_number:
         transfer.doc_number = next_doc_number(

@@ -27,8 +27,8 @@ import type {
 } from '@/types/auth';
 
 import ConfirmDeleteWithReason from '@/components/ConfirmDeleteWithReason';
+import IncomingTransfersPanel from '@/components/IncomingTransfersPanel';
 
-import IncomingTransfersPanel from './IncomingTransfersPanel';
 import LabTestsPanel from './LabTestsPanel';
 import PostShiftModal from './PostShiftModal';
 import QualityCheckModal from './QualityCheckModal';
@@ -204,7 +204,11 @@ export default function SlaughterPage() {
         />
       </div>
 
-      <IncomingTransfersPanel />
+      <IncomingTransfersPanel
+        module="slaughter"
+        subtitle="ждут приёма из откорма"
+        invalidateKeys={[['slaughter']]}
+      />
 
       <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
         <Seg

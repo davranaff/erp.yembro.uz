@@ -1,13 +1,10 @@
 """
-Сервис `send_chicks_to_feedlot` — перевод суточных цыплят из инкубации в откорм.
+Сервис `send_chicks_to_feedlot` — оператор инкубации передаёт суточных
+цыплят в откорм.
 
-По образцу `apps/matochnik/services/send_to_incubation.py`.
-
-Создаёт `InterModuleTransfer(incubation → feedlot)` в state=AWAITING_ACCEPTANCE
-и сразу вызывает `accept_transfer` → POSTED.
-
-После: batch.current_module = feedlot, закрывается старый BatchChainStep
-инкубации, открывается новый в feedlot, создаются StockMovement/JE через 79.01.
+Создаёт `InterModuleTransfer(incubation → feedlot)` в state=AWAITING_ACCEPTANCE.
+**Не проводит** — это сделает оператор-приёмщик в откорме через панель
+«Входящие партии» с явным выбором склада.
 
 Guards:
     - batch.origin_module.code == 'incubation'
@@ -30,10 +27,6 @@ from apps.batches.models import Batch
 from apps.common.services.numbering import next_doc_number
 from apps.modules.models import Module
 from apps.transfers.models import InterModuleTransfer
-from apps.transfers.services.accept import (
-    accept_transfer,
-    TransferAcceptError,
-)
 from apps.warehouses.models import Warehouse
 
 
@@ -81,6 +74,22 @@ def send_chicks_to_feedlot(
             f"повторная передача невозможна."
         )})
 
+    # Защита от двойной отправки между send и accept (см. send_to_incubation).
+    pending = InterModuleTransfer.objects.filter(
+        batch=batch,
+        state__in=[
+            InterModuleTransfer.State.AWAITING_ACCEPTANCE,
+            InterModuleTransfer.State.UNDER_REVIEW,
+        ],
+    ).exists()
+    if pending:
+        raise SendToFeedlotError({
+            "__all__": (
+                "По этой партии уже есть передача, ожидающая приёма. "
+                "Дождитесь приёмки в откорме или отмените текущую."
+            ),
+        })
+
     try:
         feedlot_mod = Module.objects.get(code="feedlot")
     except Module.DoesNotExist as exc:
@@ -90,26 +99,18 @@ def send_chicks_to_feedlot(
 
     incubation_mod = batch.origin_module
 
-    # Склады обоих модулей — берём первый активный.
+    # Источник нужен (StockMovement OUT при accept_transfer спишет с него).
+    # Целевой склад выберет оператор-приёмщик (откорм) при accept через
+    # модалку «Куда принять?». Здесь оставляем to_warehouse=None.
     from_wh = (
         Warehouse.objects
         .filter(organization=batch.organization, module=incubation_mod, is_active=True)
         .order_by("code")
         .first()
     )
-    to_wh = (
-        Warehouse.objects
-        .filter(organization=batch.organization, module=feedlot_mod, is_active=True)
-        .order_by("code")
-        .first()
-    )
     if from_wh is None:
         raise SendToFeedlotError({"__all__": (
             "Не найден активный склад модуля 'incubation'. Создайте его в разделе Склады."
-        )})
-    if to_wh is None:
-        raise SendToFeedlotError({"__all__": (
-            "Не найден активный склад модуля 'feedlot'. Создайте его в разделе Склады."
         )})
 
     doc_number = next_doc_number(
@@ -125,9 +126,9 @@ def send_chicks_to_feedlot(
         from_module=incubation_mod,
         to_module=feedlot_mod,
         from_block=batch.current_block,
-        to_block=None,  # feedlot определит сам
+        to_block=None,        # выберет приёмщик
         from_warehouse=from_wh,
-        to_warehouse=to_wh,
+        to_warehouse=None,    # выберет приёмщик
         nomenclature=batch.nomenclature,
         unit=batch.unit,
         quantity=batch.current_quantity,
@@ -140,13 +141,6 @@ def send_chicks_to_feedlot(
     )
     transfer.full_clean(exclude=None)
     transfer.save()
-
-    try:
-        accept_transfer(transfer, user=user)
-    except TransferAcceptError as exc:
-        raise SendToFeedlotError(
-            exc.message_dict if hasattr(exc, "message_dict") else exc.messages
-        ) from exc
 
     transfer.refresh_from_db()
     batch.refresh_from_db()

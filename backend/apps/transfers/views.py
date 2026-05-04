@@ -95,9 +95,67 @@ class InterModuleTransferViewSet(OrgScopedModelViewSet):
 
     @action(detail=True, methods=["post"])
     def accept(self, request, pk=None):
-        """AWAITING/UNDER_REVIEW → POSTED (atomic, создаёт JE + SM + chain step)."""
+        """AWAITING/UNDER_REVIEW → POSTED (atomic, создаёт JE + SM + chain step).
+
+        Body (опционально):
+            {
+                "to_warehouse_id": "<uuid>",   # склад приёмки
+                "to_block_id": "<uuid>"        # блок (опционально)
+            }
+
+        Эти поля переписывают `transfer.to_warehouse` / `to_block` ДО
+        проводки. Это нужно когда отправитель не знал, на какой склад
+        receiver хочет принять — выбор делает оператор-приёмщик в момент
+        accept. После проводки accept_transfer проверит что to_warehouse
+        задан (см. apps/transfers/services/accept.py — guard).
+
+        Валидация: warehouse/block должны принадлежать `to_module`
+        transfer-а и той же организации (то же что в Transfer.clean()).
+        """
+        from apps.warehouses.models import ProductionBlock, Warehouse
+
+        transfer = self.get_object()
+        wh_id = request.data.get("to_warehouse_id")
+        block_id = request.data.get("to_block_id")
+        updates: list[str] = []
+
+        if wh_id:
+            try:
+                wh = Warehouse.objects.get(
+                    id=wh_id,
+                    organization=transfer.organization,
+                    module=transfer.to_module,
+                )
+            except Warehouse.DoesNotExist:
+                raise DRFValidationError({
+                    "to_warehouse_id": (
+                        "Склад не найден или не принадлежит модулю-приёмнику."
+                    ),
+                })
+            transfer.to_warehouse = wh
+            updates.append("to_warehouse")
+
+        if block_id:
+            try:
+                block = ProductionBlock.objects.get(
+                    id=block_id,
+                    organization=transfer.organization,
+                    module=transfer.to_module,
+                )
+            except ProductionBlock.DoesNotExist:
+                raise DRFValidationError({
+                    "to_block_id": (
+                        "Блок не найден или не принадлежит модулю-приёмнику."
+                    ),
+                })
+            transfer.to_block = block
+            updates.append("to_block")
+
+        if updates:
+            transfer.save(update_fields=updates + ["updated_at"])
+
         try:
-            result = accept_transfer(self.get_object(), user=request.user)
+            result = accept_transfer(transfer, user=request.user)
         except TransferAcceptError as exc:
             raise DRFValidationError(
                 exc.message_dict if hasattr(exc, "message_dict") else exc.messages
