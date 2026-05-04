@@ -1010,7 +1010,25 @@ export default function FeedPage() {
                       { k: 'Цена за кг', v: fmtNum(selRaw.price_per_unit_uzs, 2) + ' сум', mono: true },
                       { k: 'Сумма закупа', v: fmtNum(selRaw.total_cost_uzs, 0) + ' сум', mono: true },
                     ] : []),
+                    {
+                      k: 'Изначально принято',
+                      v: `${fmtNum(selRaw.settlement_weight_kg ?? selRaw.quantity, 3)} ${selRaw.unit_code ?? ''}`,
+                      mono: true,
+                    },
                     { k: 'Остаток на складе', v: `${fmtNum(selRaw.current_quantity, 3)} ${selRaw.unit_code ?? ''}`, mono: true },
+                    // Дельта = списано (продажи + усушка). Подсветим если ушло заметно.
+                    ...(() => {
+                      const initial = parseFloat(selRaw.settlement_weight_kg ?? selRaw.quantity);
+                      const remain = parseFloat(selRaw.current_quantity);
+                      const delta = initial - remain;
+                      if (Number.isNaN(delta) || delta <= 0) return [];
+                      const pct = initial > 0 ? (delta / initial) * 100 : 0;
+                      return [{
+                        k: 'Списано (всего)',
+                        v: `${fmtNum(String(delta), 3)} ${selRaw.unit_code ?? ''} · ${pct.toFixed(2)}%`,
+                        mono: true,
+                      }];
+                    })(),
                     { k: 'Карантин до', v: selRaw.quarantine_until ?? '—', mono: true },
                     ...(selRaw.rejection_reason ? [{ k: 'Причина отклонения', v: selRaw.rejection_reason }] : []),
                     ...(selRaw.notes ? [{ k: 'Заметка', v: selRaw.notes }] : []),

@@ -56,19 +56,44 @@ export default function StateDetailDrawer({ state, onClose }: Props) {
   const reset = useResetShrinkage();
 
   const [error, setError] = useState<string | null>(null);
+  const [info, setInfo] = useState<string | null>(null);
 
   const initial = parseFloat(state.initial_quantity);
   const lost = parseFloat(state.accumulated_loss);
   const remaining = Math.max(0, initial - lost);
   const lostPct = state.accumulated_percent ? parseFloat(state.accumulated_percent) : 0;
 
+  // Понятные тексты для skipped_reason. По умолчанию endpoint отвечает
+  // 200 OK даже если ничего не списали — без явного сообщения юзер
+  // нажимает «Пересчитать» и думает что кнопка сломана.
+  const SKIP_LABEL: Record<string, string> = {
+    already_applied_today: 'Сегодня уже применяли — следующий цикл по расписанию.',
+    not_enough_days: 'Слишком мало дней с прошлого периода — ещё рано.',
+    grace_period: 'Партия ещё в грейс-периоде после приёмки.',
+    frozen: 'Партия заморожена (достигнут max или stop_after_days).',
+    no_profile: 'Нет активного профиля для этой партии.',
+    lot_depleted: 'Остаток партии = 0.',
+    zero_loss: 'Расчёт дал 0 кг (округление).',
+  };
+
   const handleApply = async () => {
     setError(null);
+    setInfo(null);
     try {
-      await apply.mutateAsync({
+      const res = await apply.mutateAsync({
         lot_type: state.lot_type,
         lot_id: state.lot_id,
       });
+      // Result может быть ShrinkageApplyResult (одна партия) или summary
+      // (несколько). Здесь всегда первый кейс — мы передаём lot_id.
+      const r = res as { skipped?: boolean; skipped_reason?: string; loss_kg?: string };
+      if (r.skipped) {
+        setInfo(SKIP_LABEL[r.skipped_reason ?? ''] ?? `Пропущено: ${r.skipped_reason ?? '—'}`);
+      } else if (r.loss_kg) {
+        setInfo(`✓ Списано ${parseFloat(r.loss_kg).toLocaleString('ru-RU')} кг.`);
+      } else {
+        setInfo('✓ Прогон выполнен.');
+      }
     } catch (e) {
       setError((e as ApiError).message || 'Не удалось пересчитать');
     }
@@ -225,6 +250,16 @@ export default function StateDetailDrawer({ state, onClose }: Props) {
         </>
       )}
 
+      {info && (
+        <div style={{
+          marginTop: 12, padding: '8px 10px',
+          fontSize: 12, color: 'var(--fg-1)',
+          background: 'color-mix(in srgb, var(--brand-orange) 12%, transparent)',
+          borderLeft: '3px solid var(--brand-orange)', borderRadius: 4,
+        }}>
+          {info}
+        </div>
+      )}
       {error && (
         <div style={{ marginTop: 12, fontSize: 12, color: 'var(--danger)' }}>{error}</div>
       )}
