@@ -101,6 +101,25 @@ def hatch_incubation_run(
             {"status": f"Нельзя выводить: статус {run.get_status_display()}."}
         )
 
+    # Защита от lifecycle-операций над партией, которая уже отправлена в
+    # другой модуль и ждёт приёма. Если egg-батч уехал в feedlot
+    # (теоретически — не должен, но через ручной transfer возможно) —
+    # нельзя выводить из него цыплят: его уже нет физически в инкубации.
+    from apps.transfers.models import InterModuleTransfer
+    if run.batch_id and InterModuleTransfer.objects.filter(
+        batch=run.batch,
+        state__in=[
+            InterModuleTransfer.State.AWAITING_ACCEPTANCE,
+            InterModuleTransfer.State.UNDER_REVIEW,
+        ],
+    ).exists():
+        raise IncubationHatchError({
+            "__all__": (
+                f"По партии {run.batch.doc_number} есть открытая передача "
+                f"в другой модуль. Сначала примите/отмените её, потом выводите."
+            ),
+        })
+
     # Накладываем переданные значения
     if hatched_count is not None:
         run.hatched_count = hatched_count

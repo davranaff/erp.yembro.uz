@@ -203,6 +203,42 @@ def test_ship_withdrawal_period_blocks(
         )
 
 
+def test_ship_pending_transfer_blocks(
+    feedlot_batch, slaughter_line, slaughter_wh, feedlot_wh, chick_batch
+):
+    """Если по партии уже есть открытая передача (AWAITING/UNDER_REVIEW)
+    — повторный ship невозможен. Защищает от двойной отправки между
+    созданием transfer-а и его accept-ом."""
+    from datetime import datetime, timezone
+    from decimal import Decimal as D
+    from apps.transfers.models import InterModuleTransfer
+
+    InterModuleTransfer.objects.create(
+        organization=feedlot_batch.organization,
+        doc_number="ММ-DUP-1",
+        transfer_date=datetime.now(timezone.utc),
+        from_module=feedlot_batch.module,
+        to_module=slaughter_line.module,
+        from_warehouse=feedlot_wh,
+        to_warehouse=slaughter_wh,
+        nomenclature=chick_batch.nomenclature,
+        unit=chick_batch.unit,
+        quantity=D("100"),
+        cost_uzs=D("0"),
+        batch=chick_batch,
+        state=InterModuleTransfer.State.AWAITING_ACCEPTANCE,
+    )
+    with pytest.raises(ValidationError) as exc:
+        ship_to_slaughter(
+            feedlot_batch,
+            slaughter_line=slaughter_line,
+            slaughter_warehouse=slaughter_wh,
+            source_warehouse=feedlot_wh,
+        )
+    # Должна быть упомянута «передача, ожидающая приёма»
+    assert "ожидающая приёма" in str(exc.value)
+
+
 def test_ship_slaughter_line_wrong_module_raises(
     feedlot_batch, slaughter_wh, feedlot_wh, feedlot_house
 ):

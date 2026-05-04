@@ -1279,6 +1279,17 @@ export interface Batch {
   origin_purchase: string | null;
   origin_counterparty: string | null;
   notes: string;
+  /**
+   * Если по партии есть открытая межмодульная передача (AWAITING / UNDER_REVIEW)
+   * — здесь summary для FE-бейджа «в пути → <модуль>».
+   */
+  pending_transfer?: {
+    id: string;
+    doc_number: string;
+    to_module_code: string | null;
+    to_module_name: string | null;
+    state: 'awaiting_acceptance' | 'under_review';
+  } | null;
   created_at: string;
   updated_at: string;
 }

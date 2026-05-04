@@ -1,5 +1,6 @@
 'use client';
 
+import PendingTransferBadge from '@/components/PendingTransferBadge';
 import Badge from '@/components/ui/Badge';
 import DataTable from '@/components/ui/DataTable';
 import EmptyState from '@/components/ui/EmptyState';
@@ -33,10 +34,12 @@ const STATE_TONE: Record<string, 'success' | 'info' | 'neutral' | 'danger' | 'wa
   review: 'warn',
 };
 
-/** Партию можно отправить в инкубацию только если она в маточнике и активна. */
+/** Партию можно отправить в инкубацию только если она в маточнике, активна
+ * и нет открытой передачи (если уже отправили — кнопку прячем, ждём accept). */
 function canSendToIncubation(b: Batch): boolean {
   if (b.state !== 'active') return false;
   if (parseFloat(b.current_quantity) <= 0) return false;
+  if (b.pending_transfer) return false;
   const cur = b.current_module_code ?? b.origin_module_code;
   return cur === 'matochnik';
 }
@@ -103,9 +106,12 @@ export default function EggBatchesPanel({ herd }: Props) {
             render: (b) => b.current_module_code ?? b.origin_module_code },
           { key: 'state', label: 'Статус',
             render: (b) => (
-              <Badge tone={STATE_TONE[b.state] ?? 'neutral'}>
-                {STATE_LABEL[b.state] ?? b.state}
-              </Badge>
+              <span style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }}>
+                <Badge tone={STATE_TONE[b.state] ?? 'neutral'}>
+                  {STATE_LABEL[b.state] ?? b.state}
+                </Badge>
+                <PendingTransferBadge batch={b} />
+              </span>
             ) },
           { key: 'actions', label: '', align: 'right', width: 60,
             render: (b) => (

@@ -99,6 +99,25 @@ def ship_to_slaughter(
             {"batch": "Партия сейчас не в модуле этой фабрики откорма."}
         )
 
+    # Защита от двойной отправки: если по этой партии уже есть открытый
+    # transfer (AWAITING/UNDER_REVIEW) — нельзя инициировать ещё один.
+    # Сначала пусть приёмщик примет (или sender отменит).
+    pending = InterModuleTransfer.objects.filter(
+        batch=batch,
+        state__in=[
+            InterModuleTransfer.State.AWAITING_ACCEPTANCE,
+            InterModuleTransfer.State.UNDER_REVIEW,
+        ],
+    ).exists()
+    if pending:
+        raise ShipToSlaughterError({
+            "__all__": (
+                f"По партии {batch.doc_number} уже есть передача, "
+                f"ожидающая приёма. Дождитесь приёма в целевом модуле "
+                f"или отмените её."
+            ),
+        })
+
     # Модуль убоя
     try:
         slaughter_module = Module.objects.get(code="slaughter")

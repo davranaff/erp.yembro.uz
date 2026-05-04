@@ -123,6 +123,7 @@ class BatchSerializer(FinancialFieldsMixin, serializers.ModelSerializer):
     parent_doc_number = serializers.SerializerMethodField()
     reserved_quantity = serializers.SerializerMethodField()
     available_quantity = serializers.SerializerMethodField()
+    pending_transfer = serializers.SerializerMethodField()
 
     class Meta:
         model = Batch
@@ -154,6 +155,7 @@ class BatchSerializer(FinancialFieldsMixin, serializers.ModelSerializer):
             "current_block_code",
             "origin_module_code",
             "parent_doc_number",
+            "pending_transfer",
             "created_at",
             "updated_at",
         )
@@ -218,3 +220,35 @@ class BatchSerializer(FinancialFieldsMixin, serializers.ModelSerializer):
         if avail < 0:
             avail = Decimal("0")
         return str(avail)
+
+    def get_pending_transfer(self, obj):
+        """Если по этой партии есть InterModuleTransfer в AWAITING_ACCEPTANCE
+        или UNDER_REVIEW — отдаём краткую инфу для FE-бейджа «в пути».
+
+        UI рендерит «→ <to_module> · <doc>» в карточке/строке партии,
+        чтобы оператор-отправитель видел: партия ушла, ждёт приёма
+        (а не «исчезла» как раньше при auto-accept).
+        """
+        from apps.transfers.models import InterModuleTransfer
+        t = (
+            InterModuleTransfer.objects
+            .filter(
+                batch=obj,
+                state__in=[
+                    InterModuleTransfer.State.AWAITING_ACCEPTANCE,
+                    InterModuleTransfer.State.UNDER_REVIEW,
+                ],
+            )
+            .select_related("to_module")
+            .order_by("-created_at")
+            .first()
+        )
+        if t is None:
+            return None
+        return {
+            "id": str(t.id),
+            "doc_number": t.doc_number,
+            "to_module_code": t.to_module.code if t.to_module_id else None,
+            "to_module_name": t.to_module.name if t.to_module_id else None,
+            "state": t.state,
+        }
