@@ -23,7 +23,7 @@ def test_cash_command_renders(tg_link, fake_send):
     dispatch_message(_msg(tg_link.chat_id, "/cash"))
     text = fake_send.calls[0][1]
     assert "Касса и банк" in text
-    assert "Итого" in text
+    assert "Всего" in text
 
 
 def test_debt_command_empty_state(tg_link, fake_send):
@@ -67,7 +67,8 @@ def test_debt_command_lists_top_debtor(tg_link, fake_send, org):
 def test_pnl_command_renders_for_week(tg_link, fake_send):
     dispatch_message(_msg(tg_link.chat_id, "/pnl week"))
     text = fake_send.calls[0][1]
-    assert "P&L" in text
+    # «&amp;» из-за HTML-эскейпа в "P&L"
+    assert "P&amp;L" in text or "P&L" in text
     assert "Доходы" in text and "Расходы" in text and "Прибыль" in text
 
 
@@ -76,3 +77,57 @@ def test_sales_command_empty_state(tg_link, fake_send):
     text = fake_send.calls[0][1]
     assert "Продажи" in text
     assert "Документов:" in text
+
+
+# ─── /cred — регрессия на FieldError(supplier→counterparty) ─────────────
+
+
+def test_cred_callback_renders_without_crash(tg_link, fake_send, org):
+    """Регрессия: PurchaseOrder.supplier не существует — было FieldError.
+    Поле называется counterparty. Колбек не должен падать."""
+    from apps.tgbot.dispatcher import dispatch_callback
+    dispatch_callback({
+        "id": "cbq-cred",
+        "data": "fin:cred",
+        "message": {"chat": {"id": tg_link.chat_id}, "message_id": 42},
+    })
+    all_text = " ".join(t for _, _, t, _ in fake_send.edits) + " ".join(
+        t for _, t, _ in fake_send.calls
+    )
+    assert "Кредиторка" in all_text
+    # Не падает = главное; пустой БД отдаст «Все закупки оплачены».
+
+
+def test_cred_callback_lists_top_supplier(tg_link, fake_send, org):
+    from apps.counterparties.models import Counterparty
+    from apps.modules.models import Module
+    from apps.purchases.models import PurchaseOrder
+    from apps.warehouses.models import Warehouse
+
+    m_vet = Module.objects.get(code="vet")
+    cp = Counterparty.objects.create(
+        organization=org, code="К-CRED", kind="supplier", name="Поставщик-CRED",
+    )
+    wh = Warehouse.objects.create(
+        organization=org, module=m_vet, code="СК-CRED", name="Скл CRED",
+    )
+    PurchaseOrder.objects.create(
+        organization=org, module=m_vet,
+        doc_number="ПЛ-CRED-1", date=date.today(),
+        counterparty=cp, warehouse=wh,
+        amount_uzs=Decimal("12000000"),
+        paid_amount_uzs=Decimal("0"),
+        status=PurchaseOrder.Status.CONFIRMED,
+        payment_status=PurchaseOrder.PaymentStatus.UNPAID,
+    )
+    from apps.tgbot.dispatcher import dispatch_callback
+    dispatch_callback({
+        "id": "cbq-cred-2",
+        "data": "fin:cred",
+        "message": {"chat": {"id": tg_link.chat_id}, "message_id": 99},
+    })
+    all_text = " ".join(t for _, _, t, _ in fake_send.edits) + " ".join(
+        t for _, t, _ in fake_send.calls
+    )
+    assert "Поставщик-CRED" in all_text
+    assert "ПЛ-CRED-1" in all_text
