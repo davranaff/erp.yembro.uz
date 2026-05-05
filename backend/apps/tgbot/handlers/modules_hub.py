@@ -33,14 +33,15 @@ PRODUCTION_MODULE_CODES = [
     "feed", "vet", "stock",
 ]
 
+# Чистые узбекские названия модулей (бизнес-стандарт, без сленга).
 MODULE_LABELS_UZ = {
-    "matochnik":  "🐔 Onalik",
+    "matochnik":  "🐔 Naslchilik",          # племенное стадо
     "incubation": "🥚 Inkubatsiya",
-    "feedlot":    "🍗 Bo'rdoqi",
-    "slaughter":  "🔪 So'yish",
-    "feed":       "🌾 Yem-xashak",
-    "vet":        "💊 Vet-aptek",
-    "stock":      "📦 Ombor",
+    "feedlot":    "🍗 Bo'rdoqi fabrikasi",  # фабрика откорма
+    "slaughter":  "🔪 So'yishxona",         # цех убоя
+    "feed":       "🌾 Yem ishlab chiqarish",
+    "vet":        "💊 Veterinariya",
+    "stock":      "📦 Ombor xo'jaligi",
     "sales":      "💼 Sotuvlar",
     "purchases":  "🛒 Xaridlar",
     "ledger":     "📒 Buxgalteriya",
@@ -134,7 +135,22 @@ def handle_module_hub_callback(ctx: HandlerCtx) -> None:
 
 
 def _render_module_hub(ctx: HandlerCtx, *, module_code: str) -> None:
-    """Сводка по модулю: финансы (касса/прибыль) + склады + партии."""
+    """Сводка по модулю — ЧЕСТНАЯ, cash-aware:
+
+    Раньше показывали Foyda через JournalEntry (accrual) — продал на 25М,
+    в hub писали «+25М foyda» хотя клиент дал 0. Теперь:
+      - Sotildi (otgruzilgan): из SaleOrder.amount_uzs
+      - To'landi (kassa):     SaleOrder.paid_amount_uzs
+      - Qarz (mijoz qarz):    разница
+
+      - Xarid qilindi:        PurchaseOrder.amount_uzs
+      - To'landi:             PurchaseOrder.paid_amount_uzs
+      - Qarz biz:             разница
+
+    Нигде нет «Foyda» — она требует учёта себестоимости и не может быть
+    cash-honest без отдельной оценки. Лучше показать факт, чем красивую
+    но врущую цифру.
+    """
     from apps.modules.models import Module
 
     org = ctx.org()
@@ -146,17 +162,30 @@ def _render_module_hub(ctx: HandlerCtx, *, module_code: str) -> None:
 
     lines = [f"{_label(module_code)}", f"<i>{module.name}</i>", ""]
 
-    # 1. Финансы по модулю — sum(JE) за последние 30 дней
-    fin = _module_finance_30d(org, module)
-    lines.append("<b>💰 Moliya (oxirgi 30 kun):</b>")
-    lines.append(f"  Daromad:  <code>{_fmt_money(fin['revenue'])}</code> so'm")
-    lines.append(f"  Xarajat:  <code>{_fmt_money(fin['expense'])}</code> so'm")
-    profit = fin['revenue'] - fin['expense']
-    sign = "+" if profit >= 0 else "−"
-    lines.append(
-        f"  Foyda:    <b>{sign}{_fmt_money(abs(profit))}</b> so'm"
-    )
-    lines.append("")
+    # 1. Cash-honest финансы (30 дней)
+    cash = _module_cash_view(org, module_code, days=30)
+    if cash["sales_invoiced"] > 0 or cash["purchases_invoiced"] > 0:
+        lines.append("<b>💰 Moliya (30 kun):</b>")
+        if cash["sales_invoiced"] > 0:
+            lines.append(
+                f"  📤 Sotildi:    <code>{_fmt_money(cash['sales_invoiced'])}</code> so'm"
+            )
+            lines.append(
+                f"     ↳ to'landi: <code>{_fmt_money(cash['sales_paid'])}</code> · "
+                f"qarz: <b>{_fmt_money(cash['sales_debt'])}</b>"
+            )
+        if cash["purchases_invoiced"] > 0:
+            lines.append(
+                f"  📥 Xaridlar:   <code>{_fmt_money(cash['purchases_invoiced'])}</code> so'm"
+            )
+            lines.append(
+                f"     ↳ to'landi: <code>{_fmt_money(cash['purchases_paid'])}</code> · "
+                f"qarz biz: <b>{_fmt_money(cash['purchases_debt'])}</b>"
+            )
+        lines.append("")
+    else:
+        lines.append("<i>Oxirgi 30 kunda sotuv/xarid yo'q.</i>")
+        lines.append("")
 
     # 2. Склады модуля
     wh_summary = _module_warehouses_summary(org, module)
@@ -168,7 +197,7 @@ def _render_module_hub(ctx: HandlerCtx, *, module_code: str) -> None:
             lines.append(f"  … va yana {wh_summary['count'] - 5} ta")
         lines.append("")
 
-    # 3. Партии (если применимо)
+    # 3. Партии
     lots = _module_lots_summary(org, module_code)
     if lots:
         lines.append(f"<b>📋 Partiyalar:</b>")
@@ -180,35 +209,73 @@ def _render_module_hub(ctx: HandlerCtx, *, module_code: str) -> None:
     _send_or_edit(ctx, "\n".join(lines), markup)
 
 
-def _module_finance_30d(org, module) -> dict:
-    """Доход/расход модуля за последние 30 дней через JournalEntry.module FK."""
+def _module_cash_view(org, module_code: str, *, days: int) -> dict:
+    """Cash-honest cum-aggregat по модулю за period.
+
+    Sales: distinct SaleOrder где есть item с source-FK этого модуля.
+    Purchases: PurchaseOrder.module прямо.
+    Возвращаем: invoiced/paid/debt для каждой стороны.
+    """
     from datetime import date, timedelta
-    from django.db.models import Sum
-    from apps.accounting.models import GLAccount, JournalEntry
+    from django.db.models import Q, Sum
+    from apps.purchases.models import PurchaseOrder
+    from apps.sales.models import SaleOrder
 
     today = date.today()
-    df = today - timedelta(days=30)
+    df = today - timedelta(days=days)
 
-    # Доходы (account.type=income, kredit JE по нашему модулю)
-    revenue = (
-        JournalEntry.objects
-        .filter(
-            organization=org, module=module,
-            entry_date__gte=df, entry_date__lte=today,
-            credit_subaccount__account__type=GLAccount.Type.INCOME,
-        )
-        .aggregate(s=Sum("amount_uzs"))["s"] or Decimal("0")
+    # Продажи модуля: фильтр по source-FK item'ов.
+    so_qs = SaleOrder.objects.filter(
+        organization=org, status=SaleOrder.Status.CONFIRMED,
+        date__gte=df, date__lte=today,
     )
-    expense = (
-        JournalEntry.objects
-        .filter(
-            organization=org, module=module,
-            entry_date__gte=df, entry_date__lte=today,
-            debit_subaccount__account__type=GLAccount.Type.EXPENSE,
+    if module_code == "feed":
+        so_qs = so_qs.filter(
+            Q(items__feed_batch__isnull=False)
+            | Q(items__feed_bag_lot__isnull=False)
         )
-        .aggregate(s=Sum("amount_uzs"))["s"] or Decimal("0")
+    elif module_code == "vet":
+        so_qs = so_qs.filter(
+            Q(items__vet_stock_batch__isnull=False)
+            | Q(items__vet_accessory__isnull=False)
+        )
+    elif module_code in ("matochnik", "incubation", "feedlot", "slaughter"):
+        so_qs = so_qs.filter(items__batch__current_module__code=module_code)
+    else:
+        # stock — нет специфичной привязки sale-item, отдаём пусто
+        so_qs = so_qs.none()
+
+    so_agg = so_qs.distinct().aggregate(
+        invoiced=Sum("amount_uzs"),
+        paid=Sum("paid_amount_uzs"),
     )
-    return {"revenue": revenue, "expense": expense}
+    sales_invoiced = Decimal(so_agg["invoiced"] or 0)
+    sales_paid = Decimal(so_agg["paid"] or 0)
+
+    # Закупки модуля — прямой module FK на PurchaseOrder.
+    po_agg = (
+        PurchaseOrder.objects
+        .filter(
+            organization=org, module__code=module_code,
+            status=PurchaseOrder.Status.CONFIRMED,
+            date__gte=df, date__lte=today,
+        )
+        .aggregate(
+            invoiced=Sum("amount_uzs"),
+            paid=Sum("paid_amount_uzs"),
+        )
+    )
+    purchases_invoiced = Decimal(po_agg["invoiced"] or 0)
+    purchases_paid = Decimal(po_agg["paid"] or 0)
+
+    return {
+        "sales_invoiced": sales_invoiced,
+        "sales_paid": sales_paid,
+        "sales_debt": sales_invoiced - sales_paid,
+        "purchases_invoiced": purchases_invoiced,
+        "purchases_paid": purchases_paid,
+        "purchases_debt": purchases_invoiced - purchases_paid,
+    }
 
 
 def _module_warehouses_summary(org, module) -> dict:
@@ -342,122 +409,94 @@ def handle_report_module_callback(ctx: HandlerCtx) -> None:
 
 
 def _render_module_report(ctx: HandlerCtx, *, module_code: str) -> None:
-    """Детальная аналитика модуля: финансы за неделю/месяц, обороты, KPI."""
-    from datetime import date, timedelta
-    from django.db.models import Sum
+    """Детальная аналитика модуля — cash-honest, без обманчивого «Foyda».
+
+    Раньше выводили Daromad/Xarajat/Foyda через JournalEntry — это
+    accrual (по факту накладной), а не cash. У клиента долг 24M, в
+    Foyda стояло «+25M» — пользователь возмущался.
+
+    Теперь чисто:
+      - Sotuv (otgruzilgan / to'langan / qarz)
+      - Xarid (olingan / to'langan / qarz biz)
+      - Per-module: кол-во партий
+
+    Сравнение 7 vs 30 дней показывает динамику.
+    """
     from apps.modules.models import Module
 
     org = ctx.org()
     try:
-        module = Module.objects.get(code=module_code)
+        Module.objects.get(code=module_code)
     except Module.DoesNotExist:
         send_message(ctx.chat_id, "Modul topilmadi.")
         return
 
-    today = date.today()
-    df_week = today - timedelta(days=7)
-    df_month = today - timedelta(days=30)
-
-    fin_week = _module_finance_range(org, module, df_week, today)
-    fin_month = _module_finance_range(org, module, df_month, today)
+    week = _module_cash_view(org, module_code, days=7)
+    month = _module_cash_view(org, module_code, days=30)
 
     lines = [
         f"📊 {_label(module_code)} · <b>analitika</b>",
         "",
-        "<b>7 kun:</b>",
-        f"  Daromad:  <code>{_fmt_money(fin_week['revenue'])}</code>",
-        f"  Xarajat:  <code>{_fmt_money(fin_week['expense'])}</code>",
-        f"  Foyda:    <b>{_fmt_signed(fin_week['revenue'] - fin_week['expense'])}</b>",
-        "",
-        "<b>30 kun:</b>",
-        f"  Daromad:  <code>{_fmt_money(fin_month['revenue'])}</code>",
-        f"  Xarajat:  <code>{_fmt_money(fin_month['expense'])}</code>",
-        f"  Foyda:    <b>{_fmt_signed(fin_month['revenue'] - fin_month['expense'])}</b>",
     ]
 
-    # Module-specific KPI
-    if module_code == "sales":
-        from apps.sales.models import SaleOrder
-        agg = (
-            SaleOrder.objects
-            .filter(
-                organization=org, status=SaleOrder.Status.CONFIRMED,
-                date__gte=df_month, date__lte=today,
-            )
-            .aggregate(
-                total=Sum("amount_uzs"),
-                paid=Sum("paid_amount_uzs"),
-            )
+    # Sales-блок (если есть данные)
+    if month["sales_invoiced"] > 0 or week["sales_invoiced"] > 0:
+        lines.append("<b>📤 Sotuvlar (7 / 30 kun):</b>")
+        lines.append(
+            f"  Otgruzilgan: "
+            f"<code>{_fmt_money(week['sales_invoiced'])}</code> / "
+            f"<code>{_fmt_money(month['sales_invoiced'])}</code>"
         )
-        total = Decimal(agg["total"] or 0)
-        paid = Decimal(agg["paid"] or 0)
-        debt = total - paid
-        lines.append("")
-        lines.append("<b>Sotuvlar (30 kun):</b>")
-        lines.append(f"  Otgruzilgan: <code>{_fmt_money(total)}</code>")
-        lines.append(f"  To'langan:   <code>{_fmt_money(paid)}</code>")
-        lines.append(f"  Qarz:        <code>{_fmt_money(debt)}</code>")
-    elif module_code == "purchases":
-        from apps.purchases.models import PurchaseOrder
-        agg = (
-            PurchaseOrder.objects
-            .filter(
-                organization=org, status=PurchaseOrder.Status.CONFIRMED,
-                date__gte=df_month, date__lte=today,
-            )
-            .aggregate(
-                total=Sum("amount_uzs"),
-                paid=Sum("paid_amount_uzs"),
-            )
+        lines.append(
+            f"  To'langan:   "
+            f"<code>{_fmt_money(week['sales_paid'])}</code> / "
+            f"<code>{_fmt_money(month['sales_paid'])}</code>"
         )
-        total = Decimal(agg["total"] or 0)
-        paid = Decimal(agg["paid"] or 0)
-        debt = total - paid
+        lines.append(
+            f"  Qarz:        "
+            f"<code>{_fmt_money(week['sales_debt'])}</code> / "
+            f"<b>{_fmt_money(month['sales_debt'])}</b>"
+        )
+        # Honesty hint: процент оплат
+        if month["sales_invoiced"] > 0:
+            pct = (month["sales_paid"] / month["sales_invoiced"]) * 100
+            lines.append(f"  ─ to'lov darajasi (30 kun): <b>{pct:.0f}%</b>")
         lines.append("")
-        lines.append("<b>Xaridlar (30 kun):</b>")
-        lines.append(f"  Olingan:     <code>{_fmt_money(total)}</code>")
-        lines.append(f"  To'langan:   <code>{_fmt_money(paid)}</code>")
-        lines.append(f"  Qarz biz:    <code>{_fmt_money(debt)}</code>")
-    else:
-        # Production-модули: показать кол-во партий
-        lots = _module_lots_summary(org, module_code)
-        if lots:
-            lines.append("")
-            lines.append("<b>Partiyalar:</b>")
-            for label, value in lots.items():
-                lines.append(f"  {label}: <b>{value}</b>")
+
+    # Purchases-блок
+    if month["purchases_invoiced"] > 0 or week["purchases_invoiced"] > 0:
+        lines.append("<b>📥 Xaridlar (7 / 30 kun):</b>")
+        lines.append(
+            f"  Olingan:     "
+            f"<code>{_fmt_money(week['purchases_invoiced'])}</code> / "
+            f"<code>{_fmt_money(month['purchases_invoiced'])}</code>"
+        )
+        lines.append(
+            f"  To'langan:   "
+            f"<code>{_fmt_money(week['purchases_paid'])}</code> / "
+            f"<code>{_fmt_money(month['purchases_paid'])}</code>"
+        )
+        lines.append(
+            f"  Qarz biz:    "
+            f"<code>{_fmt_money(week['purchases_debt'])}</code> / "
+            f"<b>{_fmt_money(month['purchases_debt'])}</b>"
+        )
+        lines.append("")
+
+    if (
+        month["sales_invoiced"] == 0
+        and month["purchases_invoiced"] == 0
+        and week["sales_invoiced"] == 0
+    ):
+        lines.append("<i>Oxirgi 30 kunda harakatlar yo'q.</i>")
+        lines.append("")
+
+    # Партии (production-модули)
+    lots = _module_lots_summary(org, module_code)
+    if lots:
+        lines.append("<b>📋 Partiyalar:</b>")
+        for label, value in lots.items():
+            lines.append(f"  {label}: <b>{value}</b>")
 
     markup = kb([("← Hisobotlar", "home:reports"), ("🏠 Bosh", "home")], cols=2)
     _send_or_edit(ctx, "\n".join(lines), markup)
-
-
-def _module_finance_range(org, module, df, dt) -> dict:
-    from django.db.models import Sum
-    from apps.accounting.models import GLAccount, JournalEntry
-
-    revenue = (
-        JournalEntry.objects
-        .filter(
-            organization=org, module=module,
-            entry_date__gte=df, entry_date__lte=dt,
-            credit_subaccount__account__type=GLAccount.Type.INCOME,
-        )
-        .aggregate(s=Sum("amount_uzs"))["s"] or Decimal("0")
-    )
-    expense = (
-        JournalEntry.objects
-        .filter(
-            organization=org, module=module,
-            entry_date__gte=df, entry_date__lte=dt,
-            debit_subaccount__account__type=GLAccount.Type.EXPENSE,
-        )
-        .aggregate(s=Sum("amount_uzs"))["s"] or Decimal("0")
-    )
-    return {"revenue": revenue, "expense": expense}
-
-
-def _fmt_signed(v) -> str:
-    n = Decimal(str(v))
-    if n == 0:
-        return "0"
-    return f"{'+' if n > 0 else '−'}{_fmt_money(abs(n))}"
