@@ -23,7 +23,10 @@ export default function ReceiveModal({ onClose }: Props) {
   const { data: warehouses } = useWarehouses({ module_code: 'vet' });
   const { data: suppliers } = useCounterparties({ kind: 'supplier' });
   const { data: units } = useUnits();
-  const { data: purchases } = purchasesCrud.useList();
+  // Только закупки модуля vet — иначе оператор видит закупы кормов / яиц / откорма
+  // в выпадашке «Закуп», что приводит к каше: можно случайно привязать
+  // приёмку препарата к закупу комбикорма.
+  const { data: purchases } = purchasesCrud.useList({ module_code: 'vet' });
   const receive = useReceiveVetStock();
 
   const [drug, setDrug] = useState('');

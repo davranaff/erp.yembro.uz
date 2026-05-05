@@ -26,11 +26,17 @@ export default function AccessoryFormModal({ initial, onClose }: Props) {
   const create = accessoriesCrud.useCreate();
   const update = accessoriesCrud.useUpdate();
   const { data: modules } = useModules();
-  // Аксессуары — не «вет-номенклатура» по природе (миска, поилка, ошейник).
-  // Поэтому НЕ фильтруем по module_code='vet': оператор может взять любую
-  // активную позицию, в т.ч. с категорией «Прочее» или общей. GL всё равно
-  // идёт через 41.01 (не через category.default_gl_subaccount).
-  const { data: nomenclature } = useNomenclatureItems({ is_active: 'true' });
+  // По умолчанию — только vet-номенклатура (категория «Ветпрепараты»
+  // и любые другие категории, привязанные к модулю vet). Раньше показывали
+  // все SKU, и оператор случайно привязывал аксессуар к корму/яйцам — каша.
+  // Если нужного SKU нет в списке — переключатель «Все категории» показывает
+  // полный набор (escape hatch для редких кейсов вне vet).
+  const [showAllCategories, setShowAllCategories] = useState(false);
+  const { data: nomenclature } = useNomenclatureItems(
+    showAllCategories
+      ? { is_active: 'true' }
+      : { is_active: 'true', module_code: 'vet' },
+  );
   const vetModuleId = modules?.find((m) => m.code === 'vet')?.id ?? '';
   const { data: warehouses } = useWarehouses({
     module_code: 'vet', is_active: 'true',
@@ -111,7 +117,12 @@ export default function AccessoryFormModal({ initial, onClose }: Props) {
       </div>
 
       <div className="field">
-        <label>Номенклатура *</label>
+        <label>
+          Номенклатура *{' '}
+          <span style={{ fontWeight: 400, color: 'var(--fg-3)', fontSize: 11 }}>
+            ({showAllCategories ? 'все категории' : 'только vet'})
+          </span>
+        </label>
         <select
           className="input"
           value={nomenclatureId}
@@ -129,13 +140,28 @@ export default function AccessoryFormModal({ initial, onClose }: Props) {
         {getErr('nomenclature') && (
           <div style={{ fontSize: 11, color: 'var(--danger)' }}>{getErr('nomenclature')}</div>
         )}
+        {!isEdit && (
+          <label style={{
+            display: 'flex', alignItems: 'center', gap: 6,
+            fontSize: 11, color: 'var(--fg-3)', marginTop: 6,
+          }}>
+            <input
+              type="checkbox"
+              checked={showAllCategories}
+              onChange={(e) => {
+                setShowAllCategories(e.target.checked);
+                setNomenclatureId('');
+              }}
+            />
+            Показать SKU из других модулей (если нужного нет в vet)
+          </label>
+        )}
         <div style={{ fontSize: 11, color: 'var(--fg-3)', marginTop: 4 }}>
           Не нашли нужный товар? Создайте позицию в{' '}
-          <a href="/nomenclature" target="_blank" rel="noreferrer" style={{ color: 'var(--brand-orange)' }}>
+          <a href="/nomenclature?module_code=vet" target="_blank" rel="noreferrer" style={{ color: 'var(--brand-orange)' }}>
             /nomenclature
           </a>{' '}
-          (например, категория «Прочее» или своя «Аксессуары»). GL-проводка
-          всё равно идёт через 41.01 — категория не влияет.
+          в категории, привязанной к модулю vet.
         </div>
       </div>
 
