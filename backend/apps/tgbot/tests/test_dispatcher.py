@@ -17,9 +17,9 @@ def _msg(chat_id: int, text: str) -> dict:
 
 
 def test_unauth_user_gets_link_prompt(fake_send):
-    # chat_id 99999 — нет TgLink
+    # chat_id 99999 — нет TgLink (узбекский после Phase B1)
     dispatch_message(_msg(99999, "/menu"))
-    assert any("Привяжите аккаунт" in t for _, t, _ in fake_send.calls)
+    assert any("bog'lan" in t.lower() for _, t, _ in fake_send.calls)
 
 
 def test_known_command_dispatched(tg_link, fake_send):
@@ -42,7 +42,7 @@ def test_module_gate_blocks_command(tg_link, fake_send):
         module=Module.objects.get(code="feedlot"),
     ).delete()
     dispatch_message(_msg(tg_link.chat_id, "/feedlot"))
-    assert any("Нет доступа" in t for _, t, _ in fake_send.calls)
+    assert any("ruxsat yo'q" in t.lower() for _, t, _ in fake_send.calls)
 
 
 def test_dispatch_routes_callback_query(tg_link, fake_send):
@@ -76,8 +76,8 @@ def test_callback_unauth_user_silenced(fake_send):
     }
     dispatch(update)
     # answer_callback_query всё равно дёрнут (закрываем спиннер на стороне TG),
-    # но потом отправлено сообщение «Сессия истекла»
-    assert any("Сессия истекла" in t for _, t, _ in fake_send.calls)
+    # но потом отправлено сообщение про истёкшую сессию (узбекский после B1)
+    assert any("tugadi" in t.lower() for _, t, _ in fake_send.calls)
 
 
 def test_dispatch_swallows_handler_crash(tg_link, fake_send):
@@ -98,4 +98,5 @@ def test_dispatch_swallows_handler_crash(tg_link, fake_send):
         dispatch_message(_msg(tg_link.chat_id, "/help"))
     finally:
         spec.handler = original
-    assert any("Ошибка обработки" in t for _, t, _ in fake_send.calls)
+    # Узбекский после Phase B1: «Xatolik yuz berdi…»
+    assert any("xatolik" in t.lower() for _, t, _ in fake_send.calls)

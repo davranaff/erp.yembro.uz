@@ -70,8 +70,16 @@ def _menu_text(link) -> str:
     )
 
 
-@command("/menu", help="Asosiy menyu")
+def _is_cp_link(link) -> bool:
+    return bool(link and link.counterparty_id and not link.user_id)
+
+
+@command("/menu", help="Asosiy menyu", audience="any")
 def handle_menu_cmd(ctx: HandlerCtx) -> None:
+    if _is_cp_link(ctx.link):
+        from .counterparty import render_counterparty_menu
+        render_counterparty_menu(ctx)
+        return
     send_message(
         ctx.chat_id,
         _menu_text(ctx.link),
@@ -83,6 +91,12 @@ def handle_menu_cmd(ctx: HandlerCtx) -> None:
 def handle_home_callback(ctx: HandlerCtx) -> None:
     """`home` — корень; `home:<section>` — раздел."""
     section = ctx.args[0] if ctx.args else ""
+
+    if _is_cp_link(ctx.link):
+        # Клиент-кабинет — completely separate menu tree.
+        from .counterparty import render_counterparty_menu
+        render_counterparty_menu(ctx)
+        return
 
     if not section:
         # Корень
