@@ -98,9 +98,16 @@ def _resolve_inventory_subaccount(item: SaleItem, org) -> GLSubaccount:
     """
     Кредит для проводки себестоимости (Dr 90.02 / Cr X).
 
-    Источник:
-        nomenclature.default_gl_subaccount → category.default_gl_subaccount → 10.01
+    Приоритет источника:
+        1. vet_accessory → 41.01 «Товары для перепродажи» (фиксировано —
+           аксессуары не идут через category default чтобы не путать с
+           ветпрепаратами 10.03 у того же клиента)
+        2. nomenclature.default_gl_subaccount
+        3. category.default_gl_subaccount
+        4. 10.01 (fallback)
     """
+    if item.vet_accessory_id:
+        return _get_subaccount(org, "41.01")
     nom = item.nomenclature
     if nom.default_gl_subaccount_id:
         return nom.default_gl_subaccount
@@ -133,6 +140,15 @@ def _compute_cost_per_unit(item: SaleItem) -> Decimal:
         vsb = item.vet_stock_batch
         # У VetStockBatch уже есть price_per_unit_uzs (закупочная цена при приёмке).
         return _quantize_money(Decimal(vsb.price_per_unit_uzs or 0))
+    if item.vet_accessory_id:
+        # У VetAccessory cost_per_unit_uzs хранится прямо на карточке
+        # (weighted-avg, обновляется при receive).
+        return _quantize_money(Decimal(item.vet_accessory.cost_per_unit_uzs or 0))
+    if item.feed_bag_lot_id:
+        # FeedBagLot.unit_cost_uzs — себестоимость одного мешка
+        # (наследуется при фасовке = source.unit_cost_uzs × bag_weight_kg).
+        bl = item.feed_bag_lot
+        return _quantize_money(Decimal(bl.unit_cost_uzs or 0))
     return Decimal("0.00")
 
 
@@ -218,6 +234,66 @@ def _check_and_decrement_source(item: SaleItem, qty: Decimal):
             vsb.save(update_fields=["status", "updated_at"])
         return vsb
 
+    if item.vet_accessory_id:
+        from apps.vet.models import VetAccessory
+        va = VetAccessory.objects.select_for_update().get(pk=item.vet_accessory_id)
+        if not va.is_active:
+            raise SaleConfirmError(
+                {"items": (
+                    f"Аксессуар {va.nomenclature.sku} отключён — продажа невозможна."
+                )}
+            )
+        if Decimal(va.current_quantity) < qty:
+            raise SaleConfirmError(
+                {"items": (
+                    f"Недостаточно остатка аксессуара {va.nomenclature.sku}: "
+                    f"требуется {qty}, доступно {va.current_quantity}."
+                )}
+            )
+        VetAccessory.objects.filter(pk=va.pk).update(
+            current_quantity=F("current_quantity") - qty
+        )
+        va.refresh_from_db(fields=["current_quantity"])
+        return va
+
+    if item.feed_bag_lot_id:
+        # qty здесь — кол-во мешков (целое), не кг.
+        from apps.feed.models import FeedBagLot
+        bl = FeedBagLot.objects.select_for_update().get(pk=item.feed_bag_lot_id)
+        if bl.status != FeedBagLot.Status.ACTIVE:
+            raise SaleConfirmError(
+                {"items": (
+                    f"Партия мешков {bl.doc_number} в статусе "
+                    f"{bl.get_status_display()} — продажа возможна только из "
+                    f"«В наличии»."
+                )}
+            )
+        # qty приходит как Decimal — для целого кол-ва мешков допустим
+        # хранить в quantity (DecimalField), но проверим что целое.
+        bags_needed = int(qty)
+        if Decimal(bags_needed) != qty:
+            raise SaleConfirmError(
+                {"items": (
+                    f"Партия мешков {bl.doc_number}: количество должно быть "
+                    f"целым числом мешков (получено {qty})."
+                )}
+            )
+        if bl.bags_remaining < bags_needed:
+            raise SaleConfirmError(
+                {"items": (
+                    f"Партия мешков {bl.doc_number}: запрошено "
+                    f"{bags_needed} шт, доступно {bl.bags_remaining} шт."
+                )}
+            )
+        FeedBagLot.objects.filter(pk=bl.pk).update(
+            bags_remaining=F("bags_remaining") - bags_needed
+        )
+        bl.refresh_from_db(fields=["bags_remaining"])
+        if bl.bags_remaining == 0 and bl.status == FeedBagLot.Status.ACTIVE:
+            bl.status = FeedBagLot.Status.DEPLETED
+            bl.save(update_fields=["status", "updated_at"])
+        return bl
+
     raise SaleConfirmError({"items": "Item без указания источника партии."})
 
 
@@ -227,13 +303,16 @@ def confirm_sale(
     *,
     user=None,
     force_credit_override: bool = False,
+    credit_override_reason: str = "",
 ) -> SaleConfirmResult:
     """
     Провести продажу. Идемпотентен по статусу: повторный → ValidationError.
 
     `force_credit_override` пропускает проверку кредитного лимита/просрочки
     клиента (используется sales:admin при осознанном превышении лимита).
-    Override логируется в audit log как POST с пометкой `credit_override`.
+    `credit_override_reason` — обязательная причина override (бизнес-требование:
+    аудитор должен видеть почему продали в долг). Минимум 10 символов.
+    Сохраняется в SaleOrder.credit_override_reason и в audit log.
     """
     # 1. Lock + reload
     order = SaleOrder.objects.select_for_update().get(pk=order.pk)
@@ -281,6 +360,20 @@ def confirm_sale(
                 "право на overrides (sales:admin)."
             ),
         })
+    if force_credit_override:
+        # Обязательная причина (бизнес-требование, защита от «забыл написать»).
+        # Минимум 10 символов осмысленного текста — отметает «.», «1» и т.п.
+        reason = (credit_override_reason or "").strip()
+        if len(reason) < 10:
+            raise SaleConfirmError({
+                "credit_override_reason": (
+                    "Причина override обязательна и должна быть не короче "
+                    "10 символов. Опишите почему продаём в долг — например: "
+                    "«клиент пообещал погасить до 12.05, согласовал директор»."
+                ),
+            })
+        # Сохраним на заказе чтобы видно было в /sales/{id} и отчётах.
+        order.credit_override_reason = reason
 
     # 2. FX-snapshot
     #    Приоритет: exchange_rate_override (ручной) → get_rate_for (CBU).
@@ -344,6 +437,25 @@ def confirm_sale(
         # Списание из источника
         _check_and_decrement_source(item, qty)
 
+        # Для FeedBagLot StockMovement пишем в кг (а не в шт), чтобы отчёты
+        # остатков по nomenclature были консистентны с FeedBatch (одна
+        # nomenclature на насыпь и фасовку). qty=мешки → kg, цена=сум/кг.
+        if item.feed_bag_lot_id:
+            # Decimal-умножение сохраняет decimals обоих множителей (5.000 ×
+            # 50.000 = 250.000000) — нужно явно квантизировать до 0.001 чтобы
+            # уложиться в StockMovement.quantity (decimal_places=3).
+            bag_weight = Decimal(item.feed_bag_lot.bag_weight_kg)
+            sm_quantity = (qty * bag_weight).quantize(
+                Decimal("0.001"), rounding=ROUND_HALF_UP
+            )
+            sm_unit_price = (
+                cost_per_unit / bag_weight
+                if bag_weight > 0 else Decimal("0")
+            ).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+        else:
+            sm_quantity = qty
+            sm_unit_price = cost_per_unit
+
         # StockMovement OUTGOING
         sm = StockMovement(
             organization=order.organization,
@@ -355,8 +467,8 @@ def confirm_sale(
             kind=StockMovement.Kind.OUTGOING,
             date=now,
             nomenclature=item.nomenclature,
-            quantity=qty,
-            unit_price_uzs=cost_per_unit,
+            quantity=sm_quantity,
+            unit_price_uzs=sm_unit_price,
             amount_uzs=item.line_cost_uzs,
             warehouse_from=order.warehouse,
             warehouse_to=None,
@@ -436,7 +548,7 @@ def confirm_sale(
     order.amount_uzs = total_uzs
     order.cost_uzs = total_cost_uzs
     order.status = SaleOrder.Status.CONFIRMED
-    order.save(update_fields=[
+    save_fields = [
         "doc_number",
         "exchange_rate",
         "exchange_rate_source",
@@ -445,7 +557,10 @@ def confirm_sale(
         "cost_uzs",
         "status",
         "updated_at",
-    ])
+    ]
+    if force_credit_override:
+        save_fields.append("credit_override_reason")
+    order.save(update_fields=save_fields)
 
     audit_log(
         organization=order.organization,

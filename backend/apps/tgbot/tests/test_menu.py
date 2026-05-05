@@ -17,27 +17,31 @@ def _cbq(chat_id, data, message_id=10):
     }
 
 
-def test_menu_renders_4_buttons(tg_link, fake_send):
+def test_menu_renders_buttons_for_owner(tg_link, fake_send):
     dispatch_message({"chat": {"id": tg_link.chat_id}, "text": "/menu"})
     sent = fake_send.calls
     assert sent
     chat_id, text, markup = sent[0]
     assert chat_id == tg_link.chat_id
-    assert "Главное меню" in text
-    # 4 inline-кнопки → ровно 4 элемента, в 2 строки по 2.
+    assert "Asosiy menyu" in text
     rows = markup["inline_keyboard"]
     flat = [btn for row in rows for btn in row]
-    assert len(flat) == 4
     callbacks = {b["callback_data"] for b in flat}
-    assert callbacks == {"home:fin", "home:batch", "home:prod", "home:reports"}
+    # После рефактора: 3 кнопки — fin / modules / reports (вместо
+    # старых fin / batch / prod / reports). «Партии» убраны (всё в модулях).
+    assert "home:fin" in callbacks
+    assert "home:modules" in callbacks
+    assert "home:reports" in callbacks
+    assert "home:batch" not in callbacks
+    assert "home:prod" not in callbacks
 
 
 def test_callback_home_fin_renders_finance_submenu(tg_link, fake_send):
     dispatch_callback(_cbq(tg_link.chat_id, "home:fin"))
-    # Финансовое меню рендерится через edit_message_text
-    assert any("Финансы" in t for _, _, t, _ in fake_send.edits)
+    # Финансовое подменю на узбекском после Phase B1.
+    assert any("Moliya" in t for _, _, t, _ in fake_send.edits)
 
 
 def test_callback_home_returns_to_main(tg_link, fake_send):
     dispatch_callback(_cbq(tg_link.chat_id, "home"))
-    assert any("Главное меню" in t for _, _, t, _ in fake_send.edits)
+    assert any("Asosiy menyu" in t for _, _, t, _ in fake_send.edits)

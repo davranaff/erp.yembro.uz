@@ -62,12 +62,11 @@ class PaymentViewSet(ImmutableStatusMixin, DeleteReasonMixin, OrgScopedModelView
 
         payment.refresh_from_db()
 
+        # TG-уведомления через orchestrator: клиент/поставщик + админы
+        # организации + head sales/purchases в зависимости от direction.
         try:
-            from apps.tgbot.notifications import fmt_payment_posted
-            from apps.tgbot.tasks import notify_admins_task
-            notify_admins_task.delay(
-                fmt_payment_posted(payment), str(payment.organization_id), "purchases"
-            )
+            from apps.tgbot.services.orchestration import notify_payment_event
+            notify_payment_event(payment)
         except Exception:
             pass
 

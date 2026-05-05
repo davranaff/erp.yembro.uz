@@ -77,12 +77,10 @@ class PurchaseOrderViewSet(ImmutableStatusMixin, DeleteReasonMixin, OrgScopedMod
 
         order.refresh_from_db()
 
+        # TG-уведомление о проведённом закупе — админ организации + head purchases.
         try:
-            from apps.tgbot.notifications import fmt_purchase_confirmed
-            from apps.tgbot.tasks import notify_admins_task
-            notify_admins_task.delay(
-                fmt_purchase_confirmed(order), str(order.organization_id), "purchases"
-            )
+            from apps.tgbot.services.orchestration import notify_purchase_event
+            notify_purchase_event(order)
         except Exception:
             pass
 

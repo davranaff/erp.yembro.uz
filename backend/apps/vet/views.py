@@ -14,6 +14,7 @@ from .models import (
     SellerDeviceToken,
     VaccinationSchedule,
     VaccinationScheduleItem,
+    VetAccessory,
     VetDrug,
     VetStockBatch,
     VetTreatmentLog,
@@ -23,6 +24,7 @@ from .serializers import (
     SellerDeviceTokenSerializer,
     VaccinationScheduleItemSerializer,
     VaccinationScheduleSerializer,
+    VetAccessorySerializer,
     VetDrugSerializer,
     VetStockBatchSerializer,
     VetTreatmentLogSerializer,
@@ -32,6 +34,10 @@ from .services.apply_treatment import (
     apply_vet_treatment,
 )
 from .services.cancel import VetTreatmentCancelError, cancel_vet_treatment
+from .services.receive_accessory import (
+    VetAccessoryReceiveError,
+    receive_vet_accessory,
+)
 from .services.receive_stock import (
     VetStockReceiveError,
     receive_vet_stock_batch,
@@ -46,8 +52,19 @@ class VetDrugViewSet(OrgScopedModelViewSet):
     module_code = "vet"
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
     filterset_fields = ["drug_type", "administration_route", "is_active"]
-    search_fields = ["nomenclature__sku", "nomenclature__name"]
+    search_fields = ["nomenclature__sku", "nomenclature__name", "barcode"]
     ordering = ["nomenclature__sku"]
+
+    def perform_create(self, serializer):
+        from apps.audit.models import AuditLog
+        kwargs = self._save_kwargs_for_create(serializer)
+        # Auto-barcode для shelf-tag (этикетка на полке).
+        # Не путать с barcode у VetStockBatch — там штрих-код конкретного лота.
+        if not serializer.validated_data.get("barcode"):
+            sku = serializer.validated_data["nomenclature"].sku.upper()[:16]
+            kwargs["barcode"] = f"VET-D-{sku}-{secrets.token_hex(2).upper()}"
+        instance = serializer.save(**kwargs)
+        self._write_audit(AuditLog.Action.CREATE, instance)
 
 
 class VetStockBatchViewSet(OrgScopedModelViewSet):
@@ -598,6 +615,90 @@ class VetTreatmentLogViewSet(OrgScopedModelViewSet):
             qs = qs.filter(target_herd_id=herd_id)
         qs = qs.order_by("treatment_date", "created_at")
         data = self.get_serializer(qs, many=True).data
+        return Response(data)
+
+
+class VetAccessoryViewSet(OrgScopedModelViewSet):
+    """
+    /api/vet/accessories/ — товары для перепродажи через вет-аптеку
+    (миски, поилки, переноски и т.п.).
+
+    CRUD по самому товару (карточка). Изменение остатка — только через
+    `POST /{id}/receive/` (приём с пересчётом avg-cost) или продажу через
+    SaleOrder (auto-decrement в confirm_sale).
+
+    Барkод авто-генерится при create если не задан вручную.
+    """
+
+    serializer_class = VetAccessorySerializer
+    queryset = VetAccessory.objects.select_related(
+        "nomenclature", "nomenclature__unit", "warehouse",
+    )
+    module_code = "vet"
+    filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
+    filterset_fields = ["warehouse", "is_active"]
+    search_fields = ["nomenclature__sku", "nomenclature__name", "barcode", "notes"]
+    ordering = ["nomenclature__sku"]
+
+    def perform_create(self, serializer):
+        from apps.audit.models import AuditLog
+        kwargs = self._save_kwargs_for_create(serializer)
+        # Auto-barcode если пользователь не задал. Формат:
+        # `VET-A-{sku}-{rand4}` уникален в рамках org.
+        if not serializer.validated_data.get("barcode"):
+            sku = serializer.validated_data["nomenclature"].sku.upper()[:16]
+            kwargs["barcode"] = f"VET-A-{sku}-{secrets.token_hex(2).upper()}"
+        instance = serializer.save(**kwargs)
+        self._write_audit(AuditLog.Action.CREATE, instance)
+
+    @action(detail=True, methods=["post"])
+    def receive(self, request, pk=None):
+        """POST /api/vet/accessories/{id}/receive/
+
+        Body: {
+            "quantity": "10.000",              # required, > 0
+            "unit_cost_uzs": "15000.00",       # optional; пересчёт weighted-avg
+            "notes": "довоз из китая"          # optional
+        }
+        """
+        from decimal import Decimal
+
+        accessory = self.get_object()
+        try:
+            qty = Decimal(str(request.data.get("quantity")))
+        except Exception:
+            raise DRFValidationError({"quantity": "Некорректное количество."})
+
+        unit_cost = request.data.get("unit_cost_uzs")
+        unit_cost_dec = None
+        if unit_cost not in (None, ""):
+            try:
+                unit_cost_dec = Decimal(str(unit_cost))
+            except Exception:
+                raise DRFValidationError(
+                    {"unit_cost_uzs": "Некорректная цена."}
+                )
+
+        try:
+            result = receive_vet_accessory(
+                accessory,
+                quantity=qty,
+                unit_cost_uzs=unit_cost_dec,
+                user=request.user,
+                notes=request.data.get("notes", ""),
+            )
+        except VetAccessoryReceiveError as exc:
+            raise DRFValidationError(
+                exc.message_dict if hasattr(exc, "message_dict") else exc.messages
+            )
+
+        accessory.refresh_from_db()
+        data = self.get_serializer(accessory).data
+        data["_result"] = {
+            "stock_movement_doc": result.stock_movement.doc_number,
+            "previous_cost_uzs": str(result.previous_cost_uzs),
+            "new_cost_uzs": str(result.new_cost_uzs),
+        }
         return Response(data)
 
 

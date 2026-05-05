@@ -1,6 +1,7 @@
 from django.contrib import admin
 
 from .models import (
+    FeedBagLot,
     FeedBatch,
     FeedConsumptionPlan,
     FeedLotShrinkageState,
@@ -205,6 +206,34 @@ class FeedBatchAdmin(admin.ModelAdmin):
         "recipe_version",
         "storage_bin",
         "storage_warehouse",
+    )
+
+
+@admin.register(FeedBagLot)
+class FeedBagLotAdmin(admin.ModelAdmin):
+    list_display = (
+        "doc_number",
+        "organization",
+        "source_feed_batch",
+        "bag_weight_kg",
+        "bags_initial",
+        "bags_remaining",
+        "unit_cost_uzs",
+        "status",
+        "storage_warehouse",
+        "packaged_at",
+    )
+    list_filter = ("organization", "status", "is_medicated")
+    date_hierarchy = "packaged_at"
+    search_fields = ("doc_number", "source_feed_batch__doc_number")
+    autocomplete_fields = (
+        "organization",
+        "module",
+        "source_feed_batch",
+        "recipe_version",
+        "storage_warehouse",
+        "storage_bin",
+        "created_by",
     )
 
 

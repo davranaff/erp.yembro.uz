@@ -4,6 +4,7 @@ from apps.common.serializers import FinancialFieldsMixin
 from apps.modules.models import Module
 
 from .models import (
+    FeedBagLot,
     FeedBatch,
     FeedLotShrinkageState,
     FeedShrinkageProfile,
@@ -391,6 +392,14 @@ class FeedBatchSerializer(FinancialFieldsMixin, serializers.ModelSerializer):
     recipe_code = serializers.SerializerMethodField()
     storage_bin_code = serializers.SerializerMethodField()
     task_doc_number = serializers.SerializerMethodField()
+    # Номенклатура готового корма резолвится через recipe.code → NomenclatureItem.sku
+    # (та же связь, что использует execute_task для INCOMING StockMovement).
+    # Нужна на фронте чтобы автоподставить позицию в продажу — без этого
+    # оператор обязан выбирать номенклатуру руками и может ошибиться (выбрать
+    # сырьё вместо готового комбикорма).
+    nomenclature = serializers.SerializerMethodField()
+    nomenclature_sku = serializers.SerializerMethodField()
+    nomenclature_name = serializers.SerializerMethodField()
 
     class Meta:
         model = FeedBatch
@@ -416,6 +425,9 @@ class FeedBatchSerializer(FinancialFieldsMixin, serializers.ModelSerializer):
             "recipe_code",
             "storage_bin_code",
             "task_doc_number",
+            "nomenclature",
+            "nomenclature_sku",
+            "nomenclature_name",
             "created_at",
             "updated_at",
         )
@@ -431,6 +443,124 @@ class FeedBatchSerializer(FinancialFieldsMixin, serializers.ModelSerializer):
 
     def get_task_doc_number(self, obj):
         return obj.produced_by_task.doc_number if obj.produced_by_task_id else None
+
+    def _resolve_feed_nomenclature(self, obj):
+        if not obj.recipe_version_id:
+            return None
+        from apps.nomenclature.models import NomenclatureItem
+        return NomenclatureItem.objects.filter(
+            organization=obj.organization_id,
+            sku=obj.recipe_version.recipe.code,
+        ).first()
+
+    def get_nomenclature(self, obj):
+        nom = self._resolve_feed_nomenclature(obj)
+        return str(nom.id) if nom else None
+
+    def get_nomenclature_sku(self, obj):
+        nom = self._resolve_feed_nomenclature(obj)
+        return nom.sku if nom else None
+
+    def get_nomenclature_name(self, obj):
+        nom = self._resolve_feed_nomenclature(obj)
+        return nom.name if nom else None
+
+
+# ─── FeedBagLot — расфасованные мешки ─────────────────────────────────────
+
+
+class FeedBagLotSerializer(FinancialFieldsMixin, serializers.ModelSerializer):
+    """Партия фасованного корма (мешки).
+
+    Создаётся только через сервис ``package_feed_batch`` — все поля read-only.
+    Денормализуем nomenclature/recipe_code чтобы фронт мог автоподставить
+    в позицию продажи без дополнительных запросов.
+    """
+
+    financial_fields = ("unit_cost_uzs", "total_cost_uzs")
+    finances_module = "feed"
+
+    source_doc_number = serializers.SerializerMethodField()
+    recipe_code = serializers.SerializerMethodField()
+    storage_warehouse_code = serializers.SerializerMethodField()
+    storage_bin_code = serializers.SerializerMethodField()
+    nomenclature = serializers.SerializerMethodField()
+    nomenclature_sku = serializers.SerializerMethodField()
+    nomenclature_name = serializers.SerializerMethodField()
+    remaining_kg = serializers.SerializerMethodField()
+
+    class Meta:
+        model = FeedBagLot
+        fields = (
+            "id",
+            "doc_number",
+            "module",
+            "source_feed_batch",
+            "source_doc_number",
+            "recipe_version",
+            "recipe_code",
+            "bag_weight_kg",
+            "bags_initial",
+            "bags_remaining",
+            "remaining_kg",
+            "unit_cost_uzs",
+            "total_cost_uzs",
+            "storage_warehouse",
+            "storage_warehouse_code",
+            "storage_bin",
+            "storage_bin_code",
+            "packaged_at",
+            "is_medicated",
+            "withdrawal_period_days",
+            "withdrawal_period_ends",
+            "status",
+            "notes",
+            "nomenclature",
+            "nomenclature_sku",
+            "nomenclature_name",
+            "created_at",
+            "updated_at",
+        )
+        read_only_fields = fields  # создаётся только через сервис package_feed_batch
+
+    def get_source_doc_number(self, obj):
+        return obj.source_feed_batch.doc_number if obj.source_feed_batch_id else None
+
+    def get_recipe_code(self, obj):
+        if not obj.recipe_version_id:
+            return None
+        return obj.recipe_version.recipe.code
+
+    def get_storage_warehouse_code(self, obj):
+        return obj.storage_warehouse.code if obj.storage_warehouse_id else None
+
+    def get_storage_bin_code(self, obj):
+        return obj.storage_bin.code if obj.storage_bin_id else None
+
+    def get_remaining_kg(self, obj):
+        return str(obj.remaining_kg)
+
+    def _resolve_nomenclature(self, obj):
+        # Та же логика что в FeedBatchSerializer — sku=recipe.code
+        if not obj.recipe_version_id:
+            return None
+        from apps.nomenclature.models import NomenclatureItem
+        return NomenclatureItem.objects.filter(
+            organization=obj.organization_id,
+            sku=obj.recipe_version.recipe.code,
+        ).first()
+
+    def get_nomenclature(self, obj):
+        nom = self._resolve_nomenclature(obj)
+        return str(nom.id) if nom else None
+
+    def get_nomenclature_sku(self, obj):
+        nom = self._resolve_nomenclature(obj)
+        return nom.sku if nom else None
+
+    def get_nomenclature_name(self, obj):
+        nom = self._resolve_nomenclature(obj)
+        return nom.name if nom else None
 
 
 # ─── Shrinkage profiles & state ───────────────────────────────────────────

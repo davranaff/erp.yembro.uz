@@ -43,7 +43,13 @@ class SaleReverseResult:
 
 
 def _restore_source(item):
-    """Вернуть quantity в источник партии."""
+    """Вернуть quantity в источник партии.
+
+    Для каждого типа источника инкрементим соответствующий счётчик и, если
+    статус был «Исчерпана» (а сейчас остаток > 0) — возвращаем в «Активна».
+    Без этого после reverse-sale партия остаётся в DEPLETED и не показывается
+    в селекторах продажи, хотя физически товар вернулся на склад.
+    """
     qty = Decimal(item.quantity)
     if item.batch_id:
         Batch.objects.filter(pk=item.batch_id).update(
@@ -60,6 +66,22 @@ def _restore_source(item):
         FeedBatch.objects.filter(pk=item.feed_batch_id).update(
             current_quantity_kg=F("current_quantity_kg") + qty
         )
+        fb = FeedBatch.objects.get(pk=item.feed_batch_id)
+        if fb.status == FeedBatch.Status.DEPLETED and fb.current_quantity_kg > 0:
+            fb.status = FeedBatch.Status.APPROVED
+            fb.save(update_fields=["status", "updated_at"])
+        return
+    if item.feed_bag_lot_id:
+        # qty хранится как Decimal, но мешки целые (см. confirm.py)
+        from apps.feed.models import FeedBagLot
+        bags = int(qty)
+        FeedBagLot.objects.filter(pk=item.feed_bag_lot_id).update(
+            bags_remaining=F("bags_remaining") + bags
+        )
+        bl = FeedBagLot.objects.get(pk=item.feed_bag_lot_id)
+        if bl.status == FeedBagLot.Status.DEPLETED and bl.bags_remaining > 0:
+            bl.status = FeedBagLot.Status.ACTIVE
+            bl.save(update_fields=["status", "updated_at"])
         return
     if item.vet_stock_batch_id:
         from apps.vet.models import VetStockBatch
@@ -70,6 +92,14 @@ def _restore_source(item):
         if vsb.status == VetStockBatch.Status.DEPLETED and vsb.current_quantity > 0:
             vsb.status = VetStockBatch.Status.AVAILABLE
             vsb.save(update_fields=["status", "updated_at"])
+        return
+    if item.vet_accessory_id:
+        # У аксессуаров нет статусов — просто инкремент остатка.
+        from apps.vet.models import VetAccessory
+        VetAccessory.objects.filter(pk=item.vet_accessory_id).update(
+            current_quantity=F("current_quantity") + qty
+        )
+        return
 
 
 @transaction.atomic
@@ -151,7 +181,10 @@ def reverse_sale(order: SaleOrder, *, reason: str = "", user=None) -> SaleRevers
         reverse_movements.append(rev_sm)
 
     # 2. Восстановить остатки источников по items
-    for item in order.items.select_related("batch", "feed_batch", "vet_stock_batch"):
+    for item in order.items.select_related(
+        "batch", "feed_batch", "feed_bag_lot",
+        "vet_stock_batch", "vet_accessory",
+    ):
         _restore_source(item)
 
     # 3. Reverse JE — Dr ↔ Cr swap для каждой

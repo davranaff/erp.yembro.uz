@@ -17,6 +17,7 @@ from apps.common.viewsets import (
 )
 
 from .models import (
+    FeedBagLot,
     FeedBatch,
     FeedLotShrinkageState,
     FeedShrinkageProfile,
@@ -28,6 +29,7 @@ from .models import (
     RecipeVersion,
 )
 from .serializers import (
+    FeedBagLotSerializer,
     FeedBatchSerializer,
     FeedLotShrinkageStateSerializer,
     FeedShrinkageProfileSerializer,
@@ -45,6 +47,10 @@ from .services.cancel_task import (
 from .services.execute_task import (
     FeedTaskExecuteError,
     execute_production_task,
+)
+from .services.package_feed_batch import (
+    FeedPackageError,
+    package_feed_batch,
 )
 
 
@@ -406,6 +412,117 @@ class FeedBatchViewSet(OrgReadOnlyViewSet):
             action_verb=f"feed batch {batch.doc_number} passport rejected · {reason}",
         )
         return Response(self.get_serializer(batch).data)
+
+    @action(detail=True, methods=["post"], url_path="package")
+    def package(self, request, pk=None):
+        """
+        POST /api/feed/feed-batches/{id}/package/
+        Body: {
+          "bag_count": 80,
+          "bag_weight_kg": "50",
+          "storage_warehouse": "<uuid>",
+          "storage_bin": "<uuid>" (опционально),
+          "notes": "..."  (опционально)
+        }
+
+        Расфасовать (часть) партии в N мешков. Партия должна быть APPROVED.
+        Можно вызывать несколько раз — каждая фасовка создаёт свой FeedBagLot.
+        """
+        from decimal import Decimal
+
+        from apps.warehouses.models import ProductionBlock, Warehouse
+
+        batch = self.get_object()
+        bag_count = request.data.get("bag_count")
+        bag_weight = request.data.get("bag_weight_kg")
+        wh_id = request.data.get("storage_warehouse")
+        bin_id = request.data.get("storage_bin")
+        notes = request.data.get("notes", "") or ""
+
+        if bag_count is None or wh_id is None or bag_weight is None:
+            raise DRFValidationError({
+                "detail": (
+                    "bag_count, bag_weight_kg и storage_warehouse обязательны."
+                ),
+            })
+
+        try:
+            bag_count_int = int(bag_count)
+        except (TypeError, ValueError):
+            raise DRFValidationError({"bag_count": "Должно быть целое число."})
+
+        try:
+            bag_weight_dec = Decimal(str(bag_weight))
+        except Exception:
+            raise DRFValidationError({"bag_weight_kg": "Некорректное число."})
+
+        try:
+            wh = Warehouse.objects.get(pk=wh_id)
+        except Warehouse.DoesNotExist:
+            raise DRFValidationError(
+                {"storage_warehouse": "Склад не найден."}
+            )
+        bin_block = None
+        if bin_id:
+            try:
+                bin_block = ProductionBlock.objects.get(pk=bin_id)
+            except ProductionBlock.DoesNotExist:
+                raise DRFValidationError({"storage_bin": "Бункер не найден."})
+
+        try:
+            result = package_feed_batch(
+                batch,
+                bag_count=bag_count_int,
+                bag_weight_kg=bag_weight_dec,
+                storage_warehouse=wh,
+                storage_bin=bin_block,
+                notes=notes,
+                user=request.user,
+            )
+        except FeedPackageError as exc:
+            raise DRFValidationError(
+                exc.message_dict if hasattr(exc, "message_dict") else exc.messages
+            )
+
+        batch.refresh_from_db()
+        data = self.get_serializer(batch).data
+        data["_result"] = {
+            "bag_lot": FeedBagLotSerializer(
+                result.bag_lot, context=self.get_serializer_context(),
+            ).data,
+            "stock_movements": [
+                {"id": str(sm.id), "doc_number": sm.doc_number, "kind": sm.kind}
+                for sm in result.stock_movements
+            ],
+        }
+        return Response(data)
+
+
+class FeedBagLotViewSet(OrgReadOnlyViewSet):
+    """Read-only: FeedBagLot создаётся через FeedBatch.package action.
+
+    Список доступен админам и операторам склада мешков; cost-поля скрыты
+    для пользователей без `feed.r` (через FinancialFieldsMixin).
+    """
+
+    serializer_class = FeedBagLotSerializer
+    queryset = FeedBagLot.objects.select_related(
+        "source_feed_batch",
+        "recipe_version__recipe",
+        "storage_warehouse",
+        "storage_bin",
+    )
+    module_code = "feed"
+    filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
+    filterset_fields = [
+        "status",
+        "is_medicated",
+        "source_feed_batch",
+        "recipe_version",
+        "storage_warehouse",
+    ]
+    search_fields = ["doc_number", "source_feed_batch__doc_number"]
+    ordering = ["-packaged_at"]
 
 
 # ─── Shrinkage: profiles + state + report ─────────────────────────────────

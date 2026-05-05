@@ -112,6 +112,20 @@ class SaleOrder(UUIDModel, TimestampedModel):
         help_text="Плановая дата оплаты (для отчёта дебиторского старения).",
     )
 
+    # ─── Кредит-override ─────────────────────────────────────────────────
+    # Заполняется ТОЛЬКО если confirm_sale прошёл с force_credit_override=True
+    # (когда у клиента превышен лимит/просрочка, но sales:admin осознанно
+    # пробил продажу). Бизнес-требование: причина override обязательна —
+    # для аудита и защиты от случайного «продал в долг забыл записать почему».
+    credit_override_reason = models.TextField(
+        blank=True,
+        help_text=(
+            "Причина override кредитной блокировки. Заполняется при "
+            "confirm_sale(force_credit_override=True). Без причины override "
+            "невозможен."
+        ),
+    )
+
     notes = models.TextField(blank=True)
     created_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -256,8 +270,11 @@ class SaleCommunication(UUIDModel, TimestampedModel):
 
 class SaleItem(UUIDModel, TimestampedModel):
     """
-    Позиция продажи. Партия указывается ровно через одну из трёх FK
-    (batch / vet_stock_batch / feed_batch) — XOR-проверка в clean().
+    Позиция продажи. Источник указывается ровно через одну из четырёх FK
+    (batch / vet_stock_batch / vet_accessory / feed_batch) — XOR в clean().
+
+    `vet_accessory` — для аксессуаров вет-аптеки (миски, поилки и т.п.):
+    нет партионного учёта, себестоимость weighted-avg, проводки через 41.01.
     """
 
     order = models.ForeignKey(
@@ -283,12 +300,30 @@ class SaleItem(UUIDModel, TimestampedModel):
         on_delete=models.PROTECT,
         related_name="sale_items",
     )
+    vet_accessory = models.ForeignKey(
+        "vet.VetAccessory",
+        null=True,
+        blank=True,
+        on_delete=models.PROTECT,
+        related_name="sale_items",
+    )
     feed_batch = models.ForeignKey(
         "feed.FeedBatch",
         null=True,
         blank=True,
         on_delete=models.PROTECT,
         related_name="sale_items",
+    )
+    feed_bag_lot = models.ForeignKey(
+        "feed.FeedBagLot",
+        null=True,
+        blank=True,
+        on_delete=models.PROTECT,
+        related_name="sale_items",
+        help_text=(
+            "Партия фасованного корма (мешки). При sale-confirm декрементится "
+            "bags_remaining, quantity хранится в штуках мешков."
+        ),
     )
 
     quantity = models.DecimalField(max_digits=18, decimal_places=3)
@@ -319,14 +354,18 @@ class SaleItem(UUIDModel, TimestampedModel):
 
     def clean(self):
         super().clean()
-        sources = [self.batch_id, self.vet_stock_batch_id, self.feed_batch_id]
+        sources = [
+            self.batch_id, self.vet_stock_batch_id,
+            self.vet_accessory_id, self.feed_batch_id, self.feed_bag_lot_id,
+        ]
         non_null = [s for s in sources if s]
         if len(non_null) != 1:
             raise ValidationError(
                 {
                     "__all__": (
-                        "Должна быть указана ровно одна партия: "
-                        "batch, vet_stock_batch или feed_batch."
+                        "Должен быть указан ровно один источник: "
+                        "batch, vet_stock_batch, vet_accessory, feed_batch "
+                        "или feed_bag_lot."
                     )
                 }
             )

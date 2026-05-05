@@ -61,6 +61,15 @@ class VetDrug(UUIDModel, TimestampedModel):
     default_withdrawal_days = models.PositiveSmallIntegerField(default=0)
     storage_conditions = models.CharField(max_length=128, blank=True)
     is_active = models.BooleanField(default=True)
+    barcode = models.CharField(
+        max_length=64, null=True, blank=True, db_index=True,
+        help_text=(
+            "Штрих-код SKU (для shelf-tag — этикетка на полке). "
+            "Авто-генерится при create если не задан вручную. "
+            "Не путать с barcode у VetStockBatch (там штрих-код конкретного лота "
+            "для розничной продажи)."
+        ),
+    )
     notes = models.TextField(blank=True)
     created_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -72,10 +81,14 @@ class VetDrug(UUIDModel, TimestampedModel):
 
     class Meta:
         ordering = ["-created_at"]
-        unique_together = (("organization", "nomenclature"),)
+        unique_together = (
+            ("organization", "nomenclature"),
+            ("organization", "barcode"),
+        )
         indexes = [
             models.Index(fields=["organization", "is_active"]),
             models.Index(fields=["organization", "drug_type"]),
+            models.Index(fields=["organization", "barcode"]),
         ]
         verbose_name = "Ветпрепарат"
         verbose_name_plural = "Ветпрепараты"
@@ -582,3 +595,130 @@ class SellerDeviceToken(UUIDModel, TimestampedModel):
         if not self.token:
             return ""
         return "****" + self.token[-4:]
+
+
+class VetAccessory(UUIDModel, TimestampedModel):
+    """Простой товар для перепродажи через вет-аптеку:
+    миски, поилки, переноски, ошейники, фартуки и т.п.
+
+    В отличие от `VetStockBatch` (партионный учёт ветпрепаратов с
+    expiration / quarantine / lot_number / withdrawal_period) — здесь:
+        - один товар = одна строка stock-on-hand (без партий)
+        - себестоимость weighted-avg (обновляется при receive)
+        - продажная цена отдельным полем (можно менять без переоценки)
+        - GL: проводки идут через 41.01 «Товары для перепродажи»
+        - barcode для розничного scan-and-sell
+
+    Сделано отдельной моделью (а не общей VetDrug+kind), потому что у
+    препаратов слишком много специфики (drug_type, route, withdrawal_days,
+    schedule_items) которая на аксессуарах бессмысленна.
+    """
+
+    organization = models.ForeignKey(
+        "organizations.Organization",
+        on_delete=models.PROTECT,
+        related_name="vet_accessories",
+    )
+    module = models.ForeignKey(
+        "modules.Module",
+        on_delete=models.PROTECT,
+        related_name="vet_accessories",
+    )
+    nomenclature = models.ForeignKey(
+        "nomenclature.NomenclatureItem",
+        on_delete=models.PROTECT,
+        related_name="vet_accessories",
+        help_text=(
+            "Номенклатурная карточка (sku/name/unit). Категория должна "
+            "указывать на 41.01, иначе fallback в проводке."
+        ),
+    )
+    warehouse = models.ForeignKey(
+        "warehouses.Warehouse",
+        on_delete=models.PROTECT,
+        related_name="vet_accessories",
+        help_text="Склад где физически лежит товар (модуль = vet).",
+    )
+    current_quantity = models.DecimalField(
+        max_digits=14, decimal_places=3, default=0,
+    )
+    cost_per_unit_uzs = models.DecimalField(
+        max_digits=18, decimal_places=2, default=0,
+        help_text=(
+            "Текущая себестоимость единицы (weighted-avg при приёмке). "
+            "Используется в Cr-проводке при продаже."
+        ),
+    )
+    sale_price_uzs = models.DecimalField(
+        max_digits=18, decimal_places=2, default=0,
+        help_text=(
+            "Текущая розничная цена. Меняется без переоценки склада. "
+            "В SaleItem можно переопределить через unit_price_uzs."
+        ),
+    )
+    barcode = models.CharField(
+        max_length=64, null=True, blank=True, db_index=True,
+        help_text=(
+            "Штрих-код для розничного скан-фло. Авто-генерится при create "
+            "если не задан вручную (например при штрихкоде поставщика)."
+        ),
+    )
+    is_active = models.BooleanField(default=True)
+    notes = models.TextField(blank=True)
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="+",
+    )
+
+    class Meta:
+        ordering = ["nomenclature__sku"]
+        unique_together = (
+            ("organization", "barcode"),
+        )
+        indexes = [
+            models.Index(fields=["organization", "is_active"]),
+            models.Index(fields=["warehouse", "is_active"]),
+            models.Index(fields=["organization", "barcode"]),
+        ]
+        verbose_name = "Аксессуар вет-аптеки"
+        verbose_name_plural = "Аксессуары вет-аптеки"
+
+    def __str__(self):
+        return f"{self.nomenclature.sku if self.nomenclature_id else '?'} · {self.nomenclature.name if self.nomenclature_id else 'без названия'}"
+
+    def clean(self):
+        super().clean()
+        org_id = self.organization_id
+        if not org_id:
+            return
+        if (
+            self.nomenclature_id
+            and self.nomenclature.organization_id != org_id
+        ):
+            raise ValidationError(
+                {"nomenclature": "Номенклатура из другой организации."}
+            )
+        if self.warehouse_id:
+            if self.warehouse.organization_id != org_id:
+                raise ValidationError(
+                    {"warehouse": "Склад из другой организации."}
+                )
+            if self.module_id and self.warehouse.module_id != self.module_id:
+                raise ValidationError(
+                    {"warehouse": "Склад не принадлежит модулю vet."}
+                )
+        if self.current_quantity is not None and self.current_quantity < 0:
+            raise ValidationError(
+                {"current_quantity": "Остаток не может быть отрицательным."}
+            )
+        if self.cost_per_unit_uzs is not None and self.cost_per_unit_uzs < 0:
+            raise ValidationError(
+                {"cost_per_unit_uzs": "Себестоимость не может быть отрицательной."}
+            )
+        if self.sale_price_uzs is not None and self.sale_price_uzs < 0:
+            raise ValidationError(
+                {"sale_price_uzs": "Цена продажи не может быть отрицательной."}
+            )

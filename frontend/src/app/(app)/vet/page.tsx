@@ -30,6 +30,7 @@ import BarcodeLabel from '@/components/BarcodeLabel';
 
 import ConfirmDeleteWithReason from '@/components/ConfirmDeleteWithReason';
 
+import AccessoriesPanel from './AccessoriesPanel';
 import DrugModal from './DrugModal';
 import ReceiveModal from './ReceiveModal';
 import TreatmentModal from './TreatmentModal';
@@ -65,7 +66,7 @@ function daysUntil(dateISO: string): number {
 }
 
 export default function VetPage() {
-  const [tab, setTab] = useState<'stock' | 'treatments' | 'drugs'>('stock');
+  const [tab, setTab] = useState<'stock' | 'treatments' | 'drugs' | 'accessories'>('stock');
   const [stockStatus, setStockStatus] = useState('');
   const [selDrug, setSelDrug] = useState<VetDrug | null>(null);
   const [selStock, setSelStock] = useState<VetStockBatch | null>(null);
@@ -152,6 +153,7 @@ export default function VetPage() {
             { value: 'stock', label: 'Склад' },
             { value: 'treatments', label: 'Журнал лечений' },
             { value: 'drugs', label: 'SKU препаратов' },
+            { value: 'accessories', label: 'Аксессуары' },
           ]}
           value={tab}
           onChange={(v) => setTab(v as typeof tab)}
@@ -375,6 +377,8 @@ export default function VetPage() {
         </Panel>
       )}
 
+      {tab === 'accessories' && <AccessoriesPanel />}
+
       {selStock && (
         <DetailDrawer
           title={`Лот · ${selStock.lot_number}`}
@@ -510,6 +514,59 @@ export default function VetPage() {
             </button>
           }
         >
+          {selDrug.barcode && (
+            <div style={{
+              padding: 12, marginBottom: 14,
+              background: 'var(--bg-soft)', borderRadius: 6,
+              border: '1px solid var(--border)',
+            }}>
+              <div style={{
+                fontSize: 11, fontWeight: 700, color: 'var(--fg-3)',
+                textTransform: 'uppercase', letterSpacing: '.04em',
+                marginBottom: 8,
+              }}>
+                Штрих-код SKU (полка)
+              </div>
+
+              <div style={{ marginBottom: 10, overflowX: 'auto' }}>
+                <BarcodeLabel
+                  barcode={selDrug.barcode}
+                  drugName={selDrug.nomenclature_name ?? selDrug.nomenclature_sku ?? undefined}
+                  lotNumber={selDrug.nomenclature_sku ?? undefined}
+                />
+              </div>
+
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                <button
+                  className="btn btn-ghost btn-sm"
+                  onClick={() => {
+                    navigator.clipboard?.writeText(selDrug.barcode!);
+                    alert('Скопировано');
+                  }}
+                >
+                  Копировать
+                </button>
+                <button
+                  className="btn btn-secondary btn-sm"
+                  onClick={() => {
+                    const p = new URLSearchParams({
+                      barcode: selDrug.barcode!,
+                      ...(selDrug.nomenclature_name ? { drug: selDrug.nomenclature_name } : {}),
+                      ...(selDrug.nomenclature_sku ? { lot: selDrug.nomenclature_sku } : {}),
+                    });
+                    window.open(`/print/vet-label?${p}`, '_blank');
+                  }}
+                >
+                  Печать этикетки
+                </button>
+              </div>
+
+              <div style={{ fontSize: 11, color: 'var(--fg-3)', marginTop: 6 }}>
+                Этикетка для полки/каталога. Лоты имеют свои штрих-коды
+                (на упаковке) — см. вкладку «Склад».
+              </div>
+            </div>
+          )}
           <KV
             items={[
               { k: 'SKU', v: selDrug.nomenclature_sku ?? '—', mono: true },

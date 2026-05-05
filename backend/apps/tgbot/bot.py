@@ -96,9 +96,43 @@ def edit_message_text(
     return _post("editMessageText", payload) is not None
 
 
-def set_my_commands(commands: list[dict]) -> bool:
-    """POST /setMyCommands. `commands` — список {"command": str, "description": str}."""
-    return _post("setMyCommands", {"commands": commands}) is not None
+def set_my_commands(
+    commands: list[dict],
+    *,
+    chat_id: Optional[int] = None,
+    language_code: Optional[str] = None,
+) -> bool:
+    """POST /setMyCommands. ``commands`` — список ``{"command": str, "description": str}``.
+
+    Если передан ``chat_id`` — команды сохраняются в scope `BotCommandScopeChat`,
+    то есть видны только этому чату. Это позволяет показывать каждому
+    пользователю персональный список команд по его RBAC. Без chat_id —
+    дефолтный scope для всех.
+    """
+    payload: dict = {"commands": commands}
+    if chat_id is not None:
+        payload["scope"] = {"type": "chat", "chat_id": chat_id}
+    if language_code:
+        payload["language_code"] = language_code
+    return _post("setMyCommands", payload) is not None
+
+
+def delete_my_commands(
+    *,
+    chat_id: Optional[int] = None,
+    language_code: Optional[str] = None,
+) -> bool:
+    """POST /deleteMyCommands — снять кастомный список команд для chat-scope.
+
+    Используется когда юзер отвязал TG-аккаунт: чтобы / меню больше не
+    предлагало команды на которые у него нет прав.
+    """
+    payload: dict = {}
+    if chat_id is not None:
+        payload["scope"] = {"type": "chat", "chat_id": chat_id}
+    if language_code:
+        payload["language_code"] = language_code
+    return _post("deleteMyCommands", payload) is not None
 
 
 # Process-local кеш юзернейма бота. getMe ходит в Telegram API, и не имеет

@@ -1,61 +1,153 @@
 """
-/menu — главное inline-меню владельца.
+/menu — главное inline-меню с RBAC-фильтрацией.
 
-Структура:
-  💰 Финансы (home:fin)         📦 Партии (home:batch)
-  🐔 Производство (home:prod)   📊 Отчёты (home:reports)
+Кнопки автоматически прячутся если у юзера нет доступа к разделу.
+Owner (admin модуль 'admin') видит всё. Head feed-модуля видит только
+батчи/производство, без финансов и т.д.
+
+Внутри каждого раздела используются inline-кнопки (callback_query) —
+юзер не должен набирать команды через /, всё клики. Рядом с любым
+сообщением где есть данные — есть «← Назад» / «🏠 Меню».
 """
 from __future__ import annotations
+
+import logging
 
 from ..bot import edit_message_text, send_message
 from ..dispatcher import HandlerCtx, command, on_callback
 from ..keyboards import kb
-
-
-_MENU_TEXT = (
-    "🏠 <b>Главное меню</b>\n\n"
-    "Выберите раздел:"
+from ..services.menu_scope import (
+    can_see_section,
+    is_owner,
+    user_module_levels,
 )
 
-_MENU_BUTTONS = [
-    ("💰 Финансы", "home:fin"),
-    ("📦 Партии", "home:batch"),
-    ("🐔 Производство", "home:prod"),
-    ("📊 Отчёты", "home:reports"),
+logger = logging.getLogger(__name__)
+
+
+# Каждый кортеж: (label, callback_data, section_key для RBAC).
+# «Modullar» (бывшее Ishlab chiqarish) — единая точка входа в любой модуль
+# (касса/склады/партии модуля). «Partiyalar» убрали — всё внутри модулей.
+_ALL_SECTIONS = [
+    ("💰 Moliya",        "home:fin",     "fin"),
+    ("🐔 Modullar",      "home:modules", "modules"),
+    ("📊 Hisobotlar",    "home:reports", "reports"),
 ]
 
 
-@command("/menu", help="Главное меню")
+def _menu_buttons_for(link) -> list[tuple[str, str]]:
+    """Только кнопки разделов, к которым у юзера есть доступ.
+
+    Если юзер не видит ничего (странно — но возможно если убрали все
+    permissions) — оставим хотя бы /help чтобы было что нажать.
+    """
+    levels = user_module_levels(link)
+    buttons = [
+        (label, cb) for (label, cb, section) in _ALL_SECTIONS
+        if can_see_section(levels, section)
+    ]
+    if not buttons:
+        return [("ℹ️ Yordam", "home:help")]
+    return buttons
+
+
+def _menu_text(link) -> str:
+    """Заголовок меню. Если owner — без подписи; иначе подпишем «scope: …»
+    чтобы юзер понимал, почему кнопок мало."""
+    levels = user_module_levels(link)
+    if is_owner(levels):
+        return "🏠 <b>Asosiy menyu</b>\n\nBo'limni tanlang:"
+    visible = [
+        label for label, _, section in _ALL_SECTIONS
+        if can_see_section(levels, section)
+    ]
+    if not visible:
+        return (
+            "🏠 <b>Asosiy menyu</b>\n\n"
+            "Sizda hech qanday modulga ruxsat yo'q. Administrator bilan bog'laning."
+        )
+    scope_hint = ", ".join(s for s in visible)
+    return (
+        f"🏠 <b>Asosiy menyu</b>\n"
+        f"<i>Sizning ruxsatingiz: {scope_hint}</i>\n\n"
+        f"Bo'limni tanlang:"
+    )
+
+
+def _is_cp_link(link) -> bool:
+    return bool(link and link.counterparty_id and not link.user_id)
+
+
+@command("/menu", help="Asosiy menyu", audience="any")
 def handle_menu_cmd(ctx: HandlerCtx) -> None:
-    send_message(ctx.chat_id, _MENU_TEXT, reply_markup=kb(_MENU_BUTTONS, cols=2))
+    if _is_cp_link(ctx.link):
+        from .counterparty import render_counterparty_menu
+        render_counterparty_menu(ctx)
+        return
+    send_message(
+        ctx.chat_id,
+        _menu_text(ctx.link),
+        reply_markup=kb(_menu_buttons_for(ctx.link), cols=2),
+    )
 
 
 @on_callback("home")
 def handle_home_callback(ctx: HandlerCtx) -> None:
-    """Универсальный handler `home` (вернуться в главное меню) и `home:<section>`."""
-    if ctx.callback_data in (None, "home"):
-        # Возврат на главную — редактируем существующее сообщение.
-        if ctx.message_id:
-            edit_message_text(
-                ctx.chat_id, ctx.message_id, _MENU_TEXT,
-                reply_markup=kb(_MENU_BUTTONS, cols=2),
-            )
-        else:
-            send_message(ctx.chat_id, _MENU_TEXT, reply_markup=kb(_MENU_BUTTONS, cols=2))
+    """`home` — корень; `home:<section>` — раздел."""
+    section = ctx.args[0] if ctx.args else ""
+
+    if _is_cp_link(ctx.link):
+        # Клиент-кабинет — completely separate menu tree.
+        from .counterparty import render_counterparty_menu
+        render_counterparty_menu(ctx)
         return
 
-    section = ctx.args[0] if ctx.args else ""
+    if not section:
+        # Корень
+        text = _menu_text(ctx.link)
+        markup = kb(_menu_buttons_for(ctx.link), cols=2)
+        if ctx.message_id:
+            edit_message_text(ctx.chat_id, ctx.message_id, text, reply_markup=markup)
+        else:
+            send_message(ctx.chat_id, text, reply_markup=markup)
+        return
+
+    # RBAC-gate для подменю
+    levels = user_module_levels(ctx.link)
+    if not can_see_section(levels, section):
+        send_message(
+            ctx.chat_id,
+            "⛔ Bu bo'limga sizda ruxsat yo'q.",
+            reply_markup=kb([("← Orqaga", "home")], cols=1),
+        )
+        return
+
     if section == "fin":
         from .finance import render_finance_menu
         render_finance_menu(ctx)
-    elif section == "batch":
-        from .production import render_batches_section
-        render_batches_section(ctx)
-    elif section == "prod":
-        from .production import render_production_section
-        render_production_section(ctx)
+    elif section in ("modules", "batch", "prod"):
+        # batch / prod — legacy callbacks от старых сообщений с inline-кнопками,
+        # переадресуем на новый единый «Modullar».
+        from .modules_hub import render_modules_section
+        render_modules_section(ctx)
     elif section == "reports":
-        from .reports import render_reports_section
-        render_reports_section(ctx)
+        # Hisobotlar тоже разбито по модулям: выбираешь модуль → его аналитика.
+        from .modules_hub import render_reports_modules
+        render_reports_modules(ctx)
+    elif section == "help":
+        from .help_cmd import handle_help
+        handle_help(ctx)
     else:
-        send_message(ctx.chat_id, "Раздел не найден.")
+        # Логируем неизвестный section — поможет диагностировать stale-worker
+        # сценарии (юзер кликнул home:newsection, но worker запущен с
+        # version-N кода без этой ветки).
+        logger.warning(
+            "home callback: unknown section=%r (chat=%s) — most likely "
+            "stale worker, restart with --force-recreate",
+            section, ctx.chat_id,
+        )
+        send_message(
+            ctx.chat_id,
+            f"Bo'lim topilmadi: <code>{section}</code>",
+            reply_markup=kb([("🏠 Bosh menyu", "home")], cols=1),
+        )

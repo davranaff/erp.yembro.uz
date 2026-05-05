@@ -22,16 +22,18 @@ def _msg(chat_id, text):
 def test_cash_command_renders(tg_link, fake_send):
     dispatch_message(_msg(tg_link.chat_id, "/cash"))
     text = fake_send.calls[0][1]
-    assert "Касса и банк" in text
-    assert "Всего" in text
+    # Узбекский после B-рефактора: «Kassa va bank» / «Jami»
+    assert "Kassa va bank" in text
+    assert "Jami" in text
 
 
 def test_debt_command_empty_state(tg_link, fake_send):
-    """Если нет неоплаченных заказов — выводится «✅ Все продажи оплачены»."""
+    """Если нет неоплаченных заказов — выводится «Barcha sotuvlar to'langan»."""
     dispatch_message(_msg(tg_link.chat_id, "/debt"))
     text = fake_send.calls[0][1]
-    assert "Дебиторка" in text
-    assert "Все продажи оплачены" in text
+    # Заголовок переведён на узбекский в B-refactor
+    assert "Mijoz qarzlari" in text
+    assert "to'langan" in text.lower()
 
 
 def test_debt_command_lists_top_debtor(tg_link, fake_send, org):
@@ -61,7 +63,8 @@ def test_debt_command_lists_top_debtor(tg_link, fake_send, org):
     text = fake_send.calls[0][1]
     assert "Должник 1" in text
     assert "ПР-DEBT-1" in text
-    assert "просрочка" in text
+    # «kechikkan» — узбекский эквивалент «просрочка/опоздал»
+    assert "kechikkan" in text.lower()
 
 
 def test_pnl_command_renders_for_week(tg_link, fake_send):
@@ -75,8 +78,9 @@ def test_pnl_command_renders_for_week(tg_link, fake_send):
 def test_sales_command_empty_state(tg_link, fake_send):
     dispatch_message(_msg(tg_link.chat_id, "/sales today"))
     text = fake_send.calls[0][1]
-    assert "Продажи" in text
-    assert "Документов:" in text
+    # Узбекский после B-refactor
+    assert "Sotuvlar" in text
+    assert "Hujjatlar:" in text
 
 
 # ─── /cred — регрессия на FieldError(supplier→counterparty) ─────────────
@@ -94,8 +98,68 @@ def test_cred_callback_renders_without_crash(tg_link, fake_send, org):
     all_text = " ".join(t for _, _, t, _ in fake_send.edits) + " ".join(
         t for _, t, _ in fake_send.calls
     )
-    assert "Кредиторка" in all_text
-    # Не падает = главное; пустой БД отдаст «Все закупки оплачены».
+    # Узбекский: «Yetkazib beruvchi qarzlari»
+    assert "Yetkazib beruvchi" in all_text
+    # Не падает = главное; пустой БД отдаст «Barcha xaridlar to'langan».
+
+
+def test_debt_pagination_navigates_pages(tg_link, fake_send, org):
+    """12 неоплаченных продаж → 1-я страница 10, 2-я 2 + кнопки навигации."""
+    from apps.counterparties.models import Counterparty
+    from apps.modules.models import Module
+    from apps.sales.models import SaleOrder
+    from apps.warehouses.models import Warehouse
+
+    cp = Counterparty.objects.create(
+        organization=org, code="К-PAGE", kind="buyer", name="Page test",
+    )
+    m_vet = Module.objects.get(code="vet")
+    wh = Warehouse.objects.create(
+        organization=org, module=m_vet, code="СК-PAGE", name="Скл",
+    )
+    for i in range(12):
+        SaleOrder.objects.create(
+            organization=org, module=m_vet,
+            doc_number=f"ПР-PG-{i:02d}", date=date.today(),
+            customer=cp, warehouse=wh,
+            amount_uzs=Decimal(str(1_000_000 * (12 - i))),  # decreasing
+            paid_amount_uzs=Decimal("0"),
+            status=SaleOrder.Status.CONFIRMED,
+            payment_status=SaleOrder.PaymentStatus.UNPAID,
+        )
+
+    # Page 1
+    from apps.tgbot.dispatcher import dispatch_callback
+    dispatch_callback({
+        "id": "cbq-page1", "data": "fin:debt",
+        "message": {"chat": {"id": tg_link.chat_id}, "message_id": 1},
+    })
+    text1 = fake_send.edits[-1][2]
+    markup1 = fake_send.edits[-1][3]
+    assert "Jami 12 ta hujjat" in text1
+    # Должно быть 10 строк (1.-10.)
+    for i in range(1, 11):
+        assert f"\n{i}. " in text1
+    # Должна быть кнопка «Keyingi →» с callback fin:debt:2
+    callbacks = {b["callback_data"] for row in markup1["inline_keyboard"] for b in row}
+    assert "fin:debt:2" in callbacks
+    # И не должно быть «← Oldingi» (мы на 1-й)
+    assert "fin:debt:0" not in callbacks
+
+    # Page 2
+    fake_send.edits.clear()
+    dispatch_callback({
+        "id": "cbq-page2", "data": "fin:debt:2",
+        "message": {"chat": {"id": tg_link.chat_id}, "message_id": 1},
+    })
+    text2 = fake_send.edits[-1][2]
+    markup2 = fake_send.edits[-1][3]
+    # На второй стр элементы 11 и 12
+    assert "\n11. " in text2
+    assert "\n12. " in text2
+    # Должна быть «← Oldingi» (вернуться на 1)
+    callbacks2 = {b["callback_data"] for row in markup2["inline_keyboard"] for b in row}
+    assert "fin:debt:1" in callbacks2
 
 
 def test_cred_callback_lists_top_supplier(tg_link, fake_send, org):

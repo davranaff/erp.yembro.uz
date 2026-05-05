@@ -69,10 +69,16 @@ class CommandSpec:
     help_line: str               # «Продажи за период»
     module: str | None = None    # RBAC gate; None = публично (для /start, /help)
     private: bool = False        # если True — не показывать в setMyCommands
+    audience: str = "admin"      # "admin" | "counterparty" | "any"
 
 
 COMMANDS: dict[str, CommandSpec] = {}
 CALLBACKS: list[tuple[str, Handler]] = []
+
+# Reply-клавиатура шлёт текст кнопки. Здесь маппим эти тексты в /команды
+# чтобы dispatch работал единообразно. Каждый handler-модуль может
+# дописать сюда свои кнопки через update().
+TEXT_TO_COMMAND: dict[str, str] = {}
 """Список `(prefix, handler)`. Длинные префиксы матчатся раньше — порядок
 регистрации важен. Для предсказуемости сортируем по убыванию длины
 непосредственно при поиске handler-а."""
@@ -84,12 +90,19 @@ def command(
     help: str = "",
     module: str | None = None,
     private: bool = False,
+    audience: str = "admin",
 ) -> Callable[[Handler], Handler]:
-    """Декоратор регистрации текстовой команды."""
+    """Декоратор регистрации текстовой команды.
+
+    ``audience``:
+      - "admin"        (default): доступно только для user-link (RBAC по module).
+      - "counterparty": доступно только для counterparty-link (клиент-кабинет).
+      - "any"          : доступно обоим типам (например /menu, /help).
+    """
     def deco(fn: Handler) -> Handler:
         COMMANDS[name] = CommandSpec(
             name=name, handler=fn, help_line=help,
-            module=module, private=private,
+            module=module, private=private, audience=audience,
         )
         return fn
     return deco
@@ -113,6 +126,23 @@ def get_admin_link(chat_id: int):
         TgLink.objects
         .filter(chat_id=chat_id, is_active=True, user__isnull=False)
         .select_related("organization", "user", "active_organization")
+        .first()
+    )
+
+
+def get_counterparty_link(chat_id: int):
+    """Возвращает активный TgLink контрагента (cp-link) или None.
+
+    Counterparty-линки используются клиентами для self-service кабинета:
+    свои заказы, долги, статус блокировки. Dispatcher ищет их когда
+    admin-link не найден — благодаря XOR-constraint на TgLink один chat
+    одновременно либо admin, либо cp в одной org.
+    """
+    from .models import TgLink
+    return (
+        TgLink.objects
+        .filter(chat_id=chat_id, is_active=True, counterparty__isnull=False)
+        .select_related("organization", "counterparty")
         .first()
     )
 
@@ -159,6 +189,14 @@ def dispatch_message(msg: dict) -> None:
     # тоже импортирует dispatcher).
     from . import handlers  # noqa: F401  — регистрирует команды
 
+    # Text-button mapping: reply-клавиатура шлёт текст кнопки (без слеша).
+    # Преобразуем известные тексты в /команды чтобы handler dispatch работал
+    # одинаково. Если текст не совпадает — оставляем как есть (попадёт в
+    # /help как unknown command).
+    cmd_from_text = TEXT_TO_COMMAND.get(text.strip())
+    if cmd_from_text:
+        text = cmd_from_text
+
     parts = text.split()
     cmd_name = parts[0]
     args = parts[1:]
@@ -173,30 +211,48 @@ def dispatch_message(msg: dict) -> None:
             send_message(chat_id, "⚠️ Ошибка обработки. Повторите позже.")
         return
 
+    # Сначала ищем admin-link (сотрудник), потом counterparty-link (клиент).
+    # XOR-constraint на TgLink (organization, chat_id) гарантирует что в
+    # одной org один chat — это либо admin, либо cp, не оба.
     link = get_admin_link(chat_id)
+    is_counterparty = False
+    if link is None:
+        link = get_counterparty_link(chat_id)
+        is_counterparty = link is not None
+
     if link is None:
         send_message(
             chat_id,
-            "❌ Нет доступа.\n\nПривяжите аккаунт в ERP: Настройки → Telegram.",
+            "❌ Akkaunt bog'lanmagan.\n\nERP'da bog'lang: Sozlamalar → Telegram.",
         )
         return
 
     spec = COMMANDS.get(cmd_name)
     if spec is None:
-        # Неизвестная команда → /help (генерируется автоматически)
+        # Неизвестная команда → /help
         from .handlers.help_cmd import handle_help
         handle_help(HandlerCtx(chat_id=chat_id, link=link))
         return
 
-    if spec.module and not has_module_access(link, spec.module):
-        send_message(chat_id, f"⛔ Нет доступа к модулю <b>{spec.module}</b>.")
+    # Audience-gate: counterparty не может звать admin-команды и наоборот.
+    audience = getattr(spec, "audience", "admin")
+    if audience == "admin" and is_counterparty:
+        send_message(chat_id, "⛔ Bu buyruq xodimlar uchun.")
+        return
+    if audience == "counterparty" and not is_counterparty:
+        send_message(chat_id, "⛔ Bu buyruq mijozlar uchun.")
+        return
+
+    # RBAC-gate (только для admin-link, у counterparty нет module-доступов).
+    if not is_counterparty and spec.module and not has_module_access(link, spec.module):
+        send_message(chat_id, f"⛔ Modulga ruxsat yo'q: <b>{spec.module}</b>.")
         return
 
     try:
         spec.handler(HandlerCtx(chat_id=chat_id, link=link, args=args))
     except Exception:  # noqa: BLE001
         logger.exception("command %s crashed", cmd_name)
-        send_message(chat_id, "⚠️ Ошибка обработки. Повторите позже.")
+        send_message(chat_id, "⚠️ Xatolik yuz berdi. Keyinroq qayta urinib ko'ring.")
 
 
 def dispatch_callback(cbq: dict) -> None:
@@ -213,15 +269,24 @@ def dispatch_callback(cbq: dict) -> None:
 
     from . import handlers  # noqa: F401
 
-    link = get_admin_link(chat_id)
+    link = get_admin_link(chat_id) or get_counterparty_link(chat_id)
     if link is None:
-        send_message(chat_id, "❌ Сессия истекла. Привяжите аккаунт заново.")
+        send_message(chat_id, "❌ Sessiya tugadi. Akkauntni qaytadan bog'lang.")
         return
 
-    handler = _resolve_callback(data)
-    if handler is None:
+    resolved = _resolve_callback(data)
+    if resolved is None:
         logger.warning("no handler for callback %r", data)
         return
+    prefix, handler = resolved
+
+    # Args = всё ПОСЛЕ matched prefix, разрезанное по `:`.
+    # Раньше делали data.split(":")[1:] — это работало только для коротких
+    # однотокеновых префиксов (`fin`, `home`). Для `prod:batch` оставляло
+    # «batch» в args[0] → handler склеивал «batch:П-Ц-ОТК-...» и не находил
+    # партию в БД («Партия batch:П-Ц-... не найдена»).
+    remainder = data[len(prefix):].lstrip(":")
+    args = remainder.split(":") if remainder else []
 
     try:
         handler(HandlerCtx(
@@ -230,17 +295,22 @@ def dispatch_callback(cbq: dict) -> None:
             callback_data=data,
             callback_id=callback_id,
             message_id=message_id,
-            args=data.split(":")[1:],  # удобно: prefix:arg1:arg2 → args=[arg1,arg2]
+            args=args,
         ))
     except Exception:  # noqa: BLE001
         logger.exception("callback %s crashed", data)
         send_message(chat_id, "⚠️ Ошибка обработки. Повторите позже.")
 
 
-def _resolve_callback(data: str) -> Optional[Handler]:
-    """Самый длинный соответствующий префикс побеждает (`fin:pnl:` > `fin:`)."""
+def _resolve_callback(data: str) -> Optional[tuple[str, Handler]]:
+    """Самый длинный соответствующий префикс побеждает (`fin:pnl:` > `fin:`).
+
+    Возвращает (prefix, handler) или None — prefix нужен dispatcher'у чтобы
+    правильно отрезать args (раньше отрезалось только до первого `:`,
+    что ломало составные префиксы).
+    """
     matches = [(p, h) for p, h in CALLBACKS if data.startswith(p)]
     if not matches:
         return None
     matches.sort(key=lambda kv: -len(kv[0]))
-    return matches[0][1]
+    return matches[0]

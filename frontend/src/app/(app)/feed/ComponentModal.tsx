@@ -1,5 +1,6 @@
 'use client';
 
+import { useQueryClient } from '@tanstack/react-query';
 import { useMemo, useState } from 'react';
 
 import HelpHint from '@/components/ui/HelpHint';
@@ -19,6 +20,7 @@ interface Props {
 /** POST/PATCH /api/feed/recipe-components/ */
 export default function ComponentModal({ version, initial, onClose }: Props) {
   const isEdit = Boolean(initial);
+  const qc = useQueryClient();
   const create = recipeComponentsCrud.useCreate();
   const update = recipeComponentsCrud.useUpdate();
   // Только feed-номенклатура: иначе в выпадашке появятся тушки/яйца/цыплята —
@@ -78,6 +80,7 @@ export default function ComponentModal({ version, initial, onClose }: Props) {
       } else {
         await create.mutateAsync(payload as never);
       }
+      await qc.invalidateQueries({ queryKey: ['feed', 'recipe-versions'] });
       onClose();
     } catch { /* */ }
   };

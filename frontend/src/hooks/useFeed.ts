@@ -5,6 +5,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ApiError, apiFetch } from '@/lib/api';
 import { makeCrud } from '@/lib/crudFactory';
 import type {
+  FeedBagLot,
   FeedBatch,
   FeedLotShrinkageState,
   FeedShrinkageProfile,
@@ -70,6 +71,48 @@ export const useApprovePassport = feedBatchesCrud.makeAction<void, FeedBatch>(
 export const useRejectPassport = feedBatchesCrud.makeAction<{ reason: string }, FeedBatch>(
   (id) => `/api/feed/feed-batches/${id}/reject_passport/`,
 );
+
+// ─── FeedBagLot — фасованные мешки ─────────────────────────────────────
+
+export const feedBagLotsCrud = makeCrud<FeedBagLot>({
+  key: ['feed', 'bag-lots'],
+  path: '/api/feed/feed-bag-lots/',
+  ordering: '-packaged_at',
+});
+
+/**
+ * Расфасовать партию комбикорма в мешки.
+ * POST /api/feed/feed-batches/{id}/package/
+ * После успеха инвалидируем и feed-batches (изменился остаток), и bag-lots
+ * (создалась новая запись), чтобы оба списка освежились без перезагрузки.
+ */
+export function usePackageFeedBatch() {
+  const qc = useQueryClient();
+  return useMutation<
+    FeedBatch & { _result?: { bag_lot: FeedBagLot } },
+    ApiError,
+    {
+      id: string;
+      body: {
+        bag_count: number;
+        bag_weight_kg: string;
+        storage_warehouse: string;
+        storage_bin?: string | null;
+        notes?: string;
+      };
+    }
+  >({
+    mutationFn: ({ id, body }) =>
+      apiFetch(`/api/feed/feed-batches/${id}/package/`, {
+        method: 'POST',
+        body,
+      }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['feed', 'batches'] });
+      qc.invalidateQueries({ queryKey: ['feed', 'bag-lots'] });
+    },
+  });
+}
 
 // ─── Raw materials ─────────────────────────────────────────────────────
 

@@ -77,6 +77,7 @@ class SaleOrderViewSet(ImmutableStatusMixin, DeleteReasonMixin, OrgScopedModelVi
         order = self.get_object()
 
         force = bool(request.data.get("force_credit_override"))
+        override_reason = (request.data.get("credit_override_reason") or "").strip()
         if force:
             membership = getattr(request, "membership", None)
             if not (membership and level_satisfies(
@@ -90,7 +91,10 @@ class SaleOrderViewSet(ImmutableStatusMixin, DeleteReasonMixin, OrgScopedModelVi
 
         try:
             result = confirm_sale(
-                order, user=request.user, force_credit_override=force,
+                order,
+                user=request.user,
+                force_credit_override=force,
+                credit_override_reason=override_reason,
             )
         except SaleConfirmError as exc:
             raise DRFValidationError(
@@ -106,10 +110,40 @@ class SaleOrderViewSet(ImmutableStatusMixin, DeleteReasonMixin, OrgScopedModelVi
                 actor=request.user,
                 action=AuditLog.Action.UPDATE,
                 entity=order,
-                action_verb=f"credit_override on confirm of {order.doc_number}",
+                action_verb=(
+                    f"credit_override on confirm of {order.doc_number} · "
+                    f"{override_reason[:200]}"
+                ),
             )
 
         order.refresh_from_db()
+
+        # TG-уведомления через orchestration: клиент + админы sales + head'ы
+        # source-модулей (детализация). Логика инкапсулирована в одном месте,
+        # view остаётся тонким.
+        # Также проверяем не сменился ли credit-status клиента (новая
+        # продажа могла перевести в blokirovka даже после force_override).
+        try:
+            from apps.sales.services.credit_check import check_customer_credit
+            from apps.tgbot.services.orchestration import (
+                notify_credit_status_change,
+                notify_sale_event,
+            )
+            notify_sale_event(order)
+            after = check_customer_credit(
+                organization=order.organization, customer=order.customer,
+            )
+            # was_ok=True (по умолчанию мы продали — значит ДО продажи
+            # был ok ИЛИ был override). Если после — not ok, клиент
+            # получит push о блокировке.
+            notify_credit_status_change(
+                order.customer,
+                was_ok=True, is_ok=after.ok,
+                reasons=after.reasons,
+            )
+        except Exception:
+            pass
+
         data = self.get_serializer(order).data
         data["_result"] = {
             "stock_movements_count": len(result.stock_movements),
@@ -207,6 +241,13 @@ class SaleOrderViewSet(ImmutableStatusMixin, DeleteReasonMixin, OrgScopedModelVi
         else:
             pay_date = date_cls.today()
 
+        # Кредит-статус ДО оплаты — для notify_credit_status_change.
+        # Если был not_ok и оплата сняла блок → клиент получит push.
+        from apps.sales.services.credit_check import check_customer_credit
+        was_credit_ok = check_customer_credit(
+            organization=order.organization, customer=order.customer,
+        ).ok
+
         try:
             result = create_and_post_payment(
                 organization=order.organization,
@@ -224,6 +265,28 @@ class SaleOrderViewSet(ImmutableStatusMixin, DeleteReasonMixin, OrgScopedModelVi
             raise DRFValidationError(
                 exc.message_dict if hasattr(exc, "message_dict") else exc.messages
             )
+
+        # TG-уведомления о входящей оплате — клиенту, админу организации,
+        # head sales. create_and_post_payment не дёргает обычный
+        # POST /api/payments/{id}/post/, поэтому шлём явно через orchestrator.
+        try:
+            from apps.tgbot.services.orchestration import (
+                notify_credit_status_change,
+                notify_payment_event,
+            )
+            notify_payment_event(result.payment, related_order=order)
+            # Status flip notification (клиент только что разблокировался)
+            after = check_customer_credit(
+                organization=order.organization, customer=order.customer,
+            )
+            notify_credit_status_change(
+                order.customer,
+                was_ok=was_credit_ok,
+                is_ok=after.ok,
+                reasons=after.reasons,
+            )
+        except Exception:
+            pass
 
         order.refresh_from_db()
         data = self.get_serializer(order).data

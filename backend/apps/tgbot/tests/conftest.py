@@ -95,8 +95,10 @@ def fake_send():
             legacy as _leg,
             linking as _link,
             digest as _dig,
+            counterparty as _cp,
+            modules_hub as _mod_hub,
         )
-        for mod in (_disp, _menu, _fin, _prod, _rep, _org, _help, _leg, _link, _dig):
+        for mod in (_disp, _menu, _fin, _prod, _rep, _org, _help, _leg, _link, _dig, _cp, _mod_hub):
             if hasattr(mod, "send_message"):
                 mod.send_message = fake.send
             if hasattr(mod, "edit_message_text"):

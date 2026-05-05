@@ -69,7 +69,7 @@ def test_command_uses_active_org_after_switch(tg_link, second_org, fake_send, or
     # Cash должен запрашивать second_org. Раз там нет платежей — итого = 0.
     dispatch_message(_msg(tg_link.chat_id, "/cash"))
     text = fake_send.calls[0][1]
-    assert "Касса и банк" in text
+    assert "Kassa va bank" in text
     # Sanity: tg_link обновлён
     tg_link.refresh_from_db()
     assert tg_link.active_organization_id == second_org.id

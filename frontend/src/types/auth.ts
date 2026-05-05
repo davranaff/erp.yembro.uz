@@ -913,7 +913,55 @@ export interface FeedBatch {
   withdrawal_period_ends: string | null;
   quality_passport_status: string | null;
   task_doc_number: string | null;
+  /**
+   * Резолвится бэкендом через recipe.code → NomenclatureItem.sku.
+   * Используется фронтом для автоподстановки в позицию продажи.
+   */
+  nomenclature: string | null;
+  nomenclature_sku: string | null;
+  nomenclature_name: string | null;
   notes: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export type FeedBagLotStatus = 'active' | 'depleted' | 'recalled';
+
+/**
+ * Партия комбикорма, расфасованная в мешки.
+ * Создаётся через POST /api/feed/feed-batches/{id}/package/.
+ * Учёт в штуках мешков (`bags_remaining`), не в кг.
+ */
+export interface FeedBagLot {
+  id: string;
+  /** Field-level RBAC: false → cost-поля скрыты */
+  _finances_visible?: boolean;
+  doc_number: string;
+  module: string;
+  source_feed_batch: string;
+  source_doc_number: string | null;
+  recipe_version: string;
+  recipe_code: string | null;
+  bag_weight_kg: string;
+  bags_initial: number;
+  bags_remaining: number;
+  remaining_kg: string;
+  unit_cost_uzs: string;
+  total_cost_uzs: string;
+  storage_warehouse: string;
+  storage_warehouse_code: string | null;
+  storage_bin: string | null;
+  storage_bin_code: string | null;
+  packaged_at: string;
+  is_medicated: boolean;
+  withdrawal_period_days: number;
+  withdrawal_period_ends: string | null;
+  status: FeedBagLotStatus;
+  notes: string;
+  /** Авто-резолв через recipe.code → NomenclatureItem.sku. */
+  nomenclature: string | null;
+  nomenclature_sku: string | null;
+  nomenclature_name: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -1207,6 +1255,11 @@ export interface VetDrug {
   administration_route: DrugRoute;
   default_withdrawal_days: number;
   storage_conditions: string;
+  /**
+   * Штрих-код SKU (shelf-tag) — ставится на полку, отдельный от
+   * lot-barcode-ов в VetStockBatch.
+   */
+  barcode: string | null;
   is_active: boolean;
   notes: string;
   created_at: string;
@@ -1226,6 +1279,8 @@ export interface VetStockBatch {
   drug_sku: string | null;
   drug_name: string | null;
   drug_type: DrugType | null;
+  /** = drug.nomenclature_id, для автоподстановки в позицию продажи. */
+  nomenclature: string | null;
   lot_number: string;
   warehouse: string;
   warehouse_code: string | null;
@@ -1254,10 +1309,12 @@ export interface VetStockBatch {
 }
 
 /**
- * Public-данные лота для сканера (без чувствительной информации).
- * Возвращается из /api/vet/public/scan/<barcode>/.
+ * Public-данные лота препарата для сканера.
+ * Возвращается из /api/vet/public/scan/<barcode>/ когда в barcode-индексе
+ * нашёлся VetStockBatch.
  */
 export interface VetStockBatchPublic {
+  source_kind: 'drug_lot';
   id: string;
   barcode: string;
   drug_sku: string | null;
@@ -1274,6 +1331,26 @@ export interface VetStockBatchPublic {
   is_expired: boolean;
   is_expiring_soon: boolean;
 }
+
+/**
+ * Public-данные аксессуара для сканера.
+ * Возвращается из /api/vet/public/scan/<barcode>/ когда в barcode-индексе
+ * нашёлся VetAccessory (миска/поилка и т.п. без партионного учёта).
+ */
+export interface VetAccessoryPublic {
+  source_kind: 'accessory';
+  id: string;
+  barcode: string;
+  nomenclature_sku: string | null;
+  nomenclature_name: string | null;
+  unit_code: string | null;
+  current_quantity: string;
+  sale_price_uzs: string;
+  is_active: boolean;
+}
+
+/** Discriminated union — что отдаёт public scan. */
+export type ScanResult = VetStockBatchPublic | VetAccessoryPublic;
 
 export interface SellerDeviceToken {
   id: string;
@@ -1427,6 +1504,26 @@ export interface BatchTrace {
   totals: BatchTraceTotals;
 }
 
+export interface VetAccessory {
+  id: string;
+  module: string;
+  nomenclature: string;
+  nomenclature_sku: string | null;
+  nomenclature_name: string | null;
+  unit_code: string | null;
+  warehouse: string;
+  warehouse_code: string | null;
+  current_quantity: string;
+  /** Может быть null для пользователей без vet.r (FinancialFieldsMixin). */
+  cost_per_unit_uzs: string | null;
+  sale_price_uzs: string;
+  barcode: string | null;
+  is_active: boolean;
+  notes: string;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface VetTreatmentLog {
   id: string;
   doc_number: string;
@@ -1478,10 +1575,13 @@ export interface SaleItem {
   nomenclature_sku?: string | null;
   nomenclature_name?: string | null;
 
-  // XOR: ровно одна партия из трёх
+  // XOR: ровно одна партия из пяти
   batch: string | null;
   vet_stock_batch: string | null;
+  vet_accessory?: string | null;
   feed_batch: string | null;
+  /** FeedBagLot — партия фасованного корма (мешки), quantity = шт мешков. */
+  feed_bag_lot?: string | null;
 
   quantity: string;
   unit_price_uzs: string;
@@ -1520,6 +1620,8 @@ export interface SaleOrder {
   paid_amount_uzs: string;
   payment_status: SalePaymentStatus;
   due_date: string | null;
+  /** Заполняется только при confirm с force_credit_override=true. */
+  credit_override_reason?: string;
 
   // derived
   margin_uzs?: string;

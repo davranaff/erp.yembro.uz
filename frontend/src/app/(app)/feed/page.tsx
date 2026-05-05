@@ -1,5 +1,6 @@
 'use client';
 
+import { useQueryClient } from '@tanstack/react-query';
 import { useMemo, useState } from 'react';
 
 import DetailDrawer, { KV } from '@/components/DetailDrawer';
@@ -17,6 +18,7 @@ import Panel from '@/components/ui/Panel';
 import RowActions from '@/components/ui/RowActions';
 import Seg from '@/components/ui/Seg';
 import {
+  feedBagLotsCrud,
   feedBatchesCrud,
   rawBatchesCrud,
   recipeComponentsCrud,
@@ -32,6 +34,8 @@ import {
 import { useHasLevel } from '@/hooks/usePermissions';
 import { getFinancesVisible } from '@/lib/permissions';
 import type {
+  FeedBagLot,
+  FeedBagLotStatus,
   FeedBatch,
   ProductionTask,
   ProductionTaskStatus,
@@ -44,12 +48,25 @@ import type {
 
 import ComponentModal from './ComponentModal';
 import ExecuteTaskModal from './ExecuteTaskModal';
+import PackagingModal from './PackagingModal';
 import RawBatchModal from './RawBatchModal';
 import RecipeModal from './RecipeModal';
 import TaskModal from './TaskModal';
 import VersionModal from './VersionModal';
 
-type TabKey = 'recipes' | 'raw' | 'tasks' | 'batches';
+type TabKey = 'recipes' | 'raw' | 'tasks' | 'batches' | 'bags';
+
+const BAG_STATUS_LABEL: Record<FeedBagLotStatus, string> = {
+  active: 'В наличии',
+  depleted: 'Исчерпана',
+  recalled: 'Отозвана',
+};
+
+const BAG_STATUS_TONE: Record<FeedBagLotStatus, 'success' | 'neutral' | 'danger'> = {
+  active: 'success',
+  depleted: 'neutral',
+  recalled: 'danger',
+};
 
 const TASK_STATUS_LABEL: Record<ProductionTaskStatus, string> = {
   planned: 'План',
@@ -95,6 +112,7 @@ export default function FeedPage() {
 
   const hasLevel = useHasLevel();
   const canEdit = hasLevel('feed', 'rw');
+  const qc = useQueryClient();
 
   const { data: recipes, isLoading: recipesLoading } = recipesCrud.useList();
   const { data: versions } = recipeVersionsCrud.useList();
@@ -105,12 +123,15 @@ export default function FeedPage() {
     rawStatus ? { status: rawStatus } : {},
   );
   const { data: feedBatches, isLoading: feedBatchesLoading } = feedBatchesCrud.useList();
+  const { data: bagLots, isLoading: bagLotsLoading } = feedBagLotsCrud.useList();
 
   // Selection
   const [selRecipe, setSelRecipe] = useState<Recipe | null>(null);
   const [selRaw, setSelRaw] = useState<RawMaterialBatch | null>(null);
   const [selTask, setSelTask] = useState<ProductionTask | null>(null);
   const [selBatch, setSelBatch] = useState<FeedBatch | null>(null);
+  const [packageFor, setPackageFor] = useState<FeedBatch | null>(null);
+  const [selBagLot, setSelBagLot] = useState<FeedBagLot | null>(null);
 
   // Modals
   const [recipeModalOpen, setRecipeModalOpen] = useState(false);
@@ -250,6 +271,7 @@ export default function FeedPage() {
             { value: 'raw', label: 'Сырьё' },
             { value: 'tasks', label: 'Задания на замес' },
             { value: 'batches', label: 'Готовые партии' },
+            { value: 'bags', label: 'Мешки' },
           ]}
           value={tab}
           onChange={(v) => setTab(v as TabKey)}
@@ -571,6 +593,63 @@ export default function FeedPage() {
         </Panel>
       )}
 
+      {/* ── Tab: Мешки (FeedBagLot) ─────────────────────────────────────── */}
+      {tab === 'bags' && (
+        <Panel flush>
+          <DataTable<FeedBagLot>
+            isLoading={bagLotsLoading}
+            rows={bagLots}
+            rowKey={(b) => b.id}
+            emptyMessage={
+              <EmptyState
+                icon="box"
+                title="Мешков ещё нет"
+                description="Расфасованные мешки создаются из готовой партии комбикорма (статус «Одобрена») кнопкой «Расфасовать в мешки» в drawer'е партии."
+                steps={[
+                  { label: 'Создайте рецептуру и проведите замес' },
+                  { label: 'Дождитесь одобрения паспорта качества' },
+                  { label: 'В drawer-е партии нажмите «Расфасовать в мешки»' },
+                  { label: 'Укажите кол-во мешков, вес мешка и склад' },
+                ]}
+                hint="Учёт мешков ведётся в штуках. При продаже декрементится bags_remaining, в StockMovement автоматом конвертируется в кг."
+              />
+            }
+            onRowClick={(b) => setSelBagLot(b)}
+            rowProps={(b) => ({ active: selBagLot?.id === b.id })}
+            columns={[
+              { key: 'doc', label: 'Документ',
+                render: (b) => <span className="badge id">{b.doc_number}</span> },
+              { key: 'source', label: 'Из замеса', mono: true, cellStyle: { fontSize: 11, color: 'var(--fg-3)' },
+                render: (b) => b.source_doc_number ?? '—' },
+              { key: 'recipe', label: 'Рецепт', cellStyle: { fontSize: 12 },
+                render: (b) => b.recipe_code ?? '—' },
+              { key: 'date', label: 'Расфасовано', mono: true, cellStyle: { fontSize: 12 },
+                render: (b) => new Date(b.packaged_at).toLocaleDateString('ru-RU') },
+              { key: 'weight', label: 'Вес мешка', align: 'right', mono: true,
+                render: (b) => `${parseFloat(b.bag_weight_kg).toLocaleString('ru-RU')} кг` },
+              { key: 'remaining', label: 'Остаток', align: 'right', mono: true,
+                cellStyle: { fontWeight: 600 },
+                render: (b) => `${b.bags_remaining} / ${b.bags_initial} шт` },
+              { key: 'kg', label: '≈ кг', align: 'right', mono: true, cellStyle: { fontSize: 12, color: 'var(--fg-3)' },
+                render: (b) => fmtNum(b.remaining_kg, 0) },
+              ...(getFinancesVisible(bagLots) ? [{
+                key: 'unit_cost', label: 'Себест/мешок', align: 'right' as const, mono: true,
+                cellStyle: { fontSize: 12 },
+                render: (b: FeedBagLot) => fmtNum(b.unit_cost_uzs, 0) + ' сум',
+              }] : []),
+              { key: 'med', label: 'Мед.',
+                render: (b) => b.is_medicated ? <Badge tone="warn">мед</Badge> : '—' },
+              { key: 'status', label: 'Статус',
+                render: (b) => (
+                  <Badge tone={BAG_STATUS_TONE[b.status]} dot>
+                    {BAG_STATUS_LABEL[b.status]}
+                  </Badge>
+                ) },
+            ]}
+          />
+        </Panel>
+      )}
+
       {/* ── Drawer: Recipe ─────────────────────────────────────────────── */}
       {selRecipe && (() => {
         const recipeVersions = (versions ?? []).filter((v) => v.recipe === selRecipe.id);
@@ -855,6 +934,7 @@ export default function FeedPage() {
                                                   `Удалить компонент «${c.nomenclature_name ?? c.nomenclature_sku}» из версии v${v.version_number}?`,
                                                 )) return;
                                                 componentDel.mutate(c.id, {
+                                                  onSuccess: () => qc.invalidateQueries({ queryKey: ['feed', 'recipe-versions'] }),
                                                   onError: (err) => alert('Не удалось: ' + err.message),
                                                 });
                                               },
@@ -1307,6 +1387,16 @@ export default function FeedPage() {
                   </button>
                 </>
               )}
+              {canEdit
+                && selBatch.status === 'approved'
+                && parseFloat(selBatch.current_quantity_kg) > 0 && (
+                <button
+                  className="btn btn-secondary btn-sm"
+                  onClick={() => setPackageFor(selBatch)}
+                >
+                  <Icon name="box" size={14} /> Расфасовать в мешки
+                </button>
+              )}
               <a
                 className="btn btn-secondary btn-sm"
                 href={`/feed/${selBatch.id}/print`}
@@ -1434,6 +1524,50 @@ export default function FeedPage() {
           initial={editingRaw}
           onClose={() => { setRawModalOpen(false); setEditingRaw(null); }}
         />
+      )}
+      {packageFor && (
+        <PackagingModal
+          batch={packageFor}
+          onClose={() => setPackageFor(null)}
+        />
+      )}
+
+      {selBagLot && (
+        <DetailDrawer
+          title={`Мешки · ${selBagLot.doc_number}`}
+          subtitle={
+            `${selBagLot.recipe_code ?? '—'} · `
+            + `${selBagLot.bags_remaining}/${selBagLot.bags_initial} шт`
+          }
+          onClose={() => setSelBagLot(null)}
+        >
+          <KV
+            items={[
+              { k: 'Документ', v: selBagLot.doc_number, mono: true },
+              { k: 'Из замеса', v: selBagLot.source_doc_number ?? '—', mono: true },
+              { k: 'Рецепт', v: selBagLot.recipe_code ?? '—', mono: true },
+              { k: 'Расфасовано', v: new Date(selBagLot.packaged_at).toLocaleString('ru'), mono: true },
+              { k: 'Вес мешка', v: `${parseFloat(selBagLot.bag_weight_kg).toLocaleString('ru-RU')} кг`, mono: true },
+              { k: 'Выпуск', v: `${selBagLot.bags_initial} шт`, mono: true },
+              { k: 'Остаток', v: `${selBagLot.bags_remaining} шт`, mono: true },
+              { k: 'Остаток ≈ кг', v: `${fmtNum(selBagLot.remaining_kg, 1)} кг`, mono: true },
+              ...(getFinancesVisible(selBagLot) ? [
+                { k: 'Себестоимость / мешок', v: fmtNum(selBagLot.unit_cost_uzs, 2) + ' сум', mono: true },
+                { k: 'Сумма партии', v: fmtNum(selBagLot.total_cost_uzs, 0) + ' сум', mono: true },
+              ] : []),
+              { k: 'Склад', v: selBagLot.storage_warehouse_code ?? '—', mono: true },
+              ...(selBagLot.storage_bin_code ? [{
+                k: 'Бункер', v: selBagLot.storage_bin_code, mono: true,
+              }] : []),
+              { k: 'Медикаментозный', v: selBagLot.is_medicated ? 'Да' : 'Нет' },
+              ...(selBagLot.withdrawal_period_ends ? [{
+                k: 'Каренция до', v: selBagLot.withdrawal_period_ends, mono: true,
+              }] : []),
+              { k: 'Статус', v: BAG_STATUS_LABEL[selBagLot.status] },
+              ...(selBagLot.notes ? [{ k: 'Заметка', v: selBagLot.notes }] : []),
+            ]}
+          />
+        </DetailDrawer>
       )}
     </>
   );
