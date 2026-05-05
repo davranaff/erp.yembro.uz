@@ -62,32 +62,79 @@ export default function WarehouseBalanceDrawer({ warehouse, onClose }: Props) {
             {data.rows.map((r) => {
               const bal = parseFloat(r.balance_qty);
               const tone = bal > 0 ? 'success' : bal < 0 ? 'danger' : 'neutral';
+              const hasLots = (r.lots?.length ?? 0) > 0;
               return (
-                <tr key={r.nomenclature_id} style={{ borderBottom: '1px solid var(--border)' }}>
-                  <td style={{ padding: '6px 10px' }}>
-                    <div className="mono" style={{ fontWeight: 500 }}>{r.sku}</div>
-                    <div style={{ fontSize: 11, color: 'var(--fg-3)' }}>{r.name}</div>
-                  </td>
-                  <td className="mono" style={{
-                    padding: '6px 10px', textAlign: 'right',
-                    color: 'var(--success)',
-                  }}>
-                    +{fmt(r.incoming_qty, 2)}
-                  </td>
-                  <td className="mono" style={{
-                    padding: '6px 10px', textAlign: 'right',
-                    color: 'var(--danger)',
-                  }}>
-                    −{fmt(r.outgoing_qty, 2)}
-                  </td>
-                  <td style={{ padding: '6px 10px', textAlign: 'right' }}>
-                    <Badge tone={tone}>
-                      <span className="mono" style={{ fontWeight: 600 }}>
-                        {fmt(r.balance_qty, 2)} {r.unit}
-                      </span>
-                    </Badge>
-                  </td>
-                </tr>
+                <>
+                  <tr key={r.nomenclature_id} style={{ borderBottom: hasLots ? 'none' : '1px solid var(--border)' }}>
+                    <td style={{ padding: '6px 10px' }}>
+                      <div className="mono" style={{ fontWeight: 500 }}>{r.sku}</div>
+                      <div style={{ fontSize: 11, color: 'var(--fg-3)' }}>{r.name}</div>
+                    </td>
+                    <td className="mono" style={{
+                      padding: '6px 10px', textAlign: 'right',
+                      color: 'var(--success)',
+                    }}>
+                      +{fmt(r.incoming_qty, 2)}
+                    </td>
+                    <td className="mono" style={{
+                      padding: '6px 10px', textAlign: 'right',
+                      color: 'var(--danger)',
+                    }}>
+                      −{fmt(r.outgoing_qty, 2)}
+                    </td>
+                    <td style={{ padding: '6px 10px', textAlign: 'right' }}>
+                      <Badge tone={tone}>
+                        <span className="mono" style={{ fontWeight: 600 }}>
+                          {fmt(r.balance_qty, 2)} {r.unit}
+                        </span>
+                      </Badge>
+                    </td>
+                  </tr>
+                  {hasLots && (
+                    <tr key={`${r.nomenclature_id}-lots`} style={{
+                      borderBottom: '1px solid var(--border)',
+                      background: 'var(--bg-soft)',
+                    }}>
+                      <td colSpan={4} style={{ padding: '4px 10px 8px 24px' }}>
+                        <div style={{
+                          fontSize: 10, fontWeight: 700, color: 'var(--fg-3)',
+                          textTransform: 'uppercase', letterSpacing: '.04em',
+                          marginBottom: 4,
+                        }}>
+                          Лоты ({r.lots!.length}):
+                        </div>
+                        {r.lots!.map((lot) => {
+                          const exp = lot.expiration_date ? new Date(lot.expiration_date) : null;
+                          const days = exp ? Math.floor((exp.getTime() - Date.now()) / 86400000) : null;
+                          const expColor = days == null ? 'var(--fg-3)'
+                            : days < 30 ? 'var(--danger)'
+                            : days < 90 ? 'var(--brand-orange)' : 'var(--fg-2)';
+                          return (
+                            <div key={lot.id} style={{
+                              display: 'flex', justifyContent: 'space-between',
+                              gap: 10, padding: '2px 0', fontSize: 11,
+                            }}>
+                              <span className="mono" style={{ color: 'var(--fg-2)' }}>
+                                {lot.lot_number} <span style={{ color: 'var(--fg-3)' }}>· {lot.doc_number}</span>
+                              </span>
+                              <span className="mono" style={{ color: expColor }}>
+                                до {lot.expiration_date ?? '—'}
+                                {days != null && (
+                                  <span style={{ marginLeft: 4 }}>
+                                    ({days < 0 ? `просрочен ${-days} дн` : `${days} дн`})
+                                  </span>
+                                )}
+                              </span>
+                              <span className="mono" style={{ fontWeight: 600 }}>
+                                {fmt(lot.current_quantity, 2)} {r.unit}
+                              </span>
+                            </div>
+                          );
+                        })}
+                      </td>
+                    </tr>
+                  )}
+                </>
               );
             })}
           </tbody>

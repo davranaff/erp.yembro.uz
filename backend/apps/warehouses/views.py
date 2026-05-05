@@ -178,6 +178,37 @@ class WarehouseViewSet(OrgScopedModelViewSet):
             r["sku"],
         ))
 
+        # Для vet-склада — добавляем детализацию по лотам у каждой строки
+        # (lot_number, expiration_date, current_quantity на этом конкретном складе).
+        # Лекарства физически идентифицируются лотом, не SKU — это критично для
+        # отзыва (recall) и контроля сроков годности.
+        is_vet = warehouse.module.code == "vet" if warehouse.module_id else False
+        if is_vet:
+            from apps.vet.models import VetStockBatch
+            lots = (
+                VetStockBatch.objects
+                .filter(organization=warehouse.organization, warehouse=warehouse)
+                .filter(current_quantity__gt=0)
+                .exclude(status=VetStockBatch.Status.RECALLED)
+                .select_related("drug", "drug__nomenclature")
+                .order_by("expiration_date")
+            )
+            lots_by_nom: dict = defaultdict(list)
+            for lot in lots:
+                lots_by_nom[str(lot.drug.nomenclature_id)].append({
+                    "id": str(lot.id),
+                    "doc_number": lot.doc_number,
+                    "lot_number": lot.lot_number,
+                    "current_quantity": str(lot.current_quantity),
+                    "expiration_date": (
+                        lot.expiration_date.isoformat()
+                        if lot.expiration_date else None
+                    ),
+                    "status": lot.status,
+                })
+            for r in rows:
+                r["lots"] = lots_by_nom.get(r["nomenclature_id"], [])
+
         return Response({
             "warehouse": {
                 "id": str(warehouse.id),

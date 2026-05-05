@@ -168,6 +168,15 @@ export function useUpdateWarehouse() {
   });
 }
 
+export interface WarehouseBalanceLot {
+  id: string;
+  doc_number: string;
+  lot_number: string;
+  current_quantity: string;
+  expiration_date: string | null;
+  status: string;
+}
+
 export interface WarehouseBalanceRow {
   nomenclature_id: string;
   sku: string;
@@ -178,6 +187,8 @@ export interface WarehouseBalanceRow {
   outgoing_qty: string;
   outgoing_amount_uzs: string;
   balance_qty: string;
+  /** Только для vet-складов: активные лоты этого SKU на этом складе. */
+  lots?: WarehouseBalanceLot[];
 }
 
 export interface WarehouseBalanceResponse {
