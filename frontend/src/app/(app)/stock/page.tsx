@@ -22,6 +22,7 @@ import {
 } from '@/hooks/useStockMovements';
 import type { StockMovement, StockMovementKind, WarehouseRef } from '@/types/auth';
 
+import RawBatchModal from '../feed/RawBatchModal';
 import EditMovementModal from './EditMovementModal';
 import StockMovementModal from './StockMovementModal';
 import WarehouseModal from './WarehouseModal';
@@ -92,6 +93,13 @@ export default function StockPage() {
   const [sel, setSel] = useState<StockMovement | null>(null);
   const [showMovementModal, setShowMovementModal] = useState(false);
   const [editMovement, setEditMovement] = useState<StockMovement | null>(null);
+  const [rawBatchPrefill, setRawBatchPrefill] = useState<{
+    nomenclature?: string;
+    warehouse?: string;
+    supplier?: string;
+    quantity?: string;
+    price_per_unit?: string;
+  } | null>(null);
 
   // Warehouses tab state
   const [warehouseEdit, setWarehouseEdit] = useState<WarehouseRef | null>(null);
@@ -181,13 +189,23 @@ export default function StockPage() {
             <>
               <ExportCsvButton url={csvUrl} filename="stock-movements.csv" />
               {canEdit && (
-                <button
-                  className="btn btn-primary btn-sm"
-                  onClick={() => setShowMovementModal(true)}
-                >
-                  <Icon name="plus" size={14} />
-                  Новое движение
-                </button>
+                <>
+                  <button
+                    className="btn btn-secondary btn-sm"
+                    onClick={() => setRawBatchPrefill({})}
+                    title="Партия сырья для модуля «Корма» — учёт по Дювалю + карантин"
+                  >
+                    <Icon name="plus" size={14} />
+                    Партия сырья (корма)
+                  </button>
+                  <button
+                    className="btn btn-primary btn-sm"
+                    onClick={() => setShowMovementModal(true)}
+                  >
+                    <Icon name="plus" size={14} />
+                    Новое движение
+                  </button>
+                </>
               )}
               <button
                 className="btn btn-secondary btn-sm"
@@ -509,6 +527,17 @@ export default function StockPage() {
       {showMovementModal && (
         <StockMovementModal
           onClose={() => setShowMovementModal(false)}
+          onSwitchToFeedRaw={(prefill) => {
+            setShowMovementModal(false);
+            setRawBatchPrefill(prefill);
+          }}
+        />
+      )}
+
+      {rawBatchPrefill && (
+        <RawBatchModal
+          prefill={rawBatchPrefill}
+          onClose={() => setRawBatchPrefill(null)}
         />
       )}
 

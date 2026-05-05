@@ -24,9 +24,20 @@ const KIND_OPTIONS: { value: StockMovementKind; label: string; help: string }[] 
 interface Props {
   onClose: () => void;
   onSaved?: (m: StockMovement) => void;
+  /**
+   * Хэндофф в /feed → Партия сырья при выборе KORM-* SKU + INCOMING.
+   * Если задан, появляется кнопка «Открыть как партию сырья» в баннере.
+   */
+  onSwitchToFeedRaw?: (prefill: {
+    nomenclature: string;
+    warehouse: string;
+    supplier: string;
+    quantity: string;
+    price_per_unit: string;
+  }) => void;
 }
 
-export default function StockMovementModal({ onClose, onSaved }: Props) {
+export default function StockMovementModal({ onClose, onSaved, onSwitchToFeedRaw }: Props) {
   const create = useCreateManualMovement();
   const saving = create.isPending;
   const error = create.error;
@@ -115,6 +126,22 @@ export default function StockMovementModal({ onClose, onSaved }: Props) {
     );
   };
 
+  // Хэндофф: KORM-* SKU + INCOMING → правильный путь это «Партия сырья» в /feed
+  // (с зачётным весом по Дювалю, карантином и FK для замеса). Иначе пользователь
+  // создаёт «полу-фабрикат» — запись в журнале без учёта в feed.
+  const selectedItem = useMemo(
+    () => items?.find((i) => i.id === nomenclatureId),
+    [items, nomenclatureId],
+  );
+  const isFeedRawSku = Boolean(
+    selectedItem
+    && moduleCode === 'feed'
+    && (selectedItem.sku?.startsWith('KORM-') ?? false)
+    && !selectedItem.sku.startsWith('KORM-XALTA')
+  );
+  const showSwitchToFeedRaw =
+    isFeedRawSku && kind === 'incoming' && Boolean(onSwitchToFeedRaw);
+
   return (
     <Modal
       title="Новое движение по складу"
@@ -130,6 +157,40 @@ export default function StockMovementModal({ onClose, onSaved }: Props) {
         </>
       }
     >
+      {showSwitchToFeedRaw && (
+        <div style={{
+          padding: 12, marginBottom: 12,
+          background: 'var(--warning-soft)',
+          border: '1px solid var(--warning)',
+          borderRadius: 6, fontSize: 12, color: '#6A4500',
+        }}>
+          <div style={{ fontWeight: 600, marginBottom: 4 }}>
+            Это сырьё для модуля «Корма» — лучше создать как партию сырья
+          </div>
+          <div style={{ marginBottom: 8 }}>
+            Партия сырья даёт зачётный вес по формуле Дюваля (с учётом
+            влажности и сорности), карантин и привязку к рецептам. Эта же запись
+            автоматически создаст движение в журнале склада — без дублирования.
+          </div>
+          <button
+            type="button"
+            className="btn btn-primary btn-sm"
+            onClick={() => {
+              onSwitchToFeedRaw?.({
+                nomenclature: nomenclatureId,
+                warehouse: whTo || '',
+                supplier: counterparty || '',
+                quantity: quantity || '',
+                price_per_unit: unitPrice || '',
+              });
+              onClose();
+            }}
+          >
+            Открыть как партию сырья →
+          </button>
+        </div>
+      )}
+
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
         <div className="field" style={{ gridColumn: '1 / -1' }}>
           <label>Тип движения *</label>

@@ -12,8 +12,21 @@ import { useWarehouses } from '@/hooks/useStockMovements';
 import { ApiError } from '@/lib/api';
 import type { NomenclatureItem, RawMaterialBatch } from '@/types/auth';
 
+/**
+ * Префилл из других мест (например, переключение из «Новое движение» в /stock).
+ * Все поля опциональны.
+ */
+export interface RawBatchPrefill {
+  nomenclature?: string;
+  warehouse?: string;
+  supplier?: string;
+  quantity?: string;       // приходит как «количество» из stock-формы — кладём в gross_weight_kg
+  price_per_unit?: string;
+}
+
 interface Props {
   initial?: RawMaterialBatch | null;
+  prefill?: RawBatchPrefill;
   onClose: () => void;
 }
 
@@ -43,7 +56,7 @@ function fmtMoney(v: number): string {
   return v.toLocaleString('ru-RU', { maximumFractionDigits: 2 }) + ' сум';
 }
 
-export default function RawBatchModal({ initial, onClose }: Props) {
+export default function RawBatchModal({ initial, prefill, onClose }: Props) {
   const isEdit = Boolean(initial);
   const create = rawBatchesCrud.useCreate();
   const update = rawBatchesCrud.useUpdate();
@@ -56,19 +69,29 @@ export default function RawBatchModal({ initial, onClose }: Props) {
     module_code: 'feed', kind: 'storage_bin', is_active: 'true',
   });
 
-  const [nomenclatureId, setNomenclatureId] = useState(initial?.nomenclature ?? '');
-  const [supplierId, setSupplierId] = useState(initial?.supplier ?? '');
-  const [warehouseId, setWarehouseId] = useState(initial?.warehouse ?? '');
+  const [nomenclatureId, setNomenclatureId] = useState(
+    initial?.nomenclature ?? prefill?.nomenclature ?? '',
+  );
+  const [supplierId, setSupplierId] = useState(
+    initial?.supplier ?? prefill?.supplier ?? '',
+  );
+  const [warehouseId, setWarehouseId] = useState(
+    initial?.warehouse ?? prefill?.warehouse ?? '',
+  );
   const [storageBin, setStorageBin] = useState(initial?.storage_bin ?? '');
   const [receivedDate, setReceivedDate] = useState(
     initial?.received_date ?? new Date().toISOString().slice(0, 10),
   );
-  const [pricePerUnit, setPricePerUnit] = useState(initial?.price_per_unit_uzs ?? '');
+  const [pricePerUnit, setPricePerUnit] = useState(
+    initial?.price_per_unit_uzs ?? prefill?.price_per_unit ?? '',
+  );
   const [notes, setNotes] = useState(initial?.notes ?? '');
 
   // Веса / усушка
   const [shrinkMode, setShrinkMode] = useState<ShrinkMode>('duval');
-  const [grossKg, setGrossKg] = useState(initial?.gross_weight_kg ?? '');
+  const [grossKg, setGrossKg] = useState(
+    initial?.gross_weight_kg ?? prefill?.quantity ?? '',
+  );
   const [moistureActual, setMoistureActual] = useState(initial?.moisture_pct_actual ?? '');
   const [dockageActual, setDockageActual] = useState(initial?.dockage_pct_actual ?? '0');
   const [directShrink, setDirectShrink] = useState(initial?.shrinkage_pct ?? '');
