@@ -26,6 +26,7 @@ import RawBatchModal from '../feed/RawBatchModal';
 import EditMovementModal from './EditMovementModal';
 import PromoteToRawBatchModal from './PromoteToRawBatchModal';
 import StockMovementModal from './StockMovementModal';
+import WarehouseBalanceDrawer from './WarehouseBalanceDrawer';
 import WarehouseModal from './WarehouseModal';
 
 const KIND_LABEL: Record<StockMovementKind, string> = {
@@ -105,6 +106,7 @@ export default function StockPage() {
 
   // Warehouses tab state
   const [warehouseEdit, setWarehouseEdit] = useState<WarehouseRef | null>(null);
+  const [warehouseBalance, setWarehouseBalance] = useState<WarehouseRef | null>(null);
   const [showWarehouseModal, setShowWarehouseModal] = useState(false);
   const [whSearch, setWhSearch] = useState('');
 
@@ -442,6 +444,8 @@ export default function StockPage() {
             <DataTable<WarehouseRef>
               rows={filteredWarehouses}
               rowKey={(w) => w.id}
+              onRowClick={(w) => setWarehouseBalance(w)}
+              rowProps={(w) => ({ active: warehouseBalance?.id === w.id })}
               emptyMessage="Складов пока нет. Нажмите «Новый склад»."
               columns={[
                 { key: 'code', label: 'Код', mono: true,
@@ -581,6 +585,13 @@ export default function StockPage() {
             setShowWarehouseModal(false);
             setWarehouseEdit(null);
           }}
+        />
+      )}
+
+      {warehouseBalance && (
+        <WarehouseBalanceDrawer
+          warehouse={warehouseBalance}
+          onClose={() => setWarehouseBalance(null)}
         />
       )}
     </>

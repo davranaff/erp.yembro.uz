@@ -168,6 +168,43 @@ export function useUpdateWarehouse() {
   });
 }
 
+export interface WarehouseBalanceRow {
+  nomenclature_id: string;
+  sku: string;
+  name: string;
+  unit: string;
+  incoming_qty: string;
+  incoming_amount_uzs: string;
+  outgoing_qty: string;
+  outgoing_amount_uzs: string;
+  balance_qty: string;
+}
+
+export interface WarehouseBalanceResponse {
+  warehouse: {
+    id: string;
+    code: string;
+    name: string;
+    module_code: string | null;
+  };
+  rows: WarehouseBalanceRow[];
+  summary: {
+    sku_count: number;
+    with_balance: number;
+  };
+}
+
+export function useWarehouseBalance(warehouseId: string | null | undefined) {
+  return useQuery<WarehouseBalanceResponse, ApiError>({
+    queryKey: ['warehouses', 'balance', warehouseId ?? ''],
+    enabled: Boolean(warehouseId),
+    queryFn: () => apiFetch<WarehouseBalanceResponse>(
+      `/api/warehouses/warehouses/${warehouseId}/balance/`,
+    ),
+    staleTime: 30_000,
+  });
+}
+
 export function useDeleteWarehouse() {
   const qc = useQueryClient();
   return useMutation<void, ApiError, string>({
