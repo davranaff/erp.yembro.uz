@@ -199,6 +199,34 @@ export function useCreateManualMovement() {
   });
 }
 
+/**
+ * Частичный PATCH manual-движения. Разрешены только метаданные
+ * (date / counterparty / batch) — суммы и склады иммутабельны.
+ * Передайте `null` чтобы очистить FK.
+ */
+export type ManualMovementPatch = {
+  date?: string;
+  counterparty?: string | null;
+  batch?: string | null;
+};
+
+export function useUpdateManualMovement() {
+  const qc = useQueryClient();
+  return useMutation<
+    StockMovement, ApiError,
+    { id: string; patch: ManualMovementPatch }
+  >({
+    mutationFn: ({ id, patch }) =>
+      apiFetch<StockMovement>(`/api/warehouses/movements/${id}/manual/`, {
+        method: 'PATCH',
+        body: patch,
+      }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['stock-movements'] });
+    },
+  });
+}
+
 export function useDeleteManualMovement() {
   const qc = useQueryClient();
   return useMutation<void, ApiError, string>({

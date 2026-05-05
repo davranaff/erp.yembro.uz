@@ -22,6 +22,7 @@ import {
 } from '@/hooks/useStockMovements';
 import type { StockMovement, StockMovementKind, WarehouseRef } from '@/types/auth';
 
+import EditMovementModal from './EditMovementModal';
 import StockMovementModal from './StockMovementModal';
 import WarehouseModal from './WarehouseModal';
 
@@ -90,6 +91,7 @@ export default function StockPage() {
   const [pageSize, setPageSize] = useState(50);
   const [sel, setSel] = useState<StockMovement | null>(null);
   const [showMovementModal, setShowMovementModal] = useState(false);
+  const [editMovement, setEditMovement] = useState<StockMovement | null>(null);
 
   // Warehouses tab state
   const [warehouseEdit, setWarehouseEdit] = useState<WarehouseRef | null>(null);
@@ -355,6 +357,13 @@ export default function StockPage() {
                       actions={[
                         {
                           label: m.is_manual
+                            ? 'Изменить'
+                            : 'Создано документом — нельзя править',
+                          disabled: !m.is_manual,
+                          onClick: () => setEditMovement(m),
+                        },
+                        {
+                          label: m.is_manual
                             ? 'Удалить'
                             : 'Создано документом — нельзя удалить',
                           danger: m.is_manual,
@@ -500,6 +509,14 @@ export default function StockPage() {
       {showMovementModal && (
         <StockMovementModal
           onClose={() => setShowMovementModal(false)}
+        />
+      )}
+
+      {editMovement && (
+        <EditMovementModal
+          movement={editMovement}
+          onClose={() => setEditMovement(null)}
+          onSaved={(m) => { if (sel?.id === m.id) setSel(m); }}
         />
       )}
 

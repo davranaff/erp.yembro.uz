@@ -164,3 +164,86 @@ def delete_manual_movement(movement: StockMovement, *, user=None) -> None:
             }
         )
     movement.delete()
+
+
+# Безопасный whitelist полей для PATCH manual-движения. Меняют только
+# метаданные (когда / кто / какая партия), не трогают суммы/склады/SKU,
+# чтобы не пересчитывать остатки.
+EDITABLE_MANUAL_FIELDS = ("date", "counterparty", "batch")
+
+
+@transaction.atomic
+def update_manual_movement(
+    movement: StockMovement,
+    *,
+    date_value=None,
+    counterparty=None,
+    batch=None,
+    clear_counterparty: bool = False,
+    clear_batch: bool = False,
+    user=None,
+) -> StockMovement:
+    """
+    Частично обновить вручную созданное движение. Разрешены ТОЛЬКО:
+        - date  — если ошиблись датой
+        - counterparty  — привязать/перепривязать к контрагенту
+        - batch  — привязать к партии
+
+    Поля quantity / unit_price / amount / kind / nomenclature / warehouse_*
+    остаются иммутабельными — для их изменения нужно delete + recreate
+    (чтобы остатки и Главная книга пересчитались чисто).
+
+    `clear_counterparty=True` / `clear_batch=True` — явно очистить FK
+    (counterparty=None через PATCH в JSON неотличим от «не передано»).
+
+    Возвращает сохранённый movement.
+
+    Raises:
+        StockMovementCreateError: если movement не manual или
+            переданная связанная сущность из другой организации.
+    """
+    if not is_manual_movement(movement):
+        raise StockMovementCreateError(
+            {
+                "__all__": (
+                    "Это движение создано автоматически по документу-источнику. "
+                    "Редактирование возможно только через исходный документ."
+                )
+            }
+        )
+
+    org_id = movement.organization_id
+    update_fields: list[str] = []
+
+    if date_value is not None:
+        movement.date = date_value
+        update_fields.append("date")
+
+    if counterparty is not None:
+        if counterparty.organization_id != org_id:
+            raise StockMovementCreateError(
+                {"counterparty": "Контрагент из другой организации."}
+            )
+        movement.counterparty = counterparty
+        update_fields.append("counterparty")
+    elif clear_counterparty:
+        movement.counterparty = None
+        update_fields.append("counterparty")
+
+    if batch is not None:
+        if batch.organization_id != org_id:
+            raise StockMovementCreateError(
+                {"batch": "Партия из другой организации."}
+            )
+        movement.batch = batch
+        update_fields.append("batch")
+    elif clear_batch:
+        movement.batch = None
+        update_fields.append("batch")
+
+    if not update_fields:
+        return movement  # ничего не передано — no-op
+
+    update_fields.append("updated_at")
+    movement.save(update_fields=update_fields)
+    return movement
