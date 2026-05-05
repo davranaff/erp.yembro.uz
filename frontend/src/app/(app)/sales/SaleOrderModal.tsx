@@ -103,7 +103,6 @@ export default function SaleOrderModal({ initial, preselect, onClose }: Props) {
   // перенести продажу в другой модуль перед сохранением).
   const [moduleLocked, setModuleLocked] = useState(Boolean(preselect?.moduleCode));
   const { data: customers } = useCounterparties({ kind: 'buyer' });
-  const { data: warehouses } = useWarehouses();
   const { data: currencies } = useCurrenciesSorted();
 
   // Справочники для vet/feed (ленивая загрузка по необходимости)
@@ -115,10 +114,13 @@ export default function SaleOrderModal({ initial, preselect, onClose }: Props) {
   // Состояние формы
   const [moduleId, setModuleId] = useState(initial?.module ?? '');
 
-  // Код модуля используется для резолва типа партии (sourceKindForModule).
-  // Сама номенклатура автоподставляется из выбранной партии — отдельный
-  // селект номенклатуры в форме больше не показывается.
+  // Код модуля используется для резолва типа партии (sourceKindForModule)
+  // и для фильтрации списка складов отгрузки — оператор не должен видеть
+  // склады других модулей (раньше в дропдауне был весь зоопарк, путало).
   const selectedModuleCode = modules?.find((m) => m.id === moduleId)?.code;
+  const { data: warehouses } = useWarehouses(
+    selectedModuleCode ? { module_code: selectedModuleCode } : {},
+  );
   const [date, setDate] = useState(initial?.date ?? new Date().toISOString().slice(0, 10));
   const [customerId, setCustomerId] = useState(initial?.customer ?? '');
   const [warehouseId, setWarehouseId] = useState(initial?.warehouse ?? preselect?.warehouseId ?? '');
@@ -174,6 +176,21 @@ export default function SaleOrderModal({ initial, preselect, onClose }: Props) {
       if (m) setModuleId(m.id);
     }
   }, [preselect, modules, moduleId]);
+
+  // Авто-выбор склада: если для выбранного модуля ровно один склад — берём
+  // его молча. Если текущий warehouseId не входит в отфильтрованный список
+  // (например после смены модуля) — сбрасываем, иначе уйдёт несовместимая
+  // пара модуль/склад → бек 400.
+  useEffect(() => {
+    if (!warehouses) return;
+    if (warehouseId && !warehouses.some((w) => w.id === warehouseId)) {
+      setWarehouseId(warehouses.length === 1 ? warehouses[0].id : '');
+      return;
+    }
+    if (!warehouseId && warehouses.length === 1) {
+      setWarehouseId(warehouses[0].id);
+    }
+  }, [warehouses, warehouseId]);
 
   const moduleSourceKind: SaleSourceKind = sourceKindForModule(selectedModuleCode);
   // Per-item kind: для vet оператор может переключиться на vet_accessory.
@@ -395,12 +412,24 @@ export default function SaleOrderModal({ initial, preselect, onClose }: Props) {
 
         <div className="field">
           <label>Склад отгрузки *</label>
-          <select className="input" value={warehouseId} onChange={(e) => setWarehouseId(e.target.value)}>
-            <option value="">—</option>
+          <select
+            className="input"
+            value={warehouseId}
+            onChange={(e) => setWarehouseId(e.target.value)}
+            disabled={!moduleId}
+          >
+            <option value="">
+              {moduleId ? '—' : 'Сначала выберите модуль'}
+            </option>
             {warehouses?.map((w) => (
               <option key={w.id} value={w.id}>{w.code} · {w.name}</option>
             ))}
           </select>
+          {moduleId && warehouses && warehouses.length === 0 && (
+            <div style={{ fontSize: 11, color: 'var(--warning)', marginTop: 4 }}>
+              У модуля «{selectedModuleCode}» нет складов. Создайте в /stock.
+            </div>
+          )}
         </div>
 
         <div className="field">
