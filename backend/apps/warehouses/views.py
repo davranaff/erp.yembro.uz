@@ -303,6 +303,92 @@ class StockMovementViewSet(
 
         return Response(StockMovementSerializer(updated).data)
 
+    @action(detail=True, methods=["post"], url_path="promote-to-raw-batch")
+    def promote_to_raw_batch(self, request, pk=None):
+        """
+        POST /api/warehouses/movements/{id}/promote-to-raw-batch/
+
+        Превратить ручной INCOMING-движение в полноценную партию сырья
+        (RawMaterialBatch) модуля «Корма». Существующее движение
+        перепривязывается к новой партии — без дублирования в журнале.
+
+        Body (опц.):
+          {
+            "moisture_pct_actual": "18.0",
+            "dockage_pct_actual": "1.5",
+            "shrinkage_pct": "5.0",
+            "quarantine_until": "YYYY-MM-DD",
+            "supplier": "<uuid>",
+            "storage_bin": "БК-3",
+            "notes": "..."
+          }
+        """
+        from datetime import date as dt_date
+        from decimal import Decimal, InvalidOperation
+
+        from apps.feed.services.raw_batch_stock import (
+            RawBatchPromoteError,
+            promote_movement_to_raw_batch,
+        )
+
+        movement = self.get_object()
+        org = request.organization
+
+        def _decimal(key):
+            v = request.data.get(key)
+            if v is None or v == "":
+                return None
+            try:
+                return Decimal(str(v))
+            except (InvalidOperation, TypeError):
+                raise DRFValidationError({key: "Некорректное число."})
+
+        quarantine = None
+        if request.data.get("quarantine_until"):
+            try:
+                quarantine = dt_date.fromisoformat(str(request.data["quarantine_until"]))
+            except ValueError:
+                raise DRFValidationError(
+                    {"quarantine_until": "Ожидаю дату YYYY-MM-DD."}
+                )
+
+        supplier = None
+        if request.data.get("supplier"):
+            supplier = get_object_or_404(
+                Counterparty, pk=request.data["supplier"], organization=org
+            )
+
+        try:
+            batch = promote_movement_to_raw_batch(
+                movement,
+                moisture_pct_actual=_decimal("moisture_pct_actual"),
+                dockage_pct_actual=_decimal("dockage_pct_actual"),
+                shrinkage_pct=_decimal("shrinkage_pct"),
+                quarantine_until=quarantine,
+                supplier=supplier,
+                storage_bin=request.data.get("storage_bin", "") or "",
+                notes=request.data.get("notes", "") or "",
+                user=request.user,
+            )
+        except RawBatchPromoteError as exc:
+            raise DRFValidationError(
+                exc.message_dict if hasattr(exc, "message_dict") else exc.messages
+            )
+
+        movement.refresh_from_db()
+        return Response(
+            {
+                "movement": StockMovementSerializer(movement).data,
+                "raw_batch": {
+                    "id": str(batch.id),
+                    "doc_number": batch.doc_number,
+                    "status": batch.status,
+                    "quantity": str(batch.quantity),
+                },
+            },
+            status=http_status.HTTP_201_CREATED,
+        )
+
     def destroy(self, request, *args, **kwargs):
         """
         DELETE /api/warehouses/movements/{id}/

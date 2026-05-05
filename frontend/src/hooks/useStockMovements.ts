@@ -210,6 +210,39 @@ export type ManualMovementPatch = {
   batch?: string | null;
 };
 
+/**
+ * Превратить ручной INCOMING-movement в RawMaterialBatch (модуль «Корма»).
+ * Существующее движение перепривязывается к новой партии — без дублей.
+ */
+export type PromoteToRawBatchPayload = {
+  moisture_pct_actual?: string | null;
+  dockage_pct_actual?: string | null;
+  shrinkage_pct?: string | null;
+  quarantine_until?: string | null; // YYYY-MM-DD
+  supplier?: string | null;
+  storage_bin?: string;
+  notes?: string;
+};
+
+export function usePromoteToRawBatch() {
+  const qc = useQueryClient();
+  return useMutation<
+    { movement: StockMovement; raw_batch: { id: string; doc_number: string; status: string; quantity: string } },
+    ApiError,
+    { id: string; body: PromoteToRawBatchPayload }
+  >({
+    mutationFn: ({ id, body }) =>
+      apiFetch(`/api/warehouses/movements/${id}/promote-to-raw-batch/`, {
+        method: 'POST',
+        body,
+      }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['stock-movements'] });
+      qc.invalidateQueries({ queryKey: ['feed', 'raw-batches'] });
+    },
+  });
+}
+
 export function useUpdateManualMovement() {
   const qc = useQueryClient();
   return useMutation<

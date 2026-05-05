@@ -24,6 +24,7 @@ import type { StockMovement, StockMovementKind, WarehouseRef } from '@/types/aut
 
 import RawBatchModal from '../feed/RawBatchModal';
 import EditMovementModal from './EditMovementModal';
+import PromoteToRawBatchModal from './PromoteToRawBatchModal';
 import StockMovementModal from './StockMovementModal';
 import WarehouseModal from './WarehouseModal';
 
@@ -93,6 +94,7 @@ export default function StockPage() {
   const [sel, setSel] = useState<StockMovement | null>(null);
   const [showMovementModal, setShowMovementModal] = useState(false);
   const [editMovement, setEditMovement] = useState<StockMovement | null>(null);
+  const [promoteMovement, setPromoteMovement] = useState<StockMovement | null>(null);
   const [rawBatchPrefill, setRawBatchPrefill] = useState<{
     nomenclature?: string;
     warehouse?: string;
@@ -370,27 +372,41 @@ export default function StockPage() {
                   cellStyle: { fontSize: 12, color: 'var(--fg-2)' },
                   render: (m) => m.counterparty_name ?? m.batch_doc_number ?? '—' },
                 { key: 'actions', label: '', align: 'right',
-                  render: (m) => canEdit ? (
-                    <RowActions
-                      actions={[
-                        {
-                          label: m.is_manual
-                            ? 'Изменить'
-                            : 'Создано документом — нельзя править',
-                          disabled: !m.is_manual,
-                          onClick: () => setEditMovement(m),
-                        },
-                        {
-                          label: m.is_manual
-                            ? 'Удалить'
-                            : 'Создано документом — нельзя удалить',
-                          danger: m.is_manual,
-                          disabled: !m.is_manual,
-                          onClick: () => handleDeleteMovement(m),
-                        },
-                      ]}
-                    />
-                  ) : null },
+                  render: (m) => {
+                    if (!canEdit) return null;
+                    // Promote доступен только для manual INCOMING + KORM-* (кроме XALTA)
+                    const isFeedRaw = m.module_code === 'feed'
+                      && Boolean(m.nomenclature_sku?.startsWith('KORM-'))
+                      && !m.nomenclature_sku?.startsWith('KORM-XALTA');
+                    const canPromote = m.is_manual
+                      && m.kind === 'incoming'
+                      && isFeedRaw;
+                    return (
+                      <RowActions
+                        actions={[
+                          ...(canPromote ? [{
+                            label: '→ Сделать партией сырья',
+                            onClick: () => setPromoteMovement(m),
+                          }] : []),
+                          {
+                            label: m.is_manual
+                              ? 'Изменить'
+                              : 'Создано документом — нельзя править',
+                            disabled: !m.is_manual,
+                            onClick: () => setEditMovement(m),
+                          },
+                          {
+                            label: m.is_manual
+                              ? 'Удалить'
+                              : 'Создано документом — нельзя удалить',
+                            danger: m.is_manual,
+                            disabled: !m.is_manual,
+                            onClick: () => handleDeleteMovement(m),
+                          },
+                        ]}
+                      />
+                    );
+                  } },
               ]}
             />
             {pageData && (
@@ -546,6 +562,13 @@ export default function StockPage() {
           movement={editMovement}
           onClose={() => setEditMovement(null)}
           onSaved={(m) => { if (sel?.id === m.id) setSel(m); }}
+        />
+      )}
+
+      {promoteMovement && (
+        <PromoteToRawBatchModal
+          movement={promoteMovement}
+          onClose={() => setPromoteMovement(null)}
         />
       )}
 
