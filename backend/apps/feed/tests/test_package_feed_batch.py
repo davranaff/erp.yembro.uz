@@ -272,3 +272,115 @@ def test_package_idempotency_multiple_lots_from_same_source(
     approved_feed_batch.refresh_from_db()
     # 1000 - 250 - 500 = 250 кг
     assert Decimal(approved_feed_batch.current_quantity_kg) == Decimal("250.000")
+
+
+# ─── packaging (empty bag) auto-deduction ─────────────────────────────────
+
+
+@pytest.fixture
+def cat_packaging(org, m_feed):
+    from apps.nomenclature.models import Category
+    return Category.objects.create(
+        organization=org, name="Упаковка корма (test)", module=m_feed,
+    )
+
+
+@pytest.fixture
+def empty_bag_50(org, cat_packaging, unit_kg):
+    """SKU пустого мешка 50 кг (используется автoрезолвом по bag_weight)."""
+    from apps.nomenclature.models import NomenclatureItem, Unit
+    pcs = Unit.objects.create(organization=org, code="pcs", name="Штука")
+    return NomenclatureItem.objects.create(
+        organization=org, sku="KORM-XALTA-50",
+        name="Мешок пустой 50 кг", category=cat_packaging, unit=pcs,
+    )
+
+
+@pytest.fixture
+def stocked_bag_warehouse(bag_warehouse, empty_bag_50, org, m_feed, user):
+    """Склад мешков с приходом 100 пустых мешков (≈1000 сум/штука)."""
+    from datetime import datetime, timezone
+    StockMovement.objects.create(
+        organization=org, module=m_feed,
+        doc_number="ПР-МШ-001",
+        kind=StockMovement.Kind.INCOMING,
+        date=datetime.now(timezone.utc),
+        nomenclature=empty_bag_50,
+        quantity=Decimal("100"),
+        unit_price_uzs=Decimal("1000"),
+        amount_uzs=Decimal("100000"),
+        warehouse_to=bag_warehouse,
+        created_by=user,
+    )
+    return bag_warehouse
+
+
+def test_package_auto_resolves_empty_bag_by_weight(
+    approved_feed_batch, stocked_bag_warehouse, empty_bag_50, user,
+):
+    """bag_weight=50 → автoрезолв KORM-XALTA-50 → списание со склада."""
+    res = package_feed_batch(
+        approved_feed_batch,
+        bag_count=10, bag_weight_kg=Decimal("50"),
+        storage_warehouse=stocked_bag_warehouse, user=user,
+    )
+    # Среди stock_movements должен быть OUTGOING на пустой мешок
+    bag_outs = [
+        sm for sm in res.stock_movements
+        if sm.nomenclature_id == empty_bag_50.id
+        and sm.kind == StockMovement.Kind.OUTGOING
+    ]
+    assert len(bag_outs) == 1
+    assert bag_outs[0].quantity == Decimal("10")
+    assert bag_outs[0].warehouse_from_id == stocked_bag_warehouse.id
+
+
+def test_package_explicit_packaging_nomenclature(
+    approved_feed_batch, stocked_bag_warehouse, empty_bag_50, user,
+):
+    """Явный SKU мешка работает даже при нестандартном bag_weight."""
+    res = package_feed_batch(
+        approved_feed_batch,
+        bag_count=5, bag_weight_kg=Decimal("50"),
+        storage_warehouse=stocked_bag_warehouse,
+        packaging_nomenclature=empty_bag_50,
+        user=user,
+    )
+    bag_outs = [
+        sm for sm in res.stock_movements
+        if sm.nomenclature_id == empty_bag_50.id
+    ]
+    assert len(bag_outs) == 1
+    assert bag_outs[0].quantity == Decimal("5")
+
+
+def test_package_fails_when_not_enough_empty_bags(
+    approved_feed_batch, bag_warehouse, empty_bag_50, user,
+):
+    """100 мешков надо, но на складе пусто → ошибка."""
+    with pytest.raises(FeedPackageError) as exc:
+        package_feed_batch(
+            approved_feed_batch,
+            bag_count=10, bag_weight_kg=Decimal("50"),
+            storage_warehouse=bag_warehouse,
+            packaging_nomenclature=empty_bag_50,
+            user=user,
+        )
+    assert "пустых мешков" in str(exc.value).lower()
+
+
+def test_package_no_auto_when_weight_nonstandard(
+    approved_feed_batch, bag_warehouse, empty_bag_50, user,
+):
+    """bag_weight=33 кг → не находит SKU → не пытается списать."""
+    res = package_feed_batch(
+        approved_feed_batch,
+        bag_count=5, bag_weight_kg=Decimal("33"),
+        storage_warehouse=bag_warehouse, user=user,
+    )
+    # Нет write-off на пустые мешки — только feed-перемещения
+    bag_outs = [
+        sm for sm in res.stock_movements
+        if sm.nomenclature_id == empty_bag_50.id
+    ]
+    assert len(bag_outs) == 0

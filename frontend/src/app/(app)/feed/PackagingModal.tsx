@@ -7,6 +7,7 @@ import Modal from '@/components/ui/Modal';
 import { ApiError } from '@/lib/api';
 import { useProductionBlocks } from '@/hooks/useBlocks';
 import { usePackageFeedBatch } from '@/hooks/useFeed';
+import { useNomenclatureItems } from '@/hooks/useNomenclature';
 import { useWarehouses } from '@/hooks/useStockMovements';
 import type { FeedBatch } from '@/types/auth';
 
@@ -23,6 +24,8 @@ interface Props {
 export default function PackagingModal({ batch, onClose }: Props) {
   const { data: warehouses } = useWarehouses({ module_code: 'feed' });
   const { data: bins } = useProductionBlocks({ module_code: 'feed', kind: 'storage_bin' });
+  // Все feed-SKU для подсказки — будем фильтровать KORM-XALTA-* как мешки
+  const { data: feedItems } = useNomenclatureItems({ module_code: 'feed' });
   const pkg = usePackageFeedBatch();
 
   const [bagCount, setBagCount] = useState('');
@@ -31,7 +34,27 @@ export default function PackagingModal({ batch, onClose }: Props) {
   // Оператор пусть выберет явно.
   const [storageWarehouse, setStorageWarehouse] = useState('');
   const [storageBin, setStorageBin] = useState('');
+  const [packagingNom, setPackagingNom] = useState(''); // '' = авторезолв
+  const [packagingWh, setPackagingWh] = useState(''); // '' = тот же storage_warehouse
   const [notes, setNotes] = useState('');
+
+  // Список SKU пустых мешков (KORM-XALTA-*)
+  const bagSkus = useMemo(
+    () => (feedItems ?? []).filter((it) => it.sku.startsWith('KORM-XALTA')),
+    [feedItems],
+  );
+
+  // Авторезолв SKU по весу: 25 → KORM-XALTA-25, 50 → KORM-XALTA-50
+  const autoBagSku = useMemo(() => {
+    const w = parseFloat(bagWeightKg || '0');
+    if (!isFinite(w) || w !== Math.floor(w)) return null;
+    return bagSkus.find((it) => it.sku === `KORM-XALTA-${Math.floor(w)}`) ?? null;
+  }, [bagWeightKg, bagSkus]);
+
+  // Эффективный SKU мешка: явный выбор > авто
+  const effectiveBagSku = packagingNom
+    ? bagSkus.find((it) => it.id === packagingNom) ?? null
+    : autoBagSku;
 
   const error = pkg.error;
   const fieldErrors = error instanceof ApiError && error.status === 400
@@ -56,6 +79,8 @@ export default function PackagingModal({ batch, onClose }: Props) {
           bag_weight_kg: bagWeightKg,
           storage_warehouse: storageWarehouse,
           storage_bin: storageBin || null,
+          packaging_nomenclature: packagingNom || null,
+          packaging_warehouse: packagingWh || null,
           notes,
         },
       });
@@ -205,7 +230,81 @@ export default function PackagingModal({ batch, onClose }: Props) {
         </select>
       </div>
 
-      <div className="field">
+      <div style={{
+        marginTop: 14, padding: 10,
+        background: 'var(--bg-soft)',
+        border: '1px solid var(--border)', borderRadius: 6,
+      }}>
+        <div style={{
+          fontSize: 11, fontWeight: 700, color: 'var(--fg-3)',
+          textTransform: 'uppercase', letterSpacing: '.04em',
+          marginBottom: 8,
+        }}>
+          Списание пустых мешков
+        </div>
+
+        <div className="field">
+          <label>
+            SKU мешка
+            <HelpHint
+              text="Какой SKU пустых мешков списать."
+              details="Если оставить «Автоматически», система подберёт по весу: 25 кг → KORM-XALTA-25, 50 кг → KORM-XALTA-50. Если SKU не найден или вес нестандартный — мешки не спишутся (нужно вручную в /stock)."
+            />
+          </label>
+          <select
+            className="input"
+            value={packagingNom}
+            onChange={(e) => setPackagingNom(e.target.value)}
+          >
+            <option value="">
+              Автоматически
+              {autoBagSku ? ` → ${autoBagSku.sku}` : ' (не найден SKU для текущего веса)'}
+            </option>
+            {bagSkus.map((it) => (
+              <option key={it.id} value={it.id}>{it.sku} · {it.name}</option>
+            ))}
+          </select>
+          {effectiveBagSku ? (
+            <div style={{ fontSize: 11, color: 'var(--fg-3)', marginTop: 4 }}>
+              Будет списано <b>{bagCount || 0} шт</b> мешка <b>{effectiveBagSku.sku}</b>
+            </div>
+          ) : (
+            <div style={{ fontSize: 11, color: 'var(--brand-orange)', marginTop: 4 }}>
+              SKU мешка не определён — расход придётся списать вручную в /stock.
+            </div>
+          )}
+          {fieldErrors.packaging_nomenclature && (
+            <div style={{ fontSize: 11, color: 'var(--danger)', marginTop: 4 }}>
+              {Array.isArray(fieldErrors.packaging_nomenclature)
+                ? fieldErrors.packaging_nomenclature.join(' · ')
+                : String(fieldErrors.packaging_nomenclature)}
+            </div>
+          )}
+        </div>
+
+        <div className="field" style={{ marginTop: 8 }}>
+          <label>
+            Склад мешков (откуда списать)
+            <HelpHint
+              text="Со склада какой брать пустые мешки."
+              details="Если не указано — берётся тот же склад, куда складываем фасованную продукцию (storage_warehouse). Обычно правильно: и приходят, и уходят там же."
+            />
+          </label>
+          <select
+            className="input"
+            value={packagingWh}
+            onChange={(e) => setPackagingWh(e.target.value)}
+            disabled={!effectiveBagSku}
+          >
+            <option value="">— как «Склад мешков» выше —</option>
+            {warehouses?.filter((w) => w.module_code === 'feed').map((w) => (
+              <option key={w.id} value={w.id}>{w.code} · {w.name}</option>
+            ))}
+          </select>
+        </div>
+      </div>
+
+      <div className="field" style={{ marginTop: 12 }}>
         <label>Заметка</label>
         <input
           className="input"

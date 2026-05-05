@@ -422,14 +422,19 @@ class FeedBatchViewSet(OrgReadOnlyViewSet):
           "bag_weight_kg": "50",
           "storage_warehouse": "<uuid>",
           "storage_bin": "<uuid>" (опционально),
+          "packaging_nomenclature": "<uuid>" (опц., авто KORM-XALTA-25/50 по весу),
+          "packaging_warehouse": "<uuid>" (опц., default = storage_warehouse),
           "notes": "..."  (опционально)
         }
 
         Расфасовать (часть) партии в N мешков. Партия должна быть APPROVED.
         Можно вызывать несколько раз — каждая фасовка создаёт свой FeedBagLot.
+        Если резолвится SKU пустых мешков — автоматически списывает их
+        OUTGOING StockMovement-ом со склада упаковки.
         """
         from decimal import Decimal
 
+        from apps.nomenclature.models import NomenclatureItem
         from apps.warehouses.models import ProductionBlock, Warehouse
 
         batch = self.get_object()
@@ -437,6 +442,8 @@ class FeedBatchViewSet(OrgReadOnlyViewSet):
         bag_weight = request.data.get("bag_weight_kg")
         wh_id = request.data.get("storage_warehouse")
         bin_id = request.data.get("storage_bin")
+        pack_nom_id = request.data.get("packaging_nomenclature")
+        pack_wh_id = request.data.get("packaging_warehouse")
         notes = request.data.get("notes", "") or ""
 
         if bag_count is None or wh_id is None or bag_weight is None:
@@ -469,6 +476,23 @@ class FeedBatchViewSet(OrgReadOnlyViewSet):
             except ProductionBlock.DoesNotExist:
                 raise DRFValidationError({"storage_bin": "Бункер не найден."})
 
+        pack_nom = None
+        if pack_nom_id:
+            try:
+                pack_nom = NomenclatureItem.objects.get(pk=pack_nom_id)
+            except NomenclatureItem.DoesNotExist:
+                raise DRFValidationError(
+                    {"packaging_nomenclature": "SKU не найден."}
+                )
+        pack_wh = None
+        if pack_wh_id:
+            try:
+                pack_wh = Warehouse.objects.get(pk=pack_wh_id)
+            except Warehouse.DoesNotExist:
+                raise DRFValidationError(
+                    {"packaging_warehouse": "Склад мешков не найден."}
+                )
+
         try:
             result = package_feed_batch(
                 batch,
@@ -476,6 +500,8 @@ class FeedBatchViewSet(OrgReadOnlyViewSet):
                 bag_weight_kg=bag_weight_dec,
                 storage_warehouse=wh,
                 storage_bin=bin_block,
+                packaging_nomenclature=pack_nom,
+                packaging_warehouse=pack_wh,
                 notes=notes,
                 user=request.user,
             )
