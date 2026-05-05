@@ -8,11 +8,18 @@ logger = logging.getLogger(__name__)
 
 
 @shared_task(name="apps.tgbot.notify_admins_task")
-def notify_admins_task(text: str, organization_id: str, module_code: str | None = None) -> dict:
+def notify_admins_task(
+    text: str,
+    organization_id: str,
+    module_code: str | None = None,
+    min_level: str = "r",
+) -> dict:
     """Рассылает text активным TgLink для org.
 
     Если передан module_code — получают только пользователи с доступом
-    к этому модулю (уровень >= 'r'). Без module_code — все активные.
+    к этому модулю уровня ≥ ``min_level`` (по умолчанию 'r').
+    `min_level='admin'` — только «head» модуля (для эскалаций/решений).
+    Без module_code — все активные admin-линки.
 
     Производительность: предварительно одним запросом подгружаем все
     memberships, override'ы и role-permissions нужного модуля, потом
@@ -39,6 +46,7 @@ def notify_admins_task(text: str, organization_id: str, module_code: str | None 
             organization_id=organization_id,
             user_ids=[link.user_id for link in links],
             module_code=module_code,
+            min_level=min_level,
         )
 
     sent = 0
@@ -47,12 +55,57 @@ def notify_admins_task(text: str, organization_id: str, module_code: str | None 
             continue
         if send_message(link.chat_id, text):
             sent += 1
-    logger.info("notify_admins_task: sent=%d org=%s module=%s", sent, organization_id, module_code)
+    logger.info(
+        "notify_admins_task: sent=%d org=%s module=%s min_level=%s",
+        sent, organization_id, module_code, min_level,
+    )
     return {"sent": sent}
 
 
-def _resolve_allowed_users(*, organization_id: str, user_ids: list, module_code: str) -> set:
-    """Возвращает множество user_id, у которых доступ >= 'r' к module_code.
+@shared_task(name="apps.tgbot.notify_counterparty_task")
+def notify_counterparty_task(
+    text: str,
+    organization_id: str,
+    counterparty_id: str,
+) -> dict:
+    """Шлёт text в TG-чат привязанного контрагента.
+
+    Используется для клиентских уведомлений: «оплата зачислена», «у вас
+    задолженность», «продажа ХХХ оформлена». Если у контрагента нет
+    активного TgLink — тихо возвращает sent=0 (ошибка не нужна — клиент
+    может быть не привязан, это нормально).
+    """
+    from .bot import send_message
+    from .models import TgLink
+
+    link = TgLink.objects.filter(
+        organization_id=organization_id,
+        counterparty_id=counterparty_id,
+        is_active=True,
+    ).first()
+    if not link:
+        logger.info(
+            "notify_counterparty_task: no_tg_link org=%s counterparty=%s",
+            organization_id, counterparty_id,
+        )
+        return {"sent": 0, "reason": "no_tg_link"}
+
+    sent = 1 if send_message(link.chat_id, text) else 0
+    logger.info(
+        "notify_counterparty_task: sent=%d org=%s counterparty=%s chat=%s",
+        sent, organization_id, counterparty_id, link.chat_id,
+    )
+    return {"sent": sent, "chat_id": link.chat_id}
+
+
+def _resolve_allowed_users(
+    *,
+    organization_id: str,
+    user_ids: list,
+    module_code: str,
+    min_level: str = "r",
+) -> set:
+    """Возвращает множество user_id, у которых доступ ≥ ``min_level`` к module_code.
 
     Делает ровно 3 SQL-запроса независимо от количества пользователей:
       1. memberships по парам (org, user)
@@ -102,7 +155,7 @@ def _resolve_allowed_users(*, organization_id: str, user_ids: list, module_code:
         else:
             levels = role_levels.get(m_id) or []
             actual = max(levels, key=lambda lv: _LEVEL_ORDER.get(lv, 0)) if levels else AccessLevel.NONE
-        if level_satisfies(actual, "r"):
+        if level_satisfies(actual, min_level):
             allowed.add(user_id)
     return allowed
 

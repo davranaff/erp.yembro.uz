@@ -132,12 +132,13 @@ def test_confirm_feed_sale_notifies_sales_and_feed_admins(
 
     calls = mock_notify.call_args_list
     module_codes = [c.args[2] for c in calls]
-    # Должны быть оба: sales (сводно) + feed (детально по своим item'ам)
+    # sales (сводно) + feed (детально по своим item'ам). admin может тоже
+    # быть (через orchestrator), но проверяем минимум.
     assert "sales" in module_codes
     assert "feed" in module_codes
-    # Текст для feed должен включать слово «корм» и doc_number партии
+    # Текст для feed на узбекском после Phase A: «Yem-xashak sotildi»
     feed_text = next(c.args[0] for c in calls if c.args[2] == "feed")
-    assert "Продан корм" in feed_text
+    assert "Yem-xashak sotildi" in feed_text
     assert approved_feed_batch.doc_number in feed_text
 
 
@@ -164,4 +165,4 @@ def test_confirm_bag_lot_sale_notifies_feed_admin_with_bag_count(
     assert feed_call is not None, "feed module not notified"
     text = feed_call.args[0]
     assert bag_lot.doc_number in text
-    assert "5 мешков" in text
+    assert "5 qop" in text  # узбекский: «5 qop × 50 kg»

@@ -111,51 +111,12 @@ class SaleOrderViewSet(ImmutableStatusMixin, DeleteReasonMixin, OrgScopedModelVi
 
         order.refresh_from_db()
 
-        # TG-уведомления:
-        # 1) Админам sales — общая сводка (сумма, клиент).
-        # 2) Админам каждого source-модуля (feed/vet/slaughter/...) —
-        #    детализация по их позициям. Без этого владелец склада кормов
-        #    не видит «сколько мешков уехало», узнаёт только когда зайдёт в
-        #    /feed → «Мешки» вручную.
+        # TG-уведомления через orchestration: клиент + админы sales + head'ы
+        # source-модулей (детализация). Логика инкапсулирована в одном месте,
+        # view остаётся тонким.
         try:
-            from apps.tgbot.notifications import (
-                fmt_sale_confirmed,
-                fmt_sale_for_feed_module,
-                fmt_sale_for_generic_module,
-                fmt_sale_for_vet_module,
-            )
-            from apps.tgbot.tasks import notify_admins_task
-
-            org_id = str(order.organization_id)
-            notify_admins_task.delay(fmt_sale_confirmed(order), org_id, "sales")
-
-            # Группируем item'ы по source-модулю
-            items_by_module: dict = {}
-            for it in order.items.select_related(
-                "batch__current_module",
-                "feed_batch", "feed_bag_lot__recipe_version__recipe",
-                "vet_stock_batch__drug__nomenclature",
-                "vet_accessory__nomenclature",
-            ):
-                if it.feed_batch_id or it.feed_bag_lot_id:
-                    code = "feed"
-                elif it.vet_stock_batch_id or it.vet_accessory_id:
-                    code = "vet"
-                elif it.batch_id and it.batch.current_module_id:
-                    code = it.batch.current_module.code
-                else:
-                    continue
-                items_by_module.setdefault(code, []).append(it)
-
-            for module_code, items in items_by_module.items():
-                if module_code == "feed":
-                    text = fmt_sale_for_feed_module(order, items)
-                elif module_code == "vet":
-                    text = fmt_sale_for_vet_module(order, items)
-                else:
-                    label = items[0].batch.current_module.name if items else module_code
-                    text = fmt_sale_for_generic_module(order, items, label)
-                notify_admins_task.delay(text, org_id, module_code)
+            from apps.tgbot.services.orchestration import notify_sale_event
+            notify_sale_event(order)
         except Exception:
             pass
 
@@ -274,17 +235,12 @@ class SaleOrderViewSet(ImmutableStatusMixin, DeleteReasonMixin, OrgScopedModelVi
                 exc.message_dict if hasattr(exc, "message_dict") else exc.messages
             )
 
-        # TG-уведомление о входящей оплате — service create_and_post_payment
-        # бэйпасит обычный POST /api/payments/{id}/post/, поэтому здесь
-        # вызываем notify явно, иначе админ не увидит cash inflow.
+        # TG-уведомления о входящей оплате — клиенту, админу организации,
+        # head sales. create_and_post_payment не дёргает обычный
+        # POST /api/payments/{id}/post/, поэтому шлём явно через orchestrator.
         try:
-            from apps.tgbot.notifications import fmt_payment_posted
-            from apps.tgbot.tasks import notify_admins_task
-            notify_admins_task.delay(
-                fmt_payment_posted(result.payment),
-                str(result.payment.organization_id),
-                "sales",
-            )
+            from apps.tgbot.services.orchestration import notify_payment_event
+            notify_payment_event(result.payment, related_order=order)
         except Exception:
             pass
 
