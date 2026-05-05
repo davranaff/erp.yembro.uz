@@ -30,5 +30,14 @@ export function middleware(req: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/((?!_next/static|_next/image|favicon|public).*)'],
+  // Исключаем:
+  //   _next/*       — Next.js internals
+  //   favicon*      — favicon
+  //   .*\.[\w]+$    — любой путь с расширением (.html / .png / .txt / .xml / ...).
+  //                   Отдаются Next.js'ом из /public напрямую без auth — нельзя
+  //                   редиректить на /login, иначе ломаются:
+  //                     • /robots.txt /sitemap.xml — поисковики не дойдут
+  //                     • /logo.png — OG-картинка при шеринге
+  //                     • /googleXXX.html — Google Search Console verify
+  matcher: ['/((?!_next|favicon|.*\\.[\\w]+$).*)'],
 };
