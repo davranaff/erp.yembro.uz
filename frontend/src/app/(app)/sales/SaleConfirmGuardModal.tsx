@@ -35,15 +35,21 @@ export default function SaleConfirmGuardModal({ order, onClose, onSuccess }: Pro
   const isAdmin = hasLevel('sales', 'admin');
 
   const [override, setOverride] = useState(false);
+  const [overrideReason, setOverrideReason] = useState('');
 
   const blocked = check && !check.ok;
-  const canConfirm = check && (check.ok || (blocked && isAdmin && override));
+  const reasonOk = overrideReason.trim().length >= 10;
+  const canConfirm =
+    check && (check.ok || (blocked && isAdmin && override && reasonOk));
 
   const error = confirmMutation.error;
   const errorMessage = error instanceof ApiError && error.status === 400
     ? (() => {
         const data = error.data as Record<string, unknown> | undefined;
         const customer = data?.customer;
+        const reason = data?.credit_override_reason;
+        if (Array.isArray(reason)) return reason.join(' · ');
+        if (typeof reason === 'string') return reason;
         if (Array.isArray(customer)) return customer.join(' · ');
         if (typeof customer === 'string') return customer;
         return error.message;
@@ -51,8 +57,17 @@ export default function SaleConfirmGuardModal({ order, onClose, onSuccess }: Pro
     : error?.message ?? null;
 
   const submit = () => {
+    const useOverride = blocked && override;
     confirmMutation.mutate(
-      { id: order.id, body: { force_credit_override: blocked ? override : false } },
+      {
+        id: order.id,
+        body: {
+          force_credit_override: useOverride,
+          // Причина обязательна на бэке (>= 10 символов) когда override=true.
+          // Передаём только при override — без него поле игнорируется бэком.
+          ...(useOverride ? { credit_override_reason: overrideReason.trim() } : {}),
+        },
+      },
       {
         onSuccess: () => {
           onSuccess?.();
@@ -141,23 +156,61 @@ export default function SaleConfirmGuardModal({ order, onClose, onSuccess }: Pro
           )}
 
           {blocked && isAdmin && (
-            <label style={{
-              display: 'flex', alignItems: 'flex-start', gap: 8,
-              padding: 10, background: 'var(--bg-soft)', borderRadius: 6,
-              fontSize: 12, cursor: 'pointer',
-            }}>
-              <input
-                type="checkbox"
-                checked={override}
-                onChange={(e) => setOverride(e.target.checked)}
-                style={{ marginTop: 2 }}
-              />
-              <span>
-                Провести с <b>force_credit_override</b> — игнорировать
-                кредитную политику. Действие логируется в audit, ваше имя
-                будет видно в истории клиента.
-              </span>
-            </label>
+            <>
+              <label style={{
+                display: 'flex', alignItems: 'flex-start', gap: 8,
+                padding: 10, background: 'var(--bg-soft)', borderRadius: 6,
+                fontSize: 12, cursor: 'pointer',
+              }}>
+                <input
+                  type="checkbox"
+                  checked={override}
+                  onChange={(e) => setOverride(e.target.checked)}
+                  style={{ marginTop: 2 }}
+                />
+                <span>
+                  Провести с <b>force_credit_override</b> — игнорировать
+                  кредитную политику. Действие логируется в audit, ваше имя
+                  будет видно в истории клиента.
+                </span>
+              </label>
+
+              {override && (
+                <div style={{ marginTop: 10 }}>
+                  <label style={{
+                    display: 'block', fontSize: 12, fontWeight: 600,
+                    marginBottom: 4,
+                  }}>
+                    Причина override <span style={{ color: 'var(--danger)' }}>*</span>
+                  </label>
+                  <textarea
+                    className="input"
+                    rows={3}
+                    value={overrideReason}
+                    onChange={(e) => setOverrideReason(e.target.value)}
+                    placeholder={
+                      'Например: «клиент пообещал погасить до 12.05, '
+                      + 'согласовал директор» (минимум 10 символов)'
+                    }
+                    style={{
+                      width: '100%',
+                      borderColor: !reasonOk && overrideReason
+                        ? 'var(--danger)' : undefined,
+                    }}
+                  />
+                  <div style={{
+                    fontSize: 11,
+                    color: reasonOk ? 'var(--fg-3)' : 'var(--danger)',
+                    marginTop: 2,
+                  }}>
+                    {reasonOk
+                      ? `✓ ${overrideReason.trim().length} символов`
+                      : `Минимум 10 символов (сейчас: ${overrideReason.trim().length}).`
+                      + ' Бизнес-требование: причину видит аудит и владелец.'}
+                  </div>
+                </div>
+              )}
+            </>
           )}
 
           {blocked && !isAdmin && (

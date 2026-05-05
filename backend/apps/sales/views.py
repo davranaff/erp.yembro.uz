@@ -77,6 +77,7 @@ class SaleOrderViewSet(ImmutableStatusMixin, DeleteReasonMixin, OrgScopedModelVi
         order = self.get_object()
 
         force = bool(request.data.get("force_credit_override"))
+        override_reason = (request.data.get("credit_override_reason") or "").strip()
         if force:
             membership = getattr(request, "membership", None)
             if not (membership and level_satisfies(
@@ -90,7 +91,10 @@ class SaleOrderViewSet(ImmutableStatusMixin, DeleteReasonMixin, OrgScopedModelVi
 
         try:
             result = confirm_sale(
-                order, user=request.user, force_credit_override=force,
+                order,
+                user=request.user,
+                force_credit_override=force,
+                credit_override_reason=override_reason,
             )
         except SaleConfirmError as exc:
             raise DRFValidationError(
@@ -106,7 +110,10 @@ class SaleOrderViewSet(ImmutableStatusMixin, DeleteReasonMixin, OrgScopedModelVi
                 actor=request.user,
                 action=AuditLog.Action.UPDATE,
                 entity=order,
-                action_verb=f"credit_override on confirm of {order.doc_number}",
+                action_verb=(
+                    f"credit_override on confirm of {order.doc_number} · "
+                    f"{override_reason[:200]}"
+                ),
             )
 
         order.refresh_from_db()

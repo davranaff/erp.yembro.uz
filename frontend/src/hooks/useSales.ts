@@ -39,7 +39,12 @@ export const salesCrud = makeCrud<SaleOrder, SaleOrderInput, SaleOrderInput>({
 });
 
 export const useConfirmSale = salesCrud.makeAction<
-  { force_credit_override?: boolean } | void,
+  {
+    force_credit_override?: boolean;
+    /** Обязательна когда force_credit_override=true (>= 10 символов).
+     * Сохраняется в SaleOrder.credit_override_reason и идёт в audit. */
+    credit_override_reason?: string;
+  } | void,
   SaleOrder
 >(
   (id) => `/api/sales/orders/${id}/confirm/`,

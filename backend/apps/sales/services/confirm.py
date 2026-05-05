@@ -303,13 +303,16 @@ def confirm_sale(
     *,
     user=None,
     force_credit_override: bool = False,
+    credit_override_reason: str = "",
 ) -> SaleConfirmResult:
     """
     Провести продажу. Идемпотентен по статусу: повторный → ValidationError.
 
     `force_credit_override` пропускает проверку кредитного лимита/просрочки
     клиента (используется sales:admin при осознанном превышении лимита).
-    Override логируется в audit log как POST с пометкой `credit_override`.
+    `credit_override_reason` — обязательная причина override (бизнес-требование:
+    аудитор должен видеть почему продали в долг). Минимум 10 символов.
+    Сохраняется в SaleOrder.credit_override_reason и в audit log.
     """
     # 1. Lock + reload
     order = SaleOrder.objects.select_for_update().get(pk=order.pk)
@@ -357,6 +360,20 @@ def confirm_sale(
                 "право на overrides (sales:admin)."
             ),
         })
+    if force_credit_override:
+        # Обязательная причина (бизнес-требование, защита от «забыл написать»).
+        # Минимум 10 символов осмысленного текста — отметает «.», «1» и т.п.
+        reason = (credit_override_reason or "").strip()
+        if len(reason) < 10:
+            raise SaleConfirmError({
+                "credit_override_reason": (
+                    "Причина override обязательна и должна быть не короче "
+                    "10 символов. Опишите почему продаём в долг — например: "
+                    "«клиент пообещал погасить до 12.05, согласовал директор»."
+                ),
+            })
+        # Сохраним на заказе чтобы видно было в /sales/{id} и отчётах.
+        order.credit_override_reason = reason
 
     # 2. FX-snapshot
     #    Приоритет: exchange_rate_override (ручной) → get_rate_for (CBU).
@@ -531,7 +548,7 @@ def confirm_sale(
     order.amount_uzs = total_uzs
     order.cost_uzs = total_cost_uzs
     order.status = SaleOrder.Status.CONFIRMED
-    order.save(update_fields=[
+    save_fields = [
         "doc_number",
         "exchange_rate",
         "exchange_rate_source",
@@ -540,7 +557,10 @@ def confirm_sale(
         "cost_uzs",
         "status",
         "updated_at",
-    ])
+    ]
+    if force_credit_override:
+        save_fields.append("credit_override_reason")
+    order.save(update_fields=save_fields)
 
     audit_log(
         organization=order.organization,

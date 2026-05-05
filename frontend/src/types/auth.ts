@@ -1620,6 +1620,8 @@ export interface SaleOrder {
   paid_amount_uzs: string;
   payment_status: SalePaymentStatus;
   due_date: string | null;
+  /** Заполняется только при confirm с force_credit_override=true. */
+  credit_override_reason?: string;
 
   // derived
   margin_uzs?: string;

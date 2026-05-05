@@ -112,6 +112,20 @@ class SaleOrder(UUIDModel, TimestampedModel):
         help_text="Плановая дата оплаты (для отчёта дебиторского старения).",
     )
 
+    # ─── Кредит-override ─────────────────────────────────────────────────
+    # Заполняется ТОЛЬКО если confirm_sale прошёл с force_credit_override=True
+    # (когда у клиента превышен лимит/просрочка, но sales:admin осознанно
+    # пробил продажу). Бизнес-требование: причина override обязательна —
+    # для аудита и защиты от случайного «продал в долг забыл записать почему».
+    credit_override_reason = models.TextField(
+        blank=True,
+        help_text=(
+            "Причина override кредитной блокировки. Заполняется при "
+            "confirm_sale(force_credit_override=True). Без причины override "
+            "невозможен."
+        ),
+    )
+
     notes = models.TextField(blank=True)
     created_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,

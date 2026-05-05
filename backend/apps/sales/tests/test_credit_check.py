@@ -223,11 +223,37 @@ def test_confirm_sale_with_force_override_succeeds(
                           amount="80000", days_overdue=5)
     draft = _draft_sale(org, m_sales, buyer, warehouse, chicken, stocked_batch,
                         qty="10", price="5000")
-    # С override — проводится
-    result = confirm_sale(draft, force_credit_override=True)
+    # С override + причиной — проводится
+    result = confirm_sale(
+        draft, force_credit_override=True,
+        credit_override_reason="Клиент пообещал погасить до 12.05, согласовал директор",
+    )
     draft.refresh_from_db()
     assert draft.status == SaleOrder.Status.CONFIRMED
     assert result.revenue_journal is not None
+    # Причина сохранилась на заказе для аудита
+    assert "погасить" in draft.credit_override_reason
+
+
+def test_confirm_sale_override_without_reason_blocked(
+    org, m_slaughter, m_sales, buyer, warehouse, chicken, stocked_batch,
+):
+    """Override без причины (пустая или короче 10 символов) — блок."""
+    buyer.credit_limit_uzs = Decimal("100000")
+    buyer.save()
+    _existing_unpaid_sale(org, m_slaughter, buyer, warehouse,
+                          amount="80000", days_overdue=5)
+    draft = _draft_sale(org, m_sales, buyer, warehouse, chicken, stocked_batch,
+                        qty="10", price="5000")
+    # Без причины
+    with pytest.raises(SaleConfirmError) as exc_info:
+        confirm_sale(draft, force_credit_override=True)
+    assert "причина" in str(exc_info.value.message_dict).lower()
+    # Слишком короткая
+    with pytest.raises(SaleConfirmError):
+        confirm_sale(
+            draft, force_credit_override=True, credit_override_reason="ok",
+        )
 
 
 def test_confirm_sale_passes_when_within_limits(

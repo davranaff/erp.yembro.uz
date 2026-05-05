@@ -132,6 +132,7 @@ class SaleOrderSerializer(serializers.ModelSerializer):
             "payment_status",
             "paid_amount_uzs",
             "due_date",
+            "credit_override_reason",
             "currency",
             "currency_code",
             "exchange_rate",
@@ -161,6 +162,7 @@ class SaleOrderSerializer(serializers.ModelSerializer):
             "cost_uzs",
             "margin_uzs",
             "draft_total_uzs",
+            "credit_override_reason",  # заполняется только в confirm-action
             "module_code",
             "customer_name",
             "warehouse_code",
