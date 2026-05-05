@@ -24,8 +24,8 @@ def test_unauth_user_gets_link_prompt(fake_send):
 
 def test_known_command_dispatched(tg_link, fake_send):
     dispatch_message(_msg(tg_link.chat_id, "/menu"))
-    # /menu рендерит главное меню
-    assert any("Главное меню" in t for _, t, _ in fake_send.calls)
+    # /menu рендерит главное меню (на узбекском после Phase B1)
+    assert any("Asosiy menyu" in t for _, t, _ in fake_send.calls)
 
 
 def test_unknown_command_falls_to_help(tg_link, fake_send):
@@ -61,8 +61,8 @@ def test_dispatch_routes_callback_query(tg_link, fake_send):
     dispatch(update)
     # answerCallbackQuery должен был дёрнуться чтобы убрать спиннер
     assert fake_send.callbacks
-    # И главное меню — отредактировано in-place
-    assert any("Главное меню" in t for _, _, t, _ in fake_send.edits)
+    # И главное меню — отредактировано in-place (узбекский после Phase B1)
+    assert any("Asosiy menyu" in t for _, _, t, _ in fake_send.edits)
 
 
 def test_callback_unauth_user_silenced(fake_send):

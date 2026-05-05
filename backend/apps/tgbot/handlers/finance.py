@@ -69,10 +69,21 @@ def _period_range(period: str) -> tuple[date, date]:
     return today - timedelta(days=6), today
 
 
-def _check_or_deny(ctx: HandlerCtx) -> bool:
-    if has_module_access(ctx.link, "reports"):
+def _check_or_deny(ctx: HandlerCtx, *, modules: list[str] = None) -> bool:
+    """Доступ если есть >=r на ХОТЯ БЫ ОДИН модуль из списка.
+
+    Owner ('admin' модуль) — пускаем всегда. Без modules — старая
+    проверка только на 'reports' (для совместимости).
+    """
+    from ..services.menu_scope import has_any_access, is_owner, user_module_levels
+
+    levels = user_module_levels(ctx.link)
+    if is_owner(levels):
         return True
-    send_message(ctx.chat_id, "Нет доступа к модулю <b>Отчёты</b>.")
+    needed = modules or ["reports"]
+    if has_any_access(levels, needed):
+        return True
+    send_message(ctx.chat_id, "⛔ Sizda bu bo'limga ruxsat yo'q.")
     return False
 
 
@@ -86,23 +97,41 @@ def _send_or_edit(
 
 
 # ─── menu (callback `home:fin`) ─────────────────────────────────────────
+# Каждый sub-раздел гейтится своим списком модулей. Юзер видит только
+# те разделы, к которым у него есть доступ хотя бы к одному из модулей.
 
 
-_FIN_MENU_TEXT = "💰 <b>Финансы</b>\n\nВыберите раздел:"
-_FIN_MENU_BUTTONS = [
-    ("Касса/банк", "fin:cash"),
-    ("Дебиторка", "fin:debt"),
-    ("Кредиторка", "fin:cred"),
-    ("P&L", "fin:pnl:week"),
-    ("Продажи", "fin:sales:week"),
+_FIN_SUB_BUTTONS = [
+    # (label, callback, [required_modules])
+    ("💵 Kassa/bank",   "fin:cash",        ["ledger", "reports"]),
+    ("👥 Mijozlar qarzi", "fin:debt",       ["sales", "reports"]),
+    ("🏢 Yetkazib beruvchi qarzi", "fin:cred", ["purchases", "reports"]),
+    ("📈 P&L",           "fin:pnl:week",   ["reports", "ledger"]),
+    ("💸 Sotuvlar",      "fin:sales:week", ["sales", "reports"]),
 ]
 
 
 def render_finance_menu(ctx: HandlerCtx) -> None:
-    if not _check_or_deny(ctx):
+    from ..services.menu_scope import has_any_access, is_owner, user_module_levels
+
+    levels = user_module_levels(ctx.link)
+    if not is_owner(levels) and not any(
+        has_any_access(levels, mods) for _, _, mods in _FIN_SUB_BUTTONS
+    ):
+        send_message(ctx.chat_id, "⛔ Sizda Moliya bo'limiga ruxsat yo'q.")
         return
-    markup = kb(_FIN_MENU_BUTTONS + [("← Назад", "home")], cols=2)
-    _send_or_edit(ctx, _FIN_MENU_TEXT, markup, edit=ctx.message_id is not None)
+
+    visible = [
+        (label, cb) for label, cb, mods in _FIN_SUB_BUTTONS
+        if is_owner(levels) or has_any_access(levels, mods)
+    ]
+    markup = kb(visible + [("← Orqaga", "home")], cols=2)
+    _send_or_edit(
+        ctx,
+        "💰 <b>Moliya</b>\n\nBo'limni tanlang:",
+        markup,
+        edit=ctx.message_id is not None,
+    )
 
 
 # ─── /cash ───────────────────────────────────────────────────────────────
@@ -115,7 +144,7 @@ def handle_cash_cmd(ctx: HandlerCtx) -> None:
 
 @on_callback("fin:cash")
 def handle_cash_callback(ctx: HandlerCtx) -> None:
-    if not _check_or_deny(ctx):
+    if not _check_or_deny(ctx, modules=["ledger", "reports"]):
         return
     _render_cash(ctx, edit=True)
 
@@ -160,7 +189,7 @@ def handle_debt_cmd(ctx: HandlerCtx) -> None:
 
 @on_callback("fin:debt")
 def handle_debt_callback(ctx: HandlerCtx) -> None:
-    if not _check_or_deny(ctx):
+    if not _check_or_deny(ctx, modules=["sales", "reports"]):
         return
     _render_debt(ctx, edit=True)
 
@@ -211,7 +240,7 @@ def _render_debt(ctx: HandlerCtx, *, edit: bool = False) -> None:
 
 @on_callback("fin:cred")
 def handle_cred_callback(ctx: HandlerCtx) -> None:
-    if not _check_or_deny(ctx):
+    if not _check_or_deny(ctx, modules=["purchases", "reports"]):
         return
     _render_cred(ctx, edit=True)
 
@@ -282,7 +311,7 @@ def handle_pnl_cmd(ctx: HandlerCtx) -> None:
 
 @on_callback("fin:pnl")
 def handle_pnl_callback(ctx: HandlerCtx) -> None:
-    if not _check_or_deny(ctx):
+    if not _check_or_deny(ctx, modules=["reports", "ledger"]):
         return
     # callback «fin:pnl:week» → ctx.args = [«week»] после фикса dispatcher.
     period = ctx.args[0] if ctx.args else "week"
@@ -406,7 +435,7 @@ def handle_sales_cmd(ctx: HandlerCtx) -> None:
 
 @on_callback("fin:sales")
 def handle_sales_callback(ctx: HandlerCtx) -> None:
-    if not _check_or_deny(ctx):
+    if not _check_or_deny(ctx, modules=["sales", "reports"]):
         return
     # callback «fin:sales:week» → ctx.args = [«week»] после фикса dispatcher.
     period = ctx.args[0] if ctx.args else "week"

@@ -45,7 +45,7 @@ def handle_link(ctx: HandlerCtx, *, tg_user: dict) -> None:
 
     tg_username = tg_user.get("username", "")
 
-    TgLink.objects.update_or_create(
+    link, _ = TgLink.objects.update_or_create(
         organization=link_token.organization,
         chat_id=ctx.chat_id,
         defaults={
@@ -65,12 +65,30 @@ def handle_link(ctx: HandlerCtx, *, tg_user: dict) -> None:
     else:
         name = getattr(who, "name", str(who))
 
+    # Персональный список / команд для этого чата (RBAC-aware для админ-линка,
+    # клиент-набор для counterparty). Telegram сразу спрячет недоступные
+    # команды в popup'е, юзер не увидит /pnl если он клиент и т.п.
+    try:
+        from ..bot import set_my_commands
+        from ..services.menu_scope import (
+            commands_for_counterparty,
+            commands_for_user,
+            user_module_levels,
+        )
+        if link.user_id:
+            commands = commands_for_user(user_module_levels(link))
+        else:
+            commands = commands_for_counterparty()
+        set_my_commands(commands, chat_id=ctx.chat_id)
+    except Exception:  # noqa: BLE001
+        logger.warning("setMyCommands failed for chat %s", ctx.chat_id, exc_info=True)
+
     send_message(
         ctx.chat_id,
-        f"✅ <b>Аккаунт привязан!</b>\n\n"
+        f"✅ <b>Akkaunt bog'landi!</b>\n\n"
         f"👤 {name}\n"
-        f"🏢 Организация: {link_token.organization}\n",
+        f"🏢 Tashkilot: {link_token.organization}\n",
         reply_markup=kb([
-            ("📋 Открыть меню", "home"),
+            ("📋 Menyuni ochish", "home"),
         ], cols=1),
     )
