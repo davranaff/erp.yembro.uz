@@ -22,8 +22,9 @@ def _msg(chat_id, text):
 def test_cash_command_renders(tg_link, fake_send):
     dispatch_message(_msg(tg_link.chat_id, "/cash"))
     text = fake_send.calls[0][1]
-    assert "Касса и банк" in text
-    assert "Всего" in text
+    # Узбекский после B-рефактора: «Kassa va bank» / «Jami»
+    assert "Kassa va bank" in text
+    assert "Jami" in text
 
 
 def test_debt_command_empty_state(tg_link, fake_send):

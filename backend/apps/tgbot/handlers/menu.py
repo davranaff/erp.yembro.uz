@@ -22,11 +22,11 @@ from ..services.menu_scope import (
 
 
 # Каждый кортеж: (label, callback_data, section_key для RBAC).
-# Section_key пустой = доступно всем без ограничений.
+# «Modullar» (бывшее Ishlab chiqarish) — единая точка входа в любой модуль
+# (касса/склады/партии модуля). «Partiyalar» убрали — всё внутри модулей.
 _ALL_SECTIONS = [
     ("💰 Moliya",        "home:fin",     "fin"),
-    ("📦 Partiyalar",    "home:batch",   "batch"),
-    ("🐔 Ishlab chiqarish", "home:prod", "prod"),
+    ("🐔 Modullar",      "home:modules", "modules"),
     ("📊 Hisobotlar",    "home:reports", "reports"),
 ]
 
@@ -121,15 +121,15 @@ def handle_home_callback(ctx: HandlerCtx) -> None:
     if section == "fin":
         from .finance import render_finance_menu
         render_finance_menu(ctx)
-    elif section == "batch":
-        from .production import render_batches_section
-        render_batches_section(ctx)
-    elif section == "prod":
-        from .production import render_production_section
-        render_production_section(ctx)
+    elif section in ("modules", "batch", "prod"):
+        # batch / prod — legacy callbacks от старых сообщений с inline-кнопками,
+        # переадресуем на новый единый «Modullar».
+        from .modules_hub import render_modules_section
+        render_modules_section(ctx)
     elif section == "reports":
-        from .reports import render_reports_section
-        render_reports_section(ctx)
+        # Hisobotlar тоже разбито по модулям: выбираешь модуль → его аналитика.
+        from .modules_hub import render_reports_modules
+        render_reports_modules(ctx)
     elif section == "help":
         from .help_cmd import handle_help
         handle_help(ctx)

@@ -26,9 +26,24 @@ from typing import Iterable
 # Owner (admin модуля 'admin') видит всё бесконтрольно.
 SECTION_MODULES: dict[str, list[str]] = {
     "fin":     ["sales", "purchases", "payments", "ledger"],
-    "batch":   ["feedlot", "matochnik", "incubation", "slaughter"],
-    "prod":    ["matochnik", "incubation", "feedlot", "slaughter", "feed", "vet"],
-    "reports": ["reports", "ledger", "sales", "purchases"],
+    "modules": [
+        "matochnik", "incubation", "feedlot", "slaughter",
+        "feed", "vet", "stock",
+    ],
+    "reports": [
+        "reports", "ledger", "sales", "purchases",
+        "matochnik", "incubation", "feedlot", "slaughter", "feed", "vet",
+    ],
+    # Legacy ключи на случай если в callback всё ещё пришёл home:batch / home:prod —
+    # переадресуем на modules.
+    "batch":   [
+        "matochnik", "incubation", "feedlot", "slaughter",
+        "feed", "vet", "stock",
+    ],
+    "prod":    [
+        "matochnik", "incubation", "feedlot", "slaughter",
+        "feed", "vet", "stock",
+    ],
 }
 
 

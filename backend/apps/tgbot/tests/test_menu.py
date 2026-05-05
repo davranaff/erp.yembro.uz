@@ -17,23 +17,23 @@ def _cbq(chat_id, data, message_id=10):
     }
 
 
-def test_menu_renders_4_buttons(tg_link, fake_send):
+def test_menu_renders_buttons_for_owner(tg_link, fake_send):
     dispatch_message({"chat": {"id": tg_link.chat_id}, "text": "/menu"})
     sent = fake_send.calls
     assert sent
     chat_id, text, markup = sent[0]
     assert chat_id == tg_link.chat_id
-    # owner_user (conftest) даёт доступ к reports/feedlot/matочник/admin/ledger →
-    # видит как минимум fin (через ledger) + batch + prod + reports.
     assert "Asosiy menyu" in text
     rows = markup["inline_keyboard"]
     flat = [btn for row in rows for btn in row]
     callbacks = {b["callback_data"] for b in flat}
-    # admin модуль входит в owner_user'а override → owner → видит все 4.
+    # После рефактора: 3 кнопки — fin / modules / reports (вместо
+    # старых fin / batch / prod / reports). «Партии» убраны (всё в модулях).
     assert "home:fin" in callbacks
-    assert "home:batch" in callbacks
-    assert "home:prod" in callbacks
+    assert "home:modules" in callbacks
     assert "home:reports" in callbacks
+    assert "home:batch" not in callbacks
+    assert "home:prod" not in callbacks
 
 
 def test_callback_home_fin_renders_finance_submenu(tg_link, fake_send):

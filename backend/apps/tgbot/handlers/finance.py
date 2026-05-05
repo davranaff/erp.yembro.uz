@@ -156,25 +156,57 @@ def _render_cash(ctx: HandlerCtx, *, edit: bool = False) -> None:
     cash = cash_balances(org)
     points = cashflow_chart(org, days=7)
 
-    lines = ["💵 <b>Касса и банк</b>", ""]
+    # Cash-balance может быть отрицательным когда касса/счёт в овердрафте
+    # (списали больше чем приходов — например операционные расходы оплачены
+    # будущими поступлениями). Раньше выводили просто отрицательное число —
+    # пользователю было непонятно почему.
+
+    lines = ["💵 <b>Kassa va bank</b>", ""]
+    has_negative = False
     for ch_key, ch_data in cash.items():
         if ch_key.startswith("_"):
             continue
         label = ch_data["label"]
-        bal = _fmt_uzs(ch_data["balance_uzs"])
-        # выравниваем простыми пробелами в <code> чтобы моноширинно
-        lines.append(f"  {label}: <code>{bal}</code>")
+        bal_dec = Decimal(str(ch_data["balance_uzs"]))
+        if bal_dec < 0:
+            has_negative = True
+            icon = "🔴"
+            bal_str = f"<b>−{_fmt_uzs(abs(bal_dec))}</b>"
+        elif bal_dec == 0:
+            icon = "⚪"
+            bal_str = "0"
+        else:
+            icon = "🟢"
+            bal_str = _fmt_uzs(bal_dec)
+        lines.append(f"  {icon} {label}: <code>{bal_str}</code> so'm")
+
+    total_dec = Decimal(str(cash["_total_uzs"]))
     lines.append("  ──────────────────")
-    lines.append(f"  <b>Всего:</b> <code>{_fmt_uzs(cash['_total_uzs'])}</code> сум")
+    if total_dec < 0:
+        total_str = f"<b>−{_fmt_uzs(abs(total_dec))}</b>"
+    else:
+        total_str = f"<b>{_fmt_uzs(total_dec)}</b>"
+    lines.append(f"  <b>Jami:</b> <code>{total_str}</code> so'm")
+
+    if has_negative:
+        lines.append("")
+        lines.append(
+            "<i>🔴 Manfiy qoldiq — kanaldan jami chiqarilgan summa kirimdan "
+            "ko'p (overdraft yoki dastlabki qoldiq sozlanmagan).</i>"
+        )
 
     if points:
         net_values = [Decimal(p["in_uzs"]) - Decimal(p["out_uzs"]) for p in points]
         spark = _ascii_sparkline(net_values)
         net_total = sum(net_values, Decimal("0"))
+        in_total = sum((Decimal(p["in_uzs"]) for p in points), Decimal("0"))
+        out_total = sum((Decimal(p["out_uzs"]) for p in points), Decimal("0"))
         lines.append("")
-        lines.append("<b>Чистый поток · 7 дн</b>")
+        lines.append("<b>Cash-flow · 7 kun</b>")
         lines.append(f"<code>{spark}</code>")
-        lines.append(f"  итого: <code>{_fmt_signed(net_total)}</code> сум")
+        lines.append(f"  ⬆️ Kirim:  <code>{_fmt_uzs(in_total)}</code> so'm")
+        lines.append(f"  ⬇️ Chiqim: <code>{_fmt_uzs(out_total)}</code> so'm")
+        lines.append(f"  ━ Saldo:  <code>{_fmt_signed(net_total)}</code> so'm")
 
     _send_or_edit(ctx, "\n".join(lines), kb_back("home:fin"), edit=edit)
 

@@ -60,11 +60,11 @@ def test_feed_head_sees_only_production(org):
     link = _link_with_overrides(org, "feed-head@y.local", {"feed": AccessLevel.ADMIN})
     levels = user_module_levels(link)
     assert is_owner(levels) is False
-    # feed входит в 'prod' раздел и НЕ входит в 'fin'/'batch'/'reports'
-    assert can_see_section(levels, "prod") is True
+    # feed входит в 'modules' раздел; 'reports' тоже включает feed (per-module
+    # аналитика), 'fin' нет (sales/purchases/payments/ledger).
+    assert can_see_section(levels, "modules") is True
+    assert can_see_section(levels, "reports") is True
     assert can_see_section(levels, "fin") is False
-    assert can_see_section(levels, "batch") is False
-    assert can_see_section(levels, "reports") is False
 
 
 def test_sales_manager_sees_fin_and_reports(org):
@@ -74,8 +74,7 @@ def test_sales_manager_sees_fin_and_reports(org):
     levels = user_module_levels(link)
     assert can_see_section(levels, "fin") is True       # sales входит
     assert can_see_section(levels, "reports") is True   # sales тоже reports gate
-    assert can_see_section(levels, "prod") is False
-    assert can_see_section(levels, "batch") is False
+    assert can_see_section(levels, "modules") is False  # production-модулей нет
 
 
 def test_user_with_role_assignment_inherits_levels(org):
@@ -96,7 +95,8 @@ def test_user_with_role_assignment_inherits_levels(org):
 
     levels = user_module_levels(link)
     assert levels.get("feedlot") == AccessLevel.READ
-    assert can_see_section(levels, "batch") is True
+    # feedlot входит в 'modules' и в 'reports' (per-module аналитика)
+    assert can_see_section(levels, "modules") is True
     assert can_see_section(levels, "fin") is False
 
 
