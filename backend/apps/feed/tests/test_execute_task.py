@@ -173,11 +173,20 @@ def recipe_version(recipe):
 
 @pytest.fixture
 def broiler_feed_nom(org, cat_raw, unit_kg, recipe):
-    """Nomenclature для готового корма — sku == recipe.code."""
-    return NomenclatureItem.objects.create(
-        organization=org, sku="Р-БР-СТ", name="Старт бройлера — корм",
-        category=cat_raw, unit=unit_kg,
+    """Nomenclature для готового корма — sku == recipe.code.
+
+    NOTE: Recipe.post_save сигнал auto_create_nomenclature_for_recipe сейчас
+    создаёт такую позицию автоматически, поэтому используем get_or_create
+    чтобы фикстура работала и при наличии сигнала и без него.
+    """
+    item, _ = NomenclatureItem.objects.get_or_create(
+        organization=org, sku="Р-БР-СТ",
+        defaults={
+            "name": "Старт бройлера — корм",
+            "category": cat_raw, "unit": unit_kg,
+        },
     )
+    return item
 
 
 @pytest.fixture

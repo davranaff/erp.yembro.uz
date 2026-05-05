@@ -150,7 +150,7 @@ def test_confirm_feed_sale_notifies_sales_and_feed_admins(
     feed_text = next(
         c.args[0] for c in calls if "feed" in _modules_of(c)
     )
-    assert "Yem-xashak sotildi" in feed_text
+    assert "Yem-xashak jo'natildi" in feed_text
     assert approved_feed_batch.doc_number in feed_text
 
 
