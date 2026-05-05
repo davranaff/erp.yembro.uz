@@ -193,3 +193,40 @@ def test_report_drill_renders_analytics(org, fake_send):
     assert "analitika" in text.lower()
     # Убедимся что accrual-врущая «Foyda» убрана из аналитики
     assert "Foyda:" not in text
+
+
+def test_module_hub_period_selector_switches_days(org, fake_send):
+    """mod:feed:p:week переключает период на 7 дней (заголовок «hafta»)."""
+    _enabled(org, ["feed"])
+    link = _link(org, "feed-period@y.local", {"feed": AccessLevel.ADMIN})
+
+    dispatch_callback(_cbq(link.chat_id, "mod:feed:p:week"))
+    text = fake_send.edits[-1][2]
+    # Заголовок включает выбранный период (узбекский)
+    assert "hafta" in text.lower() or "7 kun" in text
+
+
+def test_module_hub_warehouses_drill(org, fake_send):
+    """mod:feed:wh:1 рендерит drill-down склады с заголовком «Omborlar»."""
+    _enabled(org, ["feed"])
+    link = _link(org, "feed-wh-drill@y.local", {"feed": AccessLevel.ADMIN})
+
+    dispatch_callback(_cbq(link.chat_id, "mod:feed:wh:1"))
+    text = fake_send.edits[-1][2]
+    assert "Omborlar" in text
+    assert "Jami" in text  # «Jami: N ta»
+    # Кнопка возврата к hub
+    markup = fake_send.edits[-1][3]
+    callbacks = {b["callback_data"] for row in markup["inline_keyboard"] for b in row}
+    assert "mod:feed" in callbacks
+
+
+def test_module_hub_period_invalid_falls_back(org, fake_send):
+    """mod:feed:p:badperiod → fallback на default (month)."""
+    _enabled(org, ["feed"])
+    link = _link(org, "feed-bad-p@y.local", {"feed": AccessLevel.ADMIN})
+
+    dispatch_callback(_cbq(link.chat_id, "mod:feed:p:badperiod"))
+    text = fake_send.edits[-1][2]
+    # default = month → label «Oy» в заголовке Moliya
+    assert "oy" in text.lower() or "30 kun" in text or "Yem ishlab chiqarish" in text

@@ -20,48 +20,19 @@ from django.db.models import F, Sum
 
 from ..bot import edit_message_text, send_message
 from ..dispatcher import HandlerCtx, command, has_module_access, on_callback
-from ..keyboards import kb, kb_back, kb_periods
+from ..keyboards import (
+    PAGE_SIZE,
+    kb,
+    kb_back,
+    kb_pagination,
+    kb_periods,
+    parse_page,
+)
 
 logger = logging.getLogger(__name__)
 
 
 # ─── helpers ─────────────────────────────────────────────────────────────
-
-
-PAGE_SIZE = 10  # размер страницы для пагинированных списков (debt/cred/sales)
-
-
-def _pagination_kb(prefix: str, page: int, total: int, *, back_to: str) -> dict:
-    """Клавиатура «← / страница X из Y / →» + Назад.
-
-    `prefix` — callback-префикс (e.g. «fin:debt:p»). Кнопки шлют
-    `prefix:<N>`. Если на странице нет пред/следующей — кнопка не
-    показывается (юзер не должен жать в пустоту).
-    """
-    pages = max(1, (total + PAGE_SIZE - 1) // PAGE_SIZE)
-    nav: list[tuple[str, str]] = []
-    if page > 1:
-        nav.append(("← Oldingi", f"{prefix}:{page - 1}"))
-    nav.append((f"{page}/{pages}", "noop"))  # центральная плашка
-    if page < pages:
-        nav.append(("Keyingi →", f"{prefix}:{page + 1}"))
-
-    rows = [nav, [("← Orqaga", back_to)]]
-    return {"inline_keyboard": [
-        [{"text": t, "callback_data": cb} for t, cb in row]
-        for row in rows
-    ]}
-
-
-def _parse_page(args: list[str]) -> int:
-    """Из callback args извлекает номер страницы (default=1)."""
-    if not args:
-        return 1
-    try:
-        n = int(args[0])
-        return max(1, n)
-    except (ValueError, TypeError):
-        return 1
 
 
 def _fmt_uzs(value) -> str:
@@ -267,7 +238,7 @@ def handle_noop_callback(ctx: HandlerCtx) -> None:
 def handle_debt_callback(ctx: HandlerCtx) -> None:
     if not _check_or_deny(ctx, modules=["sales", "reports"]):
         return
-    page = _parse_page(ctx.args)
+    page = parse_page(ctx.args)
     _render_debt(ctx, page=page, edit=True)
 
 
@@ -319,7 +290,7 @@ def _render_debt(ctx: HandlerCtx, *, page: int = 1, edit: bool = False) -> None:
                 f"   <code>{so.doc_number}</code> — "
                 f"<code>{_fmt_uzs(so.remaining)}</code> so'm"
             )
-        markup = _pagination_kb("fin:debt", page, total_count, back_to="home:fin")
+        markup = kb_pagination("fin:debt", page, total_count, back_to="home:fin")
 
     _send_or_edit(ctx, "\n".join(lines), markup, edit=edit)
 
@@ -331,7 +302,7 @@ def _render_debt(ctx: HandlerCtx, *, page: int = 1, edit: bool = False) -> None:
 def handle_cred_callback(ctx: HandlerCtx) -> None:
     if not _check_or_deny(ctx, modules=["purchases", "reports"]):
         return
-    page = _parse_page(ctx.args)
+    page = parse_page(ctx.args)
     _render_cred(ctx, page=page, edit=True)
 
 
@@ -385,7 +356,7 @@ def _render_cred(ctx: HandlerCtx, *, page: int = 1, edit: bool = False) -> None:
                 f"   <code>{po.doc_number}</code> — "
                 f"<code>{_fmt_uzs(po.remaining)}</code> so'm"
             )
-        markup = _pagination_kb("fin:cred", page, total_count, back_to="home:fin")
+        markup = kb_pagination("fin:cred", page, total_count, back_to="home:fin")
 
     _send_or_edit(ctx, "\n".join(lines), markup, edit=edit)
 

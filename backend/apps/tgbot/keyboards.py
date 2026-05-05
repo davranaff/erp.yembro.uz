@@ -48,17 +48,31 @@ def kb(buttons: Iterable[tuple[str, str]], cols: int = 2) -> dict:
 
 
 def kb_back(home_callback: str = "home") -> dict:
-    """Одиночная кнопка «Назад» — возвращает к главному меню."""
-    return kb([("← Назад", home_callback)], cols=1)
+    """Одиночная кнопка «← Orqaga»."""
+    return kb([("← Orqaga", home_callback)], cols=1)
+
+
+def kb_back_home(back_callback: str = "home") -> dict:
+    """Двойная кнопка: «← Orqaga» (back_callback) + «🏠 Bosh» (home).
+
+    Применяется в drill-down экранах где «назад» != «домой» (например в
+    карточке заказа: назад → список заказов, домой → главное меню).
+    Если `back_callback == "home"` — фактически дубль, в этом случае
+    лучше использовать `kb_back("home")`.
+    """
+    return kb([
+        ("← Orqaga", back_callback),
+        ("🏠 Bosh", "home"),
+    ], cols=2)
 
 
 def kb_periods(prefix: str, current: str | None = None) -> dict:
-    """Стандартная клавиатура переключения периодов: today / week / month.
+    """Клавиатура переключения периодов: today / week / month (узбекский).
 
     `prefix` — namespace callback_data (напр. `fin:pnl`). Нажатая кнопка
     пометится • если совпадает с `current`.
     """
-    options = [("today", "Сегодня"), ("week", "Неделя"), ("month", "Месяц")]
+    options = [("today", "Bugun"), ("week", "Hafta"), ("month", "Oy")]
     return kb(
         [
             (f"• {label}" if k == current else label, f"{prefix}:{k}")
@@ -66,3 +80,57 @@ def kb_periods(prefix: str, current: str | None = None) -> dict:
         ],
         cols=3,
     )
+
+
+# ─── Pagination ──────────────────────────────────────────────────────────
+
+
+PAGE_SIZE = 10
+
+
+def kb_pagination(
+    prefix: str,
+    page: int,
+    total: int,
+    *,
+    back_to: str | None = None,
+    page_size: int = PAGE_SIZE,
+) -> dict:
+    """Универсальная пагинация-клавиатура.
+
+    Кнопки: «← Oldingi» (если page>1) · «N/Total» (noop) · «Keyingi →»
+    (если page<pages). Если `back_to` задан — добавляется ряд с
+    «← Orqaga» / «🏠 Bosh».
+
+    callback_data: `{prefix}:{N}` для смены страницы. Центральная плашка
+    шлёт `noop` — handler возвращает None (см. handlers/finance.handle_noop).
+
+    Пример:
+        kb_pagination("fin:debt", page=2, total=27, back_to="home:fin")
+    """
+    pages = max(1, (total + page_size - 1) // page_size)
+    nav: list[tuple[str, str]] = []
+    if page > 1:
+        nav.append(("← Oldingi", f"{prefix}:{page - 1}"))
+    nav.append((f"{page}/{pages}", "noop"))
+    if page < pages:
+        nav.append(("Keyingi →", f"{prefix}:{page + 1}"))
+
+    rows = [nav]
+    if back_to:
+        rows.append([("← Orqaga", back_to), ("🏠 Bosh", "home")])
+    return {"inline_keyboard": [
+        [{"text": t, "callback_data": _validate(cb)} for t, cb in row]
+        for row in rows
+    ]}
+
+
+def parse_page(args: list[str], default: int = 1) -> int:
+    """Извлекает номер страницы из callback args."""
+    if not args:
+        return default
+    try:
+        n = int(args[0])
+        return max(1, n)
+    except (ValueError, TypeError):
+        return default
