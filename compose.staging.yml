@@ -21,6 +21,9 @@ volumes:
   uploads_data:
     external: true
     name: ${UPLOADS_VOLUME_NAME:-uploads_staging}
+  staticfiles_data:
+    external: true
+    name: ${STATICFILES_VOLUME_NAME:-staticfiles_staging}
 
 networks:
   internal:

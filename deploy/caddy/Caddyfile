@@ -5,7 +5,12 @@
 {$PRIMARY_DOMAIN} {
 	encode zstd gzip
 
-	@backend path /api/* /admin/* /static/* /media/* /health
+	handle_path /static/* {
+		root * /srv/static/prod
+		file_server
+	}
+
+	@backend path /api/* /admin/* /media/* /health
 	handle @backend {
 		reverse_proxy prod-api:30000
 	}
@@ -17,13 +22,24 @@
 
 {$API_PRIMARY_DOMAIN} {
 	encode zstd gzip
+
+	handle_path /static/* {
+		root * /srv/static/prod
+		file_server
+	}
+
 	reverse_proxy prod-api:30000
 }
 
 {$STAGING_DOMAIN} {
 	encode zstd gzip
 
-	@backend path /api/* /admin/* /static/* /media/* /health
+	handle_path /static/* {
+		root * /srv/static/staging
+		file_server
+	}
+
+	@backend path /api/* /admin/* /media/* /health
 	handle @backend {
 		reverse_proxy staging-api:30000
 	}
@@ -35,6 +51,12 @@
 
 {$API_STAGING_DOMAIN} {
 	encode zstd gzip
+
+	handle_path /static/* {
+		root * /srv/static/staging
+		file_server
+	}
+
 	reverse_proxy staging-api:30000
 }
 

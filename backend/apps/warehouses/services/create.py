@@ -90,10 +90,8 @@ def create_manual_movement(
             {"unit_price_uzs": "Цена не может быть отрицательной."}
         )
 
-    if module.organization_id and module.organization_id != organization.id:
-        raise StockMovementCreateError(
-            {"module": "Модуль из другой организации."}
-        )
+    # Module — системная сущность (feed/vet/incubation/...), org-scope не имеет.
+    # Org-валидация делается через Warehouse и Counterparty.
 
     for wh in (warehouse_from, warehouse_to):
         if wh is not None and wh.organization_id != organization.id:

@@ -98,6 +98,8 @@ export function usePackageFeedBatch() {
         bag_weight_kg: string;
         storage_warehouse: string;
         storage_bin?: string | null;
+        packaging_nomenclature?: string | null;
+        packaging_warehouse?: string | null;
         notes?: string;
       };
     }

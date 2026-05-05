@@ -71,6 +71,40 @@ def _resolve_feed_nomenclature(feed_batch: FeedBatch):
     ).first()
 
 
+def _resolve_bag_sku_by_weight(org_id, bag_weight: Decimal):
+    """Авторезолв SKU пустого мешка по весу: 25 → KORM-XALTA-25, 50 → KORM-XALTA-50.
+
+    Возвращает NomenclatureItem или None если не найден / вес нестандартный.
+    """
+    from apps.nomenclature.models import NomenclatureItem
+    # Округляем для сравнения с целым кг
+    weight_int = int(bag_weight) if bag_weight == bag_weight.to_integral_value() else None
+    if weight_int is None:
+        return None
+    sku = f"KORM-XALTA-{weight_int}"
+    return NomenclatureItem.objects.filter(
+        organization_id=org_id, sku=sku, is_active=True,
+    ).first()
+
+
+def _empty_bag_stock(nom_item, warehouse):
+    """Текущий остаток пустых мешков на складе по StockMovement-ам.
+
+    Stock = Σ INCOMING (warehouse_to=wh) − Σ OUTGOING (warehouse_from=wh).
+    Возвращает Decimal.
+    """
+    from django.db.models import Sum
+    incoming = StockMovement.objects.filter(
+        nomenclature=nom_item, warehouse_to=warehouse,
+        kind=StockMovement.Kind.INCOMING,
+    ).aggregate(s=Sum("quantity"))["s"] or Decimal(0)
+    outgoing = StockMovement.objects.filter(
+        nomenclature=nom_item, warehouse_from=warehouse,
+        kind__in=[StockMovement.Kind.OUTGOING, StockMovement.Kind.WRITE_OFF],
+    ).aggregate(s=Sum("quantity"))["s"] or Decimal(0)
+    return Decimal(incoming) - Decimal(outgoing)
+
+
 @transaction.atomic
 def package_feed_batch(
     source: FeedBatch,
@@ -81,6 +115,8 @@ def package_feed_batch(
     storage_bin=None,
     notes: str = "",
     user=None,
+    packaging_nomenclature=None,
+    packaging_warehouse=None,
 ) -> FeedPackageResult:
     """
     Расфасовать часть (или весь) FeedBatch в N мешков по `bag_weight_kg`.
@@ -93,12 +129,19 @@ def package_feed_batch(
         storage_bin: опциональный ProductionBlock-бункер.
         notes: текстовая заметка.
         user: User для created_by/audit.
+        packaging_nomenclature: SKU пустого мешка для автосписания. Если не задан,
+            пытаемся резолвить по bag_weight_kg → KORM-XALTA-25/50. Если ни то ни
+            другое не находится — мешки списываются вручную (StockMovement не
+            создаётся для упаковки).
+        packaging_warehouse: склад пустых мешков. Обязателен если задан
+            packaging_nomenclature (или авторезолв сработал). Если не задан —
+            используется тот же storage_warehouse.
 
     Returns:
         FeedPackageResult с bag_lot и stock_movements.
 
     Raises:
-        FeedPackageError: guards / cross-org / нехватка кг.
+        FeedPackageError: guards / cross-org / нехватка кг / нехватка мешков.
     """
     if not isinstance(bag_count, int) or bag_count <= 0:
         raise FeedPackageError({"bag_count": "Должно быть целое > 0."})
@@ -149,6 +192,31 @@ def package_feed_batch(
         if storage_bin.organization_id != org.id:
             raise FeedPackageError(
                 {"storage_bin": "Бункер из другой организации."}
+            )
+
+    # 2b. Resolve packaging (empty bag) SKU + warehouse
+    pack_nom = packaging_nomenclature
+    if pack_nom is None:
+        pack_nom = _resolve_bag_sku_by_weight(org.id, bag_weight)
+    pack_wh = packaging_warehouse or storage_warehouse
+    if pack_nom is not None:
+        if pack_nom.organization_id != org.id:
+            raise FeedPackageError(
+                {"packaging_nomenclature": "SKU мешка из другой организации."}
+            )
+        if pack_wh.organization_id != org.id:
+            raise FeedPackageError(
+                {"packaging_warehouse": "Склад мешков из другой организации."}
+            )
+        # Проверка остатка пустых мешков на складе
+        available_bags = _empty_bag_stock(pack_nom, pack_wh)
+        if available_bags < Decimal(bag_count):
+            raise FeedPackageError(
+                {"packaging_nomenclature": (
+                    f"Не хватает пустых мешков {pack_nom.sku} на складе "
+                    f"{pack_wh.code}: требуется {bag_count} шт, "
+                    f"доступно {available_bags} шт."
+                )}
             )
 
     # 3. Compute costs (наследуем per-kg, в пересчёте на мешок)
@@ -260,6 +328,42 @@ def package_feed_batch(
         sm_in.full_clean(exclude=None)
         sm_in.save()
         stock_movements.append(sm_in)
+
+    # 6b. Списываем пустые мешки (если SKU определился)
+    if pack_nom is not None:
+        # Стоимость одного пустого мешка — weighted-avg по предыдущим
+        # INCOMING. Если приходов не было (мешки пришли через бартер /
+        # неучтённое поступление) — ставим 0 чтобы не падать.
+        from django.db.models import Avg, F as _F
+        avg_cost = StockMovement.objects.filter(
+            nomenclature=pack_nom,
+            kind=StockMovement.Kind.INCOMING,
+        ).aggregate(c=Avg(_F("amount_uzs") / _F("quantity")))["c"] or Decimal(0)
+        avg_cost = _quantize_money(Decimal(avg_cost))
+        bag_total_cost = _quantize_money(avg_cost * Decimal(bag_count))
+
+        sm_pack_number = next_doc_number(
+            StockMovement, organization=org, prefix="СД", on_date=entry_date
+        )
+        sm_pack = StockMovement(
+            organization=org,
+            module=source.module,
+            doc_number=sm_pack_number,
+            kind=StockMovement.Kind.OUTGOING,
+            date=now,
+            nomenclature=pack_nom,
+            quantity=Decimal(bag_count),
+            unit_price_uzs=avg_cost,
+            amount_uzs=bag_total_cost,
+            warehouse_from=pack_wh,
+            warehouse_to=None,
+            source_content_type=ContentType.objects.get_for_model(FeedBagLot),
+            source_object_id=bag_lot.id,
+            created_by=user,
+        )
+        sm_pack.full_clean(exclude=None)
+        sm_pack.save()
+        stock_movements.append(sm_pack)
 
     # 7. Audit
     audit_log(

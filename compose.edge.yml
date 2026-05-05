@@ -10,6 +10,8 @@ services:
       - caddy_data:/data
       - caddy_config:/config
       - ./deploy/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - staticfiles_prod:/srv/static/prod:ro
+      - staticfiles_staging:/srv/static/staging:ro
     networks:
       - prod_public
       - staging_public
@@ -32,6 +34,12 @@ volumes:
     name: ${CADDY_DATA_VOLUME_NAME:-caddy_data}
   caddy_config:
     name: ${CADDY_CONFIG_VOLUME_NAME:-caddy_config}
+  staticfiles_prod:
+    external: true
+    name: ${PROD_STATICFILES_VOLUME_NAME:-staticfiles_prod}
+  staticfiles_staging:
+    external: true
+    name: ${STAGING_STATICFILES_VOLUME_NAME:-staticfiles_staging}
 
 networks:
   prod_public:
