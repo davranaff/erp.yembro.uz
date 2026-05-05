@@ -92,6 +92,37 @@ def test_resolver_blocks_user_without_module_access(org, m_sales):
     assert u.id not in allowed
 
 
+def test_notify_admins_dedupes_when_user_passes_via_multiple_modules(org, m_sales):
+    """OR-логика по modules: юзер с доступом к admin И к sales не должен
+    получить дубль. Раньше orchestrator слал 2 task'а с module_code=admin
+    и module_code=sales — owner получал 2 одинаковых сообщения подряд."""
+    from apps.modules.models import Module
+    m_admin = Module.objects.get(code="admin")
+    u = _make_user("dual-access@y.local")
+    m = OrganizationMembership.objects.create(
+        user=u, organization=org, is_active=True,
+    )
+    UserModuleAccessOverride.objects.create(
+        membership=m, module=m_admin, level=AccessLevel.ADMIN,
+    )
+    UserModuleAccessOverride.objects.create(
+        membership=m, module=m_sales, level=AccessLevel.ADMIN,
+    )
+    TgLink.objects.create(
+        organization=org, user=u, chat_id=2001, is_active=True,
+    )
+
+    with patch("apps.tgbot.bot.send_message") as mock_send:
+        mock_send.return_value = True
+        result = notify_admins_task(
+            "test", str(org.id), modules=["admin", "sales"],
+        )
+
+    assert result == {"sent": 1}
+    assert mock_send.call_count == 1
+    assert mock_send.call_args.args[0] == 2001
+
+
 def test_notify_admins_task_sends_to_users_with_module_access(org, m_sales):
     """End-to-end: notify_admins_task шлёт send_message только тем у кого
     есть TgLink + право >= r на модуль. Раньше падал с FieldError."""

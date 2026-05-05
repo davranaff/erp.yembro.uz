@@ -55,29 +55,19 @@ def notify_payment_event(payment, *, related_order=None) -> None:
         except Exception:  # noqa: BLE001
             logger.exception("notify_payment_event: client notify failed")
 
-    # 2 + 3. Сотрудники: общий fmt_payment_posted в admin (>=r) и в
-    # source-модуль (>=admin). Module-определение:
-    #   - direction=in  → 'sales'   (это наш incoming, админ продаж/owner)
-    #   - direction=out → 'purchases' (наша исходящая закупочная оплата)
+    # 2 + 3. Сотрудники: общий fmt_payment_posted одним вызовом для obox
+    # аудиторий — admin (org-wide owner) И source-модуль (head sales/purchases).
+    # Используем notify_admins_task с modules=[...] — OR-логика, дедупликация
+    # по chat_id (раньше делали 2 отдельных task'а → owner получал дубль).
     text_staff = fmt.fmt_payment_posted(payment)
-    if payment.direction == "in":
-        primary_module = "sales"
-    else:
-        primary_module = "purchases"
-
+    primary_module = "sales" if payment.direction == "in" else "purchases"
     try:
-        # Org-wide admin (модуль 'admin' = global owner channel).
-        notify_admins_task.delay(text_staff, org_id, "admin")
+        notify_admins_task.delay(
+            text_staff, org_id,
+            modules=["admin", primary_module],
+        )
     except Exception:  # noqa: BLE001
-        logger.exception("notify_payment_event: admin notify failed")
-
-    try:
-        # Head модуля (level=admin) + рядовые менеджеры (level>=r).
-        # В одном вызове — все с >=r получат, head всё равно входит.
-        # Если хочется ТОЛЬКО head — поднять min_level='admin'.
-        notify_admins_task.delay(text_staff, org_id, primary_module)
-    except Exception:  # noqa: BLE001
-        logger.exception("notify_payment_event: module notify failed")
+        logger.exception("notify_payment_event: staff notify failed")
 
 
 def notify_sale_event(order) -> None:
@@ -100,9 +90,13 @@ def notify_sale_event(order) -> None:
         except Exception:  # noqa: BLE001
             logger.exception("notify_sale_event: client notify failed")
 
-    # 2. Админы sales — общая сводка
+    # 2. Админы организации + sales-head — общая сводка одним вызовом
+    # с дедупом, чтобы owner не получал её 2 раза.
     try:
-        notify_admins_task.delay(fmt.fmt_sale_confirmed(order), org_id, "sales")
+        notify_admins_task.delay(
+            fmt.fmt_sale_confirmed(order), org_id,
+            modules=["admin", "sales"],
+        )
     except Exception:  # noqa: BLE001
         logger.exception("notify_sale_event: sales admin notify failed")
 
@@ -146,16 +140,17 @@ def notify_sale_event(order) -> None:
 
 
 def notify_purchase_event(order) -> None:
-    """Проведённый закуп → админам организации + head'у purchases."""
+    """Проведённый закуп → админам организации + head'у purchases.
+
+    Один вызов с modules=["admin", "purchases"] — owner получит ОДНО
+    сообщение даже если он admin к обоим (раньше было 2 одинаковых).
+    """
     from .. import notifications as fmt
     from ..tasks import notify_admins_task
 
     org_id = str(order.organization_id)
     text = fmt.fmt_purchase_confirmed(order)
-    for module_code in ("admin", "purchases"):
-        try:
-            notify_admins_task.delay(text, org_id, module_code)
-        except Exception:  # noqa: BLE001
-            logger.exception(
-                "notify_purchase_event: module=%s notify failed", module_code,
-            )
+    try:
+        notify_admins_task.delay(text, org_id, modules=["admin", "purchases"])
+    except Exception:  # noqa: BLE001
+        logger.exception("notify_purchase_event: notify failed")

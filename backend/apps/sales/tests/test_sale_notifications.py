@@ -131,13 +131,25 @@ def test_confirm_feed_sale_notifies_sales_and_feed_admins(
     assert resp.status_code == 200, resp.content
 
     calls = mock_notify.call_args_list
-    module_codes = [c.args[2] for c in calls]
-    # sales (сводно) + feed (детально по своим item'ам). admin может тоже
-    # быть (через orchestrator), но проверяем минимум.
-    assert "sales" in module_codes
-    assert "feed" in module_codes
-    # Текст для feed на узбекском после Phase A: «Yem-xashak sotildi»
-    feed_text = next(c.args[0] for c in calls if c.args[2] == "feed")
+
+    def _modules_of(c):
+        # После дедуп-фикса orchestrator может слать modules=[...] kwarg
+        # либо positional module_code (legacy для per-module). Учитываем оба.
+        if "modules" in c.kwargs:
+            return c.kwargs["modules"]
+        if "module_code" in c.kwargs:
+            return [c.kwargs["module_code"]]
+        if len(c.args) >= 3:
+            return [c.args[2]]
+        return []
+
+    all_modules = {m for c in calls for m in _modules_of(c)}
+    # sales-сводка летит modules=["admin","sales"], feed-detail — module_code="feed"
+    assert "sales" in all_modules
+    assert "feed" in all_modules
+    feed_text = next(
+        c.args[0] for c in calls if "feed" in _modules_of(c)
+    )
     assert "Yem-xashak sotildi" in feed_text
     assert approved_feed_batch.doc_number in feed_text
 
@@ -161,7 +173,17 @@ def test_confirm_bag_lot_sale_notifies_feed_admin_with_bag_count(
     assert resp.status_code == 200, resp.content
 
     calls = mock_notify.call_args_list
-    feed_call = next((c for c in calls if c.args[2] == "feed"), None)
+
+    def _modules_of(c):
+        if "modules" in c.kwargs:
+            return c.kwargs["modules"]
+        if "module_code" in c.kwargs:
+            return [c.kwargs["module_code"]]
+        if len(c.args) >= 3:
+            return [c.args[2]]
+        return []
+
+    feed_call = next((c for c in calls if "feed" in _modules_of(c)), None)
     assert feed_call is not None, "feed module not notified"
     text = feed_call.args[0]
     assert bag_lot.doc_number in text

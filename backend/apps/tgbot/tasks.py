@@ -13,22 +13,31 @@ def notify_admins_task(
     organization_id: str,
     module_code: str | None = None,
     min_level: str = "r",
+    modules: list[str] | None = None,
 ) -> dict:
     """Рассылает text активным TgLink для org.
 
-    Если передан module_code — получают только пользователи с доступом
-    к этому модулю уровня ≥ ``min_level`` (по умолчанию 'r').
-    `min_level='admin'` — только «head» модуля (для эскалаций/решений).
-    Без module_code — все активные admin-линки.
+    ``module_code`` (одиночный) или ``modules`` (список с OR-логикой) —
+    получают только пользователи с доступом ≥ ``min_level`` ХОТЯ БЫ К
+    ОДНОМУ из указанных модулей. Если ни тот, ни другой не передан —
+    все активные admin-линки.
 
-    Производительность: предварительно одним запросом подгружаем все
-    memberships, override'ы и role-permissions нужного модуля, потом
-    решаем «кому слать» в памяти. Старая реализация делала ~3 запроса
-    на каждого получателя (N+1) — на орге с 50 сотрудниками это 150+
-    SQL-запросов и таска тормозила.
+    Дедупликация: каждый chat получает СООБЩЕНИЕ ОДИН РАЗ, даже если
+    юзер проходит по нескольким модулям (раньше отправляли отдельные
+    задачи на admin + sales — owner получал дубликаты).
+
+    `min_level='admin'` — только «head» модуля (для эскалаций/решений).
     """
     from .bot import send_message
     from .models import TgLink
+
+    # Нормализуем: modules имеет приоритет, иначе [module_code], иначе [].
+    if modules:
+        check_modules = list(modules)
+    elif module_code:
+        check_modules = [module_code]
+    else:
+        check_modules = []
 
     links = list(
         TgLink.objects.filter(
@@ -41,25 +50,35 @@ def notify_admins_task(
         return {"sent": 0}
 
     allowed_user_ids: set | None = None
-    if module_code is not None:
-        allowed_user_ids = _resolve_allowed_users(
-            organization_id=organization_id,
-            user_ids=[link.user_id for link in links],
-            module_code=module_code,
-            min_level=min_level,
-        )
+    if check_modules:
+        # OR по модулям: юзер допущен если у него >=min_level хотя бы к
+        # одному. Союз allow-set'ов по модулям.
+        allowed_user_ids = set()
+        user_ids = [link.user_id for link in links]
+        for mc in check_modules:
+            allowed_user_ids |= _resolve_allowed_users(
+                organization_id=organization_id,
+                user_ids=user_ids,
+                module_code=mc,
+                min_level=min_level,
+            )
 
-    sent = 0
+    sent_chats: set = set()
     for link in links:
         if allowed_user_ids is not None and link.user_id not in allowed_user_ids:
             continue
+        # Дедуп: один chat — одно сообщение (на случай если у юзера
+        # несколько активных линков на тот же chat_id, маловероятно но
+        # защитно).
+        if link.chat_id in sent_chats:
+            continue
         if send_message(link.chat_id, text):
-            sent += 1
+            sent_chats.add(link.chat_id)
     logger.info(
-        "notify_admins_task: sent=%d org=%s module=%s min_level=%s",
-        sent, organization_id, module_code, min_level,
+        "notify_admins_task: sent=%d org=%s modules=%s min_level=%s",
+        len(sent_chats), organization_id, check_modules, min_level,
     )
-    return {"sent": sent}
+    return {"sent": len(sent_chats)}
 
 
 @shared_task(name="apps.tgbot.notify_counterparty_task")
