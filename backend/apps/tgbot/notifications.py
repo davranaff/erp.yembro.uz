@@ -89,7 +89,7 @@ def fmt_payment_received_for_client(payment, order=None) -> str:
             remaining = None
         if remaining is not None:
             if remaining <= 0:
-                lines.append("✨ <b>Buyurtma to'liq to'langan, rahmat!</b>")
+                lines.append("✅ <b>Buyurtma to'liq yopildi.</b>")
             else:
                 lines.append(
                     f"📊 Qoldiq qarz: <b>{_fmt_money(remaining)} so'm</b>"
@@ -235,14 +235,13 @@ def fmt_sale_confirmed_for_client(order) -> str:
     if order.due_date:
         due_block = f"⏳ To'lov muddati: <b>{order.due_date}</b>\n"
     return (
-        f"📦 <b>Hurmatli {order.customer.name}!</b>\n\n"
-        f"Sizning buyurtmangiz rasmiylashtirildi.\n\n"
-        f"📄 Buyurtma: <code>{order.doc_number}</code>\n"
+        f"📦 <b>Buyurtma rasmiylashtirildi</b>\n"
+        f"<i>{order.customer.name}</i>\n\n"
+        f"📄 Hujjat: <code>{order.doc_number}</code>\n"
         f"📦 Pozitsiyalar: {items_count}\n"
         f"💰 Summa: <b>{_fmt_money(order.amount_uzs)} so'm</b>\n"
         f"📅 Sana: {order.date}\n"
-        f"{due_block}\n"
-        f"Rahmat! ❤️"
+        f"{due_block}"
     )
 
 

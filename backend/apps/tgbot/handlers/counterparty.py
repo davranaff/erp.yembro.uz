@@ -166,8 +166,9 @@ def _render_debt(ctx: HandlerCtx) -> None:
 
     if not unpaid:
         text = (
-            f"✨ <b>{cp.name}</b>\n\n"
-            "Sizda qarzdorlik yo'q. Rahmat! ❤️"
+            f"💰 <b>Qarzdorlik holati</b>\n"
+            f"<i>{cp.name}</i>\n\n"
+            "To'lanmagan buyurtmalar yo'q."
         )
         _send_or_edit(ctx, text, _back_kb())
         return
@@ -248,7 +249,7 @@ def _render_block_status(ctx: HandlerCtx) -> None:
                 f"Mavjud limit: <b>{_fmt_money(available)}</b> so'm"
             )
         lines.append("")
-        lines.append("Siz xarid qilishingiz mumkin. ✨")
+        lines.append("Yangi xaridlarga ruxsat bor.")
     else:
         lines = [
             "🚫 <b>Holat: bloklangan</b>",

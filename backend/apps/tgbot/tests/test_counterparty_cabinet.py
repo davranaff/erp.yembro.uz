@@ -125,7 +125,7 @@ def test_cp_qarz_shows_total_debt(
 def test_cp_qarz_when_no_debt(cp_link, fake_send):
     dispatch_message(_msg(cp_link.chat_id, "/qarz"))
     text = fake_send.calls[-1][1]
-    assert "qarzdorlik yo'q" in text.lower() or "rahmat" in text.lower()
+    assert "to'lanmagan buyurtmalar yo'q" in text.lower()
 
 
 def test_cp_holat_active_when_under_limit(cp_link, fake_send):
