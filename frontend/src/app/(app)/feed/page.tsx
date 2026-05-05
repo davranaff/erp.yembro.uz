@@ -629,11 +629,37 @@ export default function FeedPage() {
                 render: (b) => b.recipe_code ?? '—' },
               { key: 'date', label: 'Произведено', mono: true, cellStyle: { fontSize: 12 },
                 render: (b) => new Date(b.produced_at).toLocaleDateString('ru-RU') },
-              { key: 'qty', label: 'Выпуск кг', align: 'right', mono: true,
-                render: (b) => fmtNum(b.quantity_kg, 0) },
-              { key: 'remain', label: 'Остаток кг', align: 'right', mono: true,
-                cellStyle: { fontWeight: 600 },
-                render: (b) => fmtNum(b.current_quantity_kg, 0) },
+              { key: 'progress', label: 'Продано / Выпущено', mono: true,
+                cellStyle: { fontSize: 12 },
+                render: (b) => {
+                  const total = parseFloat(b.quantity_kg || '0');
+                  const remain = parseFloat(b.current_quantity_kg || '0');
+                  const sold = total - remain;
+                  const pct = total > 0 ? (sold / total) * 100 : 0;
+                  const color = pct >= 100 ? 'var(--success)'
+                    : pct > 0 ? 'var(--brand-orange)' : 'var(--fg-3)';
+                  const fmt = (n: number) => n.toLocaleString('ru-RU', { maximumFractionDigits: 0 });
+                  return (
+                    <div style={{ minWidth: 160 }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 600 }}>
+                        <span style={{ color }}>{fmt(sold)} кг</span>
+                        <span style={{ color: 'var(--fg-3)' }}>из {fmt(total)}</span>
+                      </div>
+                      <div style={{
+                        height: 4, background: 'var(--bg-soft)', borderRadius: 2,
+                        marginTop: 3, overflow: 'hidden',
+                      }}>
+                        <div style={{
+                          width: `${Math.min(100, pct)}%`, height: '100%',
+                          background: color,
+                        }} />
+                      </div>
+                      <div style={{ fontSize: 10, color: 'var(--fg-3)', marginTop: 2 }}>
+                        остаток <b className="mono">{fmt(remain)} кг</b> · {pct.toFixed(1)}%
+                      </div>
+                    </div>
+                  );
+                } },
               ...(getFinancesVisible(feedBatches) ? [{
                 key: 'unit_cost', label: 'Себест/кг', align: 'right' as const, mono: true,
                 cellStyle: { fontSize: 12 },
@@ -695,9 +721,36 @@ export default function FeedPage() {
                 render: (b) => new Date(b.packaged_at).toLocaleDateString('ru-RU') },
               { key: 'weight', label: 'Вес мешка', align: 'right', mono: true,
                 render: (b) => `${parseFloat(b.bag_weight_kg).toLocaleString('ru-RU')} кг` },
-              { key: 'remaining', label: 'Остаток', align: 'right', mono: true,
-                cellStyle: { fontWeight: 600 },
-                render: (b) => `${b.bags_remaining} / ${b.bags_initial} шт` },
+              { key: 'progress', label: 'Продано / Расфасовано', mono: true,
+                cellStyle: { fontSize: 12 },
+                render: (b) => {
+                  const total = b.bags_initial;
+                  const remain = b.bags_remaining;
+                  const sold = total - remain;
+                  const pct = total > 0 ? (sold / total) * 100 : 0;
+                  const color = pct >= 100 ? 'var(--success)'
+                    : pct > 0 ? 'var(--brand-orange)' : 'var(--fg-3)';
+                  return (
+                    <div style={{ minWidth: 150 }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 600 }}>
+                        <span style={{ color }}>{sold} шт</span>
+                        <span style={{ color: 'var(--fg-3)' }}>из {total}</span>
+                      </div>
+                      <div style={{
+                        height: 4, background: 'var(--bg-soft)', borderRadius: 2,
+                        marginTop: 3, overflow: 'hidden',
+                      }}>
+                        <div style={{
+                          width: `${Math.min(100, pct)}%`, height: '100%',
+                          background: color,
+                        }} />
+                      </div>
+                      <div style={{ fontSize: 10, color: 'var(--fg-3)', marginTop: 2 }}>
+                        остаток <b>{remain} шт</b> · {pct.toFixed(1)}%
+                      </div>
+                    </div>
+                  );
+                } },
               { key: 'kg', label: '≈ кг', align: 'right', mono: true, cellStyle: { fontSize: 12, color: 'var(--fg-3)' },
                 render: (b) => fmtNum(b.remaining_kg, 0) },
               ...(getFinancesVisible(pageBagLots) ? [{
