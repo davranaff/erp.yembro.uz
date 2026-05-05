@@ -11,6 +11,8 @@ Owner (admin модуль 'admin') видит всё. Head feed-модуля в�
 """
 from __future__ import annotations
 
+import logging
+
 from ..bot import edit_message_text, send_message
 from ..dispatcher import HandlerCtx, command, on_callback
 from ..keyboards import kb
@@ -19,6 +21,8 @@ from ..services.menu_scope import (
     is_owner,
     user_module_levels,
 )
+
+logger = logging.getLogger(__name__)
 
 
 # Каждый кортеж: (label, callback_data, section_key для RBAC).
@@ -134,4 +138,16 @@ def handle_home_callback(ctx: HandlerCtx) -> None:
         from .help_cmd import handle_help
         handle_help(ctx)
     else:
-        send_message(ctx.chat_id, "Bo'lim topilmadi.")
+        # Логируем неизвестный section — поможет диагностировать stale-worker
+        # сценарии (юзер кликнул home:newsection, но worker запущен с
+        # version-N кода без этой ветки).
+        logger.warning(
+            "home callback: unknown section=%r (chat=%s) — most likely "
+            "stale worker, restart with --force-recreate",
+            section, ctx.chat_id,
+        )
+        send_message(
+            ctx.chat_id,
+            f"Bo'lim topilmadi: <code>{section}</code>",
+            reply_markup=kb([("🏠 Bosh menyu", "home")], cols=1),
+        )
