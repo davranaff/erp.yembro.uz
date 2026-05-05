@@ -35,35 +35,45 @@ export default function TablePagination({
   return (
     <div style={{
       display: 'flex', justifyContent: 'space-between',
-      alignItems: 'center', padding: '8px 12px',
+      alignItems: 'center', padding: '10px 14px',
       borderTop: '1px solid var(--border)',
       fontSize: 12, color: 'var(--fg-3)',
-      flexWrap: 'wrap', gap: 8,
+      flexWrap: 'wrap', gap: 12,
     }}>
-      <span>
-        {from}–{to} из {count} · стр. {page} / {totalPages}
+      <span style={{ whiteSpace: 'nowrap' }}>
+        <b style={{ color: 'var(--fg-1)' }}>{from}–{to}</b> из {count}
+        <span style={{ margin: '0 8px', opacity: 0.4 }}>·</span>
+        стр. <b style={{ color: 'var(--fg-1)' }}>{page}</b> / {totalPages}
       </span>
-      <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+      <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'nowrap' }}>
         {onPageSizeChange && (
-          <>
-            <span>На странице:</span>
+          <label style={{
+            display: 'inline-flex', alignItems: 'center', gap: 6,
+            whiteSpace: 'nowrap', fontSize: 12, color: 'var(--fg-3)',
+          }}>
+            На странице
             <select
               className="input"
-              style={{ height: 24, padding: '0 6px', fontSize: 12 }}
+              style={{
+                height: 28, padding: '0 22px 0 8px', fontSize: 12,
+                width: 'auto', minWidth: 64,
+              }}
               value={pageSize}
               onChange={(e) => {
-                onPageSizeChange(Number(e.target.value));
+                const next = Number(e.target.value);
                 onPageChange(1);
+                onPageSizeChange(next);
               }}
             >
               {pageSizeOptions.map((n) => (
                 <option key={n} value={n}>{n}</option>
               ))}
             </select>
-          </>
+          </label>
         )}
         <button
           className="btn btn-ghost btn-sm"
+          style={{ whiteSpace: 'nowrap' }}
           disabled={prevDisabled}
           onClick={() => onPageChange(Math.max(1, page - 1))}
         >
@@ -71,6 +81,7 @@ export default function TablePagination({
         </button>
         <button
           className="btn btn-ghost btn-sm"
+          style={{ whiteSpace: 'nowrap' }}
           disabled={nextDisabled}
           onClick={() => onPageChange(page + 1)}
         >
