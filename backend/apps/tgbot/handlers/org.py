@@ -51,9 +51,11 @@ def handle_org_cmd(ctx: HandlerCtx) -> None:
 def handle_org_set(ctx: HandlerCtx) -> None:
     from apps.organizations.models import Organization
 
-    if not ctx.args or len(ctx.args) < 2:
+    # callback_data: «org:set:<uuid>» → после фикса dispatcher (args = всё
+    # ПОСЛЕ matched prefix `org:set`) ctx.args = [<uuid>].
+    if not ctx.args:
         return
-    org_id = ctx.args[1]  # ['set', '<uuid>']
+    org_id = ctx.args[0]
     user = ctx.link.user
     org = (
         Organization.objects

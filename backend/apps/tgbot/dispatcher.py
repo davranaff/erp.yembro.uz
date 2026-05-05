@@ -218,10 +218,19 @@ def dispatch_callback(cbq: dict) -> None:
         send_message(chat_id, "❌ Сессия истекла. Привяжите аккаунт заново.")
         return
 
-    handler = _resolve_callback(data)
-    if handler is None:
+    resolved = _resolve_callback(data)
+    if resolved is None:
         logger.warning("no handler for callback %r", data)
         return
+    prefix, handler = resolved
+
+    # Args = всё ПОСЛЕ matched prefix, разрезанное по `:`.
+    # Раньше делали data.split(":")[1:] — это работало только для коротких
+    # однотокеновых префиксов (`fin`, `home`). Для `prod:batch` оставляло
+    # «batch» в args[0] → handler склеивал «batch:П-Ц-ОТК-...» и не находил
+    # партию в БД («Партия batch:П-Ц-... не найдена»).
+    remainder = data[len(prefix):].lstrip(":")
+    args = remainder.split(":") if remainder else []
 
     try:
         handler(HandlerCtx(
@@ -230,17 +239,22 @@ def dispatch_callback(cbq: dict) -> None:
             callback_data=data,
             callback_id=callback_id,
             message_id=message_id,
-            args=data.split(":")[1:],  # удобно: prefix:arg1:arg2 → args=[arg1,arg2]
+            args=args,
         ))
     except Exception:  # noqa: BLE001
         logger.exception("callback %s crashed", data)
         send_message(chat_id, "⚠️ Ошибка обработки. Повторите позже.")
 
 
-def _resolve_callback(data: str) -> Optional[Handler]:
-    """Самый длинный соответствующий префикс побеждает (`fin:pnl:` > `fin:`)."""
+def _resolve_callback(data: str) -> Optional[tuple[str, Handler]]:
+    """Самый длинный соответствующий префикс побеждает (`fin:pnl:` > `fin:`).
+
+    Возвращает (prefix, handler) или None — prefix нужен dispatcher'у чтобы
+    правильно отрезать args (раньше отрезалось только до первого `:`,
+    что ломало составные префиксы).
+    """
     matches = [(p, h) for p, h in CALLBACKS if data.startswith(p)]
     if not matches:
         return None
     matches.sort(key=lambda kv: -len(kv[0]))
-    return matches[0][1]
+    return matches[0]

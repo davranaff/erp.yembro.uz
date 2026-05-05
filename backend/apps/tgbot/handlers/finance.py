@@ -284,19 +284,67 @@ def handle_pnl_cmd(ctx: HandlerCtx) -> None:
 def handle_pnl_callback(ctx: HandlerCtx) -> None:
     if not _check_or_deny(ctx):
         return
-    period = ctx.args[1] if len(ctx.args) >= 2 else "week"
+    # callback «fin:pnl:week» → ctx.args = [«week»] после фикса dispatcher.
+    period = ctx.args[0] if ctx.args else "week"
     if period not in _PERIOD_LABELS:
         period = "week"
     _render_pnl(ctx, period=period, edit=True)
 
 
 def _render_pnl(ctx: HandlerCtx, *, period: str, edit: bool = False) -> None:
+    """P&L за период с разрезом «оплачено / задолженность».
+
+    P&L по бухгалтерии — accrual-basis: продал на 50М, признал доход 50М,
+    хотя клиент дал только 1М. В скобках показываем cash-картинку:
+    сколько из этих 50М реально пришло на счёт, сколько висит долгом.
+    Аналогично для расходов (закупки, оплаченные/нет).
+    """
+    from decimal import Decimal
+
+    from django.db.models import Sum
+
     from apps.accounting.services.reports import compute_pl_by_module, compute_pl_report
+    from apps.purchases.models import PurchaseOrder
+    from apps.sales.models import SaleOrder
 
     org = ctx.org()
     df, dt = _period_range(period)
     base = compute_pl_report(org, date_from=df, date_to=dt)
     by_mod = compute_pl_by_module(org, date_from=df, date_to=dt)
+
+    # Cash-разрез: продажи и закупки за тот же период (только confirmed,
+    # не cancelled).
+    sales_agg = (
+        SaleOrder.objects
+        .filter(
+            organization=org,
+            status=SaleOrder.Status.CONFIRMED,
+            date__gte=df, date__lte=dt,
+        )
+        .aggregate(
+            total=Sum("amount_uzs"),
+            paid=Sum("paid_amount_uzs"),
+        )
+    )
+    sales_total = Decimal(sales_agg["total"] or 0)
+    sales_paid = Decimal(sales_agg["paid"] or 0)
+    sales_debt = sales_total - sales_paid
+
+    purchases_agg = (
+        PurchaseOrder.objects
+        .filter(
+            organization=org,
+            status=PurchaseOrder.Status.CONFIRMED,
+            date__gte=df, date__lte=dt,
+        )
+        .aggregate(
+            total=Sum("amount_uzs"),
+            paid=Sum("paid_amount_uzs"),
+        )
+    )
+    purchases_total = Decimal(purchases_agg["total"] or 0)
+    purchases_paid = Decimal(purchases_agg["paid"] or 0)
+    purchases_debt = purchases_total - purchases_paid
 
     lines = [
         f"📈 <b>P&amp;L · {_PERIOD_LABELS[period]}</b>",
@@ -307,6 +355,27 @@ def _render_pnl(ctx: HandlerCtx, *, period: str, edit: bool = False) -> None:
         "  ──────────────────",
         f"  <b>Прибыль:</b>  <code>{_fmt_signed(base.profit)}</code> сум",
     ]
+
+    # Cash-блок: «продано Х (оплачено Y, должны Z)»
+    if sales_total > 0 or purchases_total > 0:
+        lines.append("")
+        lines.append("<b>Деньги (cash basis):</b>")
+        if sales_total > 0:
+            lines.append(
+                f"  📤 Продано:    <code>{_fmt_uzs(sales_total)}</code>"
+            )
+            lines.append(
+                f"     ↳ оплачено: <code>{_fmt_uzs(sales_paid)}</code>"
+                f" · должны:  <code>{_fmt_uzs(sales_debt)}</code>"
+            )
+        if purchases_total > 0:
+            lines.append(
+                f"  📥 Закуплено:  <code>{_fmt_uzs(purchases_total)}</code>"
+            )
+            lines.append(
+                f"     ↳ оплачено: <code>{_fmt_uzs(purchases_paid)}</code>"
+                f" · должны мы: <code>{_fmt_uzs(purchases_debt)}</code>"
+            )
 
     if by_mod.rows:
         lines.append("")
@@ -339,13 +408,20 @@ def handle_sales_cmd(ctx: HandlerCtx) -> None:
 def handle_sales_callback(ctx: HandlerCtx) -> None:
     if not _check_or_deny(ctx):
         return
-    period = ctx.args[1] if len(ctx.args) >= 2 else "week"
+    # callback «fin:sales:week» → ctx.args = [«week»] после фикса dispatcher.
+    period = ctx.args[0] if ctx.args else "week"
     if period not in _PERIOD_LABELS:
         period = "week"
     _render_sales(ctx, period=period, edit=True)
 
 
 def _render_sales(ctx: HandlerCtx, *, period: str, edit: bool = False) -> None:
+    """Продажи за период с разрезом «оплачено / должны».
+
+    Раньше показывали только сумму отгрузок (50М). Бизнес-проблема:
+    цифра вводила в заблуждение — клиент мог отдать только 1М, а 49М
+    висеть в дебиторке. Теперь рядом с каждой суммой видно paid/debt.
+    """
     from django.db.models import Count, Sum
     from apps.sales.models import SaleOrder
 
@@ -356,9 +432,16 @@ def _render_sales(ctx: HandlerCtx, *, period: str, edit: bool = False) -> None:
         organization=org, status=SaleOrder.Status.CONFIRMED,
         date__gte=df, date__lte=dt,
     )
-    agg = qs.aggregate(n=Count("id"), s=Sum("amount_uzs"))
+    agg = qs.aggregate(
+        n=Count("id"),
+        s=Sum("amount_uzs"),
+        p=Sum("paid_amount_uzs"),
+    )
     n = agg["n"] or 0
     total = agg["s"] or Decimal("0")
+    paid = agg["p"] or Decimal("0")
+    debt = total - paid
+    pct_paid = (paid / total * 100) if total > 0 else Decimal("0")
     top = list(qs.select_related("customer").order_by("-amount_uzs")[:5])
 
     lines = [
@@ -366,16 +449,25 @@ def _render_sales(ctx: HandlerCtx, *, period: str, edit: bool = False) -> None:
         f"<i>{df.isoformat()} — {dt.isoformat()}</i>",
         "",
         f"  Документов:  <b>{n}</b>",
-        f"  Сумма:       <code>{_fmt_uzs(total)}</code> сум",
+        f"  Отгружено:   <code>{_fmt_uzs(total)}</code> сум",
+        f"  ↳ оплачено:  <code>{_fmt_uzs(paid)}</code> ({pct_paid:.0f}%)",
+        f"  ↳ должны:    <code>{_fmt_uzs(debt)}</code> сум",
     ]
     if top:
         lines.append("")
-        lines.append("<b>Топ-5:</b>")
+        lines.append("<b>Топ-5 (отгрузка / долг):</b>")
         for i, so in enumerate(top, 1):
             customer = so.customer.name if so.customer_id else "—"
+            so_total = Decimal(so.amount_uzs or 0)
+            so_paid = Decimal(so.paid_amount_uzs or 0)
+            so_debt = so_total - so_paid
+            debt_block = (
+                f" · долг <code>{_fmt_uzs(so_debt)}</code>"
+                if so_debt > 0 else " · ✅ оплачен"
+            )
             lines.append(
                 f"  {i}. {customer} · <code>{so.doc_number}</code> · "
-                f"<code>{_fmt_uzs(so.amount_uzs)}</code>"
+                f"<code>{_fmt_uzs(so_total)}</code>{debt_block}"
             )
 
     markup = {
