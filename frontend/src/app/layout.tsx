@@ -42,6 +42,12 @@ export const metadata: Metadata = {
     statusBarStyle: 'default',
     startupImage: ['/logo.png'],
   },
+  // Параллельно с public/googlee98924015a261f40.html — meta-тег как страховка.
+  // Search Console принимает любой из методов; meta безопасен при возможной
+  // перенастройке прокси на /static/.
+  verification: {
+    google: 'googlee98924015a261f40',
+  },
 };
 
 export const viewport: Viewport = {
