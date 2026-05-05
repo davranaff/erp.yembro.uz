@@ -24,6 +24,7 @@ from ..keyboards import (
     PAGE_SIZE,
     kb,
     kb_back,
+    kb_back_home,
     kb_pagination,
     kb_periods,
     parse_page,
@@ -215,7 +216,7 @@ def _render_cash(ctx: HandlerCtx, *, edit: bool = False) -> None:
         lines.append(f"  ⬇️ Chiqim: <code>{_fmt_uzs(out_total)}</code> so'm")
         lines.append(f"  ━ Saldo:  <code>{_fmt_signed(net_total)}</code> so'm")
 
-    _send_or_edit(ctx, "\n".join(lines), kb_back("home:fin"), edit=edit)
+    _send_or_edit(ctx, "\n".join(lines), kb_back_home("home:fin"), edit=edit)
 
 
 # ─── /debt ───────────────────────────────────────────────────────────────
@@ -274,7 +275,7 @@ def _render_debt(ctx: HandlerCtx, *, page: int = 1, edit: bool = False) -> None:
     ]
     if total_count == 0:
         lines.append("Barcha sotuvlar to'langan.")
-        markup = kb_back("home:fin")
+        markup = kb_back_home("home:fin")
     else:
         lines.append(
             f"Jami {total_count} ta hujjat · <b>{_fmt_uzs(grand_total)}</b> so'm"
@@ -343,7 +344,7 @@ def _render_cred(ctx: HandlerCtx, *, page: int = 1, edit: bool = False) -> None:
     ]
     if total_count == 0:
         lines.append("Barcha xaridlar to'langan.")
-        markup = kb_back("home:fin")
+        markup = kb_back_home("home:fin")
     else:
         lines.append(
             f"Jami {total_count} ta hujjat · <b>{_fmt_uzs(grand_total)}</b> so'm"

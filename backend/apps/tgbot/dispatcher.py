@@ -74,6 +74,11 @@ class CommandSpec:
 
 COMMANDS: dict[str, CommandSpec] = {}
 CALLBACKS: list[tuple[str, Handler]] = []
+
+# Reply-клавиатура шлёт текст кнопки. Здесь маппим эти тексты в /команды
+# чтобы dispatch работал единообразно. Каждый handler-модуль может
+# дописать сюда свои кнопки через update().
+TEXT_TO_COMMAND: dict[str, str] = {}
 """Список `(prefix, handler)`. Длинные префиксы матчатся раньше — порядок
 регистрации важен. Для предсказуемости сортируем по убыванию длины
 непосредственно при поиске handler-а."""
@@ -183,6 +188,14 @@ def dispatch_message(msg: dict) -> None:
     # Импорт legacy hook здесь, чтобы избежать circular import (handlers/menu.py
     # тоже импортирует dispatcher).
     from . import handlers  # noqa: F401  — регистрирует команды
+
+    # Text-button mapping: reply-клавиатура шлёт текст кнопки (без слеша).
+    # Преобразуем известные тексты в /команды чтобы handler dispatch работал
+    # одинаково. Если текст не совпадает — оставляем как есть (попадёт в
+    # /help как unknown command).
+    cmd_from_text = TEXT_TO_COMMAND.get(text.strip())
+    if cmd_from_text:
+        text = cmd_from_text
 
     parts = text.split()
     cmd_name = parts[0]

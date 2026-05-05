@@ -61,7 +61,9 @@ def test_cp_link_can_open_menu(cp_link, fake_send):
     dispatch_message(_msg(cp_link.chat_id, "/menu"))
     sent = fake_send.calls
     assert sent
-    _, text, markup = sent[-1]
+    # Первое сообщение — приветствие + inline-меню; второе (опц) — reply_kb hint.
+    welcome = sent[0]
+    _, text, markup = welcome
     assert "Mijoz X" in text or "Salom" in text
     callbacks = {
         b["callback_data"]
@@ -71,6 +73,20 @@ def test_cp_link_can_open_menu(cp_link, fake_send):
     assert "cp:orders" in callbacks
     assert "cp:debt" in callbacks
     assert "cp:holat" in callbacks
+    # И постоянная reply-клавиатура для быстрой навигации
+    if len(sent) > 1:
+        _, _, kb = sent[-1]
+        assert "keyboard" in kb  # ReplyKeyboardMarkup
+
+
+def test_cp_reply_button_text_routes_to_command(cp_link, fake_send):
+    """Юзер тапает кнопку «📦 Buyurtmalarim» (reply_kb) → текст шлётся
+    как обычное сообщение → dispatcher преобразует в /buyurtmalar и
+    вызывает handler."""
+    dispatch_message(_msg(cp_link.chat_id, "📦 Buyurtmalarim"))
+    text = fake_send.calls[-1][1]
+    # Должно открыться окно «Buyurtmalaringiz» (как от /buyurtmalar)
+    assert "Buyurtmalar" in text
 
 
 def test_cp_link_blocked_from_admin_command(cp_link, fake_send):

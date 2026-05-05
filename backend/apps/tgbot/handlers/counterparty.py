@@ -20,8 +20,23 @@ from decimal import Decimal
 from django.db.models import Sum
 
 from ..bot import edit_message_text, send_message
-from ..dispatcher import HandlerCtx, command, on_callback
-from ..keyboards import kb
+from ..dispatcher import TEXT_TO_COMMAND, HandlerCtx, command, on_callback
+from ..keyboards import kb, reply_kb
+
+
+# Тексты кнопок reply-клавиатуры (бот матчит по точному равенству).
+# Используются и как entry-point: юзер может нажать кнопку и сразу
+# попасть в раздел без знания /команд.
+CP_BTN_ORDERS = "📦 Buyurtmalarim"
+CP_BTN_DEBT = "💰 Qarzdorligim"
+CP_BTN_HOLAT = "🚫 Holat"
+
+# Маппинг текстов reply-кнопок в /команды (см. dispatcher.TEXT_TO_COMMAND).
+TEXT_TO_COMMAND.update({
+    CP_BTN_ORDERS: "/buyurtmalar",
+    CP_BTN_DEBT: "/qarz",
+    CP_BTN_HOLAT: "/holat",
+})
 
 
 # ─── helpers ──────────────────────────────────────────────────────────────
@@ -42,28 +57,49 @@ def _send_or_edit(ctx, text, markup):
 
 
 def _menu_keyboard():
+    """Inline-клавиатура внутри сообщения — drill-down действия."""
     return kb([
-        ("📦 Buyurtmalarim", "cp:orders"),
-        ("💰 Qarzdorligim", "cp:debt"),
-        ("🚫 Bloklash holati", "cp:holat"),
+        (CP_BTN_ORDERS, "cp:orders"),
+        (CP_BTN_DEBT, "cp:debt"),
+        (CP_BTN_HOLAT, "cp:holat"),
     ], cols=1)
 
 
+def _persistent_reply_kb():
+    """Постоянная клавиатура внизу — основная навигация для клиента.
+    Юзер видит её всегда, не надо набирать /команды."""
+    return reply_kb([
+        [CP_BTN_ORDERS, CP_BTN_DEBT],
+        [CP_BTN_HOLAT],
+    ])
+
+
 def _back_kb():
-    return kb([("← Orqaga", "cp:menu")], cols=1)
+    """Возврат к клиент-меню — это и есть home для cp-link."""
+    return kb([("← Bosh menyu", "cp:menu")], cols=1)
 
 
 # ─── /menu (для counterparty) ────────────────────────────────────────────
 
 
 def render_counterparty_menu(ctx: HandlerCtx) -> None:
-    """Главное меню клиента — вызывается из handlers/menu.py если link это cp."""
+    """Главное меню клиента — вызывается из handlers/menu.py если link это cp.
+
+    Шлёт ДВА сообщения:
+    1. Inline-сообщение с кнопками (для drill-down навигации).
+    2. (Только если это первый /menu — ctx.message_id is None) — отдельное
+       короткое сообщение с reply_kb внизу, чтобы кнопки всегда были под рукой.
+    """
     cp = ctx.link.counterparty
     text = (
         f"👋 <b>Salom, {cp.name}!</b>\n\n"
         "Quyidagi bo'limlardan birini tanlang:"
     )
     _send_or_edit(ctx, text, _menu_keyboard())
+    # Reply-keyboard ставим только при первом обращении (текстовая команда),
+    # не при callback-нажатии — чтобы не плодить служебные сообщения.
+    if ctx.message_id is None:
+        send_message(ctx.chat_id, "Tugmalar har doim quyida ⬇️", reply_markup=_persistent_reply_kb())
 
 
 @on_callback("cp:menu")

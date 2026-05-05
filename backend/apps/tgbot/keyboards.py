@@ -134,3 +134,32 @@ def parse_page(args: list[str], default: int = 1) -> int:
         return max(1, n)
     except (ValueError, TypeError):
         return default
+
+
+# ─── Reply keyboard (постоянная клавиатура внизу) ─────────────────────────
+
+
+def reply_kb(rows: list[list[str]], *, persistent: bool = True) -> dict:
+    """ReplyKeyboardMarkup — нижняя постоянная клавиатура.
+
+    Тапы по кнопкам шлют их текст как обычное сообщение — handler ловит
+    через @command или текстовое сравнение. Используется для клиент-кабинета:
+    юзеры мобайла предпочитают видеть постоянные кнопки внизу, а не
+    inline под отдельным сообщением (которое скроллится вверх).
+
+    Args:
+        rows: матрица строк (каждая внутренняя — ряд кнопок).
+        persistent: ``is_persistent=True`` чтобы клавиатура не схлопывалась.
+                    Telegram также любит ``resize_keyboard=True`` для
+                    компактной высоты.
+    """
+    return {
+        "keyboard": [[{"text": label} for label in row] for row in rows],
+        "resize_keyboard": True,
+        "is_persistent": persistent,
+    }
+
+
+def reply_kb_remove() -> dict:
+    """Удалить ReplyKeyboardMarkup (вернуть стандартную клавиатуру)."""
+    return {"remove_keyboard": True}
