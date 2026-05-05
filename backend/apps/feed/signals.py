@@ -134,3 +134,61 @@ def auto_create_profile_on_feed_batch(sender, instance, created, **kwargs):
         )
     except Exception:  # noqa: BLE001
         logger.exception("auto_create_profile_on_feed_batch failed")
+
+
+@receiver(post_save, sender="feed.Recipe")
+def auto_create_nomenclature_for_recipe(sender, instance, created, **kwargs):
+    """
+    При создании рецептуры автоматически заводим NomenclatureItem с
+    sku == recipe.code, чтобы:
+      - execute_task мог оприходовать готовый корм как INCOMING StockMovement
+      - продажа FeedBagLot могла найти позицию для item.nomenclature
+
+    Без этого пользователь должен создавать «зеркальную» позицию руками
+    в /nomenclature, и системные сценарии падают если он забыл.
+
+    Категория — «Корма · сырьё и готовые» (создаём если нет, привязываем к
+    модулю feed). Единица — kg (создаём если нет).
+    """
+    if not created:
+        return
+
+    from apps.modules.models import Module
+    from apps.nomenclature.models import Category, NomenclatureItem, Unit
+
+    if instance.organization_id is None:
+        return
+
+    org_id = instance.organization_id
+
+    if NomenclatureItem.objects.filter(
+        organization_id=org_id, sku=instance.code,
+    ).exists():
+        return
+
+    try:
+        feed_module = Module.objects.get(code="feed")
+        unit, _ = Unit.objects.get_or_create(
+            organization_id=org_id, code="kg",
+            defaults={"name": "Килограмм"},
+        )
+        category, _ = Category.objects.get_or_create(
+            organization_id=org_id, name="Корма · сырьё и готовые",
+            defaults={"module": feed_module},
+        )
+        NomenclatureItem.objects.create(
+            organization_id=org_id,
+            sku=instance.code,
+            name=f"Готовый комбикорм · {instance.name}",
+            category=category,
+            unit=unit,
+            is_active=True,
+            notes="Автосоздана из рецептуры " + instance.code,
+        )
+        logger.info(
+            "Auto-created NomenclatureItem for recipe %s (org=%s)",
+            instance.code, org_id,
+        )
+    except Exception:  # noqa: BLE001
+        # Сигнал не должен ломать создание рецепта.
+        logger.exception("auto_create_nomenclature_for_recipe failed")
