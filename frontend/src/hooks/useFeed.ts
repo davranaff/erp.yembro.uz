@@ -44,6 +44,16 @@ export const tasksCrud = makeCrud<ProductionTask>({
   ordering: '-scheduled_at',
 });
 
+/**
+ * POST /api/feed/production-tasks/{id}/refresh-components/
+ * Перешолвить партии сырья для компонентов с source_batch=null
+ * (новые приходы, появившиеся после создания задания).
+ */
+export const useRefreshTaskComponents = tasksCrud.makeAction<
+  Record<string, never>,
+  { updated_count: number; task: ProductionTask }
+>((id) => `/api/feed/production-tasks/${id}/refresh-components/`);
+
 export const useExecuteTask = tasksCrud.makeAction<
   {
     output_warehouse: string;

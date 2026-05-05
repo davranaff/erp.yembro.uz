@@ -104,3 +104,43 @@ def copy_components_from_version(task: ProductionTask) -> list[ProductionTaskCom
     if components_to_create:
         ProductionTaskComponent.objects.bulk_create(components_to_create)
     return components_to_create
+
+
+@transaction.atomic
+def refresh_unassigned_task_components(
+    task: ProductionTask,
+) -> list[ProductionTaskComponent]:
+    """
+    Перешолвить партии сырья для компонентов задания, у которых ещё нет
+    привязки (source_batch IS NULL) — на случай если новая партия пришла
+    уже после создания задания.
+
+    Работает только для PLANNED-заданий (на executed/finished не трогаем
+    данные о фактически использованных партиях).
+
+    Возвращает список обновлённых компонентов.
+    """
+    if task.status != ProductionTask.Status.PLANNED:
+        return []
+
+    org = task.organization
+    updated: list[ProductionTaskComponent] = []
+    for c in (
+        ProductionTaskComponent.objects
+        .filter(task=task, source_batch__isnull=True)
+        .select_related("nomenclature")
+    ):
+        batch = _find_fifo_source_batch(
+            organization=org,
+            nomenclature=c.nomenclature,
+            required_qty=Decimal(c.planned_quantity),
+        )
+        if batch is None:
+            continue
+        c.source_batch = batch
+        c.planned_price_per_unit_uzs = batch.price_per_unit_uzs
+        c.save(update_fields=[
+            "source_batch", "planned_price_per_unit_uzs", "updated_at",
+        ])
+        updated.append(c)
+    return updated

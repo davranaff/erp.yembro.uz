@@ -29,6 +29,7 @@ import {
   tasksCrud,
   useApprovePassport,
   useCancelTask,
+  useRefreshTaskComponents,
   useRejectPassport,
   useRejectQuarantine,
   useReleaseQuarantine,
@@ -172,6 +173,7 @@ export default function FeedPage() {
   const componentDel = recipeComponentsCrud.useDelete();
   const rawDel = rawBatchesCrud.useDelete();
   const cancelTask = useCancelTask();
+  const refreshComps = useRefreshTaskComponents();
   const releaseQuarantine = useReleaseQuarantine();
   const rejectQuarantine = useRejectQuarantine();
   const approvePassport = useApprovePassport();
@@ -1334,9 +1336,30 @@ export default function FeedPage() {
                           padding: '8px 12px', fontSize: 12,
                           background: '#fef2f2', color: 'var(--danger)',
                           borderBottom: '1px solid var(--border)',
+                          display: 'flex', alignItems: 'center', gap: 8,
                         }}>
-                          ⚠ Не назначены партии сырья для {missing} из {selTask.components.length} компонентов.
-                          Замес провести нельзя — оприходуйте недостающее сырьё в табе «Сырьё».
+                          <span style={{ flex: 1 }}>
+                            ⚠ Не назначены партии сырья для {missing} из {selTask.components.length} компонентов.
+                            Если уже оприходовали — нажмите «Обновить партии».
+                          </span>
+                          <button
+                            className="btn btn-secondary btn-sm"
+                            disabled={refreshComps.isPending}
+                            onClick={() => {
+                              refreshComps.mutate({ id: selTask.id }, {
+                                onSuccess: (res) => {
+                                  if (res.updated_count > 0) {
+                                    qc.invalidateQueries({ queryKey: ['feed', 'production-tasks'] });
+                                  } else {
+                                    alert('Свободных партий не нашлось. Оприходуйте сырьё в табе «Сырьё».');
+                                  }
+                                },
+                                onError: (err) => alert(`Не удалось: ${err.message}`),
+                              });
+                            }}
+                          >
+                            {refreshComps.isPending ? 'Обновление…' : 'Обновить партии'}
+                          </button>
                         </div>
                       );
                     }
