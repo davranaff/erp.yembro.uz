@@ -394,6 +394,22 @@ export default function VetPage() {
                 render: (d) => d.administration_route },
               { key: 'karen', label: 'Каренция, дн', align: 'right', mono: true,
                 render: (d) => d.default_withdrawal_days },
+              { key: 'qty', label: 'Σ остаток', align: 'right', mono: true,
+                cellStyle: { fontWeight: 600 },
+                render: (d) => {
+                  const n = parseFloat(d.total_qty || '0');
+                  if (!n) return <span style={{ color: 'var(--fg-3)' }}>—</span>;
+                  return (
+                    <span style={{ color: 'var(--success)' }}>
+                      {n.toLocaleString('ru-RU', { maximumFractionDigits: 2 })}
+                      {d.unit_code && (
+                        <span style={{ color: 'var(--fg-3)', marginLeft: 4, fontWeight: 400 }}>
+                          {d.unit_code}
+                        </span>
+                      )}
+                    </span>
+                  );
+                } },
               { key: 'status', label: 'Статус',
                 render: (d) => d.is_active
                   ? <Badge tone="success" dot>Активен</Badge>
@@ -623,8 +639,105 @@ export default function VetPage() {
               { k: 'Каренция', v: `${selDrug.default_withdrawal_days} дн` },
               { k: 'Условия хранения', v: selDrug.storage_conditions || '—' },
               { k: 'Статус', v: selDrug.is_active ? 'Активен' : 'Архив' },
+              {
+                k: 'Σ остаток',
+                v: (() => {
+                  const n = parseFloat(selDrug.total_qty || '0');
+                  if (!n) return <span style={{ color: 'var(--fg-3)' }}>нет на складах</span>;
+                  return (
+                    <span style={{ color: 'var(--success)', fontWeight: 600 }} className="mono">
+                      {n.toLocaleString('ru-RU', { maximumFractionDigits: 2 })}
+                      {selDrug.unit_code && <span style={{ color: 'var(--fg-3)', marginLeft: 4, fontWeight: 400 }}>{selDrug.unit_code}</span>}
+                    </span>
+                  );
+                })(),
+              },
             ]}
           />
+
+          {/* ── Лоты по складам ───────────────────────────────────────── */}
+          {selDrug.lots_by_warehouse.length > 0 ? (
+            <div style={{ marginTop: 14 }}>
+              <div style={{
+                fontSize: 11, fontWeight: 700, color: 'var(--fg-3)',
+                textTransform: 'uppercase', letterSpacing: '.04em',
+                marginBottom: 8,
+              }}>
+                Активные лоты по складам ({selDrug.lots_by_warehouse.length} складов)
+              </div>
+              {selDrug.lots_by_warehouse.map((g) => (
+                <div key={g.warehouse_id} style={{
+                  marginBottom: 10,
+                  border: '1px solid var(--border)', borderRadius: 6,
+                  overflow: 'hidden',
+                }}>
+                  <div style={{
+                    padding: '6px 10px', background: 'var(--bg-soft)',
+                    fontSize: 12, fontWeight: 600,
+                    display: 'flex', justifyContent: 'space-between',
+                  }}>
+                    <span><span className="mono">{g.warehouse_code}</span> · {g.warehouse_name}</span>
+                    <span style={{ color: 'var(--fg-3)', fontWeight: 400 }}>
+                      {g.lots.length} {g.lots.length === 1 ? 'лот' : 'лота(ов)'}
+                    </span>
+                  </div>
+                  <table style={{ width: '100%', fontSize: 12, borderCollapse: 'collapse' }}>
+                    <thead>
+                      <tr style={{ color: 'var(--fg-3)', fontSize: 11 }}>
+                        <td style={{ padding: '4px 10px' }}>Lot · Документ</td>
+                        <td style={{ padding: '4px 10px' }}>Срок</td>
+                        <td style={{ padding: '4px 10px', textAlign: 'right' }}>Остаток</td>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {g.lots.map((lot) => {
+                        const exp = lot.expiration_date ? new Date(lot.expiration_date) : null;
+                        const days = exp
+                          ? Math.floor((exp.getTime() - Date.now()) / 86400000)
+                          : null;
+                        const expColor = days == null ? 'var(--fg-3)'
+                          : days < 30 ? 'var(--danger)'
+                          : days < 90 ? 'var(--warning, var(--brand-orange))'
+                          : 'var(--fg-2)';
+                        return (
+                          <tr key={lot.id} style={{ borderTop: '1px solid var(--border)' }}>
+                            <td style={{ padding: '6px 10px' }}>
+                              <div className="mono" style={{ fontWeight: 500 }}>{lot.lot_number}</div>
+                              <div className="mono" style={{ fontSize: 11, color: 'var(--fg-3)' }}>
+                                {lot.doc_number}
+                              </div>
+                            </td>
+                            <td className="mono" style={{ padding: '6px 10px', color: expColor, fontSize: 11 }}>
+                              {lot.expiration_date ?? '—'}
+                              {days != null && (
+                                <div style={{ fontSize: 10 }}>
+                                  {days < 0 ? `просрочен ${-days} дн` : `${days} дн`}
+                                </div>
+                              )}
+                            </td>
+                            <td className="mono" style={{
+                              padding: '6px 10px', textAlign: 'right', fontWeight: 600,
+                            }}>
+                              {parseFloat(lot.current_quantity).toLocaleString('ru-RU', { maximumFractionDigits: 2 })}
+                              {selDrug.unit_code && <span style={{ color: 'var(--fg-3)', marginLeft: 4, fontWeight: 400 }}>{selDrug.unit_code}</span>}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div style={{
+              marginTop: 14, padding: 12, fontSize: 12, color: 'var(--fg-3)',
+              border: '1px dashed var(--border)', borderRadius: 6, textAlign: 'center',
+            }}>
+              Нет активных лотов на складах. Сделайте приёмку через
+              «+ Приход» во вкладке «Склад».
+            </div>
+          )}
         </DetailDrawer>
       )}
 

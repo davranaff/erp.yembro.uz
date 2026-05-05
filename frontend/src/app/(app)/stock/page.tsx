@@ -26,6 +26,7 @@ import RawBatchModal from '../feed/RawBatchModal';
 import EditMovementModal from './EditMovementModal';
 import PromoteToRawBatchModal from './PromoteToRawBatchModal';
 import StockMovementModal from './StockMovementModal';
+import WarehouseBalanceDrawer from './WarehouseBalanceDrawer';
 import WarehouseModal from './WarehouseModal';
 
 const KIND_LABEL: Record<StockMovementKind, string> = {
@@ -105,6 +106,7 @@ export default function StockPage() {
 
   // Warehouses tab state
   const [warehouseEdit, setWarehouseEdit] = useState<WarehouseRef | null>(null);
+  const [warehouseBalance, setWarehouseBalance] = useState<WarehouseRef | null>(null);
   const [showWarehouseModal, setShowWarehouseModal] = useState(false);
   const [whSearch, setWhSearch] = useState('');
 
@@ -115,7 +117,9 @@ export default function StockPage() {
     () => ({
       kind: kind || undefined,
       module_code: moduleCode || undefined,
-      warehouse_from: warehouseId || undefined,
+      // Используем единый фильтр `warehouse` (Q OR на бэкенде по
+      // warehouse_from + warehouse_to), чтобы не терять INCOMING-движения.
+      warehouse: warehouseId || undefined,
       search: search || undefined,
     }),
     [kind, moduleCode, warehouseId, search],
@@ -132,7 +136,7 @@ export default function StockPage() {
     const params = new URLSearchParams();
     if (filter.kind) params.set('kind', filter.kind);
     if (filter.module_code) params.set('module_code', filter.module_code);
-    if (filter.warehouse_from) params.set('warehouse_from', filter.warehouse_from);
+    if (filter.warehouse) params.set('warehouse', filter.warehouse);
     if (filter.search) params.set('search', filter.search);
     const qs = params.toString();
     return qs
@@ -191,23 +195,13 @@ export default function StockPage() {
             <>
               <ExportCsvButton url={csvUrl} filename="stock-movements.csv" />
               {canEdit && (
-                <>
-                  <button
-                    className="btn btn-secondary btn-sm"
-                    onClick={() => setRawBatchPrefill({})}
-                    title="Партия сырья для модуля «Корма» — учёт по Дювалю + карантин"
-                  >
-                    <Icon name="plus" size={14} />
-                    Партия сырья (корма)
-                  </button>
-                  <button
-                    className="btn btn-primary btn-sm"
-                    onClick={() => setShowMovementModal(true)}
-                  >
-                    <Icon name="plus" size={14} />
-                    Новое движение
-                  </button>
-                </>
+                <button
+                  className="btn btn-primary btn-sm"
+                  onClick={() => setShowMovementModal(true)}
+                >
+                  <Icon name="plus" size={14} />
+                  Новое движение
+                </button>
               )}
               <button
                 className="btn btn-secondary btn-sm"
@@ -440,6 +434,8 @@ export default function StockPage() {
             <DataTable<WarehouseRef>
               rows={filteredWarehouses}
               rowKey={(w) => w.id}
+              onRowClick={(w) => setWarehouseBalance(w)}
+              rowProps={(w) => ({ active: warehouseBalance?.id === w.id })}
               emptyMessage="Складов пока нет. Нажмите «Новый склад»."
               columns={[
                 { key: 'code', label: 'Код', mono: true,
@@ -579,6 +575,13 @@ export default function StockPage() {
             setShowWarehouseModal(false);
             setWarehouseEdit(null);
           }}
+        />
+      )}
+
+      {warehouseBalance && (
+        <WarehouseBalanceDrawer
+          warehouse={warehouseBalance}
+          onClose={() => setWarehouseBalance(null)}
         />
       )}
     </>

@@ -16,6 +16,14 @@ from .models import (
 class VetDrugSerializer(serializers.ModelSerializer):
     nomenclature_sku = serializers.SerializerMethodField()
     nomenclature_name = serializers.SerializerMethodField()
+    # Σ остатков по всем активным лотам этого препарата (без учёта recalled,
+    # quarantine, depleted). Полезно в списке /vet → SKU препаратов чтобы
+    # сразу видеть «сколько на руках».
+    total_qty = serializers.SerializerMethodField()
+    # Группировка активных лотов по складам — для drawer карточки препарата.
+    lots_by_warehouse = serializers.SerializerMethodField()
+    # Единица измерения (с номенклатуры) — чтобы к total_qty показать «уп.»/«мл»/«доз»
+    unit_code = serializers.SerializerMethodField()
 
     class Meta:
         model = VetDrug
@@ -32,6 +40,9 @@ class VetDrugSerializer(serializers.ModelSerializer):
             "notes",
             "nomenclature_sku",
             "nomenclature_name",
+            "unit_code",
+            "total_qty",
+            "lots_by_warehouse",
             "created_at",
             "updated_at",
         )
@@ -39,6 +50,9 @@ class VetDrugSerializer(serializers.ModelSerializer):
             "id",
             "nomenclature_sku",
             "nomenclature_name",
+            "unit_code",
+            "total_qty",
+            "lots_by_warehouse",
             "created_at",
             "updated_at",
         )
@@ -48,6 +62,57 @@ class VetDrugSerializer(serializers.ModelSerializer):
 
     def get_nomenclature_name(self, obj):
         return obj.nomenclature.name if obj.nomenclature_id else None
+
+    def get_unit_code(self, obj):
+        return obj.nomenclature.unit.code if obj.nomenclature_id else None
+
+    def _active_lots(self, obj):
+        """Activные lots = AVAILABLE / EXPIRING_SOON, current_quantity > 0."""
+        from .models import VetStockBatch
+        return VetStockBatch.objects.filter(
+            drug=obj,
+            status__in=[
+                VetStockBatch.Status.AVAILABLE,
+                VetStockBatch.Status.EXPIRING_SOON,
+            ],
+            current_quantity__gt=0,
+        ).select_related("warehouse")
+
+    def get_total_qty(self, obj):
+        from decimal import Decimal
+        from django.db.models import Sum
+        agg = self._active_lots(obj).aggregate(s=Sum("current_quantity"))
+        total = agg["s"] or Decimal(0)
+        return str(total)
+
+    def get_lots_by_warehouse(self, obj):
+        """Группировка активных лотов: [{warehouse_code, warehouse_id,
+        lots: [{lot_number, qty, expiration_date}]}]"""
+        from collections import defaultdict
+        groups: dict = defaultdict(lambda: {
+            "warehouse_id": None, "warehouse_code": "",
+            "warehouse_name": "", "lots": [],
+        })
+        for lot in self._active_lots(obj).order_by(
+            "warehouse__code", "expiration_date",
+        ):
+            wh_id = str(lot.warehouse_id)
+            g = groups[wh_id]
+            g["warehouse_id"] = wh_id
+            g["warehouse_code"] = lot.warehouse.code
+            g["warehouse_name"] = lot.warehouse.name
+            g["lots"].append({
+                "id": str(lot.id),
+                "doc_number": lot.doc_number,
+                "lot_number": lot.lot_number,
+                "current_quantity": str(lot.current_quantity),
+                "expiration_date": (
+                    lot.expiration_date.isoformat()
+                    if lot.expiration_date else None
+                ),
+                "status": lot.status,
+            })
+        return list(groups.values())
 
 
 class VetStockBatchSerializer(FinancialFieldsMixin, serializers.ModelSerializer):

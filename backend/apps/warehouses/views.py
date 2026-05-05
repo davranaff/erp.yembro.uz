@@ -73,6 +73,156 @@ class WarehouseViewSet(OrgScopedModelViewSet):
     ordering_fields = ["code", "created_at"]
     ordering = ["code"]
 
+    @action(detail=True, methods=["get"], url_path="balance")
+    def balance(self, request, pk=None):
+        """
+        GET /api/warehouses/warehouses/{id}/balance/
+
+        Текущие остатки по этому складу: для каждой номенклатуры
+        Σ(INCOMING) − Σ(OUTGOING + WRITE_OFF). Считаем по StockMovement,
+        без отдельной таблицы остатков — для небольших объёмов это OK.
+
+        Возвращает только SKU с положительным или ненулевым балансом.
+        """
+        from collections import defaultdict
+        from decimal import Decimal
+        from django.db.models import Q, Sum
+
+        warehouse = self.get_object()
+
+        movements = (
+            StockMovement.objects
+            .filter(
+                organization=warehouse.organization,
+            )
+            .filter(Q(warehouse_from=warehouse) | Q(warehouse_to=warehouse))
+            .values(
+                "nomenclature_id",
+                "nomenclature__sku",
+                "nomenclature__name",
+                "nomenclature__unit__code",
+                "kind",
+            )
+            .annotate(
+                in_qty=Sum("quantity", filter=Q(
+                    warehouse_to=warehouse,
+                    kind=StockMovement.Kind.INCOMING,
+                )),
+                in_amt=Sum("amount_uzs", filter=Q(
+                    warehouse_to=warehouse,
+                    kind=StockMovement.Kind.INCOMING,
+                )),
+                out_qty=Sum("quantity", filter=Q(
+                    warehouse_from=warehouse,
+                    kind__in=[
+                        StockMovement.Kind.OUTGOING,
+                        StockMovement.Kind.WRITE_OFF,
+                    ],
+                )),
+                out_amt=Sum("amount_uzs", filter=Q(
+                    warehouse_from=warehouse,
+                    kind__in=[
+                        StockMovement.Kind.OUTGOING,
+                        StockMovement.Kind.WRITE_OFF,
+                    ],
+                )),
+                xfer_in=Sum("quantity", filter=Q(
+                    warehouse_to=warehouse,
+                    kind=StockMovement.Kind.TRANSFER,
+                )),
+                xfer_out=Sum("quantity", filter=Q(
+                    warehouse_from=warehouse,
+                    kind=StockMovement.Kind.TRANSFER,
+                )),
+            )
+        )
+
+        # Агрегируем по nomenclature (groupby + values_kind дробит)
+        agg: dict = defaultdict(lambda: {
+            "in_qty": Decimal(0), "in_amt": Decimal(0),
+            "out_qty": Decimal(0), "out_amt": Decimal(0),
+            "xfer_in": Decimal(0), "xfer_out": Decimal(0),
+            "sku": "", "name": "", "unit": "",
+        })
+        for row in movements:
+            key = row["nomenclature_id"]
+            a = agg[key]
+            a["sku"] = row["nomenclature__sku"]
+            a["name"] = row["nomenclature__name"]
+            a["unit"] = row["nomenclature__unit__code"]
+            for f in ("in_qty", "in_amt", "out_qty", "out_amt", "xfer_in", "xfer_out"):
+                a[f] += row.get(f) or Decimal(0)
+
+        rows = []
+        for nom_id, a in agg.items():
+            balance = (
+                a["in_qty"] + a["xfer_in"] - a["out_qty"] - a["xfer_out"]
+            )
+            if balance == 0 and a["in_qty"] == 0 and a["out_qty"] == 0 and a["xfer_in"] == 0 and a["xfer_out"] == 0:
+                continue
+            rows.append({
+                "nomenclature_id": str(nom_id),
+                "sku": a["sku"],
+                "name": a["name"],
+                "unit": a["unit"],
+                "incoming_qty": str(a["in_qty"]),
+                "incoming_amount_uzs": str(a["in_amt"]),
+                "outgoing_qty": str(a["out_qty"] + a["xfer_out"]),
+                "outgoing_amount_uzs": str(a["out_amt"]),
+                "balance_qty": str(balance),
+            })
+
+        # Сортируем: сначала с положительным остатком, потом нулевые/отрицательные
+        rows.sort(key=lambda r: (
+            -1 if Decimal(r["balance_qty"]) > 0 else (0 if Decimal(r["balance_qty"]) == 0 else 1),
+            r["sku"],
+        ))
+
+        # Для vet-склада — добавляем детализацию по лотам у каждой строки
+        # (lot_number, expiration_date, current_quantity на этом конкретном складе).
+        # Лекарства физически идентифицируются лотом, не SKU — это критично для
+        # отзыва (recall) и контроля сроков годности.
+        is_vet = warehouse.module.code == "vet" if warehouse.module_id else False
+        if is_vet:
+            from apps.vet.models import VetStockBatch
+            lots = (
+                VetStockBatch.objects
+                .filter(organization=warehouse.organization, warehouse=warehouse)
+                .filter(current_quantity__gt=0)
+                .exclude(status=VetStockBatch.Status.RECALLED)
+                .select_related("drug", "drug__nomenclature")
+                .order_by("expiration_date")
+            )
+            lots_by_nom: dict = defaultdict(list)
+            for lot in lots:
+                lots_by_nom[str(lot.drug.nomenclature_id)].append({
+                    "id": str(lot.id),
+                    "doc_number": lot.doc_number,
+                    "lot_number": lot.lot_number,
+                    "current_quantity": str(lot.current_quantity),
+                    "expiration_date": (
+                        lot.expiration_date.isoformat()
+                        if lot.expiration_date else None
+                    ),
+                    "status": lot.status,
+                })
+            for r in rows:
+                r["lots"] = lots_by_nom.get(r["nomenclature_id"], [])
+
+        return Response({
+            "warehouse": {
+                "id": str(warehouse.id),
+                "code": warehouse.code,
+                "name": warehouse.name,
+                "module_code": warehouse.module.code if warehouse.module_id else None,
+            },
+            "rows": rows,
+            "summary": {
+                "sku_count": len(rows),
+                "with_balance": sum(1 for r in rows if Decimal(r["balance_qty"]) > 0),
+            },
+        })
+
 
 class StockMovementViewSet(
     OrganizationScopedMixin,

@@ -8,6 +8,7 @@ from apps.common.lifecycle import DeleteReasonMixin, ImmutableStatusMixin
 from apps.common.services.numbering import next_doc_number
 from apps.common.viewsets import OrgScopedModelViewSet
 
+from .filters import PurchaseOrderFilter
 from .models import PurchaseAttachment, PurchaseOrder
 from .serializers import (
     PurchaseAttachmentSerializer,
@@ -39,7 +40,7 @@ class PurchaseOrderViewSet(ImmutableStatusMixin, DeleteReasonMixin, OrgScopedMod
     status_field = "status"
 
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
-    filterset_fields = ["status", "payment_status", "counterparty", "currency"]
+    filterset_class = PurchaseOrderFilter
     search_fields = ["doc_number", "counterparty__name", "counterparty__code", "notes"]
     ordering_fields = ["date", "doc_number", "amount_uzs", "created_at"]
     ordering = ["-date"]

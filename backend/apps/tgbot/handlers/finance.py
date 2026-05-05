@@ -116,6 +116,7 @@ _FIN_SUB_BUTTONS = [
     ("🏢 Yetkazib beruvchi qarzi", "fin:cred", ["purchases", "reports"]),
     ("📈 P&L",           "fin:pnl:week",   ["reports", "ledger"]),
     ("💸 Sotuvlar",      "fin:sales:week", ["sales", "reports"]),
+    ("📦 Sklad qoldiqlari", "fin:stock",   ["stock", "reports"]),
 ]
 
 

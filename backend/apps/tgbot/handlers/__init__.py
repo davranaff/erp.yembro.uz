@@ -14,3 +14,4 @@ from . import org  # noqa: F401  — /org + org:* callbacks
 from . import digest  # noqa: F401  — /digest /digest_on /digest_off
 from . import counterparty  # noqa: F401  — /buyurtmalar /qarz /holat для cp-link
 from . import modules_hub  # noqa: F401  — mod:* + rep:* (per-module hub + analytics)
+from . import stock  # noqa: F401  — /qoldiq + wh:bal/wh:list + fin:stock

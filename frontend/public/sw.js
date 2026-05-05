@@ -13,7 +13,10 @@
  * браузера, а получил нормальную offline-страницу с инструкцией.
  */
 
-const CACHE_VERSION = 'yembro-v1';
+// Bump version to invalidate all caches (browser получит свежий бандл).
+// При добавлении новых модулей/хуков — бамп этой версии гарантирует что
+// SW почистит старые JS-чанки и подгрузит свежие.
+const CACHE_VERSION = 'yembro-v2';
 const STATIC_ASSETS = [
   '/offline.html',
   '/manifest.webmanifest',

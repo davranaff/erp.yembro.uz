@@ -1245,12 +1245,29 @@ export interface InterModuleTransfer {
 export type DrugType = 'vaccine' | 'antibiotic' | 'vitamin' | 'electrolyte' | 'other';
 export type DrugRoute = 'injection' | 'oral' | 'drinking_water' | 'spray' | 'other';
 
+export interface VetDrugLot {
+  id: string;
+  doc_number: string;
+  lot_number: string;
+  current_quantity: string;
+  expiration_date: string | null;
+  status: string;
+}
+
+export interface VetDrugLotsByWarehouse {
+  warehouse_id: string;
+  warehouse_code: string;
+  warehouse_name: string;
+  lots: VetDrugLot[];
+}
+
 export interface VetDrug {
   id: string;
   module: string;
   nomenclature: string;
   nomenclature_sku: string | null;
   nomenclature_name: string | null;
+  unit_code: string | null;
   drug_type: DrugType;
   administration_route: DrugRoute;
   default_withdrawal_days: number;
@@ -1262,6 +1279,10 @@ export interface VetDrug {
   barcode: string | null;
   is_active: boolean;
   notes: string;
+  /** Σ остатков по всем активным лотам (AVAILABLE / EXPIRING_SOON, qty > 0). */
+  total_qty: string;
+  /** Группировка активных лотов по складам (для drawer препарата). */
+  lots_by_warehouse: VetDrugLotsByWarehouse[];
   created_at: string;
   updated_at: string;
 }

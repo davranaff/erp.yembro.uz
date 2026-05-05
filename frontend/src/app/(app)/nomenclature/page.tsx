@@ -1,6 +1,7 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 
 import DetailDrawer, { KV } from '@/components/DetailDrawer';
 import Badge from '@/components/ui/Badge';
@@ -9,6 +10,7 @@ import Icon from '@/components/ui/Icon';
 import Panel from '@/components/ui/Panel';
 import RowActions from '@/components/ui/RowActions';
 import TablePagination from '@/components/ui/TablePagination';
+import { useModules } from '@/hooks/useModules';
 import {
   useCategories,
   useDeleteItem,
@@ -20,6 +22,10 @@ import type { Category, NomenclatureItem } from '@/types/auth';
 import NomenclatureModal from './NomenclatureModal';
 
 export default function NomenclaturePage() {
+  const searchParams = useSearchParams();
+  // Дефолт модуля можно передать через ?module_code=vet (например, ссылка
+  // из vet-аптеки сразу скоупит на ветпрепараты).
+  const [moduleCode, setModuleCode] = useState(searchParams.get('module_code') ?? '');
   const [categoryId, setCategoryId] = useState('');
   const [search, setSearch] = useState('');
   const [draftSearch, setDraftSearch] = useState('');
@@ -35,14 +41,24 @@ export default function NomenclaturePage() {
   const filter = useMemo(
     () => ({
       category: categoryId || undefined,
+      module_code: moduleCode || undefined,
       search: search || undefined,
     }),
-    [categoryId, search],
+    [categoryId, moduleCode, search],
   );
 
   const { data: pageData, isLoading, error, refetch, isFetching } = useNomenclatureItemsPaginated(filter, page, pageSize);
   const items = pageData?.results ?? [];
-  const { data: categories } = useCategories();
+  // Категории фильтруются по выбранному модулю — иначе в выпадашке
+  // «Все категории» попадаются категории других модулей.
+  const { data: categories } = useCategories(moduleCode ? { module_code: moduleCode } : {});
+  const { data: modules } = useModules();
+
+  // При смене модуля сбрасываем категорию (она могла принадлежать другому).
+  useEffect(() => {
+    setCategoryId('');
+    setPage(1);
+  }, [moduleCode]);
   const del = useDeleteItem();
 
   const submitSearch = (e: React.FormEvent) => {
@@ -115,11 +131,25 @@ export default function NomenclaturePage() {
       <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
         <select
           className="input"
+          value={moduleCode}
+          onChange={(e) => setModuleCode(e.target.value)}
+          style={{ width: 200 }}
+          title="Модуль"
+        >
+          <option value="">Все модули</option>
+          {modules?.filter((m) => m.is_active).map((m) => (
+            <option key={m.id} value={m.code}>
+              {m.name}
+            </option>
+          ))}
+        </select>
+        <select
+          className="input"
           value={categoryId}
           onChange={(e) => { setCategoryId(e.target.value); setPage(1); }}
           style={{ width: 240 }}
         >
-          <option value="">Все категории</option>
+          <option value="">Все категории{moduleCode ? ` (${moduleCode})` : ''}</option>
           {categories?.map((c) => (
             <option key={c.id} value={c.id}>
               {c.name}

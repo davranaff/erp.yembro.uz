@@ -8,6 +8,14 @@ import type { Paginated, StockMovement, StockMovementKind, WarehouseRef } from '
 
 export interface MovementsFilter {
   kind?: string;
+  /**
+   * Единый «склад» — ищет движения где склад в warehouse_from ИЛИ
+   * warehouse_to (бэкенд-фильтр с Q-OR). Раньше использовали отдельные
+   * warehouse_from/warehouse_to, и фильтр пропускал INCOMING-движения
+   * (например, расфасовка корма приходовала в SKLD-MESH, а юзер фильтровал
+   * по этому складу и не видел приход).
+   */
+  warehouse?: string;
   warehouse_from?: string;
   warehouse_to?: string;
   nomenclature?: string;
@@ -22,6 +30,7 @@ export interface MovementsFilter {
 function buildMovementParams(filter: MovementsFilter): URLSearchParams {
   const params = new URLSearchParams();
   if (filter.kind) params.set('kind', filter.kind);
+  if (filter.warehouse) params.set('warehouse', filter.warehouse);
   if (filter.warehouse_from) params.set('warehouse_from', filter.warehouse_from);
   if (filter.warehouse_to) params.set('warehouse_to', filter.warehouse_to);
   if (filter.nomenclature) params.set('nomenclature', filter.nomenclature);
@@ -156,6 +165,54 @@ export function useUpdateWarehouse() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['warehouses'] });
     },
+  });
+}
+
+export interface WarehouseBalanceLot {
+  id: string;
+  doc_number: string;
+  lot_number: string;
+  current_quantity: string;
+  expiration_date: string | null;
+  status: string;
+}
+
+export interface WarehouseBalanceRow {
+  nomenclature_id: string;
+  sku: string;
+  name: string;
+  unit: string;
+  incoming_qty: string;
+  incoming_amount_uzs: string;
+  outgoing_qty: string;
+  outgoing_amount_uzs: string;
+  balance_qty: string;
+  /** Только для vet-складов: активные лоты этого SKU на этом складе. */
+  lots?: WarehouseBalanceLot[];
+}
+
+export interface WarehouseBalanceResponse {
+  warehouse: {
+    id: string;
+    code: string;
+    name: string;
+    module_code: string | null;
+  };
+  rows: WarehouseBalanceRow[];
+  summary: {
+    sku_count: number;
+    with_balance: number;
+  };
+}
+
+export function useWarehouseBalance(warehouseId: string | null | undefined) {
+  return useQuery<WarehouseBalanceResponse, ApiError>({
+    queryKey: ['warehouses', 'balance', warehouseId ?? ''],
+    enabled: Boolean(warehouseId),
+    queryFn: () => apiFetch<WarehouseBalanceResponse>(
+      `/api/warehouses/warehouses/${warehouseId}/balance/`,
+    ),
+    staleTime: 30_000,
   });
 }
 
