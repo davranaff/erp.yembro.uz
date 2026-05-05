@@ -57,6 +57,8 @@ class StockMovementFilter(django_filters.FilterSet):
     warehouse = django_filters.UUIDFilter(method="filter_warehouse")
 
     def filter_warehouse(self, qs, name, value):
+        from django.db.models import Q
+
         return qs.filter(Q(warehouse_from=value) | Q(warehouse_to=value))
 
     class Meta:

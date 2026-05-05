@@ -195,23 +195,13 @@ export default function StockPage() {
             <>
               <ExportCsvButton url={csvUrl} filename="stock-movements.csv" />
               {canEdit && (
-                <>
-                  <button
-                    className="btn btn-secondary btn-sm"
-                    onClick={() => setRawBatchPrefill({})}
-                    title="Партия сырья для модуля «Корма» — учёт по Дювалю + карантин"
-                  >
-                    <Icon name="plus" size={14} />
-                    Партия сырья (корма)
-                  </button>
-                  <button
-                    className="btn btn-primary btn-sm"
-                    onClick={() => setShowMovementModal(true)}
-                  >
-                    <Icon name="plus" size={14} />
-                    Новое движение
-                  </button>
-                </>
+                <button
+                  className="btn btn-primary btn-sm"
+                  onClick={() => setShowMovementModal(true)}
+                >
+                  <Icon name="plus" size={14} />
+                  Новое движение
+                </button>
               )}
               <button
                 className="btn btn-secondary btn-sm"
