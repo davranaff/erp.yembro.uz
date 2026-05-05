@@ -179,6 +179,7 @@ def commands_for_counterparty() -> list[dict]:
         {"command": "menu", "description": "Asosiy menyu"},
         {"command": "buyurtmalar", "description": "Mening buyurtmalarim"},
         {"command": "qarz", "description": "Qarzdorligim"},
+        {"command": "mahsulotlar", "description": "Mahsulotlar katalogi"},
         {"command": "holat", "description": "Bloklash holati"},
         {"command": "help", "description": "Yordam"},
     ]

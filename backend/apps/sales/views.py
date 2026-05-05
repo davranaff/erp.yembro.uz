@@ -121,9 +121,26 @@ class SaleOrderViewSet(ImmutableStatusMixin, DeleteReasonMixin, OrgScopedModelVi
         # TG-уведомления через orchestration: клиент + админы sales + head'ы
         # source-модулей (детализация). Логика инкапсулирована в одном месте,
         # view остаётся тонким.
+        # Также проверяем не сменился ли credit-status клиента (новая
+        # продажа могла перевести в blokirovka даже после force_override).
         try:
-            from apps.tgbot.services.orchestration import notify_sale_event
+            from apps.sales.services.credit_check import check_customer_credit
+            from apps.tgbot.services.orchestration import (
+                notify_credit_status_change,
+                notify_sale_event,
+            )
             notify_sale_event(order)
+            after = check_customer_credit(
+                organization=order.organization, customer=order.customer,
+            )
+            # was_ok=True (по умолчанию мы продали — значит ДО продажи
+            # был ok ИЛИ был override). Если после — not ok, клиент
+            # получит push о блокировке.
+            notify_credit_status_change(
+                order.customer,
+                was_ok=True, is_ok=after.ok,
+                reasons=after.reasons,
+            )
         except Exception:
             pass
 
@@ -224,6 +241,13 @@ class SaleOrderViewSet(ImmutableStatusMixin, DeleteReasonMixin, OrgScopedModelVi
         else:
             pay_date = date_cls.today()
 
+        # Кредит-статус ДО оплаты — для notify_credit_status_change.
+        # Если был not_ok и оплата сняла блок → клиент получит push.
+        from apps.sales.services.credit_check import check_customer_credit
+        was_credit_ok = check_customer_credit(
+            organization=order.organization, customer=order.customer,
+        ).ok
+
         try:
             result = create_and_post_payment(
                 organization=order.organization,
@@ -246,8 +270,21 @@ class SaleOrderViewSet(ImmutableStatusMixin, DeleteReasonMixin, OrgScopedModelVi
         # head sales. create_and_post_payment не дёргает обычный
         # POST /api/payments/{id}/post/, поэтому шлём явно через orchestrator.
         try:
-            from apps.tgbot.services.orchestration import notify_payment_event
+            from apps.tgbot.services.orchestration import (
+                notify_credit_status_change,
+                notify_payment_event,
+            )
             notify_payment_event(result.payment, related_order=order)
+            # Status flip notification (клиент только что разблокировался)
+            after = check_customer_credit(
+                organization=order.organization, customer=order.customer,
+            )
+            notify_credit_status_change(
+                order.customer,
+                was_ok=was_credit_ok,
+                is_ok=after.ok,
+                reasons=after.reasons,
+            )
         except Exception:
             pass
 

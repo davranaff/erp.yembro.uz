@@ -10,8 +10,62 @@ view-код оставался тонким и не дублировался в 
 from __future__ import annotations
 
 import logging
+from decimal import Decimal
+
 
 logger = logging.getLogger(__name__)
+
+
+def notify_credit_status_change(customer, *, was_ok: bool, is_ok: bool, reasons: list[str] | None = None) -> None:
+    """Шлём клиенту pus если его кредит-статус ИЗМЕНИЛСЯ.
+
+    - was_ok=True → is_ok=False: клиент только что заблокирован.
+    - was_ok=False → is_ok=True: клиент только что разблокирован.
+    - same → ничего не шлём (без шума).
+
+    Вызывается из confirm_sale (новая продажа могла переполнить лимит)
+    и из record_payment (оплата могла снять блок).
+    """
+    from .. import notifications as fmt
+    from ..tasks import notify_counterparty_task
+
+    if was_ok == is_ok:
+        return  # ничего не изменилось — молчим
+
+    org_id = str(customer.organization_id)
+    cp_id = str(customer.id)
+
+    if not is_ok:
+        # Только что заблокирован
+        text_lines = [
+            "🚫 <b>Holatingiz: bloklangan</b>",
+            f"<i>{customer.name}</i>",
+            "",
+            "Yangi xaridlar vaqtincha to'xtatildi.",
+        ]
+        if reasons:
+            text_lines.append("")
+            text_lines.append("<b>Sabab:</b>")
+            for r in reasons:
+                text_lines.append(f"• {r}")
+        text_lines.append("")
+        text_lines.append(
+            "💳 Qarzni to'lashdan so'ng holatingiz avtomatik ravishda "
+            "qayta «faol» bo'ladi."
+        )
+        text = "\n".join(text_lines)
+    else:
+        # Только что разблокирован
+        text = (
+            f"✅ <b>Holatingiz qayta faol!</b>\n"
+            f"<i>{customer.name}</i>\n\n"
+            f"Endi yangi xaridlar mumkin."
+        )
+
+    try:
+        notify_counterparty_task.delay(text, org_id, cp_id)
+    except Exception:  # noqa: BLE001
+        logger.exception("notify_credit_status_change: notify failed")
 
 
 def notify_payment_event(payment, *, related_order=None) -> None:

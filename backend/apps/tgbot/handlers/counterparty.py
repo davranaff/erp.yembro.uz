@@ -21,7 +21,7 @@ from django.db.models import Sum
 
 from ..bot import edit_message_text, send_message
 from ..dispatcher import TEXT_TO_COMMAND, HandlerCtx, command, on_callback
-from ..keyboards import kb, reply_kb
+from ..keyboards import PAGE_SIZE, kb, kb_pagination, parse_page, reply_kb
 
 
 # Тексты кнопок reply-клавиатуры (бот матчит по точному равенству).
@@ -30,12 +30,14 @@ from ..keyboards import kb, reply_kb
 CP_BTN_ORDERS = "📦 Buyurtmalarim"
 CP_BTN_DEBT = "💰 Qarzdorligim"
 CP_BTN_HOLAT = "🚫 Holat"
+CP_BTN_CATALOG = "🛍 Mahsulotlar"
 
 # Маппинг текстов reply-кнопок в /команды (см. dispatcher.TEXT_TO_COMMAND).
 TEXT_TO_COMMAND.update({
     CP_BTN_ORDERS: "/buyurtmalar",
     CP_BTN_DEBT: "/qarz",
     CP_BTN_HOLAT: "/holat",
+    CP_BTN_CATALOG: "/mahsulotlar",
 })
 
 
@@ -61,16 +63,17 @@ def _menu_keyboard():
     return kb([
         (CP_BTN_ORDERS, "cp:orders"),
         (CP_BTN_DEBT, "cp:debt"),
+        (CP_BTN_CATALOG, "cp:catalog:1"),
         (CP_BTN_HOLAT, "cp:holat"),
-    ], cols=1)
+    ], cols=2)
 
 
 def _persistent_reply_kb():
     """Постоянная клавиатура внизу — основная навигация для клиента.
     Юзер видит её всегда, не надо набирать /команды."""
     return reply_kb([
-        [CP_BTN_ORDERS, CP_BTN_DEBT],
-        [CP_BTN_HOLAT],
+        [CP_BTN_ORDERS, CP_BTN_CATALOG],
+        [CP_BTN_DEBT, CP_BTN_HOLAT],
     ])
 
 
@@ -466,3 +469,113 @@ def _render_block_status(ctx: HandlerCtx) -> None:
         )
 
     _send_or_edit(ctx, "\n".join(lines), _back_kb())
+
+
+# ─── /mahsulotlar — каталог товаров для клиента ─────────────────────────
+
+
+@command("/mahsulotlar", help="Mahsulotlar katalogi", audience="counterparty")
+def handle_catalog_cmd(ctx: HandlerCtx) -> None:
+    _render_catalog(ctx, page=1)
+
+
+@on_callback("cp:catalog")
+def handle_catalog_callback(ctx: HandlerCtx) -> None:
+    page = parse_page(ctx.args)
+    _render_catalog(ctx, page=page)
+
+
+def _render_catalog(ctx: HandlerCtx, *, page: int) -> None:
+    """Каталог продаваемых товаров: что у нас можно купить + остатки.
+
+    Показываем номенклатурные позиции из feed/vet/slaughter/feedlot модулей,
+    с current-stock остатками (через Batch.current_quantity сумма по
+    nomenclature). Цены не показываем — клиент сам обсудит с менеджером,
+    + цены могут зависеть от объёма/договора, не публичная инфо.
+    """
+    from django.db.models import Q, Sum
+    from apps.batches.models import Batch
+    from apps.feed.models import FeedBagLot, FeedBatch
+    from apps.nomenclature.models import NomenclatureItem
+    from apps.vet.models import VetAccessory, VetStockBatch
+
+    cp = ctx.link.counterparty
+    org_id = ctx.link.organization_id
+
+    # Список позиций «что мы продаём» — упрощённая агрегация по типам.
+    items: list[tuple[str, str, str]] = []  # (icon, name, остаток-описание)
+
+    # Готовый комбикорм (FeedBatch + FeedBagLot)
+    fb_qs = FeedBatch.objects.filter(
+        organization_id=org_id, status=FeedBatch.Status.APPROVED,
+    ).select_related("recipe_version__recipe").values_list(
+        "recipe_version__recipe__code",
+    ).annotate(total_kg=Sum("current_quantity_kg")).filter(total_kg__gt=0)
+    for code, total_kg in fb_qs:
+        items.append(("🌾", f"Yem {code}", f"{_fmt_money(total_kg)} kg"))
+
+    bl_qs = FeedBagLot.objects.filter(
+        organization_id=org_id, status=FeedBagLot.Status.ACTIVE,
+    ).select_related("recipe_version__recipe").values_list(
+        "recipe_version__recipe__code",
+    ).annotate(total_bags=Sum("bags_remaining")).filter(total_bags__gt=0)
+    for code, total_bags in bl_qs:
+        items.append(("🌾", f"Yem {code} (qoplarda)", f"{int(total_bags)} qop"))
+
+    # Вет-препараты
+    vsb_qs = VetStockBatch.objects.filter(
+        organization_id=org_id, status=VetStockBatch.Status.AVAILABLE,
+    ).select_related("drug__nomenclature").values_list(
+        "drug__nomenclature__name",
+    ).annotate(total=Sum("current_quantity")).filter(total__gt=0)
+    for name, total in vsb_qs:
+        items.append(("💊", name or "—", f"{_fmt_money(total)}"))
+
+    # Аксессуары вет-аптеки
+    va_qs = VetAccessory.objects.filter(
+        organization_id=org_id, is_active=True, current_quantity__gt=0,
+    ).select_related("nomenclature").values_list(
+        "nomenclature__name",
+    ).annotate(total=Sum("current_quantity"))
+    for name, total in va_qs:
+        items.append(("🛒", name or "—", f"{int(total)} dona"))
+
+    # Бойни/откорм/маточник — обычные Batch
+    batch_qs = Batch.objects.filter(
+        organization_id=org_id, state=Batch.State.ACTIVE,
+        current_quantity__gt=0,
+    ).select_related("nomenclature").values_list(
+        "nomenclature__name",
+    ).annotate(total=Sum("current_quantity"))
+    for name, total in batch_qs:
+        items.append(("🍗", name or "—", f"{_fmt_money(total)}"))
+
+    # Сортировка: сначала вет, корм, остальное
+    items.sort(key=lambda x: x[1].lower())
+
+    total = len(items)
+    pages = max(1, (total + PAGE_SIZE - 1) // PAGE_SIZE)
+    page = max(1, min(page, pages))
+    offset = (page - 1) * PAGE_SIZE
+    page_items = items[offset:offset + PAGE_SIZE]
+
+    lines = [
+        "🛍 <b>Mahsulotlar katalogi</b>",
+        f"<i>{cp.name}</i>",
+        "",
+    ]
+    if not items:
+        lines.append("Hozir mahsulotlar yo'q. Iltimos, keyinroq qarang.")
+        markup = kb([("← Bosh menyu", "cp:menu")], cols=1)
+    else:
+        lines.append(f"Jami {total} ta turi mavjud.")
+        lines.append("")
+        for i, (icon, name, qty) in enumerate(page_items, offset + 1):
+            lines.append(f"{icon} <b>{name}</b> — {qty}")
+        lines.append("")
+        lines.append(
+            "<i>💬 Narxlar va buyurtmalar uchun menejer bilan bog'laning.</i>"
+        )
+        markup = kb_pagination("cp:catalog", page, total, back_to="cp:menu")
+
+    _send_or_edit(ctx, "\n".join(lines), markup)

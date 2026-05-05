@@ -222,6 +222,43 @@ def test_cp_order_drill_down_shows_items_and_payments(
     assert "3 000 000" in edits_text
 
 
+def test_cp_catalog_shows_available_products(
+    cp_link, org, m_sales, fake_send,
+):
+    """/mahsulotlar показывает доступные товары: вет-аксессуары, корм, и т.д."""
+    from apps.modules.models import Module
+    from apps.nomenclature.models import Category, NomenclatureItem, Unit
+    from apps.vet.models import VetAccessory
+    from apps.warehouses.models import Warehouse
+
+    m_vet = Module.objects.get(code="vet")
+    cat, _c = Category.objects.get_or_create(
+        organization=org, name="Cat-cat",
+    )
+    unit, _u = Unit.objects.get_or_create(
+        organization=org, code="cat-unit", defaults={"name": "u"},
+    )
+    nom = NomenclatureItem.objects.create(
+        organization=org, sku="CAT-1", name="Test Drug",
+        category=cat, unit=unit,
+    )
+    wh = Warehouse.objects.create(
+        organization=org, module=m_vet, code="СК-CAT", name="WH",
+    )
+    VetAccessory.objects.create(
+        organization=org, module=m_vet, nomenclature=nom, warehouse=wh,
+        current_quantity=Decimal("50"),
+        cost_per_unit_uzs=Decimal("100"), sale_price_uzs=Decimal("200"),
+        is_active=True,
+    )
+
+    dispatch_message(_msg(cp_link.chat_id, "/mahsulotlar"))
+    text = fake_send.calls[-1][1]
+    assert "Test Drug" in text
+    assert "50" in text  # количество
+    assert "katalog" in text.lower()
+
+
 def test_cp_holat_blocked_when_over_limit(
     cp_link, buyer, org, m_sales, warehouse, fake_send,
 ):
