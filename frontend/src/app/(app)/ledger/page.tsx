@@ -8,9 +8,10 @@ import DataTable from '@/components/ui/DataTable';
 import Icon from '@/components/ui/Icon';
 import KpiCard from '@/components/ui/KpiCard';
 import Panel from '@/components/ui/Panel';
+import TablePagination from '@/components/ui/TablePagination';
 import { useAccounts } from '@/hooks/useAccounts';
 import { useDashboardSummary } from '@/hooks/useDashboard';
-import { useJournalEntries } from '@/hooks/useJournalEntries';
+import { useJournalEntriesPaginated } from '@/hooks/useJournalEntries';
 import { useModules } from '@/hooks/useModules';
 import type { JournalEntry } from '@/types/auth';
 
@@ -56,6 +57,8 @@ export default function LedgerPage() {
   const [dateBefore, setDateBefore] = useState<string>(todayISO());
   const [search, setSearch] = useState('');
   const [draftSearch, setDraftSearch] = useState('');
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(50);
   const [sel, setSel] = useState<JournalEntry | null>(null);
 
   const filter = useMemo(
@@ -64,12 +67,12 @@ export default function LedgerPage() {
       search: search || undefined,
       entry_date_after: dateAfter || undefined,
       entry_date_before: dateBefore || undefined,
-      limit: 200,
     }),
     [moduleId, search, dateAfter, dateBefore],
   );
 
-  const { data, isLoading, error, refetch, isFetching } = useJournalEntries(filter);
+  const { data: pageData, isLoading, error, refetch, isFetching } = useJournalEntriesPaginated(filter, page, pageSize);
+  const data = pageData?.results ?? [];
   const { data: modules } = useModules();
   const { data: summary } = useDashboardSummary();
   const { data: accounts } = useAccounts();
@@ -77,6 +80,7 @@ export default function LedgerPage() {
   const submitSearch = (e: React.FormEvent) => {
     e.preventDefault();
     setSearch(draftSearch.trim());
+    setPage(1);
   };
 
   const totalDebit = useMemo(() => {
@@ -113,9 +117,9 @@ export default function LedgerPage() {
           tone="blue"
           iconName="book"
           label="Проводок (период)"
-          sub={data ? `${dateAfter}..${dateBefore}` : '—'}
-          value={data ? String(data.length) : '—'}
-          meta="лимит 200"
+          sub={pageData ? `${dateAfter}..${dateBefore}` : '—'}
+          value={pageData ? String(pageData.count) : '—'}
+          meta={`страница ${page}`}
         />
         <KpiCard
           tone="orange"
@@ -152,7 +156,7 @@ export default function LedgerPage() {
         <select
           className="input"
           value={moduleId}
-          onChange={(e) => setModuleId(e.target.value)}
+          onChange={(e) => { setModuleId(e.target.value); setPage(1); }}
           style={{ width: 180 }}
         >
           <option value="">Все модули</option>
@@ -166,14 +170,14 @@ export default function LedgerPage() {
           className="input"
           type="date"
           value={dateAfter}
-          onChange={(e) => setDateAfter(e.target.value)}
+          onChange={(e) => { setDateAfter(e.target.value); setPage(1); }}
           style={{ width: 150 }}
         />
         <input
           className="input"
           type="date"
           value={dateBefore}
-          onChange={(e) => setDateBefore(e.target.value)}
+          onChange={(e) => { setDateBefore(e.target.value); setPage(1); }}
           style={{ width: 150 }}
         />
         <div style={{ flex: 1, minWidth: 200 }}>
@@ -226,6 +230,17 @@ export default function LedgerPage() {
               render: (e) => e.description },
           ]}
         />
+        {pageData && (
+          <TablePagination
+            page={page}
+            pageSize={pageSize}
+            count={pageData.count}
+            hasPrev={Boolean(pageData.previous)}
+            hasNext={Boolean(pageData.next)}
+            onPageChange={setPage}
+            onPageSizeChange={setPageSize}
+          />
+        )}
       </Panel>
 
       {sel && (

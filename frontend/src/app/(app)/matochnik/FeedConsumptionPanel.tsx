@@ -6,6 +6,7 @@ import DataTable from '@/components/ui/DataTable';
 import EmptyState from '@/components/ui/EmptyState';
 import Icon from '@/components/ui/Icon';
 import Panel from '@/components/ui/Panel';
+import TablePagination from '@/components/ui/TablePagination';
 import { feedConsumptionCrud } from '@/hooks/useMatochnik';
 import { getFinancesVisible } from '@/lib/permissions';
 import type { BreedingFeedConsumption, BreedingHerd } from '@/types/auth';
@@ -30,15 +31,18 @@ function fmtUzs(v: string | null | undefined): string {
 
 export default function FeedConsumptionPanel({ herd }: Props) {
   const [open, setOpen] = useState(false);
-  const { data, isLoading } = feedConsumptionCrud.useList({ herd: herd.id });
-
-  const records = useMemo(() => (data ?? []).slice(0, 20), [data]);
-  const showFinances = getFinancesVisible(records);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(25);
+  const { data: pageData, isLoading } = feedConsumptionCrud.useListPaginated(
+    { herd: herd.id }, page, pageSize,
+  );
+  const records = pageData?.results ?? [];
+  const showFinances = useMemo(() => getFinancesVisible(records), [records]);
 
   return (
     <>
       <Panel
-        title={`Расход кормов · ${data?.length ?? 0} записей`}
+        title={`Расход кормов · ${pageData?.count ?? 0} записей`}
         flush
         tools={
           <button className="btn btn-secondary btn-sm" onClick={() => setOpen(true)}>
@@ -58,6 +62,7 @@ export default function FeedConsumptionPanel({ herd }: Props) {
             hint="FCR = кг корма ÷ кг яйца. Норма для кур-несушек: 2.0–2.5 кг корма на кг яичной массы."
           />
         ) : (
+        <>
         <DataTable<BreedingFeedConsumption>
           isLoading={isLoading}
           rows={records}
@@ -88,6 +93,14 @@ export default function FeedConsumptionPanel({ herd }: Props) {
             }] : []),
           ]}
         />
+        {pageData && (
+          <TablePagination
+            page={page} pageSize={pageSize} count={pageData.count}
+            hasPrev={Boolean(pageData.previous)} hasNext={Boolean(pageData.next)}
+            onPageChange={setPage} onPageSizeChange={setPageSize}
+          />
+        )}
+        </>
         )}
       </Panel>
 

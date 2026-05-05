@@ -16,14 +16,20 @@ export interface BlocksFilter {
   search?: string;
 }
 
-export function useProductionBlocks(filter: BlocksFilter = {}) {
+function buildBlocksParams(filter: BlocksFilter): URLSearchParams {
   const params = new URLSearchParams();
   if (filter.module) params.set('module', filter.module);
   if (filter.module_code) params.set('module_code', filter.module_code);
   if (filter.kind) params.set('kind', filter.kind);
   if (filter.is_active) params.set('is_active', filter.is_active);
   if (filter.search) params.set('search', filter.search);
+  return params;
+}
+
+export function useProductionBlocks(filter: BlocksFilter = {}) {
+  const params = buildBlocksParams(filter);
   params.set('ordering', 'code');
+  params.set('page_size', '2000');
   const qs = params.toString();
 
   return useQuery<ProductionBlock[], ApiError>({
@@ -35,6 +41,26 @@ export function useProductionBlocks(filter: BlocksFilter = {}) {
       return asList(data);
     },
     staleTime: 30_000,
+  });
+}
+
+export function useProductionBlocksPaginated(
+  filter: BlocksFilter = {},
+  page = 1,
+  pageSize = 50,
+) {
+  const params = buildBlocksParams(filter);
+  params.set('ordering', 'code');
+  params.set('page', String(page));
+  params.set('page_size', String(pageSize));
+  const qs = params.toString();
+  return useQuery<Paginated<ProductionBlock>, ApiError>({
+    queryKey: [...KEY, 'page', qs],
+    queryFn: () => apiFetch<Paginated<ProductionBlock>>(
+      `/api/warehouses/blocks/?${qs}`,
+    ),
+    staleTime: 30_000,
+    placeholderData: (prev) => prev,
   });
 }
 

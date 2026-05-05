@@ -9,6 +9,7 @@ import Modal from '@/components/ui/Modal';
 import Panel from '@/components/ui/Panel';
 import RowActions from '@/components/ui/RowActions';
 import Seg from '@/components/ui/Seg';
+import TablePagination from '@/components/ui/TablePagination';
 import { useSubaccounts } from '@/hooks/useAccounts';
 import { expenseArticlesCrud } from '@/hooks/useExpenseArticles';
 import { useModules } from '@/hooks/useModules';
@@ -33,17 +34,23 @@ const KIND_TONE: Record<ExpenseArticleKind, 'danger' | 'success' | 'warn' | 'neu
 export default function ExpenseArticlesSection() {
   const [kind, setKind] = useState<'all' | ExpenseArticleKind>('all');
   const [includeArchived, setIncludeArchived] = useState(false);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(50);
   const [editing, setEditing] = useState<ExpenseArticle | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
 
   const hasLevel = useHasLevel();
   const canEdit = hasLevel('ledger', 'rw');
 
-  const filter: Record<string, string> = {};
-  if (kind !== 'all') filter.kind = kind;
-  if (!includeArchived) filter.is_active = 'true';
+  const filter = useMemo(() => {
+    const f: Record<string, string> = {};
+    if (kind !== 'all') f.kind = kind;
+    if (!includeArchived) f.is_active = 'true';
+    return f;
+  }, [kind, includeArchived]);
 
-  const { data: articles, isLoading } = expenseArticlesCrud.useList(filter);
+  const { data: pageData, isLoading } = expenseArticlesCrud.useListPaginated(filter, page, pageSize);
+  const articles = pageData?.results ?? [];
   const del = expenseArticlesCrud.useDelete();
 
   const handleDelete = (a: ExpenseArticle) => {
@@ -77,13 +84,13 @@ export default function ExpenseArticlesSection() {
             { value: 'transfer', label: 'Прочее' },
           ]}
           value={kind}
-          onChange={(v) => setKind(v as typeof kind)}
+          onChange={(v) => { setKind(v as typeof kind); setPage(1); }}
         />
         <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--fg-2)' }}>
           <input
             type="checkbox"
             checked={includeArchived}
-            onChange={(e) => setIncludeArchived(e.target.checked)}
+            onChange={(e) => { setIncludeArchived(e.target.checked); setPage(1); }}
           />
           Показать архивные
         </label>
@@ -161,6 +168,17 @@ export default function ExpenseArticlesSection() {
             },
           ]}
         />
+        {pageData && (
+          <TablePagination
+            page={page}
+            pageSize={pageSize}
+            count={pageData.count}
+            hasPrev={Boolean(pageData.previous)}
+            hasNext={Boolean(pageData.next)}
+            onPageChange={setPage}
+            onPageSizeChange={setPageSize}
+          />
+        )}
       </Panel>
 
       {modalOpen && (

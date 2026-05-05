@@ -10,6 +10,7 @@ import HelpHint from '@/components/ui/HelpHint';
 import Icon from '@/components/ui/Icon';
 import Panel from '@/components/ui/Panel';
 import RowActions from '@/components/ui/RowActions';
+import TablePagination from '@/components/ui/TablePagination';
 import { feedConsumptionCrud } from '@/hooks/useFeedlot';
 import type { FeedConsumptionType, FeedlotBatch, FeedlotFeedConsumption } from '@/types/auth';
 
@@ -39,18 +40,25 @@ function fmtNum(v: string | null | undefined, digits = 0): string {
 }
 
 export default function FeedConsumptionPanel({ batch }: Props) {
-  const { data: rows, isLoading } = feedConsumptionCrud.useList({
-    feedlot_batch: batch.id,
-    ordering: '-period_from_day',
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(25);
+  const { data: pageData, isLoading } = feedConsumptionCrud.useListPaginated(
+    { feedlot_batch: batch.id, ordering: '-period_from_day' },
+    page, pageSize,
+  );
+  const rows = pageData?.results ?? [];
+  // Σ для шапки берём по всем записям, не только по странице.
+  const { data: allRows } = feedConsumptionCrud.useList({
+    feedlot_batch: batch.id, ordering: '-period_from_day',
   });
   const [open, setOpen] = useState(false);
   const del = feedConsumptionCrud.useDelete();
   const [confirmDel, setConfirmDel] = useState<FeedlotFeedConsumption | null>(null);
 
   const totalKg = useMemo(() => {
-    if (!rows) return 0;
-    return rows.reduce((s, r) => s + parseFloat(r.total_kg || '0'), 0);
-  }, [rows]);
+    if (!allRows) return 0;
+    return allRows.reduce((s, r) => s + parseFloat(r.total_kg || '0'), 0);
+  }, [allRows]);
 
   const canAdd = batch.status !== 'shipped';
 
@@ -101,7 +109,7 @@ export default function FeedConsumptionPanel({ batch }: Props) {
               color: 'var(--fg-3)', borderBottom: '1px solid var(--border)',
               display: 'flex', justifyContent: 'space-between',
             }}>
-              <span>Записей: {rows.length}</span>
+              <span>Записей: {pageData?.count ?? rows.length}</span>
               <span>
                 Σ скормлено: <b className="mono">{fmtNum(String(totalKg), 0)} кг</b>
               </span>
@@ -152,6 +160,13 @@ export default function FeedConsumptionPanel({ batch }: Props) {
                   ) },
               ]}
             />
+            {pageData && (
+              <TablePagination
+                page={page} pageSize={pageSize} count={pageData.count}
+                hasPrev={Boolean(pageData.previous)} hasNext={Boolean(pageData.next)}
+                onPageChange={setPage} onPageSizeChange={setPageSize}
+              />
+            )}
           </>
         )}
       </Panel>

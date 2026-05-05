@@ -10,9 +10,10 @@ import Icon from '@/components/ui/Icon';
 import Panel from '@/components/ui/Panel';
 import RowActions from '@/components/ui/RowActions';
 import Seg from '@/components/ui/Seg';
+import TablePagination from '@/components/ui/TablePagination';
 import TgConnectModal from '@/components/ui/TgConnectModal';
 import {
-  useCounterparties,
+  useCounterpartiesPaginated,
   useDeleteCounterparty,
 } from '@/hooks/useCounterparties';
 import { useHasLevel } from '@/hooks/usePermissions';
@@ -75,6 +76,8 @@ export default function CounterpartiesPage() {
   const [kind, setKind] = useState('');
   const [search, setSearch] = useState('');
   const [draftSearch, setDraftSearch] = useState('');
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(50);
   const [sel, setSel] = useState<Counterparty | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<Counterparty | null>(null);
@@ -91,12 +94,16 @@ export default function CounterpartiesPage() {
     [kind, search],
   );
 
-  const { data, isLoading, error, refetch, isFetching } = useCounterparties(filter);
+  const { data, isLoading, error, refetch, isFetching } = useCounterpartiesPaginated(
+    filter, page, pageSize,
+  );
+  const rows = data?.results ?? [];
   const del = useDeleteCounterparty();
 
   const submitSearch = (e: React.FormEvent) => {
     e.preventDefault();
     setSearch(draftSearch.trim());
+    setPage(1);
   };
 
   const handleEdit = (c: Counterparty) => {
@@ -168,7 +175,7 @@ export default function CounterpartiesPage() {
             { value: 'other',    label: 'Прочие' },
           ]}
           value={kind}
-          onChange={(v) => setKind(v)}
+          onChange={(v) => { setKind(v); setPage(1); }}
         />
         <div style={{ flex: 1, minWidth: 200 }}>
           <form onSubmit={submitSearch} style={{ display: 'flex', gap: 6 }}>
@@ -189,7 +196,7 @@ export default function CounterpartiesPage() {
       <Panel flush>
         <DataTable<Counterparty>
           isLoading={isLoading}
-          rows={data}
+          rows={rows}
           rowKey={(r) => r.id}
           error={error}
           emptyMessage={
@@ -250,6 +257,17 @@ export default function CounterpartiesPage() {
               ) },
           ]}
         />
+        {data && (
+          <TablePagination
+            page={page}
+            pageSize={pageSize}
+            count={data.count}
+            hasPrev={Boolean(data.previous)}
+            hasNext={Boolean(data.next)}
+            onPageChange={setPage}
+            onPageSizeChange={setPageSize}
+          />
+        )}
       </Panel>
 
       {sel && (

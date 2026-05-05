@@ -20,6 +20,7 @@ export function useCounterparties(filter: CounterpartiesFilter = {}) {
   if (filter.is_active) params.set('is_active', filter.is_active);
   if (filter.search) params.set('search', filter.search);
   params.set('ordering', 'code');
+  params.set('page_size', '2000');
   const qs = params.toString();
   return useQuery<Counterparty[], ApiError>({
     queryKey: [...KEY, qs],
@@ -30,6 +31,28 @@ export function useCounterparties(filter: CounterpartiesFilter = {}) {
       return asList(data);
     },
     staleTime: 30_000,
+  });
+}
+
+export function useCounterpartiesPaginated(
+  filter: CounterpartiesFilter,
+  page: number,
+  pageSize = 25,
+) {
+  const params = new URLSearchParams();
+  if (filter.kind) params.set('kind', filter.kind);
+  if (filter.is_active) params.set('is_active', filter.is_active);
+  if (filter.search) params.set('search', filter.search);
+  params.set('ordering', 'code');
+  params.set('page', String(page));
+  params.set('page_size', String(pageSize));
+  const qs = params.toString();
+  return useQuery<Paginated<Counterparty>, ApiError>({
+    queryKey: [...KEY, 'page', qs],
+    queryFn: () =>
+      apiFetch<Paginated<Counterparty>>(`/api/counterparties/?${qs}`),
+    staleTime: 30_000,
+    placeholderData: (prev) => prev,
   });
 }
 

@@ -88,6 +88,7 @@ export function useNomenclatureItems(filter: NomenclatureFilter = {}) {
   if (filter.is_active) params.set('is_active', filter.is_active);
   if (filter.search) params.set('search', filter.search);
   params.set('ordering', 'sku');
+  params.set('page_size', '2000');
   const qs = params.toString();
 
   return useQuery<NomenclatureItem[], ApiError>({
@@ -99,6 +100,30 @@ export function useNomenclatureItems(filter: NomenclatureFilter = {}) {
       return asList(data);
     },
     staleTime: 30_000,
+  });
+}
+
+export function useNomenclatureItemsPaginated(
+  filter: NomenclatureFilter = {},
+  page = 1,
+  pageSize = 50,
+) {
+  const params = new URLSearchParams();
+  if (filter.category) params.set('category', filter.category);
+  if (filter.module_code) params.set('module_code', filter.module_code);
+  if (filter.is_active) params.set('is_active', filter.is_active);
+  if (filter.search) params.set('search', filter.search);
+  params.set('ordering', 'sku');
+  params.set('page', String(page));
+  params.set('page_size', String(pageSize));
+  const qs = params.toString();
+  return useQuery<Paginated<NomenclatureItem>, ApiError>({
+    queryKey: [...ITEMS_KEY, 'page', qs],
+    queryFn: () => apiFetch<Paginated<NomenclatureItem>>(
+      `/api/nomenclature/items/?${qs}`,
+    ),
+    staleTime: 30_000,
+    placeholderData: (prev) => prev,
   });
 }
 

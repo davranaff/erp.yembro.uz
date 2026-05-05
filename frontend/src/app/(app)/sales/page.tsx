@@ -9,6 +9,7 @@ import KpiCard from '@/components/ui/KpiCard';
 import Panel from '@/components/ui/Panel';
 import RowActions from '@/components/ui/RowActions';
 import Seg from '@/components/ui/Seg';
+import TablePagination from '@/components/ui/TablePagination';
 import { useHasLevel } from '@/hooks/usePermissions';
 import { useSendDebtReminder } from '@/hooks/useTgBot';
 import { salesCrud, useConfirmSale, useReverseSale } from '@/hooks/useSales';
@@ -54,6 +55,8 @@ function fmtUzs(v: string | null | undefined): string {
 
 export default function SalesPage() {
   const [tab, setTab] = useState<'all' | SaleStatus>('all');
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(50);
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<SaleOrder | null>(null);
   const [payFor, setPayFor] = useState<SaleOrder | null>(null);
@@ -63,16 +66,22 @@ export default function SalesPage() {
   const hasLevel = useHasLevel();
   const canEdit = hasLevel('sales', 'rw');
 
-  const { data: orders, isLoading } = salesCrud.useList(
-    tab === 'all' ? {} : { status: tab },
+  const filter = useMemo(
+    () => (tab === 'all' ? {} : { status: tab }),
+    [tab],
   );
+
+  const { data: pageData, isLoading } = salesCrud.useListPaginated(filter, page, pageSize);
+  const orders = pageData?.results ?? [];
+  // KPI считаем по полному списку (до 2000 записей), не только по странице.
+  const { data: allOrders } = salesCrud.useList(filter);
 
   const confirmMutation = useConfirmSale();
   const reverseMutation = useReverseSale();
   const sendReminder = useSendDebtReminder();
 
   const totals = useMemo(() => {
-    const list = orders ?? [];
+    const list = allOrders ?? [];
     const confirmed = list.filter((o) => o.status === 'confirmed');
     const revenue = confirmed.reduce((s, o) => s + parseFloat(o.amount_uzs || '0'), 0);
     const cost = confirmed.reduce((s, o) => s + parseFloat(o.cost_uzs || '0'), 0);
@@ -81,12 +90,12 @@ export default function SalesPage() {
       0,
     );
     return {
-      count: list.length,
+      count: pageData?.count ?? list.length,
       revenue,
       margin: revenue - cost,
       receivable,
     };
-  }, [orders]);
+  }, [allOrders, pageData]);
 
   // Confirm теперь идёт через модалку с превью кредитного гейта
   // (SaleConfirmGuardModal). window.confirm заменён на нормальный UX.
@@ -137,7 +146,7 @@ export default function SalesPage() {
             { value: 'cancelled', label: 'Отменённые' },
           ]}
           value={tab}
-          onChange={(v) => setTab(v as typeof tab)}
+          onChange={(v) => { setTab(v as typeof tab); setPage(1); }}
         />
       </div>
 
@@ -280,6 +289,17 @@ export default function SalesPage() {
             },
           ]}
         />
+        {pageData && (
+          <TablePagination
+            page={page}
+            pageSize={pageSize}
+            count={pageData.count}
+            hasPrev={Boolean(pageData.previous)}
+            hasNext={Boolean(pageData.next)}
+            onPageChange={setPage}
+            onPageSizeChange={setPageSize}
+          />
+        )}
       </Panel>
 
       {modalOpen && (

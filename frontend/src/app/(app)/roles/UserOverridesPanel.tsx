@@ -7,9 +7,10 @@ import DataTable from '@/components/ui/DataTable';
 import Icon from '@/components/ui/Icon';
 import Panel from '@/components/ui/Panel';
 import RowActions from '@/components/ui/RowActions';
+import TablePagination from '@/components/ui/TablePagination';
 import {
   useDeleteOverride,
-  useUserOverrides,
+  useUserOverridesPaginated,
   type UserModuleAccessOverride,
 } from '@/hooks/useRbac';
 import type { ModuleLevel } from '@/types/auth';
@@ -31,7 +32,10 @@ const LEVEL_LABEL: Record<ModuleLevel, string> = {
 };
 
 export default function UserOverridesPanel() {
-  const { data: overrides, isLoading, error } = useUserOverrides();
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(50);
+  const { data: pageData, isLoading, error } = useUserOverridesPaginated(undefined, page, pageSize);
+  const overrides = pageData?.results ?? [];
   const remove = useDeleteOverride();
 
   const [modalOpen, setModalOpen] = useState(false);
@@ -55,7 +59,7 @@ export default function UserOverridesPanel() {
   return (
     <>
       <Panel
-        title={`Исключения · ${overrides?.length ?? 0}`}
+        title={`Исключения · ${pageData?.count ?? 0}`}
         flush
         tools={
           <button
@@ -125,6 +129,13 @@ export default function UserOverridesPanel() {
               ) },
           ]}
         />
+        {pageData && (
+          <TablePagination
+            page={page} pageSize={pageSize} count={pageData.count}
+            hasPrev={Boolean(pageData.previous)} hasNext={Boolean(pageData.next)}
+            onPageChange={setPage} onPageSizeChange={setPageSize}
+          />
+        )}
       </Panel>
 
       {modalOpen && (

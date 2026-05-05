@@ -8,6 +8,7 @@ import Icon from '@/components/ui/Icon';
 import Modal from '@/components/ui/Modal';
 import Panel from '@/components/ui/Panel';
 import RowActions from '@/components/ui/RowActions';
+import TablePagination from '@/components/ui/TablePagination';
 import { useHasLevel } from '@/hooks/usePermissions';
 import {
   sellerTokensCrud,
@@ -20,7 +21,10 @@ import type { SellerDeviceToken } from '@/types/auth';
 
 
 export default function SellerTokensPage() {
-  const { data: tokens, isLoading } = sellerTokensCrud.useList();
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(50);
+  const { data: pageData, isLoading } = sellerTokensCrud.useListPaginated({}, page, pageSize);
+  const tokens = pageData?.results ?? [];
   const create = useCreateSellerToken();
   const revoke = useRevokeSellerToken();
   const { data: people } = usePeople({ is_active: 'true' });
@@ -125,6 +129,17 @@ export default function SellerTokensPage() {
               ) : null },
           ]}
         />
+        {pageData && (
+          <TablePagination
+            page={page}
+            pageSize={pageSize}
+            count={pageData.count}
+            hasPrev={Boolean(pageData.previous)}
+            hasNext={Boolean(pageData.next)}
+            onPageChange={setPage}
+            onPageSizeChange={setPageSize}
+          />
+        )}
       </Panel>
 
       {createOpen && (

@@ -8,7 +8,8 @@ import Icon from '@/components/ui/Icon';
 import Panel from '@/components/ui/Panel';
 import RowActions from '@/components/ui/RowActions';
 import Seg from '@/components/ui/Seg';
-import { useDeactivatePerson, usePeople } from '@/hooks/usePeople';
+import TablePagination from '@/components/ui/TablePagination';
+import { useDeactivatePerson, usePeoplePaginated } from '@/hooks/usePeople';
 import { useHasLevel } from '@/hooks/usePermissions';
 import type { MembershipRow } from '@/types/auth';
 
@@ -42,6 +43,8 @@ export default function PeoplePage() {
   const [workStatus, setWorkStatus] = useState('');
   const [search, setSearch] = useState('');
   const [draftSearch, setDraftSearch] = useState('');
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(50);
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<MembershipRow | null>(null);
 
@@ -57,12 +60,14 @@ export default function PeoplePage() {
     [isActive, workStatus, search],
   );
 
-  const { data, isLoading, error, refetch, isFetching } = usePeople(filter);
+  const { data: pageData, isLoading, error, refetch, isFetching } = usePeoplePaginated(filter, page, pageSize);
+  const data = pageData?.results ?? [];
   const deactivate = useDeactivatePerson();
 
   const submitSearch = (e: React.FormEvent) => {
     e.preventDefault();
     setSearch(draftSearch.trim());
+    setPage(1);
   };
 
   const handleEdit = (m: MembershipRow) => {
@@ -83,7 +88,7 @@ export default function PeoplePage() {
         <div>
           <h1>Сотрудники</h1>
           <div className="sub">
-            Штат компании · {data?.length ?? 0} человек · назначение ролей — в разделе «Роли и права»
+            Штат компании · {pageData?.count ?? 0} человек · назначение ролей — в разделе «Роли и права»
           </div>
         </div>
         <div className="actions">
@@ -118,12 +123,12 @@ export default function PeoplePage() {
             { value: '',      label: 'Все' },
           ]}
           value={isActive}
-          onChange={(v) => setIsActive(v)}
+          onChange={(v) => { setIsActive(v); setPage(1); }}
         />
         <select
           className="input"
           value={workStatus}
-          onChange={(e) => setWorkStatus(e.target.value)}
+          onChange={(e) => { setWorkStatus(e.target.value); setPage(1); }}
           style={{ width: 180 }}
         >
           <option value="">Любой статус</option>
@@ -225,6 +230,17 @@ export default function PeoplePage() {
               ) : null },
           ]}
         />
+        {pageData && (
+          <TablePagination
+            page={page}
+            pageSize={pageSize}
+            count={pageData.count}
+            hasPrev={Boolean(pageData.previous)}
+            hasNext={Boolean(pageData.next)}
+            onPageChange={setPage}
+            onPageSizeChange={setPageSize}
+          />
+        )}
       </Panel>
 
       {modalOpen && (

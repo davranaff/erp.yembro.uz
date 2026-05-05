@@ -9,6 +9,7 @@ import KpiCard from '@/components/ui/KpiCard';
 import Panel from '@/components/ui/Panel';
 import RowActions from '@/components/ui/RowActions';
 import Seg from '@/components/ui/Seg';
+import TablePagination from '@/components/ui/TablePagination';
 import { useSubaccounts } from '@/hooks/useAccounts';
 import { useModules } from '@/hooks/useModules';
 import {
@@ -80,6 +81,8 @@ export default function CashboxPage() {
   const [dateTo, setDateTo] = useState(todayISO());
   const [moduleId, setModuleId] = useState('');
   const [statusTab, setStatusTab] = useState<StatusTab>('posted');
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(50);
   const [opexOpen, setOpexOpen] = useState<false | 'out' | 'in'>(false);
   const [drawerPayment, setDrawerPayment] = useState<Payment | null>(null);
 
@@ -94,15 +97,19 @@ export default function CashboxPage() {
   const remove = paymentsCrud.useDelete();
 
   // Фильтрованный список платежей
-  const filter: Record<string, string> = {};
-  if (statusTab !== 'all') filter.status = statusTab;
-  if (accountCode !== 'all' && subs) {
-    const s = subs.find((x) => x.code === accountCode);
-    if (s) filter.cash_subaccount = s.id;
-  }
-  if (moduleId) filter.module = moduleId;
+  const filter = useMemo(() => {
+    const f: Record<string, string> = {};
+    if (statusTab !== 'all') f.status = statusTab;
+    if (accountCode !== 'all' && subs) {
+      const s = subs.find((x) => x.code === accountCode);
+      if (s) f.cash_subaccount = s.id;
+    }
+    if (moduleId) f.module = moduleId;
+    return f;
+  }, [statusTab, accountCode, subs, moduleId]);
 
-  const { data: payments, isLoading } = paymentsCrud.useList(filter);
+  const { data: pageData, isLoading } = paymentsCrud.useListPaginated(filter, page, pageSize);
+  const payments = pageData?.results ?? [];
 
   // Для KPI/балансов всегда нужны posted (без зависимости от вкладки)
   const { data: postedPayments } = paymentsCrud.useList({ status: 'posted' });
@@ -241,7 +248,7 @@ export default function CashboxPage() {
             { value: 'all',       label: 'Все' },
           ]}
           value={statusTab}
-          onChange={(v) => setStatusTab(v as StatusTab)}
+          onChange={(v) => { setStatusTab(v as StatusTab); setPage(1); }}
         />
       </div>
 
@@ -256,7 +263,7 @@ export default function CashboxPage() {
               { value: '51.01', label: 'Только банк' },
             ]}
             value={accountCode}
-            onChange={(v) => setAccountCode(v as typeof accountCode)}
+            onChange={(v) => { setAccountCode(v as typeof accountCode); setPage(1); }}
           />
         </div>
         <div className="filter-cell">
@@ -269,7 +276,7 @@ export default function CashboxPage() {
         </div>
         <div className="filter-cell" style={{ minWidth: 200 }}>
           <label>Модуль</label>
-          <select className="input" value={moduleId} onChange={(e) => setModuleId(e.target.value)}>
+          <select className="input" value={moduleId} onChange={(e) => { setModuleId(e.target.value); setPage(1); }}>
             <option value="">Все</option>
             {modules?.map((m) => (
               <option key={m.id} value={m.id}>{m.name}</option>
@@ -370,6 +377,17 @@ export default function CashboxPage() {
               ) },
           ]}
         />
+        {pageData && (
+          <TablePagination
+            page={page}
+            pageSize={pageSize}
+            count={pageData.count}
+            hasPrev={Boolean(pageData.previous)}
+            hasNext={Boolean(pageData.next)}
+            onPageChange={setPage}
+            onPageSizeChange={setPageSize}
+          />
+        )}
       </Panel>
 
       {opexOpen !== false && (

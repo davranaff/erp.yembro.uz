@@ -11,6 +11,7 @@ import KpiCard from '@/components/ui/KpiCard';
 import Panel from '@/components/ui/Panel';
 import RowActions from '@/components/ui/RowActions';
 import Seg from '@/components/ui/Seg';
+import TablePagination from '@/components/ui/TablePagination';
 import {
   transfersCrud,
   useAcceptTransfer,
@@ -138,11 +139,17 @@ function FlowCard({
 export default function TransfersPage() {
   const [state, setState] = useState('');
   const [route, setRoute] = useState<string>(''); // "from→to" фильтр маршрута
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(50);
   const [sel, setSel] = useState<InterModuleTransfer | null>(null);
 
-  const { data, isLoading, error, refetch, isFetching } = transfersCrud.useList(
-    state ? { state } : {},
-  );
+  const filter = useMemo(() => (state ? { state } : {}), [state]);
+
+  // Полный набор — для KPI-счётчиков и подсчёта маршрутов (нужен весь объём,
+  // не одна страница).
+  const { data, error, refetch, isFetching } = transfersCrud.useList(filter);
+  // Страница — для таблицы.
+  const { data: pageData, isLoading } = transfersCrud.useListPaginated(filter, page, pageSize);
 
   const submit = useSubmitTransfer();
   const review = useReviewTransfer();
@@ -172,12 +179,12 @@ export default function TransfersPage() {
     return map;
   }, [data]);
 
-  // Применяем фильтр маршрута к таблице
+  // Применяем фильтр маршрута к таблице (на текущую страницу)
   const filteredRows = useMemo(() => {
-    if (!data) return data;
-    if (!route) return data;
-    return data.filter((t) => `${t.from_module_code}→${t.to_module_code}` === route);
-  }, [data, route]);
+    const rows = pageData?.results ?? [];
+    if (!route) return rows;
+    return rows.filter((t) => `${t.from_module_code}→${t.to_module_code}` === route);
+  }, [pageData, route]);
 
   const handleSubmit = async (t: InterModuleTransfer) => {
     try { await submit.mutateAsync({ id: t.id }); setSel(null); }
@@ -237,7 +244,7 @@ export default function TransfersPage() {
       </div>
 
       <div className="kpi-row">
-        <KpiCard tone="orange" iconName="chart" label="Всего ММ" sub="в фильтре" value={String(data?.length ?? 0)} />
+        <KpiCard tone="orange" iconName="chart" label="Всего ММ" sub="в фильтре" value={String(pageData?.count ?? data?.length ?? 0)} />
         <KpiCard tone="blue" iconName="box" label="Черновики" sub="готовятся" value={String(totals.draft)} />
         <KpiCard tone="red" iconName="close" label="Ждут приёма" sub="нужно действие" value={String(totals.awaiting)} />
         <KpiCard tone="green" iconName="check" label="Проведены" sub="завершены" value={String(totals.posted)} />
@@ -303,7 +310,7 @@ export default function TransfersPage() {
             { value: 'cancelled', label: 'Отменены' },
           ]}
           value={state}
-          onChange={setState}
+          onChange={(v) => { setState(v); setPage(1); }}
         />
       </div>
 
@@ -400,6 +407,17 @@ export default function TransfersPage() {
               ) },
           ]}
         />
+        {pageData && !route && (
+          <TablePagination
+            page={page}
+            pageSize={pageSize}
+            count={pageData.count}
+            hasPrev={Boolean(pageData.previous)}
+            hasNext={Boolean(pageData.next)}
+            onPageChange={setPage}
+            onPageSizeChange={setPageSize}
+          />
+        )}
       </Panel>
 
       {sel && (

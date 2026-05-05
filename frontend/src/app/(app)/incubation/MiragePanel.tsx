@@ -7,6 +7,7 @@ import EmptyState from '@/components/ui/EmptyState';
 import Icon from '@/components/ui/Icon';
 import Panel from '@/components/ui/Panel';
 import RowActions from '@/components/ui/RowActions';
+import TablePagination from '@/components/ui/TablePagination';
 import { mirageCrud } from '@/hooks/useIncubation';
 import type { IncubationRun, MirageInspection } from '@/types/auth';
 
@@ -17,13 +18,17 @@ interface Props {
 }
 
 export default function MiragePanel({ run }: Props) {
-  const { data, isLoading } = mirageCrud.useList({ run: run.id });
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(25);
+  const { data: pageData, isLoading } = mirageCrud.useListPaginated(
+    { run: run.id }, page, pageSize,
+  );
   const del = mirageCrud.useDelete();
 
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<MirageInspection | null>(null);
 
-  const rows = data ?? [];
+  const rows = pageData?.results ?? [];
 
   const handleDelete = (m: MirageInspection) => {
     if (!window.confirm(`Удалить овоскопию за ${m.inspection_date}?`)) return;
@@ -111,6 +116,13 @@ export default function MiragePanel({ run }: Props) {
               ) },
           ]}
         />
+        {pageData && (
+          <TablePagination
+            page={page} pageSize={pageSize} count={pageData.count}
+            hasPrev={Boolean(pageData.previous)} hasNext={Boolean(pageData.next)}
+            onPageChange={setPage} onPageSizeChange={setPageSize}
+          />
+        )}
       </Panel>
 
       {modalOpen && (

@@ -8,10 +8,11 @@ import DataTable from '@/components/ui/DataTable';
 import Icon from '@/components/ui/Icon';
 import Panel from '@/components/ui/Panel';
 import RowActions from '@/components/ui/RowActions';
+import TablePagination from '@/components/ui/TablePagination';
 import {
   useCategories,
   useDeleteItem,
-  useNomenclatureItems,
+  useNomenclatureItemsPaginated,
 } from '@/hooks/useNomenclature';
 import { useHasLevel } from '@/hooks/usePermissions';
 import type { Category, NomenclatureItem } from '@/types/auth';
@@ -22,6 +23,8 @@ export default function NomenclaturePage() {
   const [categoryId, setCategoryId] = useState('');
   const [search, setSearch] = useState('');
   const [draftSearch, setDraftSearch] = useState('');
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(50);
   const [sel, setSel] = useState<NomenclatureItem | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<NomenclatureItem | null>(null);
@@ -37,13 +40,15 @@ export default function NomenclaturePage() {
     [categoryId, search],
   );
 
-  const { data: items, isLoading, error, refetch, isFetching } = useNomenclatureItems(filter);
+  const { data: pageData, isLoading, error, refetch, isFetching } = useNomenclatureItemsPaginated(filter, page, pageSize);
+  const items = pageData?.results ?? [];
   const { data: categories } = useCategories();
   const del = useDeleteItem();
 
   const submitSearch = (e: React.FormEvent) => {
     e.preventDefault();
     setSearch(draftSearch.trim());
+    setPage(1);
   };
 
   const handleEdit = (it: NomenclatureItem) => {
@@ -61,7 +66,7 @@ export default function NomenclaturePage() {
     });
   };
 
-  // Группировка по категории (названию)
+  // Группировка по категории (названию). На текущей странице.
   const groups = useMemo<Map<string, { cat: Category | null; items: NomenclatureItem[] }>>(() => {
     const map = new Map<string, { cat: Category | null; items: NomenclatureItem[] }>();
     if (!items) return map;
@@ -111,7 +116,7 @@ export default function NomenclaturePage() {
         <select
           className="input"
           value={categoryId}
-          onChange={(e) => setCategoryId(e.target.value)}
+          onChange={(e) => { setCategoryId(e.target.value); setPage(1); }}
           style={{ width: 240 }}
         >
           <option value="">Все категории</option>
@@ -164,7 +169,8 @@ export default function NomenclaturePage() {
           </div>
         </Panel>
       ) : (
-        Array.from(groups.entries()).map(([catName, bucket]) => (
+        <>
+        {Array.from(groups.entries()).map(([catName, bucket]) => (
           <Panel key={catName} title={`${catName} · ${bucket.items.length}`} flush>
             <DataTable<NomenclatureItem>
               rows={bucket.items}
@@ -203,7 +209,21 @@ export default function NomenclaturePage() {
               ]}
             />
           </Panel>
-        ))
+        ))}
+        {pageData && (
+          <Panel flush>
+            <TablePagination
+              page={page}
+              pageSize={pageSize}
+              count={pageData.count}
+              hasPrev={Boolean(pageData.previous)}
+              hasNext={Boolean(pageData.next)}
+              onPageChange={setPage}
+              onPageSizeChange={setPageSize}
+            />
+          </Panel>
+        )}
+        </>
       )}
 
       {sel && (

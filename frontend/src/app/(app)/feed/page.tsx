@@ -17,6 +17,7 @@ import KpiCard from '@/components/ui/KpiCard';
 import Panel from '@/components/ui/Panel';
 import RowActions from '@/components/ui/RowActions';
 import Seg from '@/components/ui/Seg';
+import TablePagination from '@/components/ui/TablePagination';
 import {
   feedBagLotsCrud,
   feedBatchesCrud,
@@ -109,21 +110,36 @@ export default function FeedPage() {
   const [tab, setTab] = useState<TabKey>('recipes');
   const [taskStatus, setTaskStatus] = useState('');
   const [rawStatus, setRawStatus] = useState('');
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(50);
 
   const hasLevel = useHasLevel();
   const canEdit = hasLevel('feed', 'rw');
   const qc = useQueryClient();
 
-  const { data: recipes, isLoading: recipesLoading } = recipesCrud.useList();
+  // KPI читаем по полному списку (до 2000), таблицу — по странице.
+  const { data: recipes } = recipesCrud.useList();
   const { data: versions } = recipeVersionsCrud.useList();
-  const { data: tasks, isLoading: tasksLoading } = tasksCrud.useList(
-    taskStatus ? { status: taskStatus } : {},
-  );
-  const { data: rawBatches, isLoading: rawLoading } = rawBatchesCrud.useList(
-    rawStatus ? { status: rawStatus } : {},
-  );
-  const { data: feedBatches, isLoading: feedBatchesLoading } = feedBatchesCrud.useList();
-  const { data: bagLots, isLoading: bagLotsLoading } = feedBagLotsCrud.useList();
+  const { data: tasks } = tasksCrud.useList(taskStatus ? { status: taskStatus } : {});
+  const { data: rawBatches } = rawBatchesCrud.useList(rawStatus ? { status: rawStatus } : {});
+  const { data: feedBatches } = feedBatchesCrud.useList();
+
+  const recipesPage = recipesCrud.useListPaginated({}, page, pageSize);
+  const tasksPage = tasksCrud.useListPaginated(taskStatus ? { status: taskStatus } : {}, page, pageSize);
+  const rawPage = rawBatchesCrud.useListPaginated(rawStatus ? { status: rawStatus } : {}, page, pageSize);
+  const feedBatchesPage = feedBatchesCrud.useListPaginated({}, page, pageSize);
+  const bagLotsPage = feedBagLotsCrud.useListPaginated({}, page, pageSize);
+
+  const pageRecipes = recipesPage.data?.results ?? [];
+  const recipesLoading = recipesPage.isLoading;
+  const pageTasks = tasksPage.data?.results ?? [];
+  const tasksLoading = tasksPage.isLoading;
+  const pageRaw = rawPage.data?.results ?? [];
+  const rawLoading = rawPage.isLoading;
+  const pageFeedBatches = feedBatchesPage.data?.results ?? [];
+  const feedBatchesLoading = feedBatchesPage.isLoading;
+  const pageBagLots = bagLotsPage.data?.results ?? [];
+  const bagLotsLoading = bagLotsPage.isLoading;
 
   // Selection
   const [selRecipe, setSelRecipe] = useState<Recipe | null>(null);
@@ -274,13 +290,13 @@ export default function FeedPage() {
             { value: 'bags', label: 'Мешки' },
           ]}
           value={tab}
-          onChange={(v) => setTab(v as TabKey)}
+          onChange={(v) => { setTab(v as TabKey); setPage(1); }}
         />
         {tab === 'tasks' && (
           <select
             className="input"
             value={taskStatus}
-            onChange={(e) => setTaskStatus(e.target.value)}
+            onChange={(e) => { setTaskStatus(e.target.value); setPage(1); }}
             style={{ width: 180 }}
           >
             <option value="">Все статусы</option>
@@ -295,7 +311,7 @@ export default function FeedPage() {
           <select
             className="input"
             value={rawStatus}
-            onChange={(e) => setRawStatus(e.target.value)}
+            onChange={(e) => { setRawStatus(e.target.value); setPage(1); }}
             style={{ width: 180 }}
           >
             <option value="">Все статусы</option>
@@ -312,7 +328,7 @@ export default function FeedPage() {
         <Panel flush>
           <DataTable<Recipe>
             isLoading={recipesLoading}
-            rows={recipes}
+            rows={pageRecipes}
             rowKey={(r) => r.id}
             emptyMessage={
               <EmptyState
@@ -365,6 +381,17 @@ export default function FeedPage() {
                 ) : null },
             ]}
           />
+          {recipesPage.data && (
+            <TablePagination
+              page={page}
+              pageSize={pageSize}
+              count={recipesPage.data.count}
+              hasPrev={Boolean(recipesPage.data.previous)}
+              hasNext={Boolean(recipesPage.data.next)}
+              onPageChange={setPage}
+              onPageSizeChange={setPageSize}
+            />
+          )}
         </Panel>
       )}
 
@@ -373,7 +400,7 @@ export default function FeedPage() {
         <Panel flush>
           <DataTable<RawMaterialBatch>
             isLoading={rawLoading}
-            rows={rawBatches}
+            rows={pageRaw}
             rowKey={(r) => r.id}
             emptyMessage={
               <EmptyState
@@ -466,6 +493,17 @@ export default function FeedPage() {
                 ) : null },
             ]}
           />
+          {rawPage.data && (
+            <TablePagination
+              page={page}
+              pageSize={pageSize}
+              count={rawPage.data.count}
+              hasPrev={Boolean(rawPage.data.previous)}
+              hasNext={Boolean(rawPage.data.next)}
+              onPageChange={setPage}
+              onPageSizeChange={setPageSize}
+            />
+          )}
         </Panel>
       )}
 
@@ -474,7 +512,7 @@ export default function FeedPage() {
         <Panel flush>
           <DataTable<ProductionTask>
             isLoading={tasksLoading}
-            rows={tasks}
+            rows={pageTasks}
             rowKey={(t) => t.id}
             emptyMessage={
               <EmptyState
@@ -539,6 +577,17 @@ export default function FeedPage() {
                 ) : null },
             ]}
           />
+          {tasksPage.data && (
+            <TablePagination
+              page={page}
+              pageSize={pageSize}
+              count={tasksPage.data.count}
+              hasPrev={Boolean(tasksPage.data.previous)}
+              hasNext={Boolean(tasksPage.data.next)}
+              onPageChange={setPage}
+              onPageSizeChange={setPageSize}
+            />
+          )}
         </Panel>
       )}
 
@@ -547,7 +596,7 @@ export default function FeedPage() {
         <Panel flush>
           <DataTable<FeedBatch>
             isLoading={feedBatchesLoading}
-            rows={feedBatches}
+            rows={pageFeedBatches}
             rowKey={(b) => b.id}
             emptyMessage={
               <EmptyState
@@ -590,6 +639,17 @@ export default function FeedPage() {
                 render: (b) => b.quality_passport_status },
             ]}
           />
+          {feedBatchesPage.data && (
+            <TablePagination
+              page={page}
+              pageSize={pageSize}
+              count={feedBatchesPage.data.count}
+              hasPrev={Boolean(feedBatchesPage.data.previous)}
+              hasNext={Boolean(feedBatchesPage.data.next)}
+              onPageChange={setPage}
+              onPageSizeChange={setPageSize}
+            />
+          )}
         </Panel>
       )}
 
@@ -598,7 +658,7 @@ export default function FeedPage() {
         <Panel flush>
           <DataTable<FeedBagLot>
             isLoading={bagLotsLoading}
-            rows={bagLots}
+            rows={pageBagLots}
             rowKey={(b) => b.id}
             emptyMessage={
               <EmptyState
@@ -632,7 +692,7 @@ export default function FeedPage() {
                 render: (b) => `${b.bags_remaining} / ${b.bags_initial} шт` },
               { key: 'kg', label: '≈ кг', align: 'right', mono: true, cellStyle: { fontSize: 12, color: 'var(--fg-3)' },
                 render: (b) => fmtNum(b.remaining_kg, 0) },
-              ...(getFinancesVisible(bagLots) ? [{
+              ...(getFinancesVisible(pageBagLots) ? [{
                 key: 'unit_cost', label: 'Себест/мешок', align: 'right' as const, mono: true,
                 cellStyle: { fontSize: 12 },
                 render: (b: FeedBagLot) => fmtNum(b.unit_cost_uzs, 0) + ' сум',
@@ -647,6 +707,17 @@ export default function FeedPage() {
                 ) },
             ]}
           />
+          {bagLotsPage.data && (
+            <TablePagination
+              page={page}
+              pageSize={pageSize}
+              count={bagLotsPage.data.count}
+              hasPrev={Boolean(bagLotsPage.data.previous)}
+              hasNext={Boolean(bagLotsPage.data.next)}
+              onPageChange={setPage}
+              onPageSizeChange={setPageSize}
+            />
+          )}
         </Panel>
       )}
 

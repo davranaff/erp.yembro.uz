@@ -7,6 +7,7 @@ import EmptyState from '@/components/ui/EmptyState';
 import Icon from '@/components/ui/Icon';
 import Panel from '@/components/ui/Panel';
 import RowActions from '@/components/ui/RowActions';
+import TablePagination from '@/components/ui/TablePagination';
 import { regimeDaysCrud } from '@/hooks/useIncubation';
 import type { IncubationRegimeDay, IncubationRun } from '@/types/auth';
 
@@ -32,13 +33,17 @@ function deltaCell(target: string | null, actual: string | null, threshold: numb
 }
 
 export default function RegimePanel({ run }: Props) {
-  const { data, isLoading } = regimeDaysCrud.useList({ run: run.id, ordering: 'day' });
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(25);
+  const { data: pageData, isLoading } = regimeDaysCrud.useListPaginated(
+    { run: run.id, ordering: 'day' }, page, pageSize,
+  );
   const del = regimeDaysCrud.useDelete();
 
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<IncubationRegimeDay | null>(null);
 
-  const rows = data ?? [];
+  const rows = pageData?.results ?? [];
 
   const handleDelete = (r: IncubationRegimeDay) => {
     if (!window.confirm(`Удалить замер за день ${r.day}?`)) return;
@@ -112,6 +117,13 @@ export default function RegimePanel({ run }: Props) {
               ) },
           ]}
         />
+        {pageData && (
+          <TablePagination
+            page={page} pageSize={pageSize} count={pageData.count}
+            hasPrev={Boolean(pageData.previous)} hasNext={Boolean(pageData.next)}
+            onPageChange={setPage} onPageSizeChange={setPageSize}
+          />
+        )}
       </Panel>
 
       {modalOpen && (

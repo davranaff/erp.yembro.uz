@@ -9,6 +9,7 @@ import KpiCard from '@/components/ui/KpiCard';
 import Panel from '@/components/ui/Panel';
 import RowActions from '@/components/ui/RowActions';
 import Seg from '@/components/ui/Seg';
+import TablePagination from '@/components/ui/TablePagination';
 import { useHasLevel } from '@/hooks/usePermissions';
 import {
   purchasesCrud,
@@ -62,6 +63,8 @@ function fmtUzs(v: string | null | undefined): string {
 
 export default function PurchasesPage() {
   const [tab, setTab] = useState<'all' | PurchaseStatus>('all');
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(50);
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<PurchaseOrder | null>(null);
   const [payingOrder, setPayingOrder] = useState<PurchaseOrder | null>(null);
@@ -70,15 +73,20 @@ export default function PurchasesPage() {
   const hasLevel = useHasLevel();
   const canEdit = hasLevel('purchases', 'rw');
 
-  const { data: orders, isLoading } = purchasesCrud.useList(
-    tab === 'all' ? {} : { status: tab },
+  const filter = useMemo(
+    () => (tab === 'all' ? {} : { status: tab }),
+    [tab],
   );
+
+  const { data: pageData, isLoading } = purchasesCrud.useListPaginated(filter, page, pageSize);
+  const orders = pageData?.results ?? [];
+  const { data: allOrders } = purchasesCrud.useList(filter);
 
   const confirmMutation = useConfirmPurchase();
   const reverseMutation = useReversePurchase();
 
   const totals = useMemo(() => {
-    const list = orders ?? [];
+    const list = allOrders ?? [];
     const confirmed = list.filter(
       (o) => o.status === 'confirmed' || o.status === 'paid',
     );
@@ -89,12 +97,12 @@ export default function PurchasesPage() {
     );
     const fxCount = confirmed.filter((o) => o.currency_code && o.currency_code !== 'UZS').length;
     return {
-      count: list.length,
+      count: pageData?.count ?? list.length,
       spend,
       payable,
       fxCount,
     };
-  }, [orders]);
+  }, [allOrders, pageData]);
 
   const handleConfirm = (o: PurchaseOrder) => {
     if (!window.confirm(
@@ -176,7 +184,7 @@ export default function PurchasesPage() {
             { value: 'cancelled', label: 'Отменённые' },
           ]}
           value={tab}
-          onChange={(v) => setTab(v as typeof tab)}
+          onChange={(v) => { setTab(v as typeof tab); setPage(1); }}
         />
       </div>
 
@@ -261,6 +269,17 @@ export default function PurchasesPage() {
             },
           ]}
         />
+        {pageData && (
+          <TablePagination
+            page={page}
+            pageSize={pageSize}
+            count={pageData.count}
+            hasPrev={Boolean(pageData.previous)}
+            hasNext={Boolean(pageData.next)}
+            onPageChange={setPage}
+            onPageSizeChange={setPageSize}
+          />
+        )}
       </Panel>
 
       {modalOpen && (

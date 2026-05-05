@@ -14,6 +14,7 @@ import KpiCard from '@/components/ui/KpiCard';
 import Panel from '@/components/ui/Panel';
 import RowActions from '@/components/ui/RowActions';
 import Seg from '@/components/ui/Seg';
+import TablePagination from '@/components/ui/TablePagination';
 import { useHasLevel } from '@/hooks/usePermissions';
 import {
   qualityChecksCrud,
@@ -76,6 +77,8 @@ function fmtPct(v: string | null | undefined): string {
 
 export default function SlaughterPage() {
   const [status, setStatus] = useState('');
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(50);
   const [sel, setSel] = useState<SlaughterShift | null>(null);
   const [tab, setTab] = useState<TabKey>('overview');
   const [postFor, setPostFor] = useState<SlaughterShift | null>(null);
@@ -89,9 +92,11 @@ export default function SlaughterPage() {
   const hasLevel = useHasLevel();
   const canEdit = hasLevel('slaughter', 'rw');
 
-  const { data: shifts, isLoading, error, refetch, isFetching } = shiftsCrud.useList(
-    status ? { status } : {},
-  );
+  const filter = useMemo(() => (status ? { status } : {}), [status]);
+
+  const { data: shifts, error, refetch, isFetching } = shiftsCrud.useList(filter);
+  const { data: pageData, isLoading } = shiftsCrud.useListPaginated(filter, page, pageSize);
+  const pageShifts = pageData?.results ?? [];
   const { data: stats } = useSlaughterStats(sel?.id ?? null);
   const { data: qcList } = qualityChecksCrud.useList(
     sel ? { shift: sel.id } : {},
@@ -220,14 +225,14 @@ export default function SlaughterPage() {
             { value: 'cancelled', label: 'Отменены' },
           ]}
           value={status}
-          onChange={setStatus}
+          onChange={(v) => { setStatus(v); setPage(1); }}
         />
       </div>
 
       <Panel flush>
         <DataTable<SlaughterShift>
           isLoading={isLoading}
-          rows={shifts}
+          rows={pageShifts}
           rowKey={(s) => s.id}
           error={error}
           emptyMessage={
@@ -311,6 +316,17 @@ export default function SlaughterPage() {
               ) : null },
           ]}
         />
+        {pageData && (
+          <TablePagination
+            page={page}
+            pageSize={pageSize}
+            count={pageData.count}
+            hasPrev={Boolean(pageData.previous)}
+            hasNext={Boolean(pageData.next)}
+            onPageChange={setPage}
+            onPageSizeChange={setPageSize}
+          />
+        )}
       </Panel>
 
       {sel && (
