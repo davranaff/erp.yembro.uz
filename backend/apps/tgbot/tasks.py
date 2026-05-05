@@ -367,6 +367,125 @@ def _fmt_collection_alert(report) -> str:
     return "\n".join(lines)
 
 
+# ─── Promise-broken (клиент не сдержал обещание) ──────────────────────────
+
+
+@shared_task(name="apps.tgbot.promise_broken_daily_task")
+def promise_broken_daily_task() -> dict:
+    """Каждое утро (09:30) находим SaleCommunication с outcome=PROMISED
+    где promised_pay_date == ВЧЕРА, но соответствующая SaleOrder ещё не
+    оплачена. Шлём клиенту мягкий push «вы обещали вчера, мы ждём».
+
+    Дедуп: фильтр по точной дате (только yesterday). Если клиент дал
+    несколько обещаний на одну дату — отправим один раз на каждое
+    активное communication, но обычно их не больше одного. Спам-фактор
+    низкий (триггер раз в день, точечно).
+    """
+    from datetime import date as _date, timedelta
+
+    from apps.sales.models import SaleCommunication, SaleOrder
+
+    from .notifications import fmt_promise_broken_uz
+
+    yesterday = _date.today() - timedelta(days=1)
+    qs = (
+        SaleCommunication.objects
+        .filter(
+            outcome=SaleCommunication.Outcome.PROMISED,
+            promised_pay_date=yesterday,
+            order__status=SaleOrder.Status.CONFIRMED,
+        )
+        .exclude(order__payment_status=SaleOrder.PaymentStatus.PAID)
+        .select_related("order", "order__customer", "order__organization")
+    )
+
+    queued = 0
+    for comm in qs:
+        order = comm.order
+        try:
+            text = fmt_promise_broken_uz(order, comm)
+            notify_counterparty_task.delay(
+                text, str(order.organization_id), str(order.customer_id),
+            )
+            queued += 1
+        except Exception:  # noqa: BLE001
+            logger.exception(
+                "promise_broken: failed for comm=%s", comm.id,
+            )
+
+    logger.info("promise_broken_daily_task: queued=%d", queued)
+    return {"queued": queued}
+
+
+# ─── Pre-block warning (близко к лимиту/просрочке) ────────────────────────
+
+
+@shared_task(name="apps.tgbot.pre_block_warning_daily_task")
+def pre_block_warning_daily_task() -> dict:
+    """Каждое утро (10:00) ищем клиентов в «жёлтой зоне» — ещё не
+    заблокированы, но близко (debt > 70% лимита ИЛИ просрочка ≥
+    max_overdue - 3 дня). Шлём предупреждающий push.
+
+    Цель: дать клиенту понять что он близок к стопу до того как стоп
+    случится (а не после). Психологически эффективно — большинство
+    предпочитают не доводить до блока.
+
+    Дедуп: каждый день, но клиент в зоне риска ≠ каждый раз. Если он
+    погасил часть и вышел из 70%-зоны — push прекратится.
+    """
+    from decimal import Decimal
+
+    from apps.counterparties.models import Counterparty
+    from apps.organizations.models import Organization
+    from apps.sales.services.credit_check import check_customer_credit
+
+    from .notifications import fmt_pre_block_warning_uz
+
+    queued = 0
+    for org in Organization.objects.filter(is_active=True).iterator():
+        # Только клиенты у которых есть credit_limit ИЛИ max_overdue —
+        # без них проверять нечего.
+        cps = (
+            Counterparty.objects
+            .filter(
+                organization=org, kind=Counterparty.Kind.BUYER,
+                is_active=True,
+            )
+            .filter(
+                # хотя бы один лимит установлен
+                credit_limit_uzs__isnull=False,
+            )
+        )
+        for cp in cps.iterator():
+            try:
+                result = check_customer_credit(
+                    organization=org, customer=cp, new_sale_uzs=Decimal("0"),
+                )
+                if not result.ok:
+                    continue  # уже заблокирован — debt-reminder его подхватит
+                # «Жёлтая зона»: 70%+ от лимита
+                if result.limit_uzs is None:
+                    continue
+                ratio = (
+                    Decimal(result.current_debt_uzs) / Decimal(result.limit_uzs)
+                    if result.limit_uzs > 0 else Decimal("0")
+                )
+                if ratio < Decimal("0.7"):
+                    continue
+                text = fmt_pre_block_warning_uz(cp, result, ratio)
+                notify_counterparty_task.delay(
+                    text, str(org.id), str(cp.id),
+                )
+                queued += 1
+            except Exception:  # noqa: BLE001
+                logger.exception(
+                    "pre_block_warning: cp=%s failed", cp.id,
+                )
+
+    logger.info("pre_block_warning_daily_task: queued=%d", queued)
+    return {"queued": queued}
+
+
 @shared_task(name="apps.tgbot.handle_tg_update_task")
 def handle_tg_update_task(update: dict) -> None:
     """Обрабатывает входящий Telegram update.

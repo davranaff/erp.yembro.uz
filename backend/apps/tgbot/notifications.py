@@ -101,36 +101,115 @@ def fmt_payment_received_for_client(payment, order=None) -> str:
 
 
 def fmt_debt_reminder_uz(sale_order, counterparty) -> str:
-    """Mijozga qarzdorlik haqida xabarnoma."""
+    """Mijozga qarzdorlik haqida xabarnoma — escalation tone по delta_days.
+
+    Тон нарастает:
+    - до срока (delta>0): мягко
+    - в день (delta=0): «Bugun to'lov kuni»
+    - просрочка 1-7 дней: твёрдо но вежливо
+    - 8-30 дней: серьёзно, упоминаем риск блокировки
+    - 30+ дней: жёстко, последнее предупреждение
+    Это снижает game-the-system эффект «бот дёргает но ничего не меняется».
+    """
     from datetime import date as _date
     from decimal import Decimal
 
     remaining = Decimal(sale_order.amount_uzs or 0) - Decimal(sale_order.paid_amount_uzs or 0)
 
-    deadline_block = ""
+    delta = None
     if sale_order.due_date:
         delta = (sale_order.due_date - _date.today()).days
-        if delta > 0:
-            deadline_block = (
-                f"⏳ To'lov muddati: <b>{sale_order.due_date}</b> "
-                f"({delta} kun qoldi)\n"
-            )
-        elif delta == 0:
-            deadline_block = f"⚠️ <b>Bugun to'lov kuni!</b> ({sale_order.due_date})\n"
-        else:
-            deadline_block = (
-                f"🚨 <b>{abs(delta)} kun kechikkan!</b> "
-                f"(muddati: {sale_order.due_date})\n"
-            )
+
+    # Подбор тональности по delta
+    if delta is None:
+        # Без due_date — generic reminder
+        header = f"📢 <b>Eslatma: qarzdorlik mavjud</b>"
+        deadline_block = ""
+        tone_block = (
+            "💳 Iltimos, to'lovni amalga oshiring.\n\n"
+            "❓ Savol bo'lsa, biz bilan bog'laning."
+        )
+    elif delta > 0:
+        header = "📢 <b>To'lov muddati yaqinlashmoqda</b>"
+        deadline_block = (
+            f"⏳ To'lov muddati: <b>{sale_order.due_date}</b> "
+            f"({delta} kun qoldi)\n"
+        )
+        tone_block = "💳 Iltimos, o'z vaqtida to'lang. Rahmat."
+    elif delta == 0:
+        header = "⚠️ <b>Bugun to'lov kuni!</b>"
+        deadline_block = f"📅 Muddati: <b>{sale_order.due_date}</b>\n"
+        tone_block = "💳 Iltimos, bugun to'lovni amalga oshiring."
+    elif delta >= -7:
+        header = f"🚨 <b>{abs(delta)} kun kechikkan</b>"
+        deadline_block = f"📅 Muddati edi: {sale_order.due_date}\n"
+        tone_block = (
+            "💳 Iltimos, qarzni iloji boricha tezroq to'lang.\n"
+            "❓ Qiyinchilik bo'lsa — menejer bilan bog'laning."
+        )
+    elif delta >= -30:
+        header = f"🔴 <b>Jiddiy kechikish: {abs(delta)} kun</b>"
+        deadline_block = f"📅 Muddati edi: {sale_order.due_date}\n"
+        tone_block = (
+            "⚠️ <b>Diqqat:</b> Qarzdorlik davom etsa, yangi xaridlar "
+            "vaqtincha to'xtatilishi mumkin.\n"
+            "💳 Iltimos, bugun-ertaga to'lang yoki menejer bilan "
+            "kelishuv tuzing."
+        )
+    else:
+        header = f"🚨🚨 <b>Oxirgi ogohlantirish: {abs(delta)} kun kechikish</b>"
+        deadline_block = f"📅 Muddati edi: {sale_order.due_date}\n"
+        tone_block = (
+            "⛔ Qarzdorlik 30 kundan oshdi. Yangi xaridlar bloklangan.\n"
+            "💼 Hisob-kitobni kelishish uchun zudlik bilan menejer "
+            "bilan bog'laning."
+        )
 
     return (
-        f"📢 <b>Hurmatli {counterparty.name}!</b>\n\n"
-        f"Sizda <code>{sale_order.doc_number}</code> raqamli buyurtma bo'yicha\n"
-        f"<b>{_fmt_money(remaining)} so'm</b> qarzdorlik mavjud.\n\n"
+        f"{header}\n\n"
+        f"<i>{counterparty.name}</i>\n"
+        f"📄 Buyurtma: <code>{sale_order.doc_number}</code>\n"
+        f"💰 Qarz: <b>{_fmt_money(remaining)} so'm</b>\n"
         f"📅 Buyurtma sanasi: {sale_order.date}\n"
-        f"{deadline_block}"
-        f"💳 Iltimos, to'lovni o'z vaqtida amalga oshiring.\n\n"
-        f"❓ Savol bo'lsa, biz bilan bog'laning."
+        f"{deadline_block}\n"
+        f"{tone_block}"
+    )
+
+
+def fmt_promise_broken_uz(sale_order, communication) -> str:
+    """Mijozga: «kecha to'lashga va'da bergan edingiz, hali to'lov yo'q»."""
+    from decimal import Decimal
+
+    remaining = Decimal(sale_order.amount_uzs or 0) - Decimal(sale_order.paid_amount_uzs or 0)
+    return (
+        f"📢 <b>Va'dangiz haqida</b>\n\n"
+        f"<i>{sale_order.customer.name}</i>\n\n"
+        f"Siz <b>{communication.promised_pay_date}</b> kuni to'lashga "
+        f"va'da bergan edingiz, biroq to'lov hali kelmadi.\n\n"
+        f"📄 Buyurtma: <code>{sale_order.doc_number}</code>\n"
+        f"💰 Qarz: <b>{_fmt_money(remaining)} so'm</b>\n\n"
+        f"💳 Iltimos, qarzni to'lang yoki yangi muddat haqida menejerga "
+        f"xabar bering."
+    )
+
+
+def fmt_pre_block_warning_uz(counterparty, credit_result, ratio) -> str:
+    """Mijozga: «вы близко к лимиту, ещё немного и блок»."""
+    from decimal import Decimal
+
+    debt = Decimal(credit_result.current_debt_uzs)
+    limit = Decimal(credit_result.limit_uzs or 0)
+    remaining_capacity = limit - debt
+    pct = int(float(ratio) * 100)
+
+    return (
+        f"⚠️ <b>Diqqat: kredit limitiga yaqinlashmoqda</b>\n\n"
+        f"<i>{counterparty.name}</i>\n\n"
+        f"📊 Joriy qarz: <b>{_fmt_money(debt)} so'm</b>\n"
+        f"📈 Limitdan ishlatilgan: <b>{pct}%</b>\n"
+        f"💼 Yangi xaridlarga qoldi: <b>{_fmt_money(remaining_capacity)} so'm</b>\n\n"
+        f"💳 Limit oshgan zahoti yangi xaridlar to'xtatiladi. "
+        f"Iloji boricha qarzni to'lang."
     )
 
 
