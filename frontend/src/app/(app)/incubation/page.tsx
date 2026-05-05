@@ -15,6 +15,7 @@ import KpiCard from '@/components/ui/KpiCard';
 import Panel from '@/components/ui/Panel';
 import RowActions from '@/components/ui/RowActions';
 import Seg from '@/components/ui/Seg';
+import TablePagination from '@/components/ui/TablePagination';
 import { useProductionBlocks } from '@/hooks/useBlocks';
 import {
   runsCrud,
@@ -63,6 +64,8 @@ function daysBetween(from: string, to: string): number {
 
 export default function IncubationPage() {
   const [status, setStatus] = useState('');
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(50);
   const [sel, setSel] = useState<IncubationRun | null>(null);
   const [tab, setTab] = useState<TabKey>('overview');
   const [createOpen, setCreateOpen] = useState(false);
@@ -73,9 +76,11 @@ export default function IncubationPage() {
   const hasLevel = useHasLevel();
   const canEdit = hasLevel('incubation', 'rw');
 
-  const { data: runs, isLoading, error, refetch, isFetching } = runsCrud.useList({
-    status: status || undefined,
-  });
+  const filter = useMemo(() => ({ status: status || undefined }), [status]);
+
+  const { data: runs, error, refetch, isFetching } = runsCrud.useList(filter);
+  const { data: pageData, isLoading } = runsCrud.useListPaginated(filter, page, pageSize);
+  const pageRuns = pageData?.results ?? [];
   const { data: hatchers } = useProductionBlocks({ kind: 'hatcher' });
   const del = runsCrud.useDelete();
   const transfer = useTransferToHatcher();
@@ -176,14 +181,14 @@ export default function IncubationPage() {
             { value: 'cancelled', label: 'Отменено' },
           ]}
           value={status}
-          onChange={setStatus}
+          onChange={(v) => { setStatus(v); setPage(1); }}
         />
       </div>
 
       <Panel flush>
         <DataTable<IncubationRun>
           isLoading={isLoading}
-          rows={runs}
+          rows={pageRuns}
           rowKey={(r) => r.id}
           error={error}
           emptyMessage={
@@ -264,6 +269,17 @@ export default function IncubationPage() {
               ) : null },
           ]}
         />
+        {pageData && (
+          <TablePagination
+            page={page}
+            pageSize={pageSize}
+            count={pageData.count}
+            hasPrev={Boolean(pageData.previous)}
+            hasNext={Boolean(pageData.next)}
+            onPageChange={setPage}
+            onPageSizeChange={setPageSize}
+          />
+        )}
       </Panel>
 
       {sel && (

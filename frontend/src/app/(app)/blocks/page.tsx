@@ -7,7 +7,8 @@ import DataTable from '@/components/ui/DataTable';
 import Icon from '@/components/ui/Icon';
 import Panel from '@/components/ui/Panel';
 import RowActions from '@/components/ui/RowActions';
-import { useProductionBlocks, useDeleteBlock } from '@/hooks/useBlocks';
+import TablePagination from '@/components/ui/TablePagination';
+import { useProductionBlocksPaginated, useDeleteBlock } from '@/hooks/useBlocks';
 import { useModules } from '@/hooks/useModules';
 import { useHasLevel } from '@/hooks/usePermissions';
 import type { BlockKind, ProductionBlock } from '@/types/auth';
@@ -33,6 +34,8 @@ export default function BlocksPage() {
   const [kind, setKind] = useState('');
   const [search, setSearch] = useState('');
   const [draftSearch, setDraftSearch] = useState('');
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(50);
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<ProductionBlock | null>(null);
 
@@ -48,12 +51,14 @@ export default function BlocksPage() {
     [moduleId, kind, search],
   );
 
-  const { data, isLoading, error, refetch, isFetching } = useProductionBlocks(filter);
+  const { data: pageData, isLoading, error, refetch, isFetching } = useProductionBlocksPaginated(filter, page, pageSize);
+  const data = pageData?.results ?? [];
   const del = useDeleteBlock();
 
   const submitSearch = (e: React.FormEvent) => {
     e.preventDefault();
     setSearch(draftSearch.trim());
+    setPage(1);
   };
 
   const handleEdit = (b: ProductionBlock) => {
@@ -117,7 +122,7 @@ export default function BlocksPage() {
         <select
           className="input"
           value={moduleId}
-          onChange={(e) => setModuleId(e.target.value)}
+          onChange={(e) => { setModuleId(e.target.value); setPage(1); }}
           style={{ width: 200 }}
         >
           <option value="">Все модули</option>
@@ -130,7 +135,7 @@ export default function BlocksPage() {
         <select
           className="input"
           value={kind}
-          onChange={(e) => setKind(e.target.value)}
+          onChange={(e) => { setKind(e.target.value); setPage(1); }}
           style={{ width: 220 }}
         >
           <option value="">Все типы</option>
@@ -183,7 +188,8 @@ export default function BlocksPage() {
           </div>
         </Panel>
       ) : (
-        Array.from(groups.entries()).map(([modName, blocks]) => (
+        <>
+        {Array.from(groups.entries()).map(([modName, blocks]) => (
           <Panel key={modName} title={`Модуль: ${modName} · ${blocks.length} блоков`} flush>
             <DataTable<ProductionBlock>
               rows={blocks}
@@ -224,7 +230,21 @@ export default function BlocksPage() {
               ]}
             />
           </Panel>
-        ))
+        ))}
+        {pageData && (
+          <Panel flush>
+            <TablePagination
+              page={page}
+              pageSize={pageSize}
+              count={pageData.count}
+              hasPrev={Boolean(pageData.previous)}
+              hasNext={Boolean(pageData.next)}
+              onPageChange={setPage}
+              onPageSizeChange={setPageSize}
+            />
+          </Panel>
+        )}
+        </>
       )}
 
       {modalOpen && (

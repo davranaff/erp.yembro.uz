@@ -8,6 +8,7 @@ import EmptyState from '@/components/ui/EmptyState';
 import Icon from '@/components/ui/Icon';
 import Panel from '@/components/ui/Panel';
 import RowActions from '@/components/ui/RowActions';
+import TablePagination from '@/components/ui/TablePagination';
 import { yieldsCrud } from '@/hooks/useSlaughter';
 import type { SlaughterShift, SlaughterYield } from '@/types/auth';
 
@@ -19,7 +20,12 @@ interface Props {
 }
 
 export default function YieldsPanel({ shift }: Props) {
-  const { data: yields, isLoading } = yieldsCrud.useList({ shift: shift.id });
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(25);
+  const { data: pageData, isLoading } = yieldsCrud.useListPaginated(
+    { shift: shift.id }, page, pageSize,
+  );
+  const yields = pageData?.results ?? [];
   const del = yieldsCrud.useDelete();
   const [open, setOpen] = useState(false);
   const [bulkOpen, setBulkOpen] = useState(false);
@@ -31,7 +37,7 @@ export default function YieldsPanel({ shift }: Props) {
   return (
     <>
       <Panel
-        title={`Выходы по SKU (${yields?.length ?? 0})`}
+        title={`Выходы по SKU (${pageData?.count ?? 0})`}
         tools={
           canEdit ? (
             <div style={{ display: 'flex', gap: 6 }}>
@@ -140,6 +146,13 @@ export default function YieldsPanel({ shift }: Props) {
                   />
                 ) },
             ]}
+          />
+        )}
+        {pageData && (
+          <TablePagination
+            page={page} pageSize={pageSize} count={pageData.count}
+            hasPrev={Boolean(pageData.previous)} hasNext={Boolean(pageData.next)}
+            onPageChange={setPage} onPageSizeChange={setPageSize}
           />
         )}
       </Panel>

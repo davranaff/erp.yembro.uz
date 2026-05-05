@@ -8,6 +8,7 @@ import DataTable from '@/components/ui/DataTable';
 import Icon from '@/components/ui/Icon';
 import Panel from '@/components/ui/Panel';
 import RowActions from '@/components/ui/RowActions';
+import TablePagination from '@/components/ui/TablePagination';
 import { weighingsCrud } from '@/hooks/useFeedlot';
 import type { DailyWeighing, FeedlotBatch } from '@/types/auth';
 
@@ -18,10 +19,13 @@ interface Props {
 }
 
 export default function WeighingsPanel({ batch }: Props) {
-  const { data: weighings, isLoading } = weighingsCrud.useList({
-    feedlot_batch: batch.id,
-    ordering: '-day_of_age',
-  });
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(25);
+  const { data: pageData, isLoading } = weighingsCrud.useListPaginated(
+    { feedlot_batch: batch.id, ordering: '-day_of_age' },
+    page, pageSize,
+  );
+  const weighings = pageData?.results ?? [];
   const del = weighingsCrud.useDelete();
   const [open, setOpen] = useState(false);
   const [confirmDel, setConfirmDel] = useState<DailyWeighing | null>(null);
@@ -56,6 +60,7 @@ export default function WeighingsPanel({ batch }: Props) {
             hint="Обычно взвешивают каждые 5–7 дней по выборке 30–100 голов."
           />
         ) : (
+          <>
           <DataTable<DailyWeighing>
             isLoading={isLoading}
             rows={weighings}
@@ -99,6 +104,14 @@ export default function WeighingsPanel({ batch }: Props) {
                 ) },
             ]}
           />
+          {pageData && (
+            <TablePagination
+              page={page} pageSize={pageSize} count={pageData.count}
+              hasPrev={Boolean(pageData.previous)} hasNext={Boolean(pageData.next)}
+              onPageChange={setPage} onPageSizeChange={setPageSize}
+            />
+          )}
+          </>
         )}
       </Panel>
 

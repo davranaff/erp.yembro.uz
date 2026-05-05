@@ -9,6 +9,7 @@ import DataTable from '@/components/ui/DataTable';
 import Icon from '@/components/ui/Icon';
 import Panel from '@/components/ui/Panel';
 import RowActions from '@/components/ui/RowActions';
+import TablePagination from '@/components/ui/TablePagination';
 import { accessoriesCrud } from '@/hooks/useVet';
 import { useHasLevel } from '@/hooks/usePermissions';
 import { useStockMovements } from '@/hooks/useStockMovements';
@@ -32,7 +33,12 @@ function fmt(uzs: string | null | undefined): string {
  * SaleOrderModal (новая опция vet_accessory).
  */
 export default function AccessoriesPanel() {
-  const { data, isLoading } = accessoriesCrud.useList({ ordering: 'nomenclature__sku' });
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(50);
+  const { data: pageData, isLoading } = accessoriesCrud.useListPaginated(
+    { ordering: 'nomenclature__sku' }, page, pageSize,
+  );
+  const data = pageData?.results ?? [];
   const del = accessoriesCrud.useDelete();
   const hasLevel = useHasLevel();
   const canEdit = hasLevel('vet', 'rw');
@@ -43,7 +49,7 @@ export default function AccessoriesPanel() {
   const [sel, setSel] = useState<VetAccessory | null>(null);
   // Свежая копия выбранного аксессуара (после receive remount/refresh).
   // Берём из data чтобы остаток обновился без закрытия drawer.
-  const selFresh = sel ? (data ?? []).find((a) => a.id === sel.id) ?? sel : null;
+  const selFresh = sel ? data.find((a) => a.id === sel.id) ?? sel : null;
 
   const handleDelete = (a: VetAccessory) => {
     if (!confirm(`Удалить ${a.nomenclature_name ?? a.nomenclature_sku}?`)) return;
@@ -68,7 +74,7 @@ export default function AccessoriesPanel() {
       >
         <DataTable<VetAccessory>
           isLoading={isLoading}
-          rows={data ?? []}
+          rows={data}
           rowKey={(a) => a.id}
           onRowClick={(a) => setSel(a)}
           rowProps={(a) => ({ active: sel?.id === a.id })}
@@ -159,6 +165,13 @@ export default function AccessoriesPanel() {
             },
           ]}
         />
+        {pageData && (
+          <TablePagination
+            page={page} pageSize={pageSize} count={pageData.count}
+            hasPrev={Boolean(pageData.previous)} hasNext={Boolean(pageData.next)}
+            onPageChange={setPage} onPageSizeChange={setPageSize}
+          />
+        )}
       </Panel>
 
       {selFresh && (

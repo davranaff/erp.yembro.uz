@@ -16,6 +16,7 @@ import KpiCard from '@/components/ui/KpiCard';
 import Panel from '@/components/ui/Panel';
 import RowActions from '@/components/ui/RowActions';
 import Seg from '@/components/ui/Seg';
+import TablePagination from '@/components/ui/TablePagination';
 import {
   feedlotCrud,
   feedlotMortalityCrud,
@@ -75,6 +76,8 @@ function fmtFcr(v: string | null | undefined): string {
 
 export default function FeedlotPage() {
   const [status, setStatus] = useState('');
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(50);
   const [sel, setSel] = useState<FeedlotBatch | null>(null);
   const [tab, setTab] = useState<TabKey>('overview');
   const [mode, setMode] = useState<'ship' | 'mortality' | null>(null);
@@ -86,9 +89,11 @@ export default function FeedlotPage() {
   const hasLevel = useHasLevel();
   const canEdit = hasLevel('feedlot', 'rw');
 
-  const { data: batches, isLoading, error, refetch, isFetching } = feedlotCrud.useList(
-    status ? { status } : {},
-  );
+  const filter = useMemo(() => (status ? { status } : {}), [status]);
+
+  const { data: batches, error, refetch, isFetching } = feedlotCrud.useList(filter);
+  const { data: pageData, isLoading } = feedlotCrud.useListPaginated(filter, page, pageSize);
+  const pageBatches = pageData?.results ?? [];
   const { data: mortality } = feedlotMortalityCrud.useList(
     sel ? { feedlot_batch: sel.id } : {},
   );
@@ -188,14 +193,14 @@ export default function FeedlotPage() {
             { value: 'shipped', label: 'Переданы' },
           ]}
           value={status}
-          onChange={setStatus}
+          onChange={(v) => { setStatus(v); setPage(1); }}
         />
       </div>
 
       <Panel flush>
         <DataTable<FeedlotBatch>
           isLoading={isLoading}
-          rows={batches}
+          rows={pageBatches}
           rowKey={(b) => b.id}
           error={error}
           emptyMessage={
@@ -267,6 +272,17 @@ export default function FeedlotPage() {
               } },
           ]}
         />
+        {pageData && (
+          <TablePagination
+            page={page}
+            pageSize={pageSize}
+            count={pageData.count}
+            hasPrev={Boolean(pageData.previous)}
+            hasNext={Boolean(pageData.next)}
+            onPageChange={setPage}
+            onPageSizeChange={setPageSize}
+          />
+        )}
       </Panel>
 
       {sel && (

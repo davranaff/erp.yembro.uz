@@ -14,6 +14,7 @@ import KpiCard from '@/components/ui/KpiCard';
 import Panel from '@/components/ui/Panel';
 import RowActions from '@/components/ui/RowActions';
 import Seg from '@/components/ui/Seg';
+import TablePagination from '@/components/ui/TablePagination';
 import { useHasLevel } from '@/hooks/usePermissions';
 import { getFinancesVisible } from '@/lib/permissions';
 import {
@@ -68,6 +69,8 @@ function daysUntil(dateISO: string): number {
 export default function VetPage() {
   const [tab, setTab] = useState<'stock' | 'treatments' | 'drugs' | 'accessories'>('stock');
   const [stockStatus, setStockStatus] = useState('');
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(50);
   const [selDrug, setSelDrug] = useState<VetDrug | null>(null);
   const [selStock, setSelStock] = useState<VetStockBatch | null>(null);
   const [selTr, setSelTr] = useState<VetTreatmentLog | null>(null);
@@ -77,11 +80,23 @@ export default function VetPage() {
   const hasLevel = useHasLevel();
   const canEdit = hasLevel('vet', 'rw');
 
+  // KPI считаем по полному списку (до 2000), таблицу — по странице.
   const { data: drugs } = drugsCrud.useList({ is_active: 'true' });
-  const { data: stock, isLoading: stockLoading } = stockBatchesCrud.useList(
+  const { data: stock } = stockBatchesCrud.useList(
     stockStatus ? { status: stockStatus } : {},
   );
-  const { data: treatments, isLoading: trLoading } = treatmentsCrud.useList();
+
+  const stockPage = stockBatchesCrud.useListPaginated(
+    stockStatus ? { status: stockStatus } : {}, page, pageSize,
+  );
+  const treatmentsPage = treatmentsCrud.useListPaginated({}, page, pageSize);
+  const drugsPage = drugsCrud.useListPaginated({ is_active: 'true' }, page, pageSize);
+
+  const stockRows = stockPage.data?.results ?? [];
+  const stockLoading = stockPage.isLoading;
+  const treatments = treatmentsPage.data?.results ?? [];
+  const trLoading = treatmentsPage.isLoading;
+  const drugRows = drugsPage.data?.results ?? [];
 
   const release = useReleaseQuarantine();
   const recall = useRecallStockBatch();
@@ -156,10 +171,10 @@ export default function VetPage() {
             { value: 'accessories', label: 'Аксессуары' },
           ]}
           value={tab}
-          onChange={(v) => setTab(v as typeof tab)}
+          onChange={(v) => { setTab(v as typeof tab); setPage(1); }}
         />
         {tab === 'stock' && (
-          <select className="input" value={stockStatus} onChange={(e) => setStockStatus(e.target.value)} style={{ width: 180 }}>
+          <select className="input" value={stockStatus} onChange={(e) => { setStockStatus(e.target.value); setPage(1); }} style={{ width: 180 }}>
             <option value="">Все статусы</option>
             {Object.entries(STOCK_STATUS_LABEL).map(([v, l]) => (
               <option key={v} value={v}>{l}</option>
@@ -172,7 +187,7 @@ export default function VetPage() {
         <Panel flush>
           <DataTable<VetStockBatch>
             isLoading={stockLoading}
-            rows={stock}
+            rows={stockRows}
             rowKey={(s) => s.id}
             emptyMessage={
               <EmptyState
@@ -253,6 +268,17 @@ export default function VetPage() {
                 ) : null },
             ]}
           />
+          {stockPage.data && (
+            <TablePagination
+              page={page}
+              pageSize={pageSize}
+              count={stockPage.data.count}
+              hasPrev={Boolean(stockPage.data.previous)}
+              hasNext={Boolean(stockPage.data.next)}
+              onPageChange={setPage}
+              onPageSizeChange={setPageSize}
+            />
+          )}
         </Panel>
       )}
 
@@ -319,13 +345,24 @@ export default function VetPage() {
                 ) : null },
             ]}
           />
+          {treatmentsPage.data && (
+            <TablePagination
+              page={page}
+              pageSize={pageSize}
+              count={treatmentsPage.data.count}
+              hasPrev={Boolean(treatmentsPage.data.previous)}
+              hasNext={Boolean(treatmentsPage.data.next)}
+              onPageChange={setPage}
+              onPageSizeChange={setPageSize}
+            />
+          )}
         </Panel>
       )}
 
       {tab === 'drugs' && (
         <Panel flush>
           <DataTable<VetDrug>
-            rows={drugs}
+            rows={drugRows}
             rowKey={(d) => d.id}
             emptyMessage={
               <EmptyState
@@ -374,6 +411,17 @@ export default function VetPage() {
                 ) : null },
             ]}
           />
+          {drugsPage.data && (
+            <TablePagination
+              page={page}
+              pageSize={pageSize}
+              count={drugsPage.data.count}
+              hasPrev={Boolean(drugsPage.data.previous)}
+              hasNext={Boolean(drugsPage.data.next)}
+              onPageChange={setPage}
+              onPageSizeChange={setPageSize}
+            />
+          )}
         </Panel>
       )}
 

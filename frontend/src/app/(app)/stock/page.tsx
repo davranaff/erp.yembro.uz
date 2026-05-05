@@ -11,11 +11,12 @@ import KpiCard from '@/components/ui/KpiCard';
 import Panel from '@/components/ui/Panel';
 import RowActions from '@/components/ui/RowActions';
 import Seg from '@/components/ui/Seg';
+import TablePagination from '@/components/ui/TablePagination';
 import { useHasLevel } from '@/hooks/usePermissions';
 import {
   useDeleteManualMovement,
   useDeleteWarehouse,
-  useStockMovements,
+  useStockMovementsPaginated,
   useStockMovementsStats,
   useWarehouses,
 } from '@/hooks/useStockMovements';
@@ -85,6 +86,8 @@ export default function StockPage() {
   const [search, setSearch] = useState('');
   const [draftSearch, setDraftSearch] = useState('');
   const [warehouseId, setWarehouseId] = useState('');
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(50);
   const [sel, setSel] = useState<StockMovement | null>(null);
   const [showMovementModal, setShowMovementModal] = useState(false);
 
@@ -102,12 +105,12 @@ export default function StockPage() {
       module_code: moduleCode || undefined,
       warehouse_from: warehouseId || undefined,
       search: search || undefined,
-      limit: 200,
     }),
     [kind, moduleCode, warehouseId, search],
   );
 
-  const { data, isLoading, error, refetch, isFetching } = useStockMovements(filter);
+  const { data: pageData, isLoading, error, refetch, isFetching } = useStockMovementsPaginated(filter, page, pageSize);
+  const data = pageData?.results ?? [];
   const { data: stats } = useStockMovementsStats(filter);
   const { data: warehouses } = useWarehouses({ is_active: '' });
   const deleteMovement = useDeleteManualMovement();
@@ -128,6 +131,7 @@ export default function StockPage() {
   const submitSearch = (e: React.FormEvent) => {
     e.preventDefault();
     setSearch(draftSearch.trim());
+    setPage(1);
   };
 
   const handleDeleteMovement = async (m: StockMovement) => {
@@ -262,19 +266,19 @@ export default function StockPage() {
                 { value: 'write_off', label: 'Списание' },
               ]}
               value={kind}
-              onChange={(v) => setKind(v)}
+              onChange={(v) => { setKind(v); setPage(1); }}
             />
             <input
               className="input"
               value={moduleCode}
-              onChange={(e) => setModuleCode(e.target.value)}
+              onChange={(e) => { setModuleCode(e.target.value); setPage(1); }}
               placeholder="Модуль (feedlot/slaughter/...)"
               style={{ width: 200 }}
             />
             <select
               className="input"
               value={warehouseId}
-              onChange={(e) => setWarehouseId(e.target.value)}
+              onChange={(e) => { setWarehouseId(e.target.value); setPage(1); }}
               style={{ width: 240 }}
             >
               <option value="">Все склады (источник)</option>
@@ -362,6 +366,17 @@ export default function StockPage() {
                   ) : null },
               ]}
             />
+            {pageData && (
+              <TablePagination
+                page={page}
+                pageSize={pageSize}
+                count={pageData.count}
+                hasPrev={Boolean(pageData.previous)}
+                hasNext={Boolean(pageData.next)}
+                onPageChange={setPage}
+                onPageSizeChange={setPageSize}
+              />
+            )}
           </Panel>
         </>
       )}

@@ -20,6 +20,7 @@ export function usePeople(filter: PeopleFilter = {}) {
   if (filter.work_status) params.set('work_status', filter.work_status);
   if (filter.search) params.set('search', filter.search);
   params.set('ordering', 'user__full_name');
+  params.set('page_size', '2000');
   const qs = params.toString();
 
   return useQuery<MembershipRow[], ApiError>({
@@ -31,6 +32,27 @@ export function usePeople(filter: PeopleFilter = {}) {
       return asList(data);
     },
     staleTime: 30_000,
+  });
+}
+
+export function usePeoplePaginated(
+  filter: PeopleFilter = {},
+  page = 1,
+  pageSize = 50,
+) {
+  const params = new URLSearchParams();
+  if (filter.is_active) params.set('is_active', filter.is_active);
+  if (filter.work_status) params.set('work_status', filter.work_status);
+  if (filter.search) params.set('search', filter.search);
+  params.set('ordering', 'user__full_name');
+  params.set('page', String(page));
+  params.set('page_size', String(pageSize));
+  const qs = params.toString();
+  return useQuery<Paginated<MembershipRow>, ApiError>({
+    queryKey: [...KEY, 'page', qs],
+    queryFn: () => apiFetch<Paginated<MembershipRow>>(`/api/memberships/?${qs}`),
+    staleTime: 30_000,
+    placeholderData: (prev) => prev,
   });
 }
 

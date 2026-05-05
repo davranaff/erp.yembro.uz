@@ -15,6 +15,7 @@ import KpiCard from '@/components/ui/KpiCard';
 import Panel from '@/components/ui/Panel';
 import RowActions from '@/components/ui/RowActions';
 import Seg from '@/components/ui/Seg';
+import TablePagination from '@/components/ui/TablePagination';
 import { useProductionBlocks } from '@/hooks/useBlocks';
 import Sparkline from '@/components/ui/Sparkline';
 import { dailyEggCrud, herdsCrud, herdMortalityCrud, useHerdStats } from '@/hooks/useMatochnik';
@@ -52,6 +53,8 @@ export default function MatochnikPage() {
   const [status, setStatus] = useState('');
   const [direction, setDirection] = useState('');
   const [blockFilter, setBlockFilter] = useState('');
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(50);
   const [sel, setSel] = useState<BreedingHerd | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
   const [editing, setEditing] = useState<BreedingHerd | null>(null);
@@ -74,7 +77,9 @@ export default function MatochnikPage() {
     [status, direction, blockFilter],
   );
 
-  const { data: herds, isLoading, error, refetch, isFetching } = herdsCrud.useList(filter);
+  const { data: herds, error, refetch, isFetching } = herdsCrud.useList(filter);
+  const { data: pageData, isLoading } = herdsCrud.useListPaginated(filter, page, pageSize);
+  const pageHerds = pageData?.results ?? [];
   const { data: blocks } = useProductionBlocks({ kind: 'matochnik' });
   const del = herdsCrud.useDelete();
 
@@ -194,12 +199,12 @@ export default function MatochnikPage() {
             { value: 'depopulated', label: 'Снятые' },
           ]}
           value={status}
-          onChange={setStatus}
+          onChange={(v) => { setStatus(v); setPage(1); }}
         />
         <select
           className="input"
           value={direction}
-          onChange={(e) => setDirection(e.target.value)}
+          onChange={(e) => { setDirection(e.target.value); setPage(1); }}
           style={{ width: 200 }}
         >
           <option value="">Все направления</option>
@@ -209,7 +214,7 @@ export default function MatochnikPage() {
         <select
           className="input"
           value={blockFilter}
-          onChange={(e) => setBlockFilter(e.target.value)}
+          onChange={(e) => { setBlockFilter(e.target.value); setPage(1); }}
           style={{ width: 200 }}
         >
           <option value="">Все корпуса</option>
@@ -222,7 +227,7 @@ export default function MatochnikPage() {
       <Panel flush>
         <DataTable<BreedingHerd>
           isLoading={isLoading}
-          rows={herds}
+          rows={pageHerds}
           rowKey={(h) => h.id}
           error={error}
           emptyMessage={
@@ -285,6 +290,17 @@ export default function MatochnikPage() {
               ) : null },
           ]}
         />
+        {pageData && (
+          <TablePagination
+            page={page}
+            pageSize={pageSize}
+            count={pageData.count}
+            hasPrev={Boolean(pageData.previous)}
+            hasNext={Boolean(pageData.next)}
+            onPageChange={setPage}
+            onPageSizeChange={setPageSize}
+          />
+        )}
       </Panel>
 
       {sel && (

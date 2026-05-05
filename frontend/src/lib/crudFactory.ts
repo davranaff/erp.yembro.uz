@@ -57,7 +57,9 @@ export function makeCrud<T extends { id: string }, CreateT = Partial<T>, UpdateT
   const { key, path, ordering, staleTime = 30_000, skipOrg } = opts;
 
   function useList(filter: Record<string, string | number | undefined | null> = {}) {
-    const qs = buildQs(filter, ordering);
+    // page_size=2000 — useList используется в селекторах/выпадашках, нужен полный набор;
+    // для пагинированного просмотра — useListPaginated.
+    const qs = buildQs({ ...filter, page_size: 2000 }, ordering);
     return useQuery<T[], ApiError>({
       queryKey: [...key, qs],
       queryFn: async () => {
@@ -68,6 +70,24 @@ export function makeCrud<T extends { id: string }, CreateT = Partial<T>, UpdateT
         return asList(data);
       },
       staleTime,
+    });
+  }
+
+  function useListPaginated(
+    filter: Record<string, string | number | undefined | null> = {},
+    page = 1,
+    pageSize = 25,
+  ) {
+    const qs = buildQs({ ...filter, page, page_size: pageSize }, ordering);
+    return useQuery<Paginated<T>, ApiError>({
+      queryKey: [...key, 'page', qs],
+      queryFn: () =>
+        apiFetch<Paginated<T>>(
+          qs ? `${path}?${qs}` : path,
+          skipOrg ? { skipOrg: true } : undefined,
+        ),
+      staleTime,
+      placeholderData: (prev) => prev,
     });
   }
 
@@ -143,5 +163,5 @@ export function makeCrud<T extends { id: string }, CreateT = Partial<T>, UpdateT
     };
   }
 
-  return { useList, useCreate, useUpdate, useDelete, makeAction };
+  return { useList, useListPaginated, useCreate, useUpdate, useDelete, makeAction };
 }

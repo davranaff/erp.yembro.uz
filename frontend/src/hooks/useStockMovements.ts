@@ -36,6 +36,7 @@ function buildMovementParams(filter: MovementsFilter): URLSearchParams {
 export function useStockMovements(filter: MovementsFilter) {
   const params = buildMovementParams(filter);
   params.set('ordering', '-date');
+  params.set('page_size', '2000');
   const qs = params.toString();
 
   return useQuery<StockMovement[], ApiError>({
@@ -48,6 +49,26 @@ export function useStockMovements(filter: MovementsFilter) {
       return filter.limit ? rows.slice(0, filter.limit) : rows;
     },
     staleTime: 15_000,
+  });
+}
+
+export function useStockMovementsPaginated(
+  filter: MovementsFilter,
+  page = 1,
+  pageSize = 25,
+) {
+  const params = buildMovementParams(filter);
+  params.set('ordering', '-date');
+  params.set('page', String(page));
+  params.set('page_size', String(pageSize));
+  const qs = params.toString();
+  return useQuery<Paginated<StockMovement>, ApiError>({
+    queryKey: ['stock-movements', 'page', qs],
+    queryFn: () => apiFetch<Paginated<StockMovement>>(
+      `/api/warehouses/movements/?${qs}`,
+    ),
+    staleTime: 15_000,
+    placeholderData: (prev) => prev,
   });
 }
 

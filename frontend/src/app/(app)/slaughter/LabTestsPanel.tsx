@@ -9,6 +9,7 @@ import EmptyState from '@/components/ui/EmptyState';
 import Icon from '@/components/ui/Icon';
 import Panel from '@/components/ui/Panel';
 import RowActions from '@/components/ui/RowActions';
+import TablePagination from '@/components/ui/TablePagination';
 import { labTestsCrud } from '@/hooks/useSlaughter';
 import type { SlaughterLabTest, SlaughterShift } from '@/types/auth';
 
@@ -31,7 +32,12 @@ const STATUS_TONE: Record<SlaughterLabTest['status'], 'warn' | 'success' | 'dang
 };
 
 export default function LabTestsPanel({ shift }: Props) {
-  const { data: tests, isLoading } = labTestsCrud.useList({ shift: shift.id });
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(25);
+  const { data: pageData, isLoading } = labTestsCrud.useListPaginated(
+    { shift: shift.id }, page, pageSize,
+  );
+  const tests = pageData?.results ?? [];
   const del = labTestsCrud.useDelete();
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<SlaughterLabTest | null>(null);
@@ -42,7 +48,7 @@ export default function LabTestsPanel({ shift }: Props) {
   return (
     <>
       <Panel
-        title={`Лабораторные тесты (${tests?.length ?? 0})`}
+        title={`Лабораторные тесты (${pageData?.count ?? 0})`}
         tools={
           canEdit ? (
             <button
@@ -107,6 +113,13 @@ export default function LabTestsPanel({ shift }: Props) {
                   />
                 ) },
             ]}
+          />
+        )}
+        {pageData && (
+          <TablePagination
+            page={page} pageSize={pageSize} count={pageData.count}
+            hasPrev={Boolean(pageData.previous)} hasNext={Boolean(pageData.next)}
+            onPageChange={setPage} onPageSizeChange={setPageSize}
           />
         )}
       </Panel>

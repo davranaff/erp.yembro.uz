@@ -7,12 +7,13 @@ import DataTable from '@/components/ui/DataTable';
 import Icon from '@/components/ui/Icon';
 import KpiCard from '@/components/ui/KpiCard';
 import Panel from '@/components/ui/Panel';
+import TablePagination from '@/components/ui/TablePagination';
 import { useCurrenciesSorted, useLatestRates, useSyncCbuRates } from '@/hooks/useCurrencyRates';
 import { ApiError, apiFetch } from '@/lib/api';
 import { asList } from '@/lib/paginated';
 import type { ExchangeRate, Paginated } from '@/types/auth';
 
-/** Архив курсов для валюты (с фильтром по периоду). */
+/** Полная история (для KPI) — без пагинации, до 1000 записей. */
 function useRatesHistory(currencyCode: string, dateFrom: string, dateTo: string) {
   const enabled = Boolean(currencyCode);
   return useQuery<ExchangeRate[], ApiError>({
@@ -36,6 +37,37 @@ function useRatesHistory(currencyCode: string, dateFrom: string, dateTo: string)
   });
 }
 
+/** Постраничная история — для таблицы. */
+function useRatesHistoryPaginated(
+  currencyCode: string,
+  dateFrom: string,
+  dateTo: string,
+  page: number,
+  pageSize: number,
+) {
+  const enabled = Boolean(currencyCode);
+  return useQuery<Paginated<ExchangeRate>, ApiError>({
+    queryKey: ['currency', 'rates', 'history', 'page', currencyCode, dateFrom, dateTo, page, pageSize],
+    enabled,
+    queryFn: () => {
+      const qs = new URLSearchParams({
+        currency: currencyCode,
+        ordering: '-date',
+        page: String(page),
+        page_size: String(pageSize),
+      });
+      if (dateFrom) qs.set('date_after', dateFrom);
+      if (dateTo) qs.set('date_before', dateTo);
+      return apiFetch<Paginated<ExchangeRate>>(
+        `/api/currency/rates/?${qs.toString()}`,
+        { skipOrg: true },
+      );
+    },
+    staleTime: 60_000,
+    placeholderData: (prev) => prev,
+  });
+}
+
 function todayISO(): string {
   return new Date().toISOString().slice(0, 10);
 }
@@ -54,10 +86,18 @@ export default function RatesHistoryPage() {
   const [code, setCode] = useState('USD');
   const [dateFrom, setDateFrom] = useState(isoDaysAgo(30));
   const [dateTo, setDateTo] = useState(todayISO());
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(50);
 
   const { data: currencies } = useCurrenciesSorted();
   const { data: latest } = useLatestRates();
-  const { data: history, isLoading: historyLoading } = useRatesHistory(code, dateFrom, dateTo);
+  // KPI/min-max — по полному списку
+  const { data: history } = useRatesHistory(code, dateFrom, dateTo);
+  // Таблица — постранично
+  const { data: pageData, isLoading: historyLoading } = useRatesHistoryPaginated(
+    code, dateFrom, dateTo, page, pageSize,
+  );
+  const pageRows = pageData?.results ?? [];
   const sync = useSyncCbuRates();
 
   // Вычисления: изменения курса за период
@@ -145,7 +185,7 @@ export default function RatesHistoryPage() {
       <div className="filter-bar">
         <div className="filter-cell" style={{ minWidth: 160 }}>
           <label>Валюта</label>
-          <select className="input" value={code} onChange={(e) => setCode(e.target.value)}>
+          <select className="input" value={code} onChange={(e) => { setCode(e.target.value); setPage(1); }}>
             {currencies?.map((c) => (
               <option key={c.id} value={c.code}>{c.code} · {c.name_ru}</option>
             ))}
@@ -153,11 +193,11 @@ export default function RatesHistoryPage() {
         </div>
         <div className="filter-cell">
           <label>С</label>
-          <input className="input" type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} />
+          <input className="input" type="date" value={dateFrom} onChange={(e) => { setDateFrom(e.target.value); setPage(1); }} />
         </div>
         <div className="filter-cell">
           <label>По</label>
-          <input className="input" type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
+          <input className="input" type="date" value={dateTo} onChange={(e) => { setDateTo(e.target.value); setPage(1); }} />
         </div>
         <div className="filter-cell">
           <label>Пресет</label>
@@ -182,7 +222,7 @@ export default function RatesHistoryPage() {
       <Panel flush>
         <DataTable<ExchangeRate>
           isLoading={historyLoading}
-          rows={history}
+          rows={pageRows}
           rowKey={(r) => r.id}
           emptyMessage="Нет данных за выбранный период. Попробуйте расширить диапазон или запустите синхронизацию ЦБ."
           columns={[
@@ -195,10 +235,12 @@ export default function RatesHistoryPage() {
               cellStyle: { fontWeight: 600 },
               render: (r) => fmtRate(String(parseFloat(r.rate) / (r.nominal || 1))) },
             { key: 'delta', label: 'Δ к пред. дню', align: 'right', mono: true,
-              render: (r, idx) => {
+              render: (r) => {
+                // Δ считаем по полной истории (history), а не по странице.
                 const all = history ?? [];
+                const ix = all.findIndex((x) => x.id === r.id);
                 const perUnit = parseFloat(r.rate) / (r.nominal || 1);
-                const prev = all[idx + 1];
+                const prev = ix >= 0 ? all[ix + 1] : undefined;
                 const prevUnit = prev ? parseFloat(prev.rate) / (prev.nominal || 1) : null;
                 const delta = prevUnit !== null ? perUnit - prevUnit : null;
                 const deltaPct = delta !== null && prevUnit ? (delta / prevUnit) * 100 : null;
@@ -224,6 +266,13 @@ export default function RatesHistoryPage() {
               render: (r) => r.fetched_at ? new Date(r.fetched_at).toLocaleString('ru-RU') : '—' },
           ]}
         />
+        {pageData && (
+          <TablePagination
+            page={page} pageSize={pageSize} count={pageData.count}
+            hasPrev={Boolean(pageData.previous)} hasNext={Boolean(pageData.next)}
+            onPageChange={setPage} onPageSizeChange={setPageSize}
+          />
+        )}
       </Panel>
 
       <div style={{ marginTop: 10, fontSize: 11, color: 'var(--fg-3)' }}>

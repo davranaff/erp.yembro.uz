@@ -123,8 +123,8 @@ export function useUserRoles(membershipId?: string) {
     queryKey: [...USER_ROLES_KEY, membershipId ?? 'all'],
     queryFn: async () => {
       const path = membershipId
-        ? `/api/rbac/user-roles/?membership=${membershipId}`
-        : '/api/rbac/user-roles/';
+        ? `/api/rbac/user-roles/?membership=${membershipId}&page_size=2000`
+        : '/api/rbac/user-roles/?page_size=2000';
       const data = await apiFetch<Paginated<UserRoleAssignment> | UserRoleAssignment[]>(path);
       return asList(data);
     },
@@ -185,14 +185,35 @@ export function useUserOverrides(membershipId?: string) {
     queryKey: [...OVERRIDES_KEY, membershipId ?? 'all'],
     queryFn: async () => {
       const path = membershipId
-        ? `/api/rbac/overrides/?membership=${membershipId}`
-        : '/api/rbac/overrides/';
+        ? `/api/rbac/overrides/?membership=${membershipId}&page_size=2000`
+        : '/api/rbac/overrides/?page_size=2000';
       const data = await apiFetch<
         Paginated<UserModuleAccessOverride> | UserModuleAccessOverride[]
       >(path);
       return asList(data);
     },
     staleTime: 30_000,
+  });
+}
+
+export function useUserOverridesPaginated(
+  membershipId: string | undefined,
+  page = 1,
+  pageSize = 50,
+) {
+  return useQuery<Paginated<UserModuleAccessOverride>, ApiError>({
+    queryKey: [...OVERRIDES_KEY, 'page', membershipId ?? 'all', page, pageSize],
+    queryFn: () => {
+      const params = new URLSearchParams();
+      if (membershipId) params.set('membership', membershipId);
+      params.set('page', String(page));
+      params.set('page_size', String(pageSize));
+      return apiFetch<Paginated<UserModuleAccessOverride>>(
+        `/api/rbac/overrides/?${params.toString()}`,
+      );
+    },
+    staleTime: 30_000,
+    placeholderData: (prev) => prev,
   });
 }
 
@@ -253,7 +274,7 @@ export function useMemberships() {
     queryKey: ['memberships'],
     queryFn: async () => {
       const data = await apiFetch<Paginated<MembershipRow> | MembershipRow[]>(
-        '/api/memberships/?is_active=true',
+        '/api/memberships/?is_active=true&page_size=2000',
       );
       return asList(data);
     },

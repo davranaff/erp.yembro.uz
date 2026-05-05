@@ -9,6 +9,7 @@ import EmptyState from '@/components/ui/EmptyState';
 import Icon from '@/components/ui/Icon';
 import Panel from '@/components/ui/Panel';
 import RowActions from '@/components/ui/RowActions';
+import TablePagination from '@/components/ui/TablePagination';
 import {
   shrinkageProfilesCrud,
   shrinkageStatesCrud,
@@ -44,7 +45,10 @@ export default function ShrinkageProfilesPage() {
   const canEdit = hasLevel('feed', 'rw');
   const canAdmin = hasLevel('feed', 'admin');
 
-  const { data: profiles, isLoading } = shrinkageProfilesCrud.useList();
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(50);
+  const { data: pageData, isLoading } = shrinkageProfilesCrud.useListPaginated({}, page, pageSize);
+  const profiles = pageData?.results ?? [];
   const { data: states } = shrinkageStatesCrud.useList();
   const del = shrinkageProfilesCrud.useDelete();
   const apply = useApplyShrinkage();
@@ -209,6 +213,17 @@ export default function ShrinkageProfilesPage() {
                 ) : null,
               },
             ]}
+          />
+        )}
+        {pageData && (
+          <TablePagination
+            page={page}
+            pageSize={pageSize}
+            count={pageData.count}
+            hasPrev={Boolean(pageData.previous)}
+            hasNext={Boolean(pageData.next)}
+            onPageChange={setPage}
+            onPageSizeChange={setPageSize}
           />
         )}
       </Panel>
