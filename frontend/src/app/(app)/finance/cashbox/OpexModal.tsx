@@ -34,10 +34,7 @@ const KIND_FOR_DIRECTION: Record<'out' | 'in', 'opex' | 'income'> = {
   in: 'income',
 };
 
-/**
- * Маппинг модуль → субсчёт НЗП по умолчанию (для быстрой кнопки
- * «На НЗП модуля» в форме OPEX).
- */
+/** Маппинг модуль → субсчёт НЗП по умолчанию. */
 const MODULE_NZP: Record<string, string> = {
   matochnik: '20.01',
   feedlot: '20.02',
@@ -45,6 +42,14 @@ const MODULE_NZP: Record<string, string> = {
   slaughter: '20.04',
   feed: '20.05',
   vet: '20.06',
+};
+
+type PayMethod = 'cash' | 'bank' | 'other';
+
+const METHOD_TO_CHANNEL: Record<PayMethod, 'cash' | 'transfer' | 'other'> = {
+  cash: 'cash',
+  bank: 'transfer',
+  other: 'other',
 };
 
 export default function OpexModal({ preselect, onClose }: Props) {
@@ -56,16 +61,12 @@ export default function OpexModal({ preselect, onClose }: Props) {
   const { data: counterparties } = useCounterparties();
   const { data: articles } = expenseArticlesCrud.useList({ is_active: 'true' });
 
-  // Направление
-  const [direction, setDirection] = useState<'out' | 'in'>(
-    preselect?.direction ?? 'out',
-  );
-  // Вид операции
+  const [direction, setDirection] = useState<'out' | 'in'>(preselect?.direction ?? 'out');
   const [kind, setKind] = useState<'opex' | 'income' | 'salary'>(
     KIND_FOR_DIRECTION[preselect?.direction ?? 'out'],
   );
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
-  const [channel, setChannel] = useState<'cash' | 'transfer' | 'click' | 'other'>('cash');
+  const [method, setMethod] = useState<PayMethod>('cash');
   const [amount, setAmount] = useState('');
   const [cashSubId, setCashSubId] = useState('');
   const [contraSubId, setContraSubId] = useState('');
@@ -73,6 +74,7 @@ export default function OpexModal({ preselect, onClose }: Props) {
   const [moduleId, setModuleId] = useState('');
   const [counterpartyId, setCounterpartyId] = useState('');
   const [notes, setNotes] = useState('');
+  const [editContra, setEditContra] = useState(false);
 
   // Preselect модуль по коду
   useEffect(() => {
@@ -82,23 +84,20 @@ export default function OpexModal({ preselect, onClose }: Props) {
     }
   }, [preselect, modules, moduleId]);
 
-  // Авто-выбор кассы (50.01) при первой загрузке субсчётов
-  useEffect(() => {
-    if (!cashSubId && subaccounts && subaccounts.length > 0) {
-      const def = subaccounts.find((s) => s.code === '50.01');
-      if (def) setCashSubId(def.id);
-    }
-  }, [subaccounts, cashSubId]);
-
-  // Каналы → касса/банк
+  // Способ оплаты → касса/банк
   useEffect(() => {
     if (!subaccounts || subaccounts.length === 0) return;
-    const want = channel === 'cash' ? '50.01' : '51.01';
-    const target = subaccounts.find((s) => s.code === want);
-    if (target && target.id !== cashSubId) setCashSubId(target.id);
-  }, [channel, subaccounts]);  // eslint-disable-line react-hooks/exhaustive-deps
+    if (method === 'cash') {
+      const s = subaccounts.find((x) => x.code === '50.01');
+      if (s) setCashSubId(s.id);
+    } else if (method === 'bank') {
+      const s = subaccounts.find((x) => x.code === '51.01');
+      if (s) setCashSubId(s.id);
+    }
+    // method === 'other' → пользователь выбирает сам
+  }, [method, subaccounts]);
 
-  // Preselect contra (если передан suggestedContraCode)
+  // Preselect contra (suggestedContraCode)
   useEffect(() => {
     if (
       !contraSubId
@@ -110,20 +109,16 @@ export default function OpexModal({ preselect, onClose }: Props) {
     }
   }, [preselect, subaccounts, contraSubId]);
 
-  // Когда меняется direction — пересчитываем kind
   useEffect(() => {
     setKind(KIND_FOR_DIRECTION[direction]);
   }, [direction]);
 
-  // Активный модуль (для быстрых кнопок)
   const activeModuleCode = useMemo(
     () => modules?.find((m) => m.id === moduleId)?.code,
     [modules, moduleId],
   );
   const nzpCodeForModule = activeModuleCode ? MODULE_NZP[activeModuleCode] : undefined;
 
-  // Статьи, подходящие к текущему направлению.
-  // out → expense + salary; in → income + transfer.
   const articleOptions = useMemo<ExpenseArticle[]>(() => {
     if (!articles) return [];
     const allowed = direction === 'out'
@@ -134,9 +129,9 @@ export default function OpexModal({ preselect, onClose }: Props) {
       .sort((a, b) => a.code.localeCompare(b.code));
   }, [articles, direction]);
 
-  // Автоподстановка subaccount + kind при выборе статьи
   const handleArticleChange = (id: string) => {
     setArticleId(id);
+    setEditContra(false);
     if (!id) return;
     const a = articles?.find((x) => x.id === id);
     if (!a) return;
@@ -146,21 +141,17 @@ export default function OpexModal({ preselect, onClose }: Props) {
     if (a.default_module && !moduleId) {
       setModuleId(a.default_module);
     }
-    // подсказка по kind: salary → kind=salary
     if (a.kind === 'salary') setKind('salary');
     else if (direction === 'out') setKind('opex');
     else setKind('income');
   };
 
-  // Сгруппированные субсчёта для dropdown'a «Статья»
   const contraOptions = useMemo(() => {
     if (!subaccounts) return [];
-    // Исключаем кассу/банк/AP/AR — они не контр-счёт для OPEX
     const excluded = new Set(['50.01', '51.01', '60.01', '60.02', '62.01', '62.02']);
     return subaccounts.filter((s) => !excluded.has(s.code));
   }, [subaccounts]);
 
-  // Быстрые кнопки: НЗП модуля, 26.01 общехоз, 70 ЗП, 91.01/91.02
   const quickContras = useMemo(() => {
     if (!subaccounts) return [];
     const quick: { code: string; id: string; label: string }[] = [];
@@ -209,7 +200,7 @@ export default function OpexModal({ preselect, onClose }: Props) {
         date,
         module: moduleId || null,
         direction,
-        channel,
+        channel: METHOD_TO_CHANNEL[method],
         kind,
         counterparty: counterpartyId || null,
         amount_uzs: amount,
@@ -228,38 +219,38 @@ export default function OpexModal({ preselect, onClose }: Props) {
   };
 
   const title = direction === 'out' ? 'Новый расход' : 'Новый приход';
+  const selectedContra = subaccounts?.find((s) => s.id === contraSubId);
+  const contraIsAutoFromArticle = Boolean(articleId) && !editContra;
 
   return (
     <Modal
       title={title}
       onClose={onClose}
       footer={
-        <>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, width: '100%' }}>
+          <span className="hint" style={{ flex: 1 }}>
+            Операция сразу создаст проводку в ГК
+          </span>
           <button className="btn btn-ghost" onClick={onClose}>Отмена</button>
           <button
             className="btn btn-primary"
             disabled={!canSubmit}
             onClick={handleSubmit}
           >
-            {create.isPending || post.isPending ? 'Сохранение…' : 'Сохранить и провести'}
+            {create.isPending || post.isPending ? 'Сохранение…' : 'Сохранить'}
           </button>
-        </>
+        </div>
       }
     >
-      <div style={{ fontSize: 12, color: 'var(--fg-3)', marginBottom: 12 }}>
-        Операция проводится сразу. Создаётся <b>проводка в ГК</b>:
-        {' '}{direction === 'out' ? 'Дт статья / Кт касса-банк' : 'Дт касса-банк / Кт статья'}.
-      </div>
-
-      {/* Направление (сегменты) */}
-      <div style={{ display: 'flex', gap: 6, marginBottom: 12 }}>
+      {/* ───── Направление ───── */}
+      <div style={{ display: 'flex', gap: 6, marginBottom: 16 }}>
         <button
           type="button"
           onClick={() => setDirection('out')}
           className={'btn btn-sm ' + (direction === 'out' ? 'btn-primary' : 'btn-ghost')}
           style={{ flex: 1 }}
         >
-          <Icon name="arrow-right" size={12} /> Расход
+          <Icon name="arrow-right" size={12} /> Расход — деньги ушли
         </button>
         <button
           type="button"
@@ -267,93 +258,137 @@ export default function OpexModal({ preselect, onClose }: Props) {
           className={'btn btn-sm ' + (direction === 'in' ? 'btn-primary' : 'btn-ghost')}
           style={{ flex: 1 }}
         >
-          <Icon name="download" size={12} /> Приход
+          <Icon name="download" size={12} /> Приход — деньги пришли
         </button>
       </div>
 
+      {/* ───── Главное ───── */}
+      <SectionLabel>Когда и сколько</SectionLabel>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
         <div className="field">
           <label>Дата *</label>
-          <input className="input" type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+          <input
+            className="input"
+            type="date"
+            value={date}
+            onChange={(e) => setDate(e.target.value)}
+          />
+          <span className="hint">Когда {direction === 'out' ? 'списали' : 'получили'} деньги</span>
         </div>
 
         <div className="field">
           <label>Сумма, UZS *</label>
           <input
-            className="input mono"
+            className={'input mono' + (getFieldErr('amount_uzs') ? ' err' : '')}
             type="number"
             step="0.01"
             value={amount}
             onChange={(e) => setAmount(e.target.value)}
             placeholder="0.00"
           />
-          {getFieldErr('amount_uzs') && (
-            <div style={{ fontSize: 11, color: 'var(--danger)' }}>{getFieldErr('amount_uzs')}</div>
-          )}
+          {getFieldErr('amount_uzs')
+            ? <span className="hint" style={{ color: 'var(--danger)' }}>{getFieldErr('amount_uzs')}</span>
+            : <span className="hint">Только число, без пробелов</span>}
         </div>
+      </div>
 
-        <div className="field">
-          <label>Канал *</label>
-          <select className="input" value={channel} onChange={(e) => setChannel(e.target.value as typeof channel)}>
-            <option value="cash">Наличные (касса 50.01)</option>
-            <option value="transfer">Перечисление (банк 51.01)</option>
-            <option value="click">Click (банк 51.01)</option>
-            <option value="other">Прочее</option>
-          </select>
+      {/* ───── Способ оплаты ───── */}
+      <div className="field">
+        <label>Способ оплаты *</label>
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+          <MethodChip active={method === 'cash'} onClick={() => setMethod('cash')}>
+            Наличные
+          </MethodChip>
+          <MethodChip active={method === 'bank'} onClick={() => setMethod('bank')}>
+            Банк / Карта
+          </MethodChip>
+          <MethodChip active={method === 'other'} onClick={() => setMethod('other')}>
+            Прочее
+          </MethodChip>
         </div>
+        <span className="hint">
+          {method === 'cash' && 'Касса 50.01 проставится автоматически'}
+          {method === 'bank' && 'Банковский счёт 51.01 проставится автоматически'}
+          {method === 'other' && 'Выберите счёт ниже вручную'}
+        </span>
 
-        <div className="field">
-          <label>Счёт (касса/банк) *</label>
-          <select className="input" value={cashSubId} onChange={(e) => setCashSubId(e.target.value)}>
-            <option value="">—</option>
+        {method === 'other' && (
+          <select
+            className="input"
+            style={{ marginTop: 6 }}
+            value={cashSubId}
+            onChange={(e) => setCashSubId(e.target.value)}
+          >
+            <option value="">— выберите счёт —</option>
             {subaccounts
               ?.filter((s) => s.code.startsWith('50.') || s.code.startsWith('51.'))
               .map((s) => (
                 <option key={s.id} value={s.id}>{s.code} · {s.name}</option>
               ))}
           </select>
-        </div>
+        )}
+      </div>
 
-        <div className="field" style={{ gridColumn: '1 / 3' }}>
-          <label>Модуль (опционально)</label>
-          <select className="input" value={moduleId} onChange={(e) => setModuleId(e.target.value)}>
-            <option value="">— не привязан —</option>
-            {modules?.map((m) => (
-              <option key={m.id} value={m.id}>{m.name}</option>
-            ))}
-          </select>
-        </div>
+      {/* ───── На что ───── */}
+      <SectionLabel>На что {direction === 'out' ? 'потрачено' : 'получено'}</SectionLabel>
 
-        <div className="field" style={{ gridColumn: '1 / 3' }}>
-          <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <span>Статья (аналитика)</span>
-            <span style={{ fontSize: 10, color: 'var(--fg-3)', fontWeight: 400 }}>
-              напр. «Газ», «Электричество», «Зарплата технолога»
-            </span>
-          </label>
-          <select
-            className="input"
-            value={articleId}
-            onChange={(e) => handleArticleChange(e.target.value)}
+      <div className="field">
+        <label>Модуль</label>
+        <select className="input" value={moduleId} onChange={(e) => setModuleId(e.target.value)}>
+          <option value="">— не привязан —</option>
+          {modules?.map((m) => (
+            <option key={m.id} value={m.id}>{m.name}</option>
+          ))}
+        </select>
+        <span className="hint">К какому производству относится. Можно пропустить</span>
+      </div>
+
+      <div className="field">
+        <label>Статья</label>
+        <select
+          className="input"
+          value={articleId}
+          onChange={(e) => handleArticleChange(e.target.value)}
+        >
+          <option value="">— выбрать субсчёт вручную —</option>
+          {articleOptions.map((a) => (
+            <option key={a.id} value={a.id}>
+              {a.code} · {a.name}
+              {a.default_subaccount_code ? ` → ${a.default_subaccount_code}` : ''}
+            </option>
+          ))}
+        </select>
+        <span className="hint">
+          Что именно — напр. «Газ», «Электричество», «Зарплата технолога». Субсчёт подставится сам
+        </span>
+      </div>
+
+      {/* Субсчёт ГК — скрываем когда выбрана статья (показываем строкой). */}
+      {contraIsAutoFromArticle && selectedContra ? (
+        <div
+          className="field"
+          style={{
+            background: 'var(--bg-subtle)', borderRadius: 6, padding: '8px 10px',
+            display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12,
+          }}
+        >
+          <Icon name="check" size={14} />
+          <div style={{ flex: 1, fontSize: 12 }}>
+            Субсчёт: <b>{selectedContra.code} · {selectedContra.name}</b>
+            <div className="hint">Подставлен из статьи</div>
+          </div>
+          <button
+            type="button"
+            className="btn btn-sm btn-ghost"
+            onClick={() => setEditContra(true)}
           >
-            <option value="">— без статьи (только субсчёт) —</option>
-            {articleOptions.map((a) => (
-              <option key={a.id} value={a.id}>
-                {a.code} · {a.name}
-                {a.default_subaccount_code ? ` → ${a.default_subaccount_code}` : ''}
-              </option>
-            ))}
-          </select>
-          {articleId && (
-            <div style={{ fontSize: 11, color: 'var(--fg-3)', marginTop: 4 }}>
-              Субсчёт ниже подставлен автоматически из статьи. Можно переопределить.
-            </div>
-          )}
+            Изменить
+          </button>
         </div>
-
-        <div className="field" style={{ gridColumn: '1 / 3' }}>
+      ) : (
+        <div className="field">
           <label>
-            Субсчёт ГК (счёт расхода/дохода) *
+            Субсчёт ГК *
             {getFieldErr('contra_subaccount') && (
               <span style={{ fontSize: 11, color: 'var(--danger)', marginLeft: 6 }}>
                 {getFieldErr('contra_subaccount')}
@@ -374,8 +409,12 @@ export default function OpexModal({ preselect, onClose }: Props) {
               ))}
             </div>
           )}
-          <select className="input" value={contraSubId} onChange={(e) => setContraSubId(e.target.value)}>
-            <option value="">— выберите статью —</option>
+          <select
+            className="input"
+            value={contraSubId}
+            onChange={(e) => setContraSubId(e.target.value)}
+          >
+            <option value="">— выберите субсчёт —</option>
             {contraOptions.map((s) => (
               <option key={s.id} value={s.id}>
                 {s.code} · {s.name}
@@ -383,30 +422,78 @@ export default function OpexModal({ preselect, onClose }: Props) {
               </option>
             ))}
           </select>
+          <span className="hint">
+            Куда списываем по плану счетов. Используйте кнопки выше для частых вариантов
+          </span>
         </div>
+      )}
 
-        <div className="field" style={{ gridColumn: '1 / 3' }}>
-          <label>Контрагент (опционально)</label>
-          <select className="input" value={counterpartyId} onChange={(e) => setCounterpartyId(e.target.value)}>
-            <option value="">— не указан —</option>
-            {counterparties?.map((c) => (
-              <option key={c.id} value={c.id}>{c.name}</option>
-            ))}
-          </select>
-        </div>
+      {/* ───── Дополнительно ───── */}
+      <SectionLabel>Дополнительно</SectionLabel>
 
-        <div className="field" style={{ gridColumn: '1 / 3' }}>
-          <label>Описание</label>
-          <input className="input" value={notes} onChange={(e) => setNotes(e.target.value)}
-                 placeholder="Например: Электричество апрель" />
-        </div>
+      <div className="field">
+        <label>Контрагент</label>
+        <select className="input" value={counterpartyId} onChange={(e) => setCounterpartyId(e.target.value)}>
+          <option value="">— не указан —</option>
+          {counterparties?.map((c) => (
+            <option key={c.id} value={c.id}>{c.name}</option>
+          ))}
+        </select>
+        <span className="hint">
+          {direction === 'out' ? 'Кому платим' : 'От кого получили'}. Можно пропустить
+        </span>
+      </div>
+
+      <div className="field">
+        <label>Описание</label>
+        <input
+          className="input"
+          value={notes}
+          onChange={(e) => setNotes(e.target.value)}
+          placeholder="Например: Электричество апрель"
+        />
+        <span className="hint">Заметка для себя — увидите в истории операций</span>
       </div>
 
       {error instanceof ApiError && error.status !== 400 && (
-        <div style={{ marginTop: 10, padding: 8, background: '#fef2f2', color: 'var(--danger)', borderRadius: 6, fontSize: 12 }}>
+        <div style={{
+          marginTop: 10, padding: 8, background: '#fef2f2',
+          color: 'var(--danger)', borderRadius: 6, fontSize: 12,
+        }}>
           {error.message}
         </div>
       )}
     </Modal>
+  );
+}
+
+function SectionLabel({ children }: { children: React.ReactNode }) {
+  return (
+    <div style={{
+      fontSize: 10, fontWeight: 700, letterSpacing: '.08em',
+      textTransform: 'uppercase', color: 'var(--fg-3)',
+      marginTop: 4, marginBottom: 8,
+    }}>
+      {children}
+    </div>
+  );
+}
+
+function MethodChip({
+  active, onClick, children,
+}: {
+  active: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={'btn btn-sm ' + (active ? 'btn-primary' : 'btn-ghost')}
+      style={{ flex: 1, minWidth: 110 }}
+    >
+      {children}
+    </button>
   );
 }
