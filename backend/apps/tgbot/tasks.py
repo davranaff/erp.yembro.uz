@@ -83,12 +83,15 @@ def _resolve_allowed_users(*, organization_id: str, user_ids: list, module_code:
         ).values_list("membership_id", "level")
     )
 
-    # 2. Role-уровни — для каждого membership собираем все level'ы
+    # 2. Role-уровни — для каждого membership собираем все level'ы.
+    # Reverse от UserRole.role это `Role.assignments` (related_name на FK).
+    # Раньше было `role__user_roles` → FieldError, и notify_admins_task
+    # падал с unhandled exception → ни одно TG-уведомление не уходило.
     role_levels: dict = defaultdict(list)
     rp_qs = RolePermission.objects.filter(
-        role__user_roles__membership_id__in=membership_ids,
+        role__assignments__membership_id__in=membership_ids,
         module__code=module_code,
-    ).values_list("role__user_roles__membership_id", "level")
+    ).values_list("role__assignments__membership_id", "level")
     for m_id, level in rp_qs:
         role_levels[m_id].append(level)
 
@@ -114,7 +117,10 @@ def send_debt_reminder_task(sale_order_id: str) -> dict:
     from .notifications import fmt_debt_reminder_uz
 
     try:
-        order = SaleOrder.objects.select_related("counterparty", "organization").get(
+        # SaleOrder.customer (а не counterparty) — поле так и называется,
+        # см. apps/sales/models.py. Раньше select_related("counterparty")
+        # падал с FieldError, и debt-reminder daily молча всем не доходил.
+        order = SaleOrder.objects.select_related("customer", "organization").get(
             id=sale_order_id
         )
     except SaleOrder.DoesNotExist:
@@ -122,7 +128,7 @@ def send_debt_reminder_task(sale_order_id: str) -> dict:
 
     link = TgLink.objects.filter(
         organization=order.organization,
-        counterparty=order.counterparty,
+        counterparty=order.customer,
         is_active=True,
         counterparty__isnull=False,
     ).first()
@@ -130,7 +136,7 @@ def send_debt_reminder_task(sale_order_id: str) -> dict:
     if not link:
         return {"error": "no_tg_link", "order": sale_order_id}
 
-    text = fmt_debt_reminder_uz(order, order.counterparty)
+    text = fmt_debt_reminder_uz(order, order.customer)
     ok = send_message(link.chat_id, text)
     return {"sent": ok, "chat_id": link.chat_id}
 
