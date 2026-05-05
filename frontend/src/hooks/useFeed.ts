@@ -102,7 +102,10 @@ export interface FeedDashboardResponse {
       sku: string;
       name: string;
       unit: string;
-      shares: Record<string, string>; // version_id → percent
+      nomenclature_id: string;
+      // version_id → { component_id, share_percent }. Пустой объект если
+      // ингредиент не входит в этот рецепт — клик создаст новый компонент.
+      shares: Record<string, { id: string; share: string }>;
     }>;
   };
   incoming: Array<{

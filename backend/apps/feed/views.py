@@ -906,8 +906,9 @@ class FeedDashboardView(OrganizationContextMixin, APIView):
             .select_related("nomenclature", "nomenclature__unit")
             .order_by("nomenclature__sku")
         )
-        # ingredient → list per version
-        comp_map: dict[str, dict[str, str]] = {}
+        # ingredient → list per version. shares value = {id, share} чтобы
+        # фронт мог делать PATCH /recipe-components/{id}/ для inline-edit.
+        comp_map: dict[str, dict[str, dict[str, str]]] = {}
         ingredient_meta: dict[str, dict] = {}
         for c in components:
             sku = c.nomenclature.sku
@@ -915,8 +916,27 @@ class FeedDashboardView(OrganizationContextMixin, APIView):
                 "sku": sku,
                 "name": c.nomenclature.name,
                 "unit": c.nomenclature.unit.code,
+                "nomenclature_id": str(c.nomenclature_id),
             })
-            comp_map.setdefault(sku, {})[str(c.recipe_version_id)] = str(c.share_percent)
+            comp_map.setdefault(sku, {})[str(c.recipe_version_id)] = {
+                "id": str(c.id),
+                "share": str(c.share_percent),
+            }
+
+        # Расширяем список ингредиентов: помимо тех, что уже есть в рецептах,
+        # добавляем все KORM-* SKU из номенклатуры — чтобы пользователь мог
+        # вписать долю для нового ингредиента прямо из матрицы.
+        from apps.nomenclature.models import NomenclatureItem
+        all_korm = NomenclatureItem.objects.filter(
+            organization=org, sku__startswith="KORM-", is_active=True,
+        ).exclude(sku__startswith="KORM-XALTA").select_related("unit").order_by("sku")
+        for item in all_korm:
+            ingredient_meta.setdefault(item.sku, {
+                "sku": item.sku,
+                "name": item.name,
+                "unit": item.unit.code,
+                "nomenclature_id": str(item.id),
+            })
 
         recipe_matrix = {
             "versions": [

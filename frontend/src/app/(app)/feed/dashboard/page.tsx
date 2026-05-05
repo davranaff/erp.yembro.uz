@@ -2,12 +2,14 @@
 
 import Link from 'next/link';
 import { useMemo, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 
 import Badge from '@/components/ui/Badge';
 import Icon from '@/components/ui/Icon';
 import KpiCard from '@/components/ui/KpiCard';
 import Panel from '@/components/ui/Panel';
-import { useFeedDashboard } from '@/hooks/useFeed';
+import { recipeComponentsCrud, useFeedDashboard } from '@/hooks/useFeed';
+import RawBatchModal from '../RawBatchModal';
 
 function todayISO(): string {
   return new Date().toISOString().slice(0, 10);
@@ -43,6 +45,7 @@ function fmtMoney(v: string): string {
  * между вкладками, хочет видеть всё на одной странице.
  */
 export default function FeedDashboardPage() {
+  const qc = useQueryClient();
   const [date, setDate] = useState(todayISO());
   const { data, isLoading, error, refetch, isFetching } = useFeedDashboard(date);
 
@@ -50,17 +53,93 @@ export default function FeedDashboardPage() {
   const matrixVersions = matrix?.versions ?? [];
   const matrixIngredients = matrix?.ingredients ?? [];
 
+  // Inline-edit состояние для ячеек матрицы
+  const [editingCell, setEditingCell] = useState<{ sku: string; vid: string } | null>(null);
+  const [editValue, setEditValue] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [savedFlash, setSavedFlash] = useState<string | null>(null); // key=sku:vid
+  const updateComp = recipeComponentsCrud.useUpdate();
+  const createComp = recipeComponentsCrud.useCreate();
+
+  // Quick-add Приход
+  const [showAddIncoming, setShowAddIncoming] = useState(false);
+
   // Считаем «итого» по столбцу (для проверки что доли = 100%)
   const columnTotals = useMemo(() => {
     const totals: Record<string, number> = {};
     for (const v of matrixVersions) totals[v.id] = 0;
     for (const ing of matrixIngredients) {
-      for (const [vid, share] of Object.entries(ing.shares)) {
-        totals[vid] = (totals[vid] ?? 0) + parseFloat(share || '0');
+      for (const [vid, info] of Object.entries(ing.shares)) {
+        totals[vid] = (totals[vid] ?? 0) + parseFloat(info.share || '0');
       }
     }
     return totals;
   }, [matrixVersions, matrixIngredients]);
+
+  const startEdit = (sku: string, vid: string, current: string | null) => {
+    setEditingCell({ sku, vid });
+    setEditValue(current ?? '');
+  };
+
+  const cancelEdit = () => {
+    setEditingCell(null);
+    setEditValue('');
+  };
+
+  const saveEdit = async () => {
+    if (!editingCell) return;
+    const { sku, vid } = editingCell;
+    const ingredient = matrixIngredients.find((i) => i.sku === sku);
+    if (!ingredient) { cancelEdit(); return; }
+
+    const trimmed = editValue.trim();
+    const existing = ingredient.shares[vid];
+    const oldShare = existing?.share ?? null;
+
+    // Без изменений — выходим
+    if (trimmed === (oldShare ?? '')) { cancelEdit(); return; }
+
+    // Пустое значение + был компонент → не разрешаем (нужен delete-action)
+    if (trimmed === '' && existing) {
+      alert('Чтобы убрать ингредиент из рецепта, удалите компонент в /feed → Рецептуры (он может быть привязан к незавершённым замесам).');
+      cancelEdit();
+      return;
+    }
+    // Пустое + не было — просто закрыть
+    if (trimmed === '' && !existing) { cancelEdit(); return; }
+
+    const num = parseFloat(trimmed);
+    if (Number.isNaN(num) || num < 0 || num > 100) {
+      alert('Доля должна быть числом от 0 до 100.');
+      return;
+    }
+
+    setSaving(true);
+    try {
+      if (existing) {
+        await updateComp.mutateAsync({
+          id: existing.id,
+          patch: { share_percent: trimmed } as never,
+        });
+      } else {
+        await createComp.mutateAsync({
+          recipe_version: vid,
+          nomenclature: ingredient.nomenclature_id,
+          share_percent: trimmed,
+        } as never);
+      }
+      // Обновляем dashboard
+      qc.invalidateQueries({ queryKey: ['feed', 'dashboard'] });
+      setSavedFlash(`${sku}:${vid}`);
+      setTimeout(() => setSavedFlash(null), 1500);
+      cancelEdit();
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Не удалось сохранить';
+      alert(msg);
+    } finally {
+      setSaving(false);
+    }
+  };
 
   return (
     <>
@@ -164,6 +243,12 @@ export default function FeedDashboardPage() {
         flush
         style={{ marginBottom: 14 }}
       >
+        <div style={{
+          padding: '6px 12px', fontSize: 11, color: 'var(--fg-3)',
+          borderBottom: '1px solid var(--border)',
+        }}>
+          💡 Кликните в любую ячейку чтобы изменить долю %. Enter — сохранить, Esc — отмена. «+» = добавить ингредиент в рецепт.
+        </div>
         {matrixVersions.length === 0 ? (
           <div style={{ padding: 16, color: 'var(--fg-3)', fontSize: 13 }}>
             Нет активных версий рецептур. Создайте в{' '}
@@ -221,19 +306,54 @@ export default function FeedDashboardPage() {
                       </span>
                     </td>
                     {matrixVersions.map((v) => {
-                      const share = ing.shares[v.id];
+                      const info = ing.shares[v.id];
+                      const share = info?.share ?? null;
+                      const isEditing = editingCell?.sku === ing.sku && editingCell?.vid === v.id;
+                      const flashed = savedFlash === `${ing.sku}:${v.id}`;
                       return (
                         <td
                           key={v.id}
                           className="mono"
                           style={{
-                            textAlign: 'right', padding: '6px 10px',
+                            textAlign: 'right', padding: 0,
                             borderLeft: '1px solid var(--border)',
-                            fontSize: 12, fontWeight: share ? 500 : 400,
-                            color: share ? 'var(--fg-1)' : 'var(--fg-3)',
+                            fontSize: 12,
+                            background: flashed ? 'rgba(34,197,94,0.12)' : undefined,
+                            transition: 'background 1.5s',
                           }}
+                          onClick={() => !isEditing && startEdit(ing.sku, v.id, share)}
+                          title={info ? 'Клик чтобы изменить долю %' : 'Клик чтобы добавить ингредиент в этот рецепт'}
                         >
-                          {share ? `${parseFloat(share).toFixed(2)}%` : '—'}
+                          {isEditing ? (
+                            <input
+                              autoFocus
+                              type="number" step="0.01" min="0" max="100"
+                              className="mono"
+                              value={editValue}
+                              onChange={(e) => setEditValue(e.target.value)}
+                              onBlur={saveEdit}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') saveEdit();
+                                else if (e.key === 'Escape') cancelEdit();
+                              }}
+                              disabled={saving}
+                              style={{
+                                width: '100%', height: '100%', padding: '6px 10px',
+                                border: '2px solid var(--brand-orange)', borderRadius: 0,
+                                textAlign: 'right', fontSize: 12, fontWeight: 600,
+                                outline: 'none', background: 'rgba(232,117,26,0.06)',
+                              }}
+                            />
+                          ) : (
+                            <div style={{
+                              padding: '6px 10px',
+                              fontWeight: share ? 500 : 400,
+                              color: share ? 'var(--fg-1)' : 'var(--fg-3)',
+                              cursor: 'cell',
+                            }}>
+                              {share ? `${parseFloat(share).toFixed(2)}%` : '+'}
+                            </div>
+                          )}
                         </td>
                       );
                     })}
@@ -269,7 +389,18 @@ export default function FeedDashboardPage() {
 
       {/* ── Day flow: Приход / Расход (2 колонки) ─────────────────────── */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(420px, 1fr))', gap: 14, marginBottom: 14 }}>
-        <Panel title={`Приход · ${data?.incoming.length ?? 0}`} flush>
+        <Panel
+          title={`Приход · ${data?.incoming.length ?? 0}`}
+          flush
+          tools={
+            <button
+              className="btn btn-primary btn-sm"
+              onClick={() => setShowAddIncoming(true)}
+            >
+              <Icon name="plus" size={12} /> Партия сырья
+            </button>
+          }
+        >
           {isLoading ? (
             <div style={{ padding: 16, color: 'var(--fg-3)' }}>Загрузка…</div>
           ) : (data?.incoming.length ?? 0) === 0 ? (
@@ -455,6 +586,15 @@ export default function FeedDashboardPage() {
         💡 «Сирота» в приходе — ручное движение в /stock без партии сырья.
         Превратите в партию через действие в /stock или из /feed → «+ Партия сырья».
       </div>
+
+      {showAddIncoming && (
+        <RawBatchModal
+          onClose={() => {
+            setShowAddIncoming(false);
+            qc.invalidateQueries({ queryKey: ['feed', 'dashboard'] });
+          }}
+        />
+      )}
     </>
   );
 }
