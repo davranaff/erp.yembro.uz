@@ -27,6 +27,99 @@ def fmt_sale_confirmed(order) -> str:
     )
 
 
+# ─── Per-module sale notifications ────────────────────────────────────────
+# Когда продаётся feed/vet — админам этих модулей шлём отдельный детальный
+# текст с конкретикой по позициям их модуля. Админам sales уходит общий
+# fmt_sale_confirmed (там сводно по сумме). Это даёт владельцу склада
+# точную информацию «что и сколько у меня уехало», без шума по чужим модулям.
+
+
+def _fmt_qty(value) -> str:
+    """Аккуратное число: без хвостовых нулей."""
+    try:
+        f = float(value)
+    except (TypeError, ValueError):
+        return str(value)
+    if f == int(f):
+        return f"{int(f):,}".replace(",", " ")
+    return f"{f:,.3f}".rstrip("0").rstrip(".")
+
+
+def fmt_sale_for_feed_module(order, items: list) -> str:
+    """Для админов модуля feed: продали корм/комбикорм (насыпь или мешки)."""
+    lines = [
+        "🌾 <b>Продан корм</b>",
+        f"📄 {order.doc_number} · {order.date}",
+        f"👤 {order.customer.name}",
+        "",
+    ]
+    for it in items:
+        if it.feed_bag_lot_id:
+            bl = it.feed_bag_lot
+            qty = int(float(it.quantity))
+            lines.append(
+                f"• <code>{bl.doc_number}</code> · {bl.recipe_version.recipe.code} ·"
+                f" {qty} мешков по {_fmt_qty(bl.bag_weight_kg)} кг"
+                f" → {float(it.line_total_uzs):,.0f} сум"
+            )
+        elif it.feed_batch_id:
+            fb = it.feed_batch
+            recipe = fb.recipe_version.recipe.code if fb.recipe_version_id else "—"
+            lines.append(
+                f"• <code>{fb.doc_number}</code> · {recipe} ·"
+                f" {_fmt_qty(it.quantity)} кг"
+                f" → {float(it.line_total_uzs):,.0f} сум"
+            )
+    return "\n".join(lines)
+
+
+def fmt_sale_for_vet_module(order, items: list) -> str:
+    """Для админов vet: продали препарат-лот или аксессуар."""
+    lines = [
+        "💊 <b>Продан вет-товар</b>",
+        f"📄 {order.doc_number} · {order.date}",
+        f"👤 {order.customer.name}",
+        "",
+    ]
+    for it in items:
+        if it.vet_stock_batch_id:
+            vsb = it.vet_stock_batch
+            drug = vsb.drug.nomenclature.name if vsb.drug.nomenclature_id else vsb.lot_number
+            lines.append(
+                f"• <code>{vsb.doc_number}</code> · {drug} ·"
+                f" {_fmt_qty(it.quantity)} {vsb.unit.code if vsb.unit_id else 'ед'}"
+                f" → {float(it.line_total_uzs):,.0f} сум"
+            )
+        elif it.vet_accessory_id:
+            va = it.vet_accessory
+            name = va.nomenclature.name if va.nomenclature_id else va.nomenclature.sku
+            lines.append(
+                f"• {name} · {_fmt_qty(it.quantity)} шт"
+                f" → {float(it.line_total_uzs):,.0f} сум"
+            )
+    return "\n".join(lines)
+
+
+def fmt_sale_for_generic_module(order, items: list, module_label: str) -> str:
+    """Fallback для slaughter/feedlot/matochnik/incubation: обычные Batch."""
+    lines = [
+        f"📦 <b>Продано из «{module_label}»</b>",
+        f"📄 {order.doc_number} · {order.date}",
+        f"👤 {order.customer.name}",
+        "",
+    ]
+    for it in items:
+        if it.batch_id:
+            b = it.batch
+            sku = b.nomenclature.sku if b.nomenclature_id else "—"
+            lines.append(
+                f"• <code>{b.doc_number}</code> · {sku} ·"
+                f" {_fmt_qty(it.quantity)} {b.unit.code if b.unit_id else 'ед'}"
+                f" → {float(it.line_total_uzs):,.0f} сум"
+            )
+    return "\n".join(lines)
+
+
 def fmt_payment_posted(payment) -> str:
     if payment.direction == "out":
         icon, direction = "💸", "Выплата поставщику"
