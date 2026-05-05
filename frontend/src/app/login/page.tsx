@@ -19,12 +19,13 @@ export default function LoginPage() {
 }
 
 function Logo() {
+  // logo.png — 2723x851 (~3.2:1). Высота 36 → ширина ≈ 115.
   return (
-    <svg height="32" viewBox="0 0 160 32" fill="none" aria-label="YemBro ERP">
-      <circle cx="16" cy="16" r="14" fill="#E8751A" />
-      <text x="10" y="22" fill="white" fontSize="15" fontWeight="700" fontFamily="sans-serif">Y</text>
-      <text x="38" y="23" fill="#2A1F0E" fontSize="17" fontWeight="700" fontFamily="sans-serif">YemBro ERP</text>
-    </svg>
+    <img
+      src="/logo.png"
+      alt="YemBro ERP"
+      style={{ height: 36, width: 'auto', objectFit: 'contain', display: 'block' }}
+    />
   );
 }
 

@@ -16,10 +16,23 @@ export const metadata: Metadata = {
     'учёт птицефабрики',
     'программа для птицефермы',
     'маточник инкубация откорм ERP',
+    'птицеводство Узбекистан',
+    'учёт корма птицефабрика',
     'YemBro',
   ],
   authors: [{ name: 'YemBro' }],
-  robots: { index: true, follow: true },
+  alternates: { canonical: '/' },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      'max-snippet': -1,
+      'max-image-preview': 'large',
+      'max-video-preview': -1,
+    },
+  },
   openGraph: {
     title: 'YemBro ERP — Управляйте птицефермой. Всё в одном месте.',
     description:
@@ -27,11 +40,21 @@ export const metadata: Metadata = {
     type: 'website',
     locale: 'ru_RU',
     siteName: 'YemBro ERP',
+    url: '/',
+    images: [
+      {
+        url: '/logo.png',
+        width: 2723,
+        height: 851,
+        alt: 'YemBro ERP',
+      },
+    ],
   },
   twitter: {
     card: 'summary_large_image',
     title: 'YemBro ERP — Система управления птицефермой',
     description: 'Полный цикл птицефабрики в одной ERP-системе.',
+    images: ['/logo.png'],
   },
 };
 
@@ -47,13 +70,16 @@ const jsonLd = {
 };
 
 function Logo({ light = false }: { light?: boolean }) {
-  const textColor = light ? '#FFFDF7' : '#2A1F0E';
+  // logo.png — full brand mark. light=true инвертирует тень для footer на тёмном фоне.
   return (
-    <svg height="30" viewBox="0 0 148 30" fill="none" aria-label="YemBro ERP">
-      <circle cx="15" cy="15" r="13" fill="#E8751A" />
-      <text x="9.5" y="21" fill="white" fontSize="14" fontWeight="700" fontFamily="sans-serif">Y</text>
-      <text x="36" y="21" fill={textColor} fontSize="16" fontWeight="700" fontFamily="sans-serif">YemBro ERP</text>
-    </svg>
+    <img
+      src="/logo.png"
+      alt="YemBro ERP"
+      style={{
+        height: 32, width: 'auto', objectFit: 'contain', display: 'block',
+        filter: light ? 'brightness(0) invert(1)' : 'none',
+      }}
+    />
   );
 }
 

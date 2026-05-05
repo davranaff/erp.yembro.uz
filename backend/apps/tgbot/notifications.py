@@ -533,16 +533,29 @@ def _fmt(val) -> str:
 
 
 def fmt_sale_confirmed(order) -> str:
+    """Хедер: «Hujjat tayyorlandi · Mahsulot jo'natildi» — чтобы не путали с
+    приходом денег. Явно показываем qarz и срок оплаты."""
+    from decimal import Decimal
     items_count = order.items.count() if hasattr(order, "items") else 0
+    paid = Decimal(order.paid_amount_uzs or 0)
+    total = Decimal(order.amount_uzs or 0)
+    debt = total - paid
+    debt_block = ""
+    if debt > 0:
+        debt_block = f"⏳ To'lanmagan: <b>{_fmt_money(debt)} so'm</b>\n"
+    elif paid > 0 and debt <= 0:
+        debt_block = "✅ To'lov to'liq qabul qilingan\n"
     due_block = ""
-    if order.due_date:
-        due_block = f"⏳ To'lov muddati: {order.due_date}\n"
+    if order.due_date and debt > 0:
+        due_block = f"📆 To'lov muddati: <b>{order.due_date}</b>\n"
     return (
-        f"💼 <b>Sotuv o'tkazildi</b>\n"
+        f"📋 <b>Sotuv qaydlandi · mahsulot jo'natildi</b>\n"
+        f"<i>Pul hali kelgani yo'q — alohida bildirish bo'ladi</i>\n\n"
         f"📄 Hujjat: <code>{order.doc_number}</code>\n"
         f"👤 Mijoz: {order.customer.name}\n"
         f"📦 Pozitsiyalar: {items_count}\n"
-        f"💰 Summa: <b>{_fmt_money(order.amount_uzs)} so'm</b>\n"
+        f"💰 Summa: <b>{_fmt_money(total)} so'm</b>\n"
+        f"{debt_block}"
         f"📅 Sana: {order.date}\n"
         f"{due_block}"
     )
@@ -553,16 +566,24 @@ def fmt_sale_confirmed(order) -> str:
 
 def fmt_sale_confirmed_for_client(order) -> str:
     """Mijozga: «sizning buyurtmangiz rasmiylashtirildi»."""
+    from decimal import Decimal
     items_count = order.items.count() if hasattr(order, "items") else 0
+    paid = Decimal(order.paid_amount_uzs or 0)
+    total = Decimal(order.amount_uzs or 0)
+    debt = total - paid
+    debt_block = ""
+    if debt > 0:
+        debt_block = f"💸 Sizning qarzingiz: <b>{_fmt_money(debt)} so'm</b>\n"
     due_block = ""
-    if order.due_date:
-        due_block = f"⏳ To'lov muddati: <b>{order.due_date}</b>\n"
+    if order.due_date and debt > 0:
+        due_block = f"📆 To'lov muddati: <b>{order.due_date}</b>\n"
     return (
         f"📦 <b>Buyurtma rasmiylashtirildi</b>\n"
         f"<i>{order.customer.name}</i>\n\n"
         f"📄 Hujjat: <code>{order.doc_number}</code>\n"
         f"📦 Pozitsiyalar: {items_count}\n"
-        f"💰 Summa: <b>{_fmt_money(order.amount_uzs)} so'm</b>\n"
+        f"💰 Summa: <b>{_fmt_money(total)} so'm</b>\n"
+        f"{debt_block}"
         f"📅 Sana: {order.date}\n"
         f"{due_block}"
     )
@@ -572,9 +593,13 @@ def fmt_sale_confirmed_for_client(order) -> str:
 
 
 def fmt_sale_for_feed_module(order, items: list) -> str:
-    """Korm modul boshlig'iga: nima sotildi."""
+    """Korm modul boshlig'iga: nima sotildi (jo'natildi, pul keyinroq)."""
+    from decimal import Decimal
+    paid = Decimal(order.paid_amount_uzs or 0)
+    total = Decimal(order.amount_uzs or 0)
+    debt = total - paid
     lines = [
-        "🌾 <b>Yem-xashak sotildi</b>",
+        "🌾 <b>Yem-xashak jo'natildi</b>",
         f"📄 {order.doc_number} · {order.date}",
         f"👤 {order.customer.name}",
         "",
@@ -596,6 +621,10 @@ def fmt_sale_for_feed_module(order, items: list) -> str:
                 f" {_fmt_qty(it.quantity)} kg"
                 f" → {_fmt_money(it.line_total_uzs)} so'm"
             )
+    if debt > 0:
+        lines.append(f"\n⏳ Qarz: <b>{_fmt_money(debt)} so'm</b> (pul kelmagan)")
+    elif paid > 0:
+        lines.append(f"\n✅ To'lov to'liq qabul qilingan: {_fmt_money(paid)} so'm")
     return "\n".join(lines)
 
 

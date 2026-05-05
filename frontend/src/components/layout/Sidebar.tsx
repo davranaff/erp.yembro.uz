@@ -90,11 +90,11 @@ export default function Sidebar() {
     <>
       <aside className="sidebar">
         <div className="sidebar-logo">
-          <svg height="26" viewBox="0 0 120 28" fill="none">
-            <circle cx="14" cy="14" r="12" fill="#E8751A" />
-            <text x="9" y="19" fill="white" fontSize="13" fontWeight="700" fontFamily="sans-serif">Y</text>
-            <text x="32" y="20" fill="#2A1F0E" fontSize="15" fontWeight="700" fontFamily="sans-serif">YemBro</text>
-          </svg>
+          <img
+            src="/logo.png"
+            alt="YemBro"
+            style={{ height: 26, width: 'auto', objectFit: 'contain', display: 'block' }}
+          />
           {/* ✕ — виден только на мобиле, закрывает drawer-сайдбар */}
           <button
             className="sidebar-close"

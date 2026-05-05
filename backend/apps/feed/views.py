@@ -249,6 +249,25 @@ class ProductionTaskViewSet(OrgScopedModelViewSet):
         from apps.audit.models import AuditLog
         self._write_audit(AuditLog.Action.CREATE, instance)
 
+    @action(detail=True, methods=["post"], url_path="refresh-components")
+    def refresh_components(self, request, pk=None):
+        """
+        POST /api/feed/production-tasks/{id}/refresh-components/
+
+        Перешолвить партии сырья для компонентов с source_batch IS NULL —
+        на случай если партии пришли уже после создания задания.
+        Работает только для PLANNED-заданий.
+        """
+        from .services.copy_components import refresh_unassigned_task_components
+
+        task = self.get_object()
+        updated = refresh_unassigned_task_components(task)
+        task.refresh_from_db()
+        return Response({
+            "updated_count": len(updated),
+            "task": self.get_serializer(task).data,
+        })
+
     @action(detail=True, methods=["post"])
     def execute(self, request, pk=None):
         """
@@ -256,6 +275,8 @@ class ProductionTaskViewSet(OrgScopedModelViewSet):
         Body: {"output_warehouse": "uuid", "storage_bin": "uuid", "actual_quantity_kg": "1000"}
         """
         from apps.warehouses.models import ProductionBlock, Warehouse
+
+        from .services.copy_components import refresh_unassigned_task_components
 
         task = self.get_object()
         wh_id = request.data.get("output_warehouse")
@@ -272,6 +293,12 @@ class ProductionTaskViewSet(OrgScopedModelViewSet):
             bin_block = ProductionBlock.objects.get(pk=bin_id)
         except (Warehouse.DoesNotExist, ProductionBlock.DoesNotExist):
             raise DRFValidationError({"detail": "output_warehouse или storage_bin не найдены."})
+
+        # Авто-pодхват свежих партий — если за время «висело» задание
+        # пришло сырьё, попытаемся резолвить его прямо сейчас, чтобы execute
+        # не упал на «нет партии».
+        refresh_unassigned_task_components(task)
+        task.refresh_from_db()
 
         from decimal import Decimal
         actual_dec = Decimal(str(actual)) if actual is not None else None
