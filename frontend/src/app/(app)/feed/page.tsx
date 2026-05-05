@@ -1,6 +1,7 @@
 'use client';
 
 import { useQueryClient } from '@tanstack/react-query';
+import Link from 'next/link';
 import { useMemo, useState } from 'react';
 
 import DetailDrawer, { KV } from '@/components/DetailDrawer';
@@ -263,6 +264,9 @@ export default function FeedPage() {
           <div className="sub">Рецептуры · приёмка сырья · задания на замес · готовые партии</div>
         </div>
         <div className="actions">
+          <Link href="/feed/dashboard" className="btn btn-secondary btn-sm">
+            <Icon name="chart" size={14} /> Сводка дня
+          </Link>
           <OpexButton moduleCode="feed" suggestedContraCode="20.05" />
           <OpenSaleFromModule moduleCode="feed" />
           {newButton()}

@@ -4,6 +4,7 @@ from rest_framework.routers import DefaultRouter
 from .views import (
     FeedBagLotViewSet,
     FeedBatchViewSet,
+    FeedDashboardView,
     FeedLotShrinkageStateViewSet,
     FeedShrinkageProfileViewSet,
     FeedShrinkageReportView,
@@ -42,5 +43,10 @@ urlpatterns = [
         "shrinkage-report/",
         FeedShrinkageReportView.as_view(),
         name="feed-shrinkage-report",
+    ),
+    path(
+        "dashboard/",
+        FeedDashboardView.as_view(),
+        name="feed-dashboard",
     ),
 ]

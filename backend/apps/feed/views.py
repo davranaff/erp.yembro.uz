@@ -850,3 +850,246 @@ class FeedShrinkageReportView(OrganizationContextMixin, APIView):
                 "total_loss_uzs": str(total_uzs),
             },
         })
+
+
+class FeedDashboardView(OrganizationContextMixin, APIView):
+    """GET /api/feed/dashboard/?date=YYYY-MM-DD
+
+    Сводка дня по модулю «Корма» — Excel-style панель для одной страницы:
+      - recipe_matrix: все активные рецептуры × ингредиенты (доли %)
+      - incoming: приход сырья за день (RawMaterialBatch + manual incoming
+        StockMovement, не привязанные к партии)
+      - outgoing: расход сырья за день (StockMovement OUTGOING для feed-сырья)
+      - production: произведено корма за день (FeedBatch)
+      - stock: текущие остатки сырья на feed-складах
+
+    Без фильтров `date` — берём сегодня.
+    """
+
+    module_code = "feed"
+    permission_classes = [IsAuthenticated, HasModulePermission]
+
+    def get(self, request, *args, **kwargs):
+        from datetime import date as _date, datetime, time, timedelta
+        from decimal import Decimal
+        from django.db.models import F, Sum
+        from django.utils import timezone
+
+        from apps.feed.models import (
+            FeedBatch, RawMaterialBatch, RecipeComponent, RecipeVersion,
+        )
+        from apps.warehouses.models import StockMovement
+
+        org = request.organization
+
+        date_str = request.query_params.get("date")
+        try:
+            day = _date.fromisoformat(date_str) if date_str else _date.today()
+        except ValueError:
+            raise DRFValidationError({"date": "Ожидаю YYYY-MM-DD."})
+
+        tz = timezone.get_current_timezone()
+        day_start = datetime.combine(day, time.min, tzinfo=tz)
+        day_end = day_start + timedelta(days=1)
+
+        # ── Recipe matrix (active versions × components) ──────────────────
+        versions = (
+            RecipeVersion.objects
+            .filter(recipe__organization=org, status=RecipeVersion.Status.ACTIVE)
+            .select_related("recipe")
+            .order_by("recipe__code", "version_number")
+        )
+        version_ids = [v.id for v in versions]
+        components = (
+            RecipeComponent.objects
+            .filter(recipe_version_id__in=version_ids)
+            .select_related("nomenclature", "nomenclature__unit")
+            .order_by("nomenclature__sku")
+        )
+        # ingredient → list per version
+        comp_map: dict[str, dict[str, str]] = {}
+        ingredient_meta: dict[str, dict] = {}
+        for c in components:
+            sku = c.nomenclature.sku
+            ingredient_meta.setdefault(sku, {
+                "sku": sku,
+                "name": c.nomenclature.name,
+                "unit": c.nomenclature.unit.code,
+            })
+            comp_map.setdefault(sku, {})[str(c.recipe_version_id)] = str(c.share_percent)
+
+        recipe_matrix = {
+            "versions": [
+                {
+                    "id": str(v.id),
+                    "recipe_code": v.recipe.code,
+                    "recipe_name": v.recipe.name,
+                    "version": v.version_number,
+                    "label": f"{v.recipe.code} v{v.version_number}",
+                }
+                for v in versions
+            ],
+            "ingredients": [
+                {
+                    **ingredient_meta[sku],
+                    "shares": comp_map.get(sku, {}),
+                }
+                for sku in sorted(ingredient_meta)
+            ],
+        }
+
+        # ── Приход (incoming) за день ─────────────────────────────────────
+        # 1. RawMaterialBatch с received_date == day
+        raw_today = (
+            RawMaterialBatch.objects
+            .filter(organization=org, received_date=day)
+            .select_related("nomenclature", "supplier", "warehouse")
+            .order_by("doc_number")
+        )
+        # 2. Manual INCOMING StockMovement без привязки к партии
+        incoming_movements = (
+            StockMovement.objects
+            .filter(
+                organization=org,
+                kind=StockMovement.Kind.INCOMING,
+                module__code="feed",
+                date__gte=day_start, date__lt=day_end,
+                source_object_id__isnull=True,  # не привязаны
+            )
+            .select_related("nomenclature", "counterparty", "warehouse_to")
+            .order_by("doc_number")
+        )
+
+        incoming = []
+        for b in raw_today:
+            incoming.append({
+                "kind": "raw_batch",
+                "doc": b.doc_number,
+                "sku": b.nomenclature.sku,
+                "name": b.nomenclature.name,
+                "qty": str(b.quantity),
+                "warehouse": b.warehouse.code,
+                "supplier": b.supplier.name if b.supplier else None,
+                "amount_uzs": str(
+                    (Decimal(b.quantity) * Decimal(b.price_per_unit_uzs))
+                    .quantize(Decimal("0.01"))
+                ),
+            })
+        for m in incoming_movements:
+            incoming.append({
+                "kind": "movement",
+                "doc": m.doc_number,
+                "sku": m.nomenclature.sku,
+                "name": m.nomenclature.name,
+                "qty": str(m.quantity),
+                "warehouse": m.warehouse_to.code if m.warehouse_to else None,
+                "supplier": m.counterparty.name if m.counterparty else None,
+                "amount_uzs": str(m.amount_uzs),
+            })
+
+        # ── Расход (outgoing) за день ─────────────────────────────────────
+        outgoing = []
+        out_qs = (
+            StockMovement.objects
+            .filter(
+                organization=org,
+                module__code="feed",
+                kind__in=[
+                    StockMovement.Kind.OUTGOING,
+                    StockMovement.Kind.WRITE_OFF,
+                ],
+                date__gte=day_start, date__lt=day_end,
+            )
+            .select_related("nomenclature", "warehouse_from")
+            .order_by("doc_number")
+        )
+        for m in out_qs:
+            outgoing.append({
+                "doc": m.doc_number,
+                "sku": m.nomenclature.sku,
+                "name": m.nomenclature.name,
+                "qty": str(m.quantity),
+                "warehouse": m.warehouse_from.code if m.warehouse_from else None,
+                "kind": m.kind,
+                "amount_uzs": str(m.amount_uzs),
+            })
+
+        # ── Production (произведено корма) ────────────────────────────────
+        produced_today = (
+            FeedBatch.objects
+            .filter(
+                organization=org,
+                produced_at__gte=day_start, produced_at__lt=day_end,
+            )
+            .select_related("recipe_version__recipe")
+            .order_by("doc_number")
+        )
+        production = []
+        for fb in produced_today:
+            v = fb.recipe_version
+            production.append({
+                "doc": fb.doc_number,
+                "recipe_code": v.recipe.code,
+                "recipe_name": v.recipe.name,
+                "qty_kg": str(fb.quantity_kg),
+                "current_kg": str(fb.current_quantity_kg),
+                "status": fb.status,
+            })
+
+        # ── Текущие остатки сырья по SKU (не привязано к дате) ────────────
+        # Берём net по StockMovement: Σ(IN − OUT) на feed-складах группируя по
+        # nomenclature. Дешёвый способ без таблицы остатков.
+        stock_in = (
+            StockMovement.objects
+            .filter(
+                organization=org, module__code="feed",
+                kind=StockMovement.Kind.INCOMING,
+                nomenclature__sku__startswith="KORM-",
+            )
+            .values("nomenclature__sku", "nomenclature__name")
+            .annotate(qty=Sum("quantity"))
+        )
+        stock_out = (
+            StockMovement.objects
+            .filter(
+                organization=org, module__code="feed",
+                kind__in=[
+                    StockMovement.Kind.OUTGOING,
+                    StockMovement.Kind.WRITE_OFF,
+                ],
+                nomenclature__sku__startswith="KORM-",
+            )
+            .values("nomenclature__sku", "nomenclature__name")
+            .annotate(qty=Sum("quantity"))
+        )
+        in_map = {r["nomenclature__sku"]: (r["qty"] or Decimal(0), r["nomenclature__name"]) for r in stock_in}
+        out_map = {r["nomenclature__sku"]: r["qty"] or Decimal(0) for r in stock_out}
+        skus = sorted(set(in_map) | set(out_map))
+        stock = []
+        for sku in skus:
+            inc = in_map.get(sku, (Decimal(0), ""))
+            out = out_map.get(sku, Decimal(0))
+            stock.append({
+                "sku": sku,
+                "name": in_map[sku][1] if sku in in_map else "",
+                "incoming_total": str(inc[0]),
+                "outgoing_total": str(out),
+                "balance": str(inc[0] - out),
+            })
+
+        return Response({
+            "date": day.isoformat(),
+            "recipe_matrix": recipe_matrix,
+            "incoming": incoming,
+            "outgoing": outgoing,
+            "production": production,
+            "stock": stock,
+            "summary": {
+                "incoming_count": len(incoming),
+                "outgoing_count": len(outgoing),
+                "production_count": len(production),
+                "production_total_kg": str(
+                    sum((Decimal(p["qty_kg"]) for p in production), Decimal(0))
+                ),
+            },
+        })

@@ -86,6 +86,75 @@ export const feedBagLotsCrud = makeCrud<FeedBagLot>({
  * После успеха инвалидируем и feed-batches (изменился остаток), и bag-lots
  * (создалась новая запись), чтобы оба списка освежились без перезагрузки.
  */
+// ── Dashboard (Excel-style сводка дня) ───────────────────────────────────
+
+export interface FeedDashboardResponse {
+  date: string;
+  recipe_matrix: {
+    versions: Array<{
+      id: string;
+      recipe_code: string;
+      recipe_name: string;
+      version: number;
+      label: string;
+    }>;
+    ingredients: Array<{
+      sku: string;
+      name: string;
+      unit: string;
+      shares: Record<string, string>; // version_id → percent
+    }>;
+  };
+  incoming: Array<{
+    kind: 'raw_batch' | 'movement';
+    doc: string;
+    sku: string;
+    name: string;
+    qty: string;
+    warehouse: string | null;
+    supplier: string | null;
+    amount_uzs: string;
+  }>;
+  outgoing: Array<{
+    doc: string;
+    sku: string;
+    name: string;
+    qty: string;
+    warehouse: string | null;
+    kind: string;
+    amount_uzs: string;
+  }>;
+  production: Array<{
+    doc: string;
+    recipe_code: string;
+    recipe_name: string;
+    qty_kg: string;
+    current_kg: string;
+    status: string;
+  }>;
+  stock: Array<{
+    sku: string;
+    name: string;
+    incoming_total: string;
+    outgoing_total: string;
+    balance: string;
+  }>;
+  summary: {
+    incoming_count: number;
+    outgoing_count: number;
+    production_count: number;
+    production_total_kg: string;
+  };
+}
+
+export function useFeedDashboard(date: string) {
+  return useQuery<FeedDashboardResponse, ApiError>({
+    queryKey: ['feed', 'dashboard', date],
+    queryFn: () => apiFetch<FeedDashboardResponse>(`/api/feed/dashboard/?date=${date}`),
+    staleTime: 30_000,
+  });
+}
+
 export function usePackageFeedBatch() {
   const qc = useQueryClient();
   return useMutation<
