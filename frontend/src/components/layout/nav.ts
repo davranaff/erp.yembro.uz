@@ -93,7 +93,7 @@ export const NAV: NavEntry[] = [
     aliases: ['rbac', 'доступ', 'права'] },
   { key: 'audit',   label: 'Журнал аудита',    icon: 'book',     href: '/audit-log', module: 'admin',
     aliases: ['аудит', 'история действий', 'audit log'] },
-  { key: 'holding', label: 'Холдинг (сводно)', icon: 'building', href: '/holding',
+  { key: 'holding', label: 'Холдинг (сводно)', icon: 'building', href: '/holding', module: 'admin', min: 'admin',
     aliases: ['холдинг', 'консолидация', 'все компании'] },
 ];
 
