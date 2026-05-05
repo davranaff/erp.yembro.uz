@@ -8,9 +8,9 @@ import { useProductionBlocks } from '@/hooks/useBlocks';
 import { useCounterparties } from '@/hooks/useCounterparties';
 import { rawBatchesCrud } from '@/hooks/useFeed';
 import { useNomenclatureItems } from '@/hooks/useNomenclature';
-import { useWarehouses } from '@/hooks/useStockMovements';
+import { useStockMovements, useWarehouses } from '@/hooks/useStockMovements';
 import { ApiError } from '@/lib/api';
-import type { NomenclatureItem, RawMaterialBatch } from '@/types/auth';
+import type { NomenclatureItem, RawMaterialBatch, StockMovement } from '@/types/auth';
 
 /**
  * Префилл из других мест (например, переключение из «Новое движение» в /stock).
@@ -28,6 +28,12 @@ interface Props {
   initial?: RawMaterialBatch | null;
   prefill?: RawBatchPrefill;
   onClose: () => void;
+  /**
+   * Юзер кликнул в секции «Из существующего движения /stock» — родитель
+   * закрывает эту модалку и открывает PromoteToRawBatchModal с выбранным
+   * movement (там уже правильный flow для конвертации).
+   */
+  onPickStockMovement?: (movement: StockMovement) => void;
 }
 
 type ShrinkMode = 'duval' | 'direct' | 'none';
@@ -56,10 +62,27 @@ function fmtMoney(v: number): string {
   return v.toLocaleString('ru-RU', { maximumFractionDigits: 2 }) + ' сум';
 }
 
-export default function RawBatchModal({ initial, prefill, onClose }: Props) {
+export default function RawBatchModal({ initial, prefill, onClose, onPickStockMovement }: Props) {
   const isEdit = Boolean(initial);
   const create = rawBatchesCrud.useCreate();
   const update = rawBatchesCrud.useUpdate();
+
+  // Подсказка: есть ли в /stock ручные INCOMING-приходы для feed-сырья,
+  // которые ещё не превращены в партию. Показываем только при создании
+  // (не при редактировании / не при prefill из /stock).
+  const showPicker = !isEdit && !prefill && Boolean(onPickStockMovement);
+  const { data: stockMovements } = useStockMovements(
+    showPicker ? { kind: 'incoming', module_code: 'feed' } : {},
+  );
+  const eligibleMovements = useMemo(() => {
+    if (!showPicker || !stockMovements) return [];
+    return stockMovements.filter((m) =>
+      m.is_manual
+      && (m.nomenclature_sku?.startsWith('KORM-') ?? false)
+      && !m.nomenclature_sku?.startsWith('KORM-XALTA')
+    );
+  }, [showPicker, stockMovements]);
+  const [pickerOpen, setPickerOpen] = useState(false);
 
   // Сырьё корма — только из nomenclature модуля feed
   const { data: noms } = useNomenclatureItems({ module_code: 'feed', is_active: 'true' });
@@ -244,6 +267,73 @@ export default function RawBatchModal({ initial, prefill, onClose }: Props) {
         Приёмка сырья на склад модуля «Корма». При повышенной влажности
         зачётный вес рассчитается по формуле Дюваля.
       </div>
+
+      {/* Импорт из существующего INCOMING-движения /stock — чтобы не вводить
+          номенклатуру/склад/цену вручную если они уже есть в журнале. */}
+      {showPicker && eligibleMovements.length > 0 && (
+        <div style={{
+          padding: 10, marginBottom: 12,
+          background: 'var(--info-soft)',
+          border: '1px solid var(--info)',
+          borderRadius: 6, fontSize: 12, color: '#1E4D80',
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+            <div>
+              <b>В /stock есть {eligibleMovements.length} прихода без партии</b>
+              <div style={{ fontSize: 11, marginTop: 2, opacity: 0.85 }}>
+                Можно загрузить данные оттуда (SKU, склад, поставщик, кол-во, цена)
+                и дозаполнить только влажность/сорность.
+              </div>
+            </div>
+            <button
+              type="button"
+              className="btn btn-secondary btn-sm"
+              onClick={() => setPickerOpen((v) => !v)}
+            >
+              {pickerOpen ? 'Свернуть' : 'Выбрать →'}
+            </button>
+          </div>
+          {pickerOpen && (
+            <div style={{
+              marginTop: 10, maxHeight: 220, overflowY: 'auto',
+              border: '1px solid var(--border)', borderRadius: 4,
+              background: 'var(--bg-card, #fff)',
+            }}>
+              {eligibleMovements.map((m) => (
+                <button
+                  key={m.id}
+                  type="button"
+                  style={{
+                    display: 'flex', width: '100%', gap: 10,
+                    padding: '8px 10px', alignItems: 'center',
+                    background: 'transparent', border: 'none',
+                    borderBottom: '1px solid var(--border)',
+                    textAlign: 'left', cursor: 'pointer',
+                    color: 'var(--fg-1)', fontSize: 12,
+                  }}
+                  onClick={() => onPickStockMovement?.(m)}
+                >
+                  <span className="mono" style={{ fontSize: 11, color: 'var(--fg-3)', minWidth: 110 }}>
+                    {m.doc_number}
+                  </span>
+                  <span style={{ minWidth: 90, color: 'var(--fg-3)', fontSize: 11 }}>
+                    {new Date(m.date).toLocaleDateString('ru')}
+                  </span>
+                  <span className="mono" style={{ fontWeight: 500, flex: 1, minWidth: 0 }}>
+                    {m.nomenclature_sku} · {m.nomenclature_name}
+                  </span>
+                  <span className="mono" style={{ fontWeight: 600 }}>
+                    {parseFloat(m.quantity).toLocaleString('ru-RU')} кг
+                  </span>
+                  <span className="mono" style={{ color: 'var(--fg-3)', minWidth: 90, textAlign: 'right' }}>
+                    {parseFloat(m.unit_price_uzs ?? '0').toLocaleString('ru-RU')} сум/кг
+                  </span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
         <div className="field" style={{ gridColumn: '1/3' }}>

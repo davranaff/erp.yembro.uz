@@ -50,6 +50,7 @@ import type {
 import ComponentModal from './ComponentModal';
 import ExecuteTaskModal from './ExecuteTaskModal';
 import PackagingModal from './PackagingModal';
+import PromoteToRawBatchModal from '../stock/PromoteToRawBatchModal';
 import RawBatchModal from './RawBatchModal';
 import RecipeModal from './RecipeModal';
 import TaskModal from './TaskModal';
@@ -161,6 +162,7 @@ export default function FeedPage() {
   const [expandedVersions, setExpandedVersions] = useState<Set<string>>(new Set());
   const [rawModalOpen, setRawModalOpen] = useState(false);
   const [editingRaw, setEditingRaw] = useState<RawMaterialBatch | null>(null);
+  const [promoteFromStock, setPromoteFromStock] = useState<import('@/types/auth').StockMovement | null>(null);
 
   // Mutations
   const recipeDel = recipesCrud.useDelete();
@@ -1594,6 +1596,18 @@ export default function FeedPage() {
         <RawBatchModal
           initial={editingRaw}
           onClose={() => { setRawModalOpen(false); setEditingRaw(null); }}
+          onPickStockMovement={(movement) => {
+            // Закрыть текущую и открыть PromoteToRawBatchModal
+            setRawModalOpen(false);
+            setEditingRaw(null);
+            setPromoteFromStock(movement);
+          }}
+        />
+      )}
+      {promoteFromStock && (
+        <PromoteToRawBatchModal
+          movement={promoteFromStock}
+          onClose={() => setPromoteFromStock(null)}
         />
       )}
       {packageFor && (
