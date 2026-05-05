@@ -115,7 +115,9 @@ export default function StockPage() {
     () => ({
       kind: kind || undefined,
       module_code: moduleCode || undefined,
-      warehouse_from: warehouseId || undefined,
+      // Используем единый фильтр `warehouse` (Q OR на бэкенде по
+      // warehouse_from + warehouse_to), чтобы не терять INCOMING-движения.
+      warehouse: warehouseId || undefined,
       search: search || undefined,
     }),
     [kind, moduleCode, warehouseId, search],
@@ -132,7 +134,7 @@ export default function StockPage() {
     const params = new URLSearchParams();
     if (filter.kind) params.set('kind', filter.kind);
     if (filter.module_code) params.set('module_code', filter.module_code);
-    if (filter.warehouse_from) params.set('warehouse_from', filter.warehouse_from);
+    if (filter.warehouse) params.set('warehouse', filter.warehouse);
     if (filter.search) params.set('search', filter.search);
     const qs = params.toString();
     return qs

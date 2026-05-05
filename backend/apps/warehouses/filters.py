@@ -50,6 +50,14 @@ class StockMovementFilter(django_filters.FilterSet):
     batch_doc = django_filters.CharFilter(
         field_name="batch__doc_number", lookup_expr="icontains"
     )
+    # Единый фильтр «склад» — ищет движения где склад фигурирует
+    # либо как источник (OUTGOING), либо как получатель (INCOMING).
+    # Без этого пользователь, фильтруя «По складу X», видит только OUTGOING
+    # и пропускает оприходования (приёмки, расфасовка, transfer in).
+    warehouse = django_filters.UUIDFilter(method="filter_warehouse")
+
+    def filter_warehouse(self, qs, name, value):
+        return qs.filter(Q(warehouse_from=value) | Q(warehouse_to=value))
 
     class Meta:
         model = StockMovement
