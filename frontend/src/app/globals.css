@@ -590,7 +590,7 @@ select.input {
   animation: bd-in 150ms var(--ease);
 }
 .drawer {
-  width: min(880px, 90vw);
+  width: min(1100px, 92vw);
   height: 100vh;
   /* Динамический viewport: на iOS Safari URL-bar не съедает контент */
   height: 100dvh;

@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 
 from celery import shared_task
+from django.db.models import Q
 
 logger = logging.getLogger(__name__)
 
@@ -483,6 +484,252 @@ def pre_block_warning_daily_task() -> dict:
                 )
 
     logger.info("pre_block_warning_daily_task: queued=%d", queued)
+    return {"queued": queued}
+
+
+# ─── Head morning brief (07:00) ──────────────────────────────────────────
+
+
+@shared_task(name="apps.tgbot.head_morning_brief_task")
+def head_morning_brief_task() -> dict:
+    """Утренний brief каждому head'у модуля (level=admin на свой модуль).
+
+    Логика: для каждой org — ищем head'ов production-модулей (admin
+    доступ). Каждому шлём mini-сводку его модуля (sotuvlar/xaridlar/
+    qoldiq за вчера) — чтобы день начинался с свежей картинки без
+    необходимости открывать бот.
+    """
+    from apps.organizations.models import Organization
+
+    from .notifications import fmt_head_brief_uz
+
+    PRODUCTION_MODULES = [
+        "matochnik", "incubation", "feedlot", "slaughter",
+        "feed", "vet",
+    ]
+    queued = 0
+    for org in Organization.objects.filter(is_active=True).iterator():
+        for module_code in PRODUCTION_MODULES:
+            try:
+                text = fmt_head_brief_uz(org, module_code)
+                if text is None:
+                    continue  # модуль выключен или нет данных
+                # Шлём только head'ам этого модуля (level=admin), не всему staff.
+                notify_admins_task.delay(
+                    text, str(org.id), module_code, min_level="admin",
+                )
+                queued += 1
+            except Exception:  # noqa: BLE001
+                logger.exception(
+                    "head_morning_brief: org=%s module=%s failed",
+                    org.code, module_code,
+                )
+
+    logger.info("head_morning_brief_task: queued=%d", queued)
+    return {"queued": queued}
+
+
+# ─── Cash-flow alert (касса в минусе) ────────────────────────────────────
+
+
+@shared_task(name="apps.tgbot.cashflow_alert_task")
+def cashflow_alert_task() -> dict:
+    """Каждый день (07:30) проверяем не ушла ли касса/банк в МИНУС.
+
+    Если хотя бы один cash-канал отрицательный → admin модуля 'admin'
+    + 'ledger' получают alert. Это сигнал «что-то не так с движением
+    денег» — либо начальный остаток не настроен, либо реальный овердрафт.
+    """
+    from apps.dashboard.services import cash_balances
+    from apps.organizations.models import Organization
+
+    from .notifications import fmt_cashflow_alert_uz
+
+    queued = 0
+    for org in Organization.objects.filter(is_active=True).iterator():
+        try:
+            cash = cash_balances(org)
+            negatives = []
+            for ch_key, ch_data in cash.items():
+                if ch_key.startswith("_"):
+                    continue
+                bal = float(ch_data.get("balance_uzs", 0) or 0)
+                if bal < 0:
+                    negatives.append((ch_data.get("label", ch_key), bal))
+            if not negatives:
+                continue
+            text = fmt_cashflow_alert_uz(negatives, cash.get("_total_uzs", 0))
+            notify_admins_task.delay(
+                text, str(org.id),
+                modules=["admin", "ledger"],
+            )
+            queued += 1
+        except Exception:  # noqa: BLE001
+            logger.exception("cashflow_alert: org=%s failed", org.code)
+
+    logger.info("cashflow_alert_task: queued=%d", queued)
+    return {"queued": queued}
+
+
+# ─── Stale-payment reminder (продажа с долгом без касания > 7 дней) ───────
+
+
+@shared_task(name="apps.tgbot.stale_payment_reminder_task")
+def stale_payment_reminder_task() -> dict:
+    """Каждый день (07:45) ищет confirmed-продажи с долгом, у которых
+    последняя SaleCommunication > 7 дней назад (или вообще нет касаний).
+    Пинок sales-админу: «займись клиентом X».
+
+    Не путать с debt-reminder (тот шлёт КЛИЕНТУ). Этот шлёт ВНУТРИ —
+    менеджеру который должен вести коммуникацию.
+    """
+    from datetime import date as _date, datetime, timedelta, timezone as _tz
+    from django.db.models import Max
+    from apps.organizations.models import Organization
+    from apps.sales.models import SaleCommunication, SaleOrder
+
+    from .notifications import fmt_stale_payment_alert_uz
+
+    threshold = datetime.now(_tz.utc) - timedelta(days=7)
+    queued = 0
+    for org in Organization.objects.filter(is_active=True).iterator():
+        try:
+            stale = list(
+                SaleOrder.objects
+                .filter(
+                    organization=org, status=SaleOrder.Status.CONFIRMED,
+                )
+                .exclude(payment_status=SaleOrder.PaymentStatus.PAID)
+                .annotate(last_touch=Max("communications__contacted_at"))
+                .filter(
+                    # Либо вообще нет касаний, либо последнее > 7 дней назад
+                    Q(last_touch__isnull=True) | Q(last_touch__lt=threshold),
+                )
+                .select_related("customer")
+                .order_by("date")[:50]
+            )
+            if not stale:
+                continue
+            text = fmt_stale_payment_alert_uz(stale, threshold_days=7)
+            notify_admins_task.delay(text, str(org.id), "sales")
+            queued += 1
+        except Exception:  # noqa: BLE001
+            logger.exception("stale_payment: org=%s failed", org.code)
+
+    logger.info("stale_payment_reminder_task: queued=%d", queued)
+    return {"queued": queued}
+
+
+# ─── Low-stock warning (комбикорм закончится через N дней) ───────────────
+
+
+@shared_task(name="apps.tgbot.low_stock_feed_task")
+def low_stock_feed_task() -> dict:
+    """Каждое утро (08:30) проверяем партии готового корма (FeedBatch +
+    FeedBagLot ACTIVE/APPROVED). Считаем средний дневной расход за
+    последние 14 дней (через StockMovement OUTGOING). Если по этому
+    темпу запас закончится за <3 дня → alert head'у feed-модуля.
+
+    Идея: дать оператору возможность заказать сырьё / запустить замес
+    ДО того как корм закончился, а не пост-фактум.
+    """
+    from datetime import date as _date, datetime, timedelta, timezone as _tz
+    from decimal import Decimal
+    from django.db.models import Sum
+    from apps.organizations.models import Organization
+
+    from .notifications import fmt_low_stock_alert_uz
+
+    queued = 0
+    for org in Organization.objects.filter(is_active=True).iterator():
+        try:
+            alerts = _compute_low_stock_alerts(org)
+            if not alerts:
+                continue
+            text = fmt_low_stock_alert_uz(alerts)
+            notify_admins_task.delay(text, str(org.id), "feed")
+            queued += 1
+        except Exception:  # noqa: BLE001
+            logger.exception("low_stock_feed: org=%s failed", org.code)
+
+    logger.info("low_stock_feed_task: queued=%d", queued)
+    return {"queued": queued}
+
+
+def _compute_low_stock_alerts(org) -> list:
+    """Returns list of (label, remaining_qty, avg_daily_consumption, days_left)."""
+    from datetime import date as _date, timedelta
+    from decimal import Decimal
+    from django.db.models import Sum
+    from apps.feed.models import FeedBagLot, FeedBatch
+    from apps.warehouses.models import StockMovement
+
+    today = _date.today()
+    df = today - timedelta(days=14)
+
+    alerts = []
+    for fb in FeedBatch.objects.filter(
+        organization=org, status=FeedBatch.Status.APPROVED,
+        current_quantity_kg__gt=0,
+    ).select_related("recipe_version__recipe"):
+        # Средний расход за 14 дней по этой nomenclature (через recipe.code)
+        recipe_code = (
+            fb.recipe_version.recipe.code if fb.recipe_version_id else None
+        )
+        if not recipe_code:
+            continue
+        # Берём все OUTGOING по этой партии (через source_object_id)
+        consumed = (
+            StockMovement.objects.filter(
+                organization=org, kind=StockMovement.Kind.OUTGOING,
+                date__date__gte=df, date__date__lte=today,
+                source_object_id=fb.id,
+            ).aggregate(s=Sum("quantity"))["s"] or Decimal("0")
+        )
+        avg_daily = Decimal(consumed) / Decimal("14")
+        if avg_daily <= 0:
+            continue  # не расходуется — нет смысла alert'ить
+        remaining = Decimal(fb.current_quantity_kg)
+        days_left = float(remaining / avg_daily)
+        if days_left < 3:
+            alerts.append({
+                "label": f"{fb.doc_number} · {recipe_code}",
+                "remaining": f"{float(remaining):,.0f} kg".replace(",", " "),
+                "avg_daily": f"{float(avg_daily):,.0f} kg/kun".replace(",", " "),
+                "days_left": round(days_left, 1),
+            })
+    return alerts
+
+
+# ─── Weekly Monday summary (07:00 в понедельник) ──────────────────────────
+
+
+@shared_task(name="apps.tgbot.weekly_monday_summary_task")
+def weekly_monday_summary_task() -> dict:
+    """Понедельник 07:00 — недельный обзор для admin-линков с
+    digest_enabled. Что было за прошлую неделю: продажи / оплаты /
+    закупки / производство / ключевые KPI.
+
+    Дополняет owner-digest (ежедневный) — еженедельный показывает тренд.
+    """
+    from apps.organizations.models import Organization
+
+    from .notifications import fmt_weekly_summary_uz
+
+    queued = 0
+    for org in Organization.objects.filter(is_active=True).iterator():
+        try:
+            text = fmt_weekly_summary_uz(org)
+            if text is None:
+                continue
+            notify_admins_task.delay(
+                text, str(org.id), modules=["admin", "reports"],
+            )
+            queued += 1
+        except Exception:  # noqa: BLE001
+            logger.exception("weekly_monday_summary: org=%s failed", org.code)
+
+    logger.info("weekly_monday_summary_task: queued=%d", queued)
     return {"queued": queued}
 
 

@@ -193,6 +193,250 @@ def fmt_promise_broken_uz(sale_order, communication) -> str:
     )
 
 
+def fmt_head_brief_uz(org, module_code: str) -> str | None:
+    """Утренний brief head'у модуля: за вчера sotuv / xarid / cash-снимок.
+
+    Возвращает None если по модулю за вчера ничего не происходило —
+    тогда не шлём (без шума).
+    """
+    from datetime import date as _date, timedelta
+    from decimal import Decimal
+    from django.db.models import Sum
+    from apps.modules.models import Module
+    from apps.purchases.models import PurchaseOrder
+    from apps.sales.models import SaleOrder
+
+    try:
+        module = Module.objects.get(code=module_code)
+    except Module.DoesNotExist:
+        return None
+
+    yesterday = _date.today() - timedelta(days=1)
+
+    # Sales вчера: distinct orders с item этого модуля
+    so_qs = SaleOrder.objects.filter(
+        organization=org, status=SaleOrder.Status.CONFIRMED,
+        date=yesterday,
+    )
+    if module_code == "feed":
+        so_qs = so_qs.filter(
+            Q(items__feed_batch__isnull=False)
+            | Q(items__feed_bag_lot__isnull=False)
+        )
+    elif module_code == "vet":
+        so_qs = so_qs.filter(
+            Q(items__vet_stock_batch__isnull=False)
+            | Q(items__vet_accessory__isnull=False)
+        )
+    elif module_code in ("matochnik", "incubation", "feedlot", "slaughter"):
+        so_qs = so_qs.filter(items__batch__current_module__code=module_code)
+    else:
+        so_qs = so_qs.none()
+
+    so_agg = so_qs.distinct().aggregate(
+        n=_count_zero(),
+        s=Sum("amount_uzs"),
+        p=Sum("paid_amount_uzs"),
+    )
+    sales_count = so_agg["n"] or 0
+    sales_invoiced = Decimal(so_agg["s"] or 0)
+    sales_paid = Decimal(so_agg["p"] or 0)
+
+    po_agg = PurchaseOrder.objects.filter(
+        organization=org, module=module,
+        status=PurchaseOrder.Status.CONFIRMED,
+        date=yesterday,
+    ).aggregate(
+        n=_count_zero(),
+        s=Sum("amount_uzs"),
+        p=Sum("paid_amount_uzs"),
+    )
+    purch_count = po_agg["n"] or 0
+    purch_invoiced = Decimal(po_agg["s"] or 0)
+    purch_paid = Decimal(po_agg["p"] or 0)
+
+    # Если за вчера вообще ничего — пустой brief не шлём
+    if sales_count == 0 and purch_count == 0:
+        return None
+
+    label = MODULE_LABEL_BRIEF.get(module_code, module_code)
+    lines = [
+        f"☀️ <b>Tongi brief — {label}</b>",
+        f"<i>Kechagi kun: {yesterday}</i>",
+        "",
+    ]
+    if sales_count > 0:
+        debt = sales_invoiced - sales_paid
+        lines.append(
+            f"📤 Sotuv: <b>{sales_count}</b> ta · "
+            f"{_fmt_money(sales_invoiced)} so'm"
+        )
+        lines.append(
+            f"   ↳ to'landi: {_fmt_money(sales_paid)} · "
+            f"qarz: <b>{_fmt_money(debt)}</b>"
+        )
+    if purch_count > 0:
+        debt = purch_invoiced - purch_paid
+        lines.append(
+            f"📥 Xarid: <b>{purch_count}</b> ta · "
+            f"{_fmt_money(purch_invoiced)} so'm"
+        )
+        lines.append(
+            f"   ↳ to'landi: {_fmt_money(purch_paid)} · "
+            f"qarz biz: <b>{_fmt_money(debt)}</b>"
+        )
+
+    return "\n".join(lines)
+
+
+# Узбекские лейблы для head-brief (сжато — в pushe место экономим).
+MODULE_LABEL_BRIEF = {
+    "matochnik":  "Naslchilik",
+    "incubation": "Inkubatsiya",
+    "feedlot":    "Bo'rdoqi",
+    "slaughter":  "So'yishxona",
+    "feed":       "Yem",
+    "vet":        "Veterinariya",
+}
+
+
+def _count_zero():
+    """`Count('id')` хелпер чтобы не таскать import повсюду."""
+    from django.db.models import Count
+    return Count("id")
+
+
+def fmt_cashflow_alert_uz(negatives: list, total_uzs) -> str:
+    """Alert о минусе на кассах/счетах. negatives = [(label, balance), …]."""
+    from decimal import Decimal
+
+    lines = [
+        "🚨 <b>Diqqat: kassada manfiy qoldiq!</b>",
+        "",
+    ]
+    for label, bal in negatives:
+        lines.append(
+            f"  🔴 {label}: <b>−{_fmt_money(abs(Decimal(str(bal))))}</b> so'm"
+        )
+    total = Decimal(str(total_uzs))
+    if total < 0:
+        lines.append("")
+        lines.append(f"<b>Jami:</b> <b>−{_fmt_money(abs(total))}</b> so'm")
+    lines.append("")
+    lines.append(
+        "⚠️ Tekshiring: dastlabki qoldiqlar to'g'ri sozlanganmi yoki "
+        "haqiqatda overdraft bormi."
+    )
+    return "\n".join(lines)
+
+
+def fmt_stale_payment_alert_uz(stale_orders: list, threshold_days: int) -> str:
+    """Alert sales-админу: продажи без касания > threshold_days."""
+    lines = [
+        f"📞 <b>Mijozlar bilan ishlash kerak</b>",
+        f"<i>{threshold_days} kundan ortiq qarzdorlar bilan aloqa yo'q</i>",
+        "",
+        f"Jami: <b>{len(stale_orders)}</b> ta hujjat",
+        "",
+    ]
+    for o in stale_orders[:10]:
+        from decimal import Decimal
+        debt = Decimal(o.amount_uzs or 0) - Decimal(o.paid_amount_uzs or 0)
+        cust = o.customer.name if o.customer_id else "—"
+        lines.append(
+            f"• <b>{cust}</b>\n"
+            f"   <code>{o.doc_number}</code> · qarz "
+            f"<b>{_fmt_money(debt)}</b> so'm"
+        )
+    if len(stale_orders) > 10:
+        lines.append(f"… va yana {len(stale_orders) - 10} ta")
+    lines.append("")
+    lines.append("💼 Mijozlar bilan bog'lanib, va'da olib qo'ying.")
+    return "\n".join(lines)
+
+
+def fmt_low_stock_alert_uz(alerts: list) -> str:
+    """Alert head feed'a: партии корма закончатся через <3 дня."""
+    lines = [
+        "📉 <b>Yem zaxiralari tugayapti!</b>",
+        "<i>Joriy iste'mol bo'yicha 3 kundan kam qoldi</i>",
+        "",
+    ]
+    for a in alerts[:10]:
+        lines.append(
+            f"• <b>{a['label']}</b>\n"
+            f"   Qoldiq: {a['remaining']} · "
+            f"o'rtacha: {a['avg_daily']} · "
+            f"<b>{a['days_left']} kun</b> qoldi"
+        )
+    if len(alerts) > 10:
+        lines.append(f"… va yana {len(alerts) - 10} ta")
+    lines.append("")
+    lines.append("🌾 Yangi zamesni rejalashtiring yoki xom-ashyo xarid qiling.")
+    return "\n".join(lines)
+
+
+def fmt_weekly_summary_uz(org) -> str | None:
+    """Понедельник 07:00 — обзор прошлой недели для admin/reports."""
+    from datetime import date as _date, timedelta
+    from decimal import Decimal
+    from django.db.models import Count, Sum
+    from apps.purchases.models import PurchaseOrder
+    from apps.sales.models import SaleOrder
+
+    today = _date.today()
+    week_end = today - timedelta(days=1)
+    week_start = today - timedelta(days=7)
+
+    so_agg = SaleOrder.objects.filter(
+        organization=org, status=SaleOrder.Status.CONFIRMED,
+        date__gte=week_start, date__lte=week_end,
+    ).aggregate(
+        n=Count("id"),
+        s=Sum("amount_uzs"),
+        p=Sum("paid_amount_uzs"),
+    )
+    sales_n = so_agg["n"] or 0
+    sales_total = Decimal(so_agg["s"] or 0)
+    sales_paid = Decimal(so_agg["p"] or 0)
+
+    po_agg = PurchaseOrder.objects.filter(
+        organization=org, status=PurchaseOrder.Status.CONFIRMED,
+        date__gte=week_start, date__lte=week_end,
+    ).aggregate(
+        n=Count("id"),
+        s=Sum("amount_uzs"),
+        p=Sum("paid_amount_uzs"),
+    )
+    purch_n = po_agg["n"] or 0
+    purch_total = Decimal(po_agg["s"] or 0)
+    purch_paid = Decimal(po_agg["p"] or 0)
+
+    if sales_n == 0 and purch_n == 0:
+        return None  # пустая неделя — не шумим
+
+    sales_pct = (
+        (sales_paid / sales_total * 100) if sales_total > 0 else Decimal("0")
+    )
+    lines = [
+        "📊 <b>Haftalik hisobot</b>",
+        f"<i>{week_start} — {week_end}</i>",
+        "",
+        f"📤 Sotuvlar: <b>{sales_n}</b> ta · "
+        f"<b>{_fmt_money(sales_total)}</b> so'm",
+        f"  ↳ to'langan: {_fmt_money(sales_paid)} ({sales_pct:.0f}%)",
+        f"  ↳ qarz:      <b>{_fmt_money(sales_total - sales_paid)}</b> so'm",
+        "",
+        f"📥 Xaridlar: <b>{purch_n}</b> ta · "
+        f"{_fmt_money(purch_total)} so'm",
+        f"  ↳ to'langan: {_fmt_money(purch_paid)}",
+        f"  ↳ qarz biz:  {_fmt_money(purch_total - purch_paid)}",
+        "",
+        "Yangi haftaga sog'-omon yetib bordingiz! 💼",
+    ]
+    return "\n".join(lines)
+
+
 def fmt_pre_block_warning_uz(counterparty, credit_result, ratio) -> str:
     """Mijozga: «вы близко к лимиту, ещё немного и блок»."""
     from decimal import Decimal
