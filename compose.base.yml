@@ -26,6 +26,7 @@ services:
       - public
     volumes:
       - uploads_data:${APP_STORAGE_LOCAL_ROOT:-/data/uploads}
+      - staticfiles_data:/app/staticfiles
     healthcheck:
       test:
         - CMD
@@ -52,6 +53,8 @@ services:
         condition: service_healthy
     networks:
       - internal
+    volumes:
+      - staticfiles_data:/app/staticfiles
     restart: "no"
 
   worker:
@@ -180,6 +183,7 @@ volumes:
   postgres_data: {}
   redis_data: {}
   uploads_data: {}
+  staticfiles_data: {}
 
 networks:
   internal: {}
