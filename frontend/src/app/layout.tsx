@@ -23,13 +23,24 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL(
+    process.env.NEXT_PUBLIC_SITE_URL || 'https://erp.yembro.uz',
+  ),
   title: 'YemBro ERP',
   description: 'Учётная система птицеводческого предприятия',
   manifest: '/manifest.webmanifest',
+  icons: {
+    icon: [
+      { url: '/logo.png', type: 'image/png' },
+    ],
+    shortcut: '/logo.png',
+    apple: '/logo.png',
+  },
   appleWebApp: {
     capable: true,
     title: 'YemBro',
     statusBarStyle: 'default',
+    startupImage: ['/logo.png'],
   },
 };
 
