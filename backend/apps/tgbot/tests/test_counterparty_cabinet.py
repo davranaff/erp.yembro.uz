@@ -135,6 +135,77 @@ def test_cp_holat_active_when_under_limit(cp_link, fake_send):
     assert "faol" in text.lower()
 
 
+def test_cp_holat_shows_real_debt_when_no_credit_limit_set(
+    org, m_sales, warehouse, fake_send,
+):
+    """Регрессия: клиент БЕЗ credit_limit_uzs/max_overdue_days. У него
+    есть реальный долг 24M (из confirmed-неоплаченной продажи). Бот должен
+    показать актуальный долг, а не 0 (раньше fast-path в check_customer_credit
+    возвращал 0 для клиентов без лимитов)."""
+    cp_no_limit = Counterparty.objects.create(
+        organization=org, code="К-NOLIM", kind="buyer", name="Без лимита",
+        # credit_limit_uzs=None, max_overdue_days=None — defaults
+    )
+    SaleOrder.objects.create(
+        organization=org, module=m_sales, doc_number="ПРД-NL-1",
+        date=date(2026, 4, 1), customer=cp_no_limit, warehouse=warehouse,
+        amount_uzs=Decimal("24000000"), paid_amount_uzs=Decimal("0"),
+        status=SaleOrder.Status.CONFIRMED,
+    )
+    cp_link2 = TgLink.objects.create(
+        organization=org, counterparty=cp_no_limit,
+        chat_id=606060, is_active=True,
+    )
+    dispatch_message(_msg(cp_link2.chat_id, "/holat"))
+    text = fake_send.calls[-1][1]
+    # Должен показать 24 000 000 (а не 0)
+    assert "24 000 000" in text
+    # Статус всё равно faol (лимит не задан → не блокировка), но с
+    # предупреждением что долг есть
+    assert "faol" in text.lower()
+
+
+def test_cp_order_drill_down_shows_items_and_payments(
+    cp_link, buyer, org, m_sales, warehouse, fake_send,
+):
+    """Клик по конкретному заказу → детали с позициями + история платежей."""
+    from apps.nomenclature.models import Category, NomenclatureItem, Unit
+    unit, _ = Unit.objects.get_or_create(
+        organization=org, code="kg", defaults={"name": "kg"},
+    )
+    cat, _ = Category.objects.get_or_create(
+        organization=org, name="Test cat for drill",
+    )
+    nom = NomenclatureItem.objects.create(
+        organization=org, sku="TEST-DRILL", name="Test product",
+        category=cat, unit=unit,
+    )
+    order = SaleOrder.objects.create(
+        organization=org, module=m_sales, doc_number="ПРД-DRILL",
+        date=date(2026, 5, 1), customer=buyer, warehouse=warehouse,
+        amount_uzs=Decimal("3000000"), paid_amount_uzs=Decimal("0"),
+        status=SaleOrder.Status.CONFIRMED,
+    )
+    from apps.sales.models import SaleItem
+    SaleItem.objects.create(
+        order=order, nomenclature=nom,
+        quantity=Decimal("100"), unit_price_uzs=Decimal("30000"),
+        line_total_uzs=Decimal("3000000"),
+    )
+
+    # Эмулируем callback drill-down
+    from apps.tgbot.dispatcher import dispatch_callback
+    dispatch_callback({
+        "id": "cbq-drill", "data": f"cp:order:{order.id}",
+        "message": {"chat": {"id": cp_link.chat_id}, "message_id": 1},
+    })
+    # Текст в edits (callback редактирует in-place)
+    edits_text = "\n".join(t for _, _, t, _ in fake_send.edits)
+    assert "ПРД-DRILL" in edits_text
+    assert "Test product" in edits_text
+    assert "3 000 000" in edits_text
+
+
 def test_cp_holat_blocked_when_over_limit(
     cp_link, buyer, org, m_sales, warehouse, fake_send,
 ):

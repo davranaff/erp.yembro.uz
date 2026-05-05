@@ -85,7 +85,8 @@ def handle_orders_callback(ctx: HandlerCtx) -> None:
 
 
 def _render_orders(ctx: HandlerCtx) -> None:
-    """Последние 10 confirmed-заказов клиента с paid/debt разрезом."""
+    """Последние 10 confirmed-заказов клиента с paid/debt разрезом + сводка
+    и кнопки drill-down на каждый заказ."""
     from apps.sales.models import SaleOrder
 
     cp = ctx.link.counterparty
@@ -100,34 +101,164 @@ def _render_orders(ctx: HandlerCtx) -> None:
     )
     orders = list(qs)
 
-    lines = [f"📦 <b>{cp.name} — buyurtmalaringiz</b>", ""]
+    # Сводка по последним 10
+    sum_total = sum(Decimal(o.amount_uzs or 0) for o in orders)
+    sum_paid = sum(Decimal(o.paid_amount_uzs or 0) for o in orders)
+    sum_debt = sum_total - sum_paid
+
+    lines = [f"📦 <b>Buyurtmalaringiz</b>", f"<i>{cp.name}</i>", ""]
     if not orders:
         lines.append("Hozircha buyurtmalar yo'q.")
-    else:
-        for o in orders:
-            total = Decimal(o.amount_uzs or 0)
-            paid = Decimal(o.paid_amount_uzs or 0)
-            debt = total - paid
-            status_icon = "✅" if debt <= 0 else "⏳"
-            line = (
-                f"{status_icon} <code>{o.doc_number}</code> · {o.date}\n"
-                f"   Summa: <b>{_fmt_money(total)}</b> so'm"
-            )
-            if debt > 0:
-                line += f"\n   Qarz: <b>{_fmt_money(debt)}</b> so'm"
-                if o.due_date:
-                    delta = (o.due_date - _date.today()).days
-                    if delta < 0:
-                        line += f" · 🚨 {abs(delta)} kun kechikdi"
-                    elif delta == 0:
-                        line += " · ⚠️ bugun muddat"
-                    else:
-                        line += f" · {delta} kun qoldi"
-            else:
-                line += " · ✅ to'liq to'langan"
-            lines.append(line)
+        _send_or_edit(ctx, "\n".join(lines), _back_kb())
+        return
 
-    _send_or_edit(ctx, "\n".join(lines), _back_kb())
+    lines.append(f"Oxirgi {len(orders)} ta buyurtma:")
+    lines.append(f"  Jami summa:  <b>{_fmt_money(sum_total)}</b> so'm")
+    lines.append(f"  To'langan:   <b>{_fmt_money(sum_paid)}</b> so'm")
+    lines.append(f"  Qarz:        <b>{_fmt_money(sum_debt)}</b> so'm")
+    lines.append("")
+
+    buttons = []
+    for o in orders:
+        total = Decimal(o.amount_uzs or 0)
+        paid = Decimal(o.paid_amount_uzs or 0)
+        debt = total - paid
+        status_icon = "✅" if debt <= 0 else "⏳"
+        line = (
+            f"{status_icon} <code>{o.doc_number}</code> · {o.date}\n"
+            f"   Summa: <b>{_fmt_money(total)}</b> so'm"
+        )
+        if debt > 0:
+            line += f"\n   Qarz: <b>{_fmt_money(debt)}</b> so'm"
+            if o.due_date:
+                delta = (o.due_date - _date.today()).days
+                if delta < 0:
+                    line += f" · 🚨 {abs(delta)} kun kechikdi"
+                elif delta == 0:
+                    line += " · ⚠️ bugun muddat"
+                else:
+                    line += f" · {delta} kun qoldi"
+        else:
+            line += " · ✅ to'liq to'langan"
+        lines.append(line)
+        # Кнопка drill-down на детали заказа
+        buttons.append((f"📄 {o.doc_number}", f"cp:order:{o.id}"))
+
+    # Делим клавиатуру: сначала кнопки заказов, потом «← Назад»
+    markup = kb(buttons[:8] + [("← Orqaga", "cp:menu")], cols=2)
+    _send_or_edit(ctx, "\n".join(lines), markup)
+
+
+# ─── Детали одного заказа: позиции + платежи ──────────────────────────────
+
+
+@on_callback("cp:order")
+def handle_order_detail_callback(ctx: HandlerCtx) -> None:
+    if not ctx.args:
+        return
+    _render_order_detail(ctx, order_id=ctx.args[0])
+
+
+def _render_order_detail(ctx: HandlerCtx, *, order_id: str) -> None:
+    """Карточка заказа: что купили (позиции) + история платежей."""
+    from apps.payments.models import Payment, PaymentAllocation
+    from apps.sales.models import SaleOrder
+
+    cp = ctx.link.counterparty
+    order = (
+        SaleOrder.objects
+        .filter(
+            id=order_id,
+            organization=ctx.link.organization_id,
+            customer=cp,
+        )
+        .select_related("currency", "warehouse")
+        .first()
+    )
+    if order is None:
+        send_message(ctx.chat_id, "❌ Buyurtma topilmadi.")
+        return
+
+    total = Decimal(order.amount_uzs or 0)
+    paid = Decimal(order.paid_amount_uzs or 0)
+    debt = total - paid
+
+    lines = [
+        f"📄 <b>Buyurtma {order.doc_number}</b>",
+        f"📅 Sana: {order.date}",
+        f"💰 Summa: <b>{_fmt_money(total)}</b> so'm",
+        f"✅ To'langan: <b>{_fmt_money(paid)}</b> so'm",
+    ]
+    if debt > 0:
+        lines.append(f"⏳ Qarz: <b>{_fmt_money(debt)}</b> so'm")
+        if order.due_date:
+            lines.append(f"📆 To'lov muddati: {order.due_date}")
+    else:
+        lines.append("✅ To'liq to'langan")
+    lines.append("")
+
+    # Позиции
+    items = list(
+        order.items.select_related(
+            "nomenclature", "feed_batch", "feed_bag_lot", "vet_stock_batch",
+            "vet_accessory", "batch",
+        )
+    )
+    if items:
+        lines.append("<b>Pozitsiyalar:</b>")
+        for it in items:
+            nom = it.nomenclature.name if it.nomenclature_id else "—"
+            unit = ""
+            if it.feed_bag_lot_id:
+                unit = "qop"
+            elif it.feed_batch_id:
+                unit = "kg"
+            elif it.batch_id and it.batch.unit_id:
+                unit = it.batch.unit.code
+            qty_str = f"{int(float(it.quantity)):,}".replace(",", " ") \
+                if float(it.quantity) == int(float(it.quantity)) \
+                else f"{float(it.quantity):,.3f}".rstrip("0").rstrip(".")
+            lines.append(
+                f"  • {nom} · {qty_str} {unit} × "
+                f"{_fmt_money(it.unit_price_uzs)} = "
+                f"<b>{_fmt_money(it.line_total_uzs)}</b> so'm"
+            )
+        lines.append("")
+
+    # История платежей по этому заказу через PaymentAllocation
+    from django.contrib.contenttypes.models import ContentType
+    so_ct = ContentType.objects.get_for_model(SaleOrder)
+    payments = (
+        Payment.objects
+        .filter(
+            organization=ctx.link.organization_id,
+            allocations__target_content_type=so_ct,
+            allocations__target_object_id=order.id,
+            status=Payment.Status.POSTED,
+        )
+        .order_by("date", "created_at")
+        .distinct()
+    )
+    if payments:
+        lines.append("<b>To'lovlar tarixi:</b>")
+        for p in payments:
+            allocs = PaymentAllocation.objects.filter(
+                payment=p,
+                target_content_type=so_ct,
+                target_object_id=order.id,
+            )
+            alloc_sum = sum(Decimal(a.amount_uzs or 0) for a in allocs)
+            lines.append(
+                f"  • {p.date} · {p.get_channel_display()} · "
+                f"<b>{_fmt_money(alloc_sum)}</b> so'm"
+            )
+    elif paid > 0:
+        lines.append(f"To'langan: {_fmt_money(paid)} so'm")
+
+    _send_or_edit(
+        ctx, "\n".join(lines),
+        kb([("← Buyurtmalar", "cp:orders"), ("🏠 Bosh menyu", "cp:menu")], cols=2),
+    )
 
 
 # ─── /qarz ────────────────────────────────────────────────────────────────
@@ -214,20 +345,36 @@ def handle_status_callback(ctx: HandlerCtx) -> None:
 
 
 def _render_block_status(ctx: HandlerCtx) -> None:
-    """Покажет клиенту: заблокирован ли он от новых покупок и почему.
+    """Показ клиенту: заблокирован ли он от новых покупок и фактический долг.
 
-    Используется тот же check_customer_credit что бэк дёргает на confirm —
-    единая правда. Если ok=True → «можете покупать». Если ok=False —
-    показываем причины и сколько надо погасить.
+    check_customer_credit хорош для решения «блокировать или нет», но его
+    fast-path возвращает current_debt_uzs=0 для клиентов БЕЗ настроенных
+    лимитов (что встречается чаще всего). Для отображения реального долга
+    считаем сами через aging-report — единая логика с /qarz командой.
     """
+    from apps.organizations.models import Organization
+    from apps.sales.models import SaleOrder
     from apps.sales.services.credit_check import check_customer_credit
 
     cp = ctx.link.counterparty
-    org_id = ctx.link.organization_id
-    # Симулируем «новая продажа = 0» — проверяем текущее состояние без
-    # учёта будущих покупок. Если уже сейчас не ok — клиент заблокирован.
-    from apps.organizations.models import Organization
-    org = Organization.objects.get(id=org_id)
+    org = Organization.objects.get(id=ctx.link.organization_id)
+
+    # 1. Реальный долг — суммируем неоплаченные confirmed-продажи.
+    # check_customer_credit для клиентов без credit_limit/max_overdue даёт 0
+    # (fast-path), что вводит в заблуждение «у вас 0 so'm долг» при наличии
+    # реальной дебиторки. Считаем сами.
+    unpaid_qs = (
+        SaleOrder.objects
+        .filter(organization=org, customer=cp, status=SaleOrder.Status.CONFIRMED)
+        .exclude(payment_status=SaleOrder.PaymentStatus.PAID)
+    )
+    actual_debt = sum(
+        (Decimal(o.amount_uzs or 0) - Decimal(o.paid_amount_uzs or 0))
+        for o in unpaid_qs
+    )
+
+    # 2. Решение блокировки — оставляем check_customer_credit (единая правда
+    # с confirm_sale).
     result = check_customer_credit(
         organization=org, customer=cp, new_sale_uzs=Decimal("0"),
     )
@@ -238,25 +385,36 @@ def _render_block_status(ctx: HandlerCtx) -> None:
             "",
             f"<i>{cp.name}</i>",
             "",
-            f"Joriy qarz: <b>{_fmt_money(result.current_debt_uzs)}</b> so'm",
+            f"Joriy qarz: <b>{_fmt_money(actual_debt)}</b> so'm",
         ]
         if result.limit_uzs is not None:
-            available = result.limit_uzs - result.current_debt_uzs
+            available = result.limit_uzs - actual_debt
             lines.append(
                 f"Kredit limiti: {_fmt_money(result.limit_uzs)} so'm"
             )
             lines.append(
                 f"Mavjud limit: <b>{_fmt_money(available)}</b> so'm"
             )
+        elif actual_debt > 0:
+            # Лимит не задан, но долг есть — предупреждаем без блока.
+            lines.append("")
+            lines.append("ℹ️ Kredit limiti belgilanmagan, lekin qarzdorlik mavjud.")
         lines.append("")
-        lines.append("Yangi xaridlarga ruxsat bor.")
+        if actual_debt > 0:
+            lines.append(
+                "Yangi xaridlarga ruxsat bor, lekin avvalgi qarzni "
+                "iloji boricha tezroq to'lash tavsiya etiladi."
+            )
+        else:
+            lines.append("Yangi xaridlarga ruxsat bor.")
     else:
         lines = [
             "🚫 <b>Holat: bloklangan</b>",
             "",
             f"<i>{cp.name}</i>",
             "",
-            f"Joriy qarz: <b>{_fmt_money(result.current_debt_uzs)}</b> so'm",
+            # actual_debt — посчитан из SaleOrder, не из credit_check fast-path
+            f"Joriy qarz: <b>{_fmt_money(actual_debt)}</b> so'm",
         ]
         if result.limit_uzs is not None:
             lines.append(f"Kredit limiti: {_fmt_money(result.limit_uzs)} so'm")

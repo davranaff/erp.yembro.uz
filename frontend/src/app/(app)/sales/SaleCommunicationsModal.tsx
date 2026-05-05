@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 
-import Modal from '@/components/ui/Modal';
+import DetailDrawer from '@/components/DetailDrawer';
 import Badge from '@/components/ui/Badge';
 import Icon from '@/components/ui/Icon';
 import { ApiError } from '@/lib/api';
@@ -109,24 +109,21 @@ export default function SaleCommunicationsModal({ order, onClose }: Props) {
     a.contacted_at < b.contacted_at ? 1 : -1,
   );
 
-  return (
-    <Modal
-      title={`Касания клиента · ${order.doc_number}`}
-      onClose={onClose}
-      footer={
-        <button className="btn btn-ghost" onClick={onClose}>Закрыть</button>
-      }
-    >
-      <div style={{ fontSize: 12, color: 'var(--fg-3)', marginBottom: 14 }}>
-        Клиент: <b>{order.customer_name ?? '—'}</b> ·{' '}
-        Долг:{' '}
-        <span className="mono" style={{ color: 'var(--brand-orange)' }}>
-          {(parseFloat(order.amount_uzs) - parseFloat(order.paid_amount_uzs)).toLocaleString('ru-RU', { maximumFractionDigits: 0 })} сум
-        </span>
-        {order.due_date && <> · Срок до <b>{order.due_date}</b></>}
-      </div>
+  const debtNum = parseFloat(order.amount_uzs) - parseFloat(order.paid_amount_uzs);
+  const subtitle = (
+    `${order.customer_name ?? '—'} · `
+    + `Долг ${debtNum.toLocaleString('ru-RU', { maximumFractionDigits: 0 })} сум`
+    + (order.due_date ? ` · до ${order.due_date}` : '')
+  );
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+  return (
+    <DetailDrawer
+      title={`Касания клиента · ${order.doc_number}`}
+      subtitle={subtitle}
+      onClose={onClose}
+    >
+      {/* Drawer шире модалки → 2 колонки помещаются с воздухом. */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
         {/* ── Таймлайн ─────────────────────────────────────── */}
         <div>
           <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 8 }}>
@@ -261,7 +258,7 @@ export default function SaleCommunicationsModal({ order, onClose }: Props) {
           )}
         </div>
       </div>
-    </Modal>
+    </DetailDrawer>
   );
 }
 
