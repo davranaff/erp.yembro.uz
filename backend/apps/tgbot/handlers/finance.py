@@ -16,7 +16,7 @@ import logging
 from datetime import date, timedelta
 from decimal import Decimal
 
-from django.db.models import F
+from django.db.models import F, Sum
 
 from ..bot import edit_message_text, send_message
 from ..dispatcher import HandlerCtx, command, has_module_access, on_callback
@@ -26,6 +26,42 @@ logger = logging.getLogger(__name__)
 
 
 # ─── helpers ─────────────────────────────────────────────────────────────
+
+
+PAGE_SIZE = 10  # размер страницы для пагинированных списков (debt/cred/sales)
+
+
+def _pagination_kb(prefix: str, page: int, total: int, *, back_to: str) -> dict:
+    """Клавиатура «← / страница X из Y / →» + Назад.
+
+    `prefix` — callback-префикс (e.g. «fin:debt:p»). Кнопки шлют
+    `prefix:<N>`. Если на странице нет пред/следующей — кнопка не
+    показывается (юзер не должен жать в пустоту).
+    """
+    pages = max(1, (total + PAGE_SIZE - 1) // PAGE_SIZE)
+    nav: list[tuple[str, str]] = []
+    if page > 1:
+        nav.append(("← Oldingi", f"{prefix}:{page - 1}"))
+    nav.append((f"{page}/{pages}", "noop"))  # центральная плашка
+    if page < pages:
+        nav.append(("Keyingi →", f"{prefix}:{page + 1}"))
+
+    rows = [nav, [("← Orqaga", back_to)]]
+    return {"inline_keyboard": [
+        [{"text": t, "callback_data": cb} for t, cb in row]
+        for row in rows
+    ]}
+
+
+def _parse_page(args: list[str]) -> int:
+    """Из callback args извлекает номер страницы (default=1)."""
+    if not args:
+        return 1
+    try:
+        n = int(args[0])
+        return max(1, n)
+    except (ValueError, TypeError):
+        return 1
 
 
 def _fmt_uzs(value) -> str:
@@ -196,14 +232,14 @@ def _render_cash(ctx: HandlerCtx, *, edit: bool = False) -> None:
         )
 
     if points:
+        # Без ASCII-чарта: в Telegram он рендерился квадратами и юзер не
+        # понимал что это (см. user-feedback). Оставили только числа.
         net_values = [Decimal(p["in_uzs"]) - Decimal(p["out_uzs"]) for p in points]
-        spark = _ascii_sparkline(net_values)
         net_total = sum(net_values, Decimal("0"))
         in_total = sum((Decimal(p["in_uzs"]) for p in points), Decimal("0"))
         out_total = sum((Decimal(p["out_uzs"]) for p in points), Decimal("0"))
         lines.append("")
         lines.append("<b>Cash-flow · 7 kun</b>")
-        lines.append(f"<code>{spark}</code>")
         lines.append(f"  ⬆️ Kirim:  <code>{_fmt_uzs(in_total)}</code> so'm")
         lines.append(f"  ⬇️ Chiqim: <code>{_fmt_uzs(out_total)}</code> so'm")
         lines.append(f"  ━ Saldo:  <code>{_fmt_signed(net_total)}</code> so'm")
@@ -219,52 +255,73 @@ def handle_debt_cmd(ctx: HandlerCtx) -> None:
     _render_debt(ctx)
 
 
+@on_callback("noop")
+def handle_noop_callback(ctx: HandlerCtx) -> None:
+    """Pagination-плашка «3/7» — кликабельна но ничего не делает.
+    Telegram требует ответ за 15с — answer_callback_query уже дёрнут
+    в dispatcher до handler'а."""
+    return
+
+
 @on_callback("fin:debt")
 def handle_debt_callback(ctx: HandlerCtx) -> None:
     if not _check_or_deny(ctx, modules=["sales", "reports"]):
         return
-    _render_debt(ctx, edit=True)
+    page = _parse_page(ctx.args)
+    _render_debt(ctx, page=page, edit=True)
 
 
-def _render_debt(ctx: HandlerCtx, *, edit: bool = False) -> None:
+def _render_debt(ctx: HandlerCtx, *, page: int = 1, edit: bool = False) -> None:
     from apps.sales.models import SaleOrder
 
     org = ctx.org()
     today = date.today()
-    debts = list(
+
+    base_qs = (
         SaleOrder.objects
         .filter(organization=org, status=SaleOrder.Status.CONFIRMED)
         .exclude(payment_status=SaleOrder.PaymentStatus.PAID)
         .annotate(remaining=F("amount_uzs") - F("paid_amount_uzs"))
         .filter(remaining__gt=0)
         .select_related("customer")
-        .order_by("-remaining")[:5]
+        .order_by("-remaining")
     )
+    total_count = base_qs.count()
+    grand_total = (
+        base_qs.aggregate(s=Sum("remaining"))["s"] or Decimal("0")
+    ) if total_count else Decimal("0")
+
+    pages = max(1, (total_count + PAGE_SIZE - 1) // PAGE_SIZE)
+    page = max(1, min(page, pages))
+    offset = (page - 1) * PAGE_SIZE
+    debts = list(base_qs[offset:offset + PAGE_SIZE])
 
     lines = [
-        "📥 <b>Дебиторка · топ-5</b>",
-        "<i>сколько нам должны клиенты</i>",
+        "📥 <b>Mijoz qarzlari</b>",
+        "<i>kim bizga qarzdor</i>",
         "",
     ]
-    if not debts:
-        lines.append("Все продажи оплачены.")
+    if total_count == 0:
+        lines.append("Barcha sotuvlar to'langan.")
+        markup = kb_back("home:fin")
     else:
-        total = Decimal("0")
-        for i, so in enumerate(debts, 1):
+        lines.append(
+            f"Jami {total_count} ta hujjat · <b>{_fmt_uzs(grand_total)}</b> so'm"
+        )
+        lines.append("")
+        for i, so in enumerate(debts, offset + 1):
             customer = so.customer.name if so.customer_id else "—"
             tail = ""
             if so.due_date and so.due_date < today:
-                tail = f"  <i>просрочка {(today - so.due_date).days} дн</i>"
+                tail = f"  <i>{(today - so.due_date).days} kun kechikkan</i>"
             lines.append(
                 f"{i}. <b>{customer}</b>{tail}\n"
                 f"   <code>{so.doc_number}</code> — "
-                f"<code>{_fmt_uzs(so.remaining)}</code> сум"
+                f"<code>{_fmt_uzs(so.remaining)}</code> so'm"
             )
-            total += so.remaining
-        lines.append("")
-        lines.append(f"<b>Итого:</b> <code>{_fmt_uzs(total)}</code> сум")
+        markup = _pagination_kb("fin:debt", page, total_count, back_to="home:fin")
 
-    _send_or_edit(ctx, "\n".join(lines), kb_back("home:fin"), edit=edit)
+    _send_or_edit(ctx, "\n".join(lines), markup, edit=edit)
 
 
 # ─── /cred (топ-5 кредиторов) ────────────────────────────────────────────
@@ -274,21 +331,16 @@ def _render_debt(ctx: HandlerCtx, *, edit: bool = False) -> None:
 def handle_cred_callback(ctx: HandlerCtx) -> None:
     if not _check_or_deny(ctx, modules=["purchases", "reports"]):
         return
-    _render_cred(ctx, edit=True)
+    page = _parse_page(ctx.args)
+    _render_cred(ctx, page=page, edit=True)
 
 
-def _render_cred(ctx: HandlerCtx, *, edit: bool = False) -> None:
-    """Кредиторка — кому мы должны.
-
-    PurchaseOrder.counterparty (не `supplier`!) — поставщик. status
-    может быть CONFIRMED (поставка проведена) или PAID (полностью
-    закрыт). Берём оба, ловим реально незакрытые через payment_status
-    и remaining > 0.
-    """
+def _render_cred(ctx: HandlerCtx, *, page: int = 1, edit: bool = False) -> None:
+    """Кредиторка — кому мы должны (10 на стр + пагинация)."""
     from apps.purchases.models import PurchaseOrder
 
     org = ctx.org()
-    debts = list(
+    base_qs = (
         PurchaseOrder.objects
         .filter(
             organization=org,
@@ -301,30 +353,41 @@ def _render_cred(ctx: HandlerCtx, *, edit: bool = False) -> None:
         .annotate(remaining=F("amount_uzs") - F("paid_amount_uzs"))
         .filter(remaining__gt=0)
         .select_related("counterparty")
-        .order_by("-remaining")[:5]
+        .order_by("-remaining")
     )
+    total_count = base_qs.count()
+    grand_total = (
+        base_qs.aggregate(s=Sum("remaining"))["s"] or Decimal("0")
+    ) if total_count else Decimal("0")
+
+    pages = max(1, (total_count + PAGE_SIZE - 1) // PAGE_SIZE)
+    page = max(1, min(page, pages))
+    offset = (page - 1) * PAGE_SIZE
+    debts = list(base_qs[offset:offset + PAGE_SIZE])
 
     lines = [
-        "📤 <b>Кредиторка · топ-5</b>",
-        "<i>сколько мы должны поставщикам</i>",
+        "📤 <b>Yetkazib beruvchi qarzlari</b>",
+        "<i>biz kimga qarzdormiz</i>",
         "",
     ]
-    if not debts:
-        lines.append("Все закупки оплачены.")
+    if total_count == 0:
+        lines.append("Barcha xaridlar to'langan.")
+        markup = kb_back("home:fin")
     else:
-        total = Decimal("0")
-        for i, po in enumerate(debts, 1):
+        lines.append(
+            f"Jami {total_count} ta hujjat · <b>{_fmt_uzs(grand_total)}</b> so'm"
+        )
+        lines.append("")
+        for i, po in enumerate(debts, offset + 1):
             supplier = po.counterparty.name if po.counterparty_id else "—"
             lines.append(
                 f"{i}. <b>{supplier}</b>\n"
                 f"   <code>{po.doc_number}</code> — "
-                f"<code>{_fmt_uzs(po.remaining)}</code> сум"
+                f"<code>{_fmt_uzs(po.remaining)}</code> so'm"
             )
-            total += po.remaining
-        lines.append("")
-        lines.append(f"<b>Итого:</b> <code>{_fmt_uzs(total)}</code> сум")
+        markup = _pagination_kb("fin:cred", page, total_count, back_to="home:fin")
 
-    _send_or_edit(ctx, "\n".join(lines), kb_back("home:fin"), edit=edit)
+    _send_or_edit(ctx, "\n".join(lines), markup, edit=edit)
 
 
 # ─── /pnl ────────────────────────────────────────────────────────────────
@@ -503,37 +566,58 @@ def _render_sales(ctx: HandlerCtx, *, period: str, edit: bool = False) -> None:
     paid = agg["p"] or Decimal("0")
     debt = total - paid
     pct_paid = (paid / total * 100) if total > 0 else Decimal("0")
-    top = list(qs.select_related("customer").order_by("-amount_uzs")[:5])
+    # 10 на странице + пагинация. callback: «fin:sales:p:<period>:<page>».
+    # Страница берётся из ctx.args (callback может прислать period+page).
+    page = 1
+    if len(ctx.args) >= 2:
+        try:
+            page = max(1, int(ctx.args[1]))
+        except (ValueError, TypeError):
+            page = 1
+
+    base_qs = qs.select_related("customer").order_by("-amount_uzs")
+    pages = max(1, (n + PAGE_SIZE - 1) // PAGE_SIZE)
+    page = max(1, min(page, pages))
+    offset = (page - 1) * PAGE_SIZE
+    rows = list(base_qs[offset:offset + PAGE_SIZE])
 
     lines = [
-        f"💸 <b>Продажи · {_PERIOD_LABELS[period]}</b>",
+        f"💸 <b>Sotuvlar · {_PERIOD_LABELS[period]}</b>",
         f"<i>{df.isoformat()} — {dt.isoformat()}</i>",
         "",
-        f"  Документов:  <b>{n}</b>",
-        f"  Отгружено:   <code>{_fmt_uzs(total)}</code> сум",
-        f"  ↳ оплачено:  <code>{_fmt_uzs(paid)}</code> ({pct_paid:.0f}%)",
-        f"  ↳ должны:    <code>{_fmt_uzs(debt)}</code> сум",
+        f"  Hujjatlar:    <b>{n}</b>",
+        f"  Otgruzilgan:  <code>{_fmt_uzs(total)}</code> so'm",
+        f"  ↳ to'langan:  <code>{_fmt_uzs(paid)}</code> ({pct_paid:.0f}%)",
+        f"  ↳ qarz:       <code>{_fmt_uzs(debt)}</code> so'm",
     ]
-    if top:
+    if rows:
         lines.append("")
-        lines.append("<b>Топ-5 (отгрузка / долг):</b>")
-        for i, so in enumerate(top, 1):
+        lines.append(f"<b>Hujjatlar (sahifa {page}/{pages}):</b>")
+        for i, so in enumerate(rows, offset + 1):
             customer = so.customer.name if so.customer_id else "—"
             so_total = Decimal(so.amount_uzs or 0)
             so_paid = Decimal(so.paid_amount_uzs or 0)
             so_debt = so_total - so_paid
             debt_block = (
-                f" · долг <code>{_fmt_uzs(so_debt)}</code>"
-                if so_debt > 0 else " · ✅ оплачен"
+                f" · qarz <code>{_fmt_uzs(so_debt)}</code>"
+                if so_debt > 0 else " · ✅ to'langan"
             )
             lines.append(
                 f"  {i}. {customer} · <code>{so.doc_number}</code> · "
                 f"<code>{_fmt_uzs(so_total)}</code>{debt_block}"
             )
 
-    markup = {
-        "inline_keyboard":
-            kb_periods("fin:sales", current=period)["inline_keyboard"]
-            + kb_back("home:fin")["inline_keyboard"]
-    }
-    _send_or_edit(ctx, "\n".join(lines), markup, edit=edit)
+    # Пагинация переключает страницу: callback «fin:sales:<period>:<N>».
+    nav: list[tuple[str, str]] = []
+    if page > 1:
+        nav.append(("← Oldingi", f"fin:sales:{period}:{page - 1}"))
+    nav.append((f"{page}/{pages}", "noop"))
+    if page < pages:
+        nav.append(("Keyingi →", f"fin:sales:{period}:{page + 1}"))
+
+    inline = (
+        kb_periods("fin:sales", current=period)["inline_keyboard"]
+        + [[{"text": t, "callback_data": cb} for t, cb in nav]]
+        + kb_back("home:fin")["inline_keyboard"]
+    )
+    _send_or_edit(ctx, "\n".join(lines), {"inline_keyboard": inline}, edit=edit)
