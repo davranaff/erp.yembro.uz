@@ -32,6 +32,7 @@ from .services.create import (
     create_manual_movement,
     delete_manual_movement,
     is_manual_movement,
+    update_manual_movement,
 )
 
 
@@ -230,6 +231,163 @@ class StockMovementViewSet(
 
         out = StockMovementSerializer(result.movement).data
         return Response(out, status=http_status.HTTP_201_CREATED)
+
+    @action(detail=True, methods=["patch"], url_path="manual")
+    def manual_update(self, request, pk=None):
+        """
+        PATCH /api/warehouses/movements/{id}/manual/
+
+        Body (все поля опциональны):
+          {
+            "date": "ISO datetime",
+            "counterparty": "<uuid>" | null,
+            "batch": "<uuid>" | null
+          }
+
+        Разрешено ТОЛЬКО для ручных движений. quantity / unit_price /
+        amount / kind / nomenclature / warehouse_* — иммутабельны (для
+        изменения нужно delete + recreate, чтобы остатки пересчитались).
+        """
+        from datetime import datetime
+
+        movement = self.get_object()
+        org = request.organization
+
+        date_value = None
+        if "date" in request.data and request.data["date"]:
+            raw = request.data["date"]
+            try:
+                date_value = (
+                    raw if isinstance(raw, datetime)
+                    else datetime.fromisoformat(str(raw).replace("Z", "+00:00"))
+                )
+            except ValueError:
+                raise DRFValidationError(
+                    {"date": "Некорректный формат даты (ожидаю ISO 8601)."}
+                )
+
+        counterparty = None
+        clear_cp = False
+        if "counterparty" in request.data:
+            cp_id = request.data["counterparty"]
+            if cp_id is None or cp_id == "":
+                clear_cp = True
+            else:
+                counterparty = get_object_or_404(
+                    Counterparty, pk=cp_id, organization=org
+                )
+
+        batch = None
+        clear_batch = False
+        if "batch" in request.data:
+            b_id = request.data["batch"]
+            if b_id is None or b_id == "":
+                clear_batch = True
+            else:
+                batch = get_object_or_404(Batch, pk=b_id, organization=org)
+
+        try:
+            updated = update_manual_movement(
+                movement,
+                date_value=date_value,
+                counterparty=counterparty,
+                batch=batch,
+                clear_counterparty=clear_cp,
+                clear_batch=clear_batch,
+                user=request.user,
+            )
+        except StockMovementCreateError as exc:
+            raise DRFValidationError(
+                exc.message_dict if hasattr(exc, "message_dict") else exc.messages
+            )
+
+        return Response(StockMovementSerializer(updated).data)
+
+    @action(detail=True, methods=["post"], url_path="promote-to-raw-batch")
+    def promote_to_raw_batch(self, request, pk=None):
+        """
+        POST /api/warehouses/movements/{id}/promote-to-raw-batch/
+
+        Превратить ручной INCOMING-движение в полноценную партию сырья
+        (RawMaterialBatch) модуля «Корма». Существующее движение
+        перепривязывается к новой партии — без дублирования в журнале.
+
+        Body (опц.):
+          {
+            "moisture_pct_actual": "18.0",
+            "dockage_pct_actual": "1.5",
+            "shrinkage_pct": "5.0",
+            "quarantine_until": "YYYY-MM-DD",
+            "supplier": "<uuid>",
+            "storage_bin": "БК-3",
+            "notes": "..."
+          }
+        """
+        from datetime import date as dt_date
+        from decimal import Decimal, InvalidOperation
+
+        from apps.feed.services.raw_batch_stock import (
+            RawBatchPromoteError,
+            promote_movement_to_raw_batch,
+        )
+
+        movement = self.get_object()
+        org = request.organization
+
+        def _decimal(key):
+            v = request.data.get(key)
+            if v is None or v == "":
+                return None
+            try:
+                return Decimal(str(v))
+            except (InvalidOperation, TypeError):
+                raise DRFValidationError({key: "Некорректное число."})
+
+        quarantine = None
+        if request.data.get("quarantine_until"):
+            try:
+                quarantine = dt_date.fromisoformat(str(request.data["quarantine_until"]))
+            except ValueError:
+                raise DRFValidationError(
+                    {"quarantine_until": "Ожидаю дату YYYY-MM-DD."}
+                )
+
+        supplier = None
+        if request.data.get("supplier"):
+            supplier = get_object_or_404(
+                Counterparty, pk=request.data["supplier"], organization=org
+            )
+
+        try:
+            batch = promote_movement_to_raw_batch(
+                movement,
+                moisture_pct_actual=_decimal("moisture_pct_actual"),
+                dockage_pct_actual=_decimal("dockage_pct_actual"),
+                shrinkage_pct=_decimal("shrinkage_pct"),
+                quarantine_until=quarantine,
+                supplier=supplier,
+                storage_bin=request.data.get("storage_bin", "") or "",
+                notes=request.data.get("notes", "") or "",
+                user=request.user,
+            )
+        except RawBatchPromoteError as exc:
+            raise DRFValidationError(
+                exc.message_dict if hasattr(exc, "message_dict") else exc.messages
+            )
+
+        movement.refresh_from_db()
+        return Response(
+            {
+                "movement": StockMovementSerializer(movement).data,
+                "raw_batch": {
+                    "id": str(batch.id),
+                    "doc_number": batch.doc_number,
+                    "status": batch.status,
+                    "quantity": str(batch.quantity),
+                },
+            },
+            status=http_status.HTTP_201_CREATED,
+        )
 
     def destroy(self, request, *args, **kwargs):
         """

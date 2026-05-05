@@ -123,9 +123,13 @@ class RawMaterialBatchViewSet(OrgScopedModelViewSet):
     def perform_create(self, serializer):
         """
         Авто-генерация doc_number если не задан + автоустановка module=feed.
+        После сохранения создаём привязанный StockMovement INCOMING — чтобы
+        партия отражалась в общем журнале склада (/stock).
         """
         from apps.common.services.numbering import next_doc_number
         from apps.modules.models import Module
+
+        from .services.raw_batch_stock import create_movement_for_raw_batch
 
         org = getattr(self.request, "organization", None)
         kwargs = self._save_kwargs_for_create(serializer)
@@ -142,6 +146,7 @@ class RawMaterialBatchViewSet(OrgScopedModelViewSet):
                 on_date=serializer.validated_data.get("received_date"),
             )
         instance = serializer.save(**kwargs)
+        create_movement_for_raw_batch(instance, user=self.request.user)
         from apps.audit.models import AuditLog
         self._write_audit(AuditLog.Action.CREATE, instance)
 
