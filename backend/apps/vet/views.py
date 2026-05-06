@@ -642,6 +642,7 @@ class VetAccessoryViewSet(OrgScopedModelViewSet):
 
     def perform_create(self, serializer):
         from apps.audit.models import AuditLog
+        from apps.warehouses.models import StockMovement
         from apps.warehouses.services.balance import compute_warehouse_balance_for_sku
         from rest_framework.exceptions import ValidationError as DRFValidationError
 
@@ -664,6 +665,27 @@ class VetAccessoryViewSet(OrgScopedModelViewSet):
             })
 
         kwargs = self._save_kwargs_for_create(serializer)
+
+        # Себестоимость авто-подтягиваем из последнего INCOMING на этом
+        # складе по этому SKU — оператор уже указал unit_price при приёмке
+        # в /stock или PO. Без этого пришлось бы вводить цену дважды.
+        # Frontend не отправляет cost_per_unit_uzs при create.
+        if not serializer.validated_data.get("cost_per_unit_uzs"):
+            last_in = (
+                StockMovement.objects
+                .filter(
+                    organization=warehouse.organization,
+                    warehouse_to=warehouse,
+                    nomenclature=nomenclature,
+                    kind=StockMovement.Kind.INCOMING,
+                )
+                .order_by("-date", "-created_at")
+                .values_list("unit_price_uzs", flat=True)
+                .first()
+            )
+            if last_in is not None:
+                kwargs["cost_per_unit_uzs"] = last_in
+
         # Auto-barcode если пользователь не задал. Формат:
         # `VET-A-{sku}-{rand4}` уникален в рамках org.
         if not serializer.validated_data.get("barcode"):

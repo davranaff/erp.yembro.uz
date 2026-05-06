@@ -50,8 +50,11 @@ export default function AccessoryFormModal({ initial, onClose }: Props) {
   const [nomenclatureId, setNomenclatureId] = useState(initial?.nomenclature ?? '');
   const [warehouseId, setWarehouseId] = useState(initial?.warehouse ?? '');
   const [salePrice, setSalePrice] = useState(initial?.sale_price_uzs ?? '');
+  // Себестоимость в edit показываем read-only (правится через /stock приход).
+  // В create форме поля нет — backend подставит из последнего INCOMING.
   const [costPrice, setCostPrice] = useState(initial?.cost_per_unit_uzs ?? '');
-  const [barcode, setBarcode] = useState(initial?.barcode ?? '');
+  // Barcode на create скрыт — авто-генерируется на бэкенде. На edit
+  // тоже не редактируется через эту форму (если нужно — отдельный flow).
   const [isActive, setIsActive] = useState(initial?.is_active ?? true);
   const [notes, setNotes] = useState(initial?.notes ?? '');
 
@@ -89,16 +92,20 @@ export default function AccessoryFormModal({ initial, onClose }: Props) {
 
   const submit = async () => {
     if (!canSubmit) return;
-    const payload = {
+    const payload: Record<string, unknown> = {
       module: vetModuleId,
       nomenclature: nomenclatureId,
       warehouse: warehouseId,
       sale_price_uzs: salePrice,
-      cost_per_unit_uzs: costPrice || '0',
-      barcode: barcode || null,
       is_active: isActive,
       notes,
     };
+    // Себестоимость и barcode НЕ отправляем при create — backend
+    // подтянет cost из последнего INCOMING на складе и сгенерит barcode.
+    // При edit можно править cost (если оператор вручную поправил avg).
+    if (isEdit) {
+      payload.cost_per_unit_uzs = costPrice || '0';
+    }
     try {
       if (isEdit && initial) {
         await update.mutateAsync({ id: initial.id, patch: payload });
@@ -203,9 +210,24 @@ export default function AccessoryFormModal({ initial, onClose }: Props) {
         )}
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+      <div className="field">
+        <label>Цена продажи, сум *</label>
+        <input
+          className="input mono"
+          type="number"
+          step="0.01"
+          min={0}
+          value={salePrice}
+          onChange={(e) => setSalePrice(e.target.value)}
+        />
+        <div style={{ fontSize: 11, color: 'var(--fg-3)', marginTop: 4 }}>
+          Меняется без переоценки склада.
+        </div>
+      </div>
+
+      {isEdit && (
         <div className="field">
-          <label>Себестоимость, сум{isEdit ? '' : ' *'}</label>
+          <label>Себестоимость, сум</label>
           <input
             className="input mono"
             type="number"
@@ -216,26 +238,11 @@ export default function AccessoryFormModal({ initial, onClose }: Props) {
             placeholder="0.00"
           />
           <div style={{ fontSize: 11, color: 'var(--fg-3)', marginTop: 4 }}>
-            {isEdit
-              ? 'Прямое изменение перезапишет текущий avg. Для корректной приёмки используйте «Принять».'
-              : 'Цена за единицу при первой приёмке. После — пересчёт weighted-avg.'}
+            Текущий avg-cost (берётся из последнего прихода). Прямое
+            изменение перезапишет — обычно не требуется.
           </div>
         </div>
-        <div className="field">
-          <label>Цена продажи, сум *</label>
-          <input
-            className="input mono"
-            type="number"
-            step="0.01"
-            min={0}
-            value={salePrice}
-            onChange={(e) => setSalePrice(e.target.value)}
-          />
-          <div style={{ fontSize: 11, color: 'var(--fg-3)', marginTop: 4 }}>
-            Меняется без переоценки склада.
-          </div>
-        </div>
-      </div>
+      )}
 
       {!isEdit && warehouseId && nomenclatureId && (
         <div style={{
@@ -266,15 +273,8 @@ export default function AccessoryFormModal({ initial, onClose }: Props) {
         </div>
       )}
 
-      <div className="field">
-        <label>Штрих-код</label>
-        <input
-          className="input mono"
-          value={barcode}
-          onChange={(e) => setBarcode(e.target.value)}
-          placeholder="оставьте пустым — авто-генерация"
-        />
-      </div>
+      {/* Штрих-код скрыт — авто-генерируется на бэкенде в формате
+          VET-A-{SKU}-{rand4}. Если нужно ввести вручную — отдельный flow. */}
 
       <div className="field">
         <label>Заметки</label>
