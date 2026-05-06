@@ -58,6 +58,7 @@ export default function ScanBarcodePage({
   const [sellerLabel, setSellerLabel] = useState('');
 
   const [qty, setQty] = useState('1');
+  const [priceOverride, setPriceOverride] = useState('');
   const [customerId, setCustomerId] = useState('');
   const [customers, setCustomers] = useState<SellerCustomer[]>([]);
   const [submitting, setSubmitting] = useState(false);
@@ -73,6 +74,12 @@ export default function ScanBarcodePage({
     fetchPublicLot(barcode)
       .then((data) => {
         setItem(data);
+        if (data) {
+          const defaultPrice = data.source_kind === 'accessory'
+            ? data.sale_price_uzs
+            : data.price_per_unit_uzs;
+          setPriceOverride(defaultPrice ? String(defaultPrice) : '');
+        }
         setLoading(false);
       })
       .catch((e) => {
@@ -97,11 +104,20 @@ export default function ScanBarcodePage({
       alert('Укажите количество > 0');
       return;
     }
+    const trimmedPrice = priceOverride.trim();
+    if (trimmedPrice !== '') {
+      const pNum = parseFloat(trimmedPrice);
+      if (!Number.isFinite(pNum) || pNum <= 0) {
+        alert('Цена должна быть > 0');
+        return;
+      }
+    }
     setSubmitting(true);
     try {
       const result = await submitSellerSale(tok, {
         barcode,
         quantity: qty,
+        ...(trimmedPrice !== '' ? { unit_price_uzs: trimmedPrice } : {}),
         ...(customerId ? { customer_id: customerId } : {}),
       });
       setSuccess({
@@ -111,6 +127,12 @@ export default function ScanBarcodePage({
       });
       const updated = await fetchPublicLot(barcode);
       setItem(updated);
+      if (updated) {
+        const defaultPrice = updated.source_kind === 'accessory'
+          ? updated.sale_price_uzs
+          : updated.price_per_unit_uzs;
+        setPriceOverride(defaultPrice ? String(defaultPrice) : '');
+      }
       setCustomerId('');
     } catch (e) {
       const msg = e instanceof PublicApiError ? e.message : 'Ошибка продажи';
@@ -319,37 +341,84 @@ export default function ScanBarcodePage({
               </div>
             )}
 
-            <div style={{ display: 'flex', gap: 8 }}>
-              <input
-                type="number"
-                step="0.001"
-                min="0"
-                value={qty}
-                onChange={(e) => setQty(e.target.value)}
-                style={{
-                  flex: 1,
-                  padding: '12px 14px',
-                  fontSize: 18, fontFamily: 'monospace',
-                  border: '1px solid #D1D5DB', borderRadius: 6,
-                }}
-              />
-              <button
-                onClick={handleSell}
-                disabled={submitting}
-                style={{
-                  padding: '12px 20px',
-                  background: '#E8751A', color: '#fff',
-                  border: 'none', borderRadius: 6,
-                  fontSize: 15, fontWeight: 600,
-                  cursor: submitting ? 'wait' : 'pointer',
-                  opacity: submitting ? 0.6 : 1,
-                }}
-              >
-                {submitting ? '...' : 'Продать'}
-              </button>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+              <div>
+                <label style={{
+                  display: 'block', fontSize: 11, color: '#6B7280',
+                  textTransform: 'uppercase', marginBottom: 4,
+                }}>
+                  Кол-во
+                </label>
+                <input
+                  type="number"
+                  step="0.001"
+                  min="0"
+                  value={qty}
+                  onChange={(e) => setQty(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '12px 14px',
+                    fontSize: 18, fontFamily: 'monospace',
+                    border: '1px solid #D1D5DB', borderRadius: 6,
+                  }}
+                />
+              </div>
+              <div>
+                <label style={{
+                  display: 'block', fontSize: 11, color: '#6B7280',
+                  textTransform: 'uppercase', marginBottom: 4,
+                }}>
+                  Цена за ед.
+                </label>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={priceOverride}
+                  onChange={(e) => setPriceOverride(e.target.value)}
+                  placeholder={unitPrice ? String(unitPrice) : '0'}
+                  style={{
+                    width: '100%',
+                    padding: '12px 14px',
+                    fontSize: 18, fontFamily: 'monospace',
+                    border: '1px solid #D1D5DB', borderRadius: 6,
+                  }}
+                />
+              </div>
             </div>
-            <div style={{ fontSize: 11, color: '#6B7280', marginTop: 6 }}>
-              Сумма: <strong>{fmtMoney(parseFloat(qty || '0') * parseFloat(unitPrice || '0'))}</strong>
+            <button
+              onClick={handleSell}
+              disabled={submitting}
+              style={{
+                marginTop: 10,
+                width: '100%',
+                padding: '12px 20px',
+                background: '#E8751A', color: '#fff',
+                border: 'none', borderRadius: 6,
+                fontSize: 15, fontWeight: 600,
+                cursor: submitting ? 'wait' : 'pointer',
+                opacity: submitting ? 0.6 : 1,
+              }}
+            >
+              {submitting ? '...' : 'Продать'}
+            </button>
+            <div style={{
+              fontSize: 12, color: '#6B7280', marginTop: 8,
+              display: 'flex', justifyContent: 'space-between', alignItems: 'baseline',
+            }}>
+              <span>
+                Сумма: <strong style={{ color: '#111827', fontSize: 14 }}>
+                  {fmtMoney(
+                    parseFloat(qty || '0') *
+                    parseFloat(priceOverride || String(unitPrice || '0') || '0'),
+                  )}
+                </strong>
+              </span>
+              {priceOverride && unitPrice && parseFloat(priceOverride) !== parseFloat(String(unitPrice)) && (
+                <span style={{ color: '#92400E' }}>
+                  ≠ базовой ({fmtMoney(unitPrice)})
+                </span>
+              )}
             </div>
             {!isAccessory && item.status === 'expiring_soon' && (
               <div style={{
