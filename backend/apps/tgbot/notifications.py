@@ -286,51 +286,6 @@ def fmt_debt_reminder_uz(sale_order, counterparty) -> str:
     )
 
 
-def fmt_opening_debt_reminder_uz(counterparty) -> str:
-    """
-    Mijozga: «sizning bizga qarzdorlik (avvalgi tizimdan ko'chirildi)».
-
-    Используется когда у клиента есть opening_debt_uzs > 0 (стартовый
-    долг, перенесённый при миграции с другой ERP), но нет привязанной
-    SaleOrder для классического fmt_debt_reminder_uz.
-
-    Тон мягкий — это «исторический» долг, клиент мог о нём забыть, но
-    мы его официально учли.
-    """
-    from datetime import date as _date
-    from decimal import Decimal
-
-    debt = Decimal(counterparty.opening_debt_uzs or 0)
-    opening_date = counterparty.opening_balance_date
-
-    days_since = None
-    if opening_date:
-        days_since = (_date.today() - opening_date).days
-
-    lines = [
-        "📢 <b>Eslatma: oldingi qarzdorlik</b>",
-        "",
-        f"<i>{counterparty.name}</i>",
-        "",
-        f"💰 <b>Qarz:</b> <code>{_fmt_money(debt)}</code> so'm",
-    ]
-    if opening_date:
-        lines.append(f"📅 <b>Qayd etilgan sana:</b> {_fmt_date(opening_date)}")
-        if days_since is not None and days_since > 0:
-            lines.append(f"⏳ <b>Davomiyligi:</b> {days_since} kun")
-    lines.append("")
-    lines.append(
-        "💳 Iltimos, qarzni iloji boricha to'lang yoki menejer bilan "
-        "bog'lanib kelishuv tuzing."
-    )
-    lines.append("")
-    lines.append(
-        "<i>Bu qarz oldingi tizimdan ko'chirildi. Savol bo'lsa biz "
-        "bilan bog'laning.</i>"
-    )
-    return "\n".join(lines)
-
-
 def fmt_promise_broken_uz(sale_order, communication) -> str:
     """Mijozga: «kecha to'lashga va'da bergan edingiz, hali to'lov yo'q»."""
     from decimal import Decimal

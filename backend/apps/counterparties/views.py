@@ -138,6 +138,27 @@ class CounterpartyViewSet(OrgScopedModelViewSet):
     ordering_fields = ["code", "name", "balance_uzs", "created_at"]
     ordering = ["code"]
 
+    def perform_create(self, serializer):
+        super().perform_create(serializer)
+        self._sync_opening_balance(serializer.instance)
+
+    def perform_update(self, serializer):
+        super().perform_update(serializer)
+        self._sync_opening_balance(serializer.instance)
+
+    def _sync_opening_balance(self, counterparty):
+        """Материализует opening_debt в синтетический SaleOrder.
+
+        Без этого долг живёт только числом на карточке — касса не может
+        принять оплату, /tasks молчит, aging требует костыля. Подробнее
+        в apps/sales/services/opening_balance.py.
+        """
+        from apps.sales.services.opening_balance import (
+            sync_opening_balance_for_counterparty,
+        )
+
+        sync_opening_balance_for_counterparty(counterparty)
+
     @action(detail=False, methods=["get"], url_path="balances")
     def balances(self, request):
         """GET /api/counterparties/balances/

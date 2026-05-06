@@ -226,10 +226,9 @@ def debt_reminder_daily_task() -> dict:
       - T+N: каждые 7 дней просрочки (T+1, T+8, T+15, …)
       - без due_date: раз в неделю по понедельникам (мягкое напоминание)
 
-    Дополнительно по понедельникам — пробег по контрагентам с
-    opening_debt_uzs > 0 (стартовый долг от миграции). У них нет
-    привязанной SaleOrder, поэтому отдельная ветка с
-    fmt_opening_debt_reminder_uz.
+    Стартовые долги (миграция) теперь живут как синтетические SaleOrder
+    с kind=opening_balance — попадают в эту же выборку и напоминания
+    работают по общему расписанию, без отдельной ветки.
 
     Это даёт клиенту 3 чётких касания до срока + еженедельный пинок
     при просрочке, без раздражения.
@@ -252,65 +251,10 @@ def debt_reminder_daily_task() -> dict:
         send_debt_reminder_task.delay(str(order.id))
         queued += 1
 
-    # Opening-debt напоминания — раз в неделю по понедельникам.
-    opening_queued = 0
-    if today.weekday() == 0:
-        from apps.counterparties.models import Counterparty
-
-        cp_qs = Counterparty.objects.filter(
-            is_active=True,
-            opening_debt_uzs__gt=0,
-        )
-        for cp in cp_qs:
-            send_opening_debt_reminder_task.delay(str(cp.id))
-            opening_queued += 1
-
     logger.info(
-        "debt_reminder_daily_task: queued=%d skipped=%d opening=%d",
-        queued, skipped, opening_queued,
+        "debt_reminder_daily_task: queued=%d skipped=%d", queued, skipped,
     )
-    return {
-        "queued": queued,
-        "skipped": skipped,
-        "opening_queued": opening_queued,
-    }
-
-
-@shared_task(name="apps.tgbot.send_opening_debt_reminder_task")
-def send_opening_debt_reminder_task(counterparty_id: str) -> dict:
-    """
-    Отправляет напоминание о стартовом долге (миграция).
-
-    Только если у контрагента есть active TgLink (clientside) —
-    иначе тихий skip.
-    """
-    from apps.counterparties.models import Counterparty
-
-    from .bot import send_message
-    from .models import TgLink
-    from .notifications import fmt_opening_debt_reminder_uz
-
-    try:
-        cp = Counterparty.objects.select_related("organization").get(id=counterparty_id)
-    except Counterparty.DoesNotExist:
-        return {"error": "counterparty_not_found"}
-
-    if not cp.opening_debt_uzs or cp.opening_debt_uzs <= 0:
-        return {"skipped": "no_opening_debt"}
-
-    link = TgLink.objects.filter(
-        organization=cp.organization,
-        counterparty=cp,
-        is_active=True,
-        counterparty__isnull=False,
-    ).first()
-
-    if not link:
-        return {"error": "no_tg_link", "counterparty": counterparty_id}
-
-    text = fmt_opening_debt_reminder_uz(cp)
-    ok = send_message(link.chat_id, text)
-    return {"sent": ok, "chat_id": link.chat_id}
+    return {"queued": queued, "skipped": skipped}
 
 
 def _should_remind_today(order, today) -> bool:

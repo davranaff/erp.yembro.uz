@@ -69,27 +69,26 @@ def check_customer_credit(
     """
     limit = customer.credit_limit_uzs
     max_od = customer.max_overdue_days
-    # Стартовый долг от миграции с другой ERP — добавляется к live-долгу.
-    # Положительное = клиент должен, отрицательное = предоплата.
-    opening = Decimal(customer.opening_debt_uzs or 0)
 
     # Если ни один лимит не задан — fast-path без агрегации.
-    # Opening учитываем как «уже существующий долг» — но если оба лимита
-    # NULL, всё равно проверять не надо.
     if limit is None and max_od is None:
         return CreditCheckResult(
             ok=True,
-            current_debt_uzs=opening,
+            current_debt_uzs=Decimal("0"),
             new_sale_uzs=new_sale_uzs,
         )
 
+    # Стартовый долг (opening_debt_uzs) теперь живёт как синтетический
+    # SaleOrder с kind=OPENING_BALANCE — он попадает в aging_report
+    # как обычный непогашенный счёт. Никаких ручных «+ opening» здесь
+    # больше не нужно. См. apps/sales/services/opening_balance.py.
     report = compute_aging_report(organization, customer_id=str(customer.id))
     if report.rows:
         row = report.rows[0]
-        current_debt = row.total + opening
+        current_debt = row.total
         oldest = row.oldest_overdue_days
     else:
-        current_debt = opening
+        current_debt = Decimal("0")
         oldest = 0
 
     result = CreditCheckResult(
