@@ -109,6 +109,17 @@ def create_manual_movement(
             {"batch": "Партия из другой организации."}
         )
 
+    # Поставщик обязателен для INCOMING — без него мы не можем создать
+    # связанный закуп в /purchases. Это держит инвариант
+    # «приход ↔ закуп»: каждый приход на склад имеет источник-поставщика.
+    if kind == StockMovement.Kind.INCOMING and counterparty is None:
+        raise StockMovementCreateError(
+            {"counterparty": (
+                "Для прихода обязательно укажите поставщика — он автоматически "
+                "становится закупом в /purchases (для отслеживания долга и оплаты)."
+            )}
+        )
+
     when = date_value or timezone.now()
 
     doc_number = next_doc_number(
@@ -200,10 +211,12 @@ def _link_to_auto_purchase(movement: StockMovement, *, user=None) -> None:
     po.save()
 
     PurchaseItem.objects.create(
-        purchase=po,
+        order=po,
         nomenclature=movement.nomenclature,
         quantity=movement.quantity,
         unit_price=movement.unit_price_uzs,
+        line_total_uzs=movement.amount_uzs,
+        received_qty=movement.quantity,
     )
 
     # Перепривязываем movement.source → новый PO
