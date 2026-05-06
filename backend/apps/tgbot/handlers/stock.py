@@ -55,9 +55,12 @@ def handle_fin_stock(ctx: HandlerCtx) -> None:
 
 @on_callback("wh:list")
 def handle_wh_list(ctx: HandlerCtx) -> None:
-    """callback_data = wh:list:<page>"""
-    parts = ctx.data.split(":")
-    page = int(parts[2]) if len(parts) >= 3 else 1
+    """callback_data = wh:list:<page>. Dispatcher отрезает prefix (`wh:list`)
+    и разрезает остаток по `:` → ctx.args = ['<page>']."""
+    try:
+        page = int(ctx.args[0]) if ctx.args else 1
+    except (ValueError, IndexError):
+        page = 1
     _render_warehouse_list(ctx, page=page)
 
 
@@ -115,13 +118,16 @@ def _render_warehouse_list(ctx: HandlerCtx, *, page: int) -> None:
 
 @on_callback("wh:bal")
 def handle_wh_balance(ctx: HandlerCtx) -> None:
-    """callback_data = wh:bal:<warehouse_id>[:page]"""
-    parts = ctx.data.split(":")
-    if len(parts) < 3:
+    """callback_data = wh:bal:<warehouse_id>[:page]. Dispatcher отрезает
+    prefix (`wh:bal`) и разрезает остаток по `:` → ctx.args = ['<uuid>', '<page>']."""
+    if not ctx.args:
         send_message(ctx.chat_id, "Noto'g'ri so'rov.")
         return
-    wh_id = parts[2]
-    page = int(parts[3]) if len(parts) >= 4 else 1
+    wh_id = ctx.args[0]
+    try:
+        page = int(ctx.args[1]) if len(ctx.args) >= 2 else 1
+    except (ValueError, IndexError):
+        page = 1
     _render_warehouse_balance(ctx, wh_id=wh_id, page=page)
 
 

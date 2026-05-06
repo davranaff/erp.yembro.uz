@@ -34,16 +34,87 @@ def _fmt_money(value) -> str:
         return "—"
 
 
+def _fmt_dt(dt) -> str:
+    """
+    Полный человекочитаемый datetime: 06.05.2026 14:32.
+    Принимает date / datetime / None. Если None — возвращает прочерк.
+    Использует local timezone (TIME_ZONE из settings).
+    """
+    from datetime import date as _date, datetime as _datetime
+    from django.utils import timezone
+
+    if dt is None:
+        return "—"
+    if isinstance(dt, _datetime):
+        if timezone.is_aware(dt):
+            dt = timezone.localtime(dt)
+        return dt.strftime("%d.%m.%Y %H:%M")
+    if isinstance(dt, _date):
+        return dt.strftime("%d.%m.%Y")
+    return str(dt)
+
+
+def _fmt_date(d) -> str:
+    """Только дата: 06.05.2026."""
+    from datetime import date as _date, datetime as _datetime
+    from django.utils import timezone
+
+    if d is None:
+        return "—"
+    if isinstance(d, _datetime):
+        if timezone.is_aware(d):
+            d = timezone.localtime(d)
+        return d.strftime("%d.%m.%Y")
+    if isinstance(d, _date):
+        return d.strftime("%d.%m.%Y")
+    return str(d)
+
+
+def _module_label(module) -> str:
+    """Человекочитаемое имя модуля или '—'."""
+    if module is None:
+        return "—"
+    return getattr(module, "name", None) or getattr(module, "code", "—")
+
+
+def _cash_label(payment) -> str:
+    """«50.02 · Вет аптека Касса» или fallback по каналу."""
+    sub = getattr(payment, "cash_subaccount", None)
+    if sub is not None:
+        return f"{sub.code} · {sub.name}"
+    return payment.get_channel_display()
+
+
 # ─── Закуп (uz) — для админов/head purchases ──────────────────────────────
 
 
 def fmt_purchase_confirmed(order) -> str:
+    """Xarid uchun barcha muhim ma'lumotlar: hujjat, yetkazib beruvchi,
+    summa, modul, sana + vaqt o'tkazilgan."""
+    debt_block = ""
+    try:
+        from decimal import Decimal
+        paid = Decimal(order.paid_amount_uzs or 0)
+        total = Decimal(order.amount_uzs or 0)
+        debt = total - paid
+        if debt > 0:
+            debt_block = f"\n⏳ <b>Qarz biz:</b> {_fmt_money(debt)} so'm"
+        elif paid > 0:
+            debt_block = "\n✅ <b>To'liq to'langan</b>"
+    except Exception:
+        pass
+
     return (
-        f"🛒 <b>Xarid o'tkazildi</b>\n"
-        f"📄 Hujjat: <code>{order.doc_number}</code>\n"
-        f"🏢 Yetkazib beruvchi: {order.counterparty.name}\n"
-        f"💰 Summa: <b>{_fmt_money(order.amount_uzs)} so'm</b>\n"
-        f"📅 Sana: {order.date}"
+        "🛒 <b>Xarid o'tkazildi</b>\n"
+        "\n"
+        f"📄 <b>Hujjat:</b> <code>{order.doc_number}</code>\n"
+        f"🏢 <b>Yetkazib beruvchi:</b> {order.counterparty.name}\n"
+        f"🗂 <b>Modul:</b> {_module_label(order.module)}\n"
+        f"💰 <b>Summa:</b> {_fmt_money(order.amount_uzs)} so'm"
+        f"{debt_block}\n"
+        "\n"
+        f"📅 <b>Sana:</b> {_fmt_date(order.date)}\n"
+        f"🕐 <b>O'tkazildi:</b> {_fmt_dt(order.updated_at)}"
     )
 
 
@@ -51,20 +122,56 @@ def fmt_purchase_confirmed(order) -> str:
 
 
 def fmt_payment_posted(payment) -> str:
+    """
+    Полный финансовый отчёт по проведённому платежу:
+        - Направление (расход/доход) + тип (поставщик/клиент/опex)
+        - Контрагент (если есть)
+        - Касса/счёт куда поступило / откуда списано
+        - Канал (наличные / банк / Click)
+        - Модуль (для скоупа)
+        - Сумма + статья расходов (для opex)
+        - Дата операции + полное datetime проведения
+    """
     if payment.direction == "out":
-        icon, direction = "💸", "Yetkazib beruvchiga to'lov"
+        icon, header = "💸", "Chiqim — to'lov amalga oshirildi"
     else:
-        icon, direction = "💰", "Mijozdan tushum"
-    counterparty_line = ""
-    if payment.counterparty:
-        counterparty_line = f"🏢 Kontragent: {payment.counterparty.name}\n"
-    return (
-        f"{icon} <b>{direction}</b>\n"
-        f"{counterparty_line}"
-        f"💳 Kanal: {payment.get_channel_display()}\n"
-        f"💰 Summa: <b>{_fmt_money(payment.amount_uzs)} so'm</b>\n"
-        f"📅 Sana: {payment.date}"
-    )
+        icon, header = "💰", "Kirim — pul tushdi"
+
+    lines = [f"{icon} <b>{header}</b>", ""]
+
+    # Контрагент
+    if payment.counterparty_id:
+        lines.append(f"🏢 <b>Kontragent:</b> {payment.counterparty.name}")
+
+    # Тип платежа
+    kind_display = payment.get_kind_display()
+    lines.append(f"🏷 <b>Turi:</b> {kind_display}")
+
+    # Касса/счёт — критично для понимания «куда деньги»
+    lines.append(f"💼 <b>Kassa/hisob:</b> {_cash_label(payment)}")
+    lines.append(f"💳 <b>Kanal:</b> {payment.get_channel_display()}")
+
+    # Модуль (если задан) — для модульной аналитики
+    if payment.module_id:
+        lines.append(f"🗂 <b>Modul:</b> {_module_label(payment.module)}")
+
+    # Статья расходов (для opex)
+    if payment.expense_article_id:
+        lines.append(f"📁 <b>Modda:</b> {payment.expense_article.name}")
+
+    lines.append("")
+    lines.append(f"💰 <b>Summa:</b> <code>{_fmt_money(payment.amount_uzs)}</code> so'm")
+    lines.append("")
+
+    # Даты
+    lines.append(f"📅 <b>Operatsiya sanasi:</b> {_fmt_date(payment.date)}")
+    lines.append(f"🕐 <b>O'tkazildi:</b> {_fmt_dt(payment.updated_at)}")
+
+    # Документ
+    lines.append("")
+    lines.append(f"📄 <code>{payment.doc_number}</code>")
+
+    return "\n".join(lines)
 
 
 # ─── Платёж (uz) — для клиента (получил наш платёж к ним или мы получили его) ─
@@ -75,13 +182,16 @@ def fmt_payment_received_for_client(payment, order=None) -> str:
     добавляем номер счёта и остаток долга."""
     lines = [
         "✅ <b>To'lovingiz qabul qilindi!</b>",
-        f"💰 Summa: <b>{_fmt_money(payment.amount_uzs)} so'm</b>",
-        f"💳 Kanal: {payment.get_channel_display()}",
-        f"📅 Sana: {payment.date}",
+        "",
+        f"💰 <b>Summa:</b> <code>{_fmt_money(payment.amount_uzs)}</code> so'm",
+        f"💳 <b>Kanal:</b> {payment.get_channel_display()}",
+        "",
+        f"📅 <b>Sana:</b> {_fmt_date(payment.date)}",
+        f"🕐 <b>Qabul qilindi:</b> {_fmt_dt(payment.updated_at)}",
     ]
     if order is not None:
         lines.append("")
-        lines.append(f"📄 Buyurtma: <code>{order.doc_number}</code>")
+        lines.append(f"📄 <b>Buyurtma:</b> <code>{order.doc_number}</code>")
         try:
             from decimal import Decimal
             remaining = Decimal(order.amount_uzs or 0) - Decimal(order.paid_amount_uzs or 0)
@@ -92,7 +202,7 @@ def fmt_payment_received_for_client(payment, order=None) -> str:
                 lines.append("✅ <b>Buyurtma to'liq yopildi.</b>")
             else:
                 lines.append(
-                    f"📊 Qoldiq qarz: <b>{_fmt_money(remaining)} so'm</b>"
+                    f"📊 <b>Qoldiq qarz:</b> {_fmt_money(remaining)} so'm"
                 )
     return "\n".join(lines)
 
@@ -201,7 +311,7 @@ def fmt_head_brief_uz(org, module_code: str) -> str | None:
     """
     from datetime import date as _date, timedelta
     from decimal import Decimal
-    from django.db.models import Sum
+    from django.db.models import Q, Sum
     from apps.modules.models import Module
     from apps.purchases.models import PurchaseOrder
     from apps.sales.models import SaleOrder
@@ -533,32 +643,37 @@ def _fmt(val) -> str:
 
 
 def fmt_sale_confirmed(order) -> str:
-    """Хедер: «Hujjat tayyorlandi · Mahsulot jo'natildi» — чтобы не путали с
+    """Хедер: «Sotuv qaydlandi · mahsulot jo'natildi» — чтобы не путали с
     приходом денег. Явно показываем qarz и срок оплаты."""
     from decimal import Decimal
     items_count = order.items.count() if hasattr(order, "items") else 0
     paid = Decimal(order.paid_amount_uzs or 0)
     total = Decimal(order.amount_uzs or 0)
     debt = total - paid
-    debt_block = ""
+
+    lines = [
+        "📋 <b>Sotuv qaydlandi · mahsulot jo'natildi</b>",
+        "<i>Pul hali kelgani yo'q — alohida bildirish bo'ladi</i>",
+        "",
+        f"📄 <b>Hujjat:</b> <code>{order.doc_number}</code>",
+        f"👤 <b>Mijoz:</b> {order.customer.name}",
+        f"🗂 <b>Modul:</b> {_module_label(order.module)}",
+        f"📦 <b>Pozitsiyalar:</b> {items_count}",
+        "",
+        f"💰 <b>Summa:</b> <code>{_fmt_money(total)}</code> so'm",
+    ]
     if debt > 0:
-        debt_block = f"⏳ To'lanmagan: <b>{_fmt_money(debt)} so'm</b>\n"
+        lines.append(f"⏳ <b>To'lanmagan:</b> {_fmt_money(debt)} so'm")
     elif paid > 0 and debt <= 0:
-        debt_block = "✅ To'lov to'liq qabul qilingan\n"
-    due_block = ""
+        lines.append("✅ <b>To'lov to'liq qabul qilingan</b>")
+
+    lines.append("")
+    lines.append(f"📅 <b>Sana:</b> {_fmt_date(order.date)}")
+    lines.append(f"🕐 <b>O'tkazildi:</b> {_fmt_dt(order.updated_at)}")
     if order.due_date and debt > 0:
-        due_block = f"📆 To'lov muddati: <b>{order.due_date}</b>\n"
-    return (
-        f"📋 <b>Sotuv qaydlandi · mahsulot jo'natildi</b>\n"
-        f"<i>Pul hali kelgani yo'q — alohida bildirish bo'ladi</i>\n\n"
-        f"📄 Hujjat: <code>{order.doc_number}</code>\n"
-        f"👤 Mijoz: {order.customer.name}\n"
-        f"📦 Pozitsiyalar: {items_count}\n"
-        f"💰 Summa: <b>{_fmt_money(total)} so'm</b>\n"
-        f"{debt_block}"
-        f"📅 Sana: {order.date}\n"
-        f"{due_block}"
-    )
+        lines.append(f"📆 <b>To'lov muddati:</b> {_fmt_date(order.due_date)}")
+
+    return "\n".join(lines)
 
 
 # ─── Продажа (uz) — для клиента ──────────────────────────────────────────
@@ -571,22 +686,25 @@ def fmt_sale_confirmed_for_client(order) -> str:
     paid = Decimal(order.paid_amount_uzs or 0)
     total = Decimal(order.amount_uzs or 0)
     debt = total - paid
-    debt_block = ""
+
+    lines = [
+        "📦 <b>Buyurtma rasmiylashtirildi</b>",
+        f"<i>{order.customer.name}</i>",
+        "",
+        f"📄 <b>Hujjat:</b> <code>{order.doc_number}</code>",
+        f"📦 <b>Pozitsiyalar:</b> {items_count}",
+        f"💰 <b>Summa:</b> <code>{_fmt_money(total)}</code> so'm",
+    ]
     if debt > 0:
-        debt_block = f"💸 Sizning qarzingiz: <b>{_fmt_money(debt)} so'm</b>\n"
-    due_block = ""
+        lines.append(f"💸 <b>Sizning qarzingiz:</b> {_fmt_money(debt)} so'm")
+
+    lines.append("")
+    lines.append(f"📅 <b>Sana:</b> {_fmt_date(order.date)}")
+    lines.append(f"🕐 <b>Qabul qilindi:</b> {_fmt_dt(order.updated_at)}")
     if order.due_date and debt > 0:
-        due_block = f"📆 To'lov muddati: <b>{order.due_date}</b>\n"
-    return (
-        f"📦 <b>Buyurtma rasmiylashtirildi</b>\n"
-        f"<i>{order.customer.name}</i>\n\n"
-        f"📄 Hujjat: <code>{order.doc_number}</code>\n"
-        f"📦 Pozitsiyalar: {items_count}\n"
-        f"💰 Summa: <b>{_fmt_money(total)} so'm</b>\n"
-        f"{debt_block}"
-        f"📅 Sana: {order.date}\n"
-        f"{due_block}"
-    )
+        lines.append(f"📆 <b>To'lov muddati:</b> {_fmt_date(order.due_date)}")
+
+    return "\n".join(lines)
 
 
 # ─── Per-module sale notifications (uz) ──────────────────────────────────
