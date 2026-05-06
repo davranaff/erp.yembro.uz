@@ -196,6 +196,66 @@ export default function CounterpartyDetailPage() {
               </div>
             </Panel>
           )}
+
+          {/* ── Стартовые предоплаты (free credit) ──────────── */}
+          {data.prepayments && data.prepayments.length > 0 && (
+            <Panel
+              title={`Свободный кредит: ${fmtFull(data.prepayments_total_free_uzs)}`}
+              style={{ marginTop: 14 }}
+            >
+              <div style={{ padding: 12 }}>
+                <div style={{
+                  fontSize: 12, color: 'var(--fg-3)', marginBottom: 10,
+                }}>
+                  Стартовые предоплаты, перенесённые при миграции. Кассир может
+                  применить часть к новой продаже/закупу через кнопку
+                  «Применить предоплату» в карточке документа.
+                </div>
+                <table style={{ width: '100%', fontSize: 13, borderCollapse: 'collapse' }}>
+                  <thead>
+                    <tr style={{ color: 'var(--fg-3)', fontSize: 11, textAlign: 'left' }}>
+                      <th style={{ padding: '6px 12px' }}>Документ</th>
+                      <th style={{ padding: '6px 12px' }}>Дата</th>
+                      <th style={{ padding: '6px 12px' }}>Направление</th>
+                      <th style={{ padding: '6px 12px', textAlign: 'right' }}>Сумма</th>
+                      <th style={{ padding: '6px 12px', textAlign: 'right' }}>Использовано</th>
+                      <th style={{ padding: '6px 12px', textAlign: 'right' }}>Свободно</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {data.prepayments.map((p) => (
+                      <tr key={p.id} style={{ borderTop: '1px solid var(--border)' }}>
+                        <td className="mono" style={{ padding: '8px 12px', fontWeight: 500 }}>
+                          {p.doc_number}
+                        </td>
+                        <td className="mono" style={{ padding: '8px 12px', fontSize: 12 }}>
+                          {p.date}
+                        </td>
+                        <td style={{ padding: '8px 12px', fontSize: 12 }}>
+                          {p.direction === 'in' ? '⬇️ от клиента' : '⬆️ поставщику'}
+                        </td>
+                        <td className="mono" style={{ padding: '8px 12px', textAlign: 'right' }}>
+                          {fmt(p.amount_uzs)}
+                        </td>
+                        <td className="mono" style={{
+                          padding: '8px 12px', textAlign: 'right',
+                          color: 'var(--fg-3)',
+                        }}>
+                          {fmt(p.used_uzs)}
+                        </td>
+                        <td className="mono" style={{
+                          padding: '8px 12px', textAlign: 'right',
+                          color: 'var(--success)', fontWeight: 600,
+                        }}>
+                          {fmt(p.free_uzs)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </Panel>
+          )}
         </>
       )}
 

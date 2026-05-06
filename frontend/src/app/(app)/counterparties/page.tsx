@@ -295,6 +295,24 @@ export default function CounterpartiesPage() {
               { k: 'Email', v: sel.email || '—' },
               { k: 'Специализация', v: sel.specialization || '—' },
               { k: 'Сальдо, UZS', v: fmtBalance(sel.balance_uzs).text, mono: true },
+              ...(parseFloat(sel.opening_debt_uzs || '0') !== 0 ? [{
+                k: 'Стартовый долг (миграция)',
+                v: (
+                  <span className="mono" style={{
+                    color: parseFloat(sel.opening_debt_uzs) > 0 ? 'var(--danger)' : 'var(--success)',
+                    fontWeight: 600,
+                  }}>
+                    {parseFloat(sel.opening_debt_uzs).toLocaleString('ru-RU', { maximumFractionDigits: 0 })} сум
+                    {sel.opening_balance_date && (
+                      <span style={{
+                        color: 'var(--fg-3)', fontWeight: 400, fontSize: 11, marginLeft: 6,
+                      }}>
+                        (на {sel.opening_balance_date})
+                      </span>
+                    )}
+                  </span>
+                ),
+              }] : []),
               {
                 k: 'Статус',
                 v: sel.is_active ? (

@@ -500,6 +500,11 @@ export interface Counterparty {
   credit_limit_uzs: string | null;
   /** Макс. допустимая просрочка в днях. NULL = без ограничения. */
   max_overdue_days: number | null;
+  /** Стартовый долг (миграция из другой ERP). Знак: + клиент должен,
+   * − предоплата (для buyer); + мы должны, − переплата (для supplier). */
+  opening_debt_uzs: string;
+  /** Дата на которую зафиксирован стартовый долг. */
+  opening_balance_date: string | null;
   is_active: boolean;
   notes: string;
   created_at: string;
@@ -957,6 +962,12 @@ export interface FeedBagLot {
   withdrawal_period_days: number;
   withdrawal_period_ends: string | null;
   status: FeedBagLotStatus;
+  /**
+   * Штрих-код партии мешков (Code128). Авто-генерируется при packaging
+   * в формате FEED-{recipe}-{rand4}. Сканер на /scan/<barcode> открывает
+   * розничную карточку партии с возможностью продажи.
+   */
+  barcode: string | null;
   notes: string;
   /** Авто-резолв через recipe.code → NomenclatureItem.sku. */
   nomenclature: string | null;

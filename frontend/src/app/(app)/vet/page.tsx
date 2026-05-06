@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 import DetailDrawer, { KV } from '@/components/DetailDrawer';
 import IncomingTransfersPanel from '@/components/IncomingTransfersPanel';
@@ -66,9 +66,72 @@ function daysUntil(dateISO: string): number {
   return Math.floor((new Date(dateISO).getTime() - Date.now()) / 86400000);
 }
 
+function ScanInputPanel() {
+  const inputRef = useRef<HTMLInputElement | null>(null);
+  const [value, setValue] = useState('');
+
+  useEffect(() => {
+    const t = setTimeout(() => inputRef.current?.focus(), 50);
+    return () => clearTimeout(t);
+  }, []);
+
+  const open = () => {
+    const v = value.trim();
+    if (!v) return;
+    window.open(`/scan/${encodeURIComponent(v)}`, '_blank');
+    setValue('');
+    inputRef.current?.focus();
+  };
+
+  return (
+    <div style={{
+      padding: 12, marginBottom: 14,
+      background: 'var(--info-soft, var(--bg-soft))',
+      borderRadius: 6, border: '1px solid var(--border)',
+    }}>
+      <div style={{
+        fontSize: 11, fontWeight: 700, color: 'var(--fg-3)',
+        textTransform: 'uppercase', letterSpacing: '.04em',
+        marginBottom: 8,
+      }}>
+        Сканер / ручной ввод штрих-кода
+      </div>
+      <div style={{ display: 'flex', gap: 6 }}>
+        <input
+          ref={inputRef}
+          className="input"
+          placeholder="Отсканируйте или введите код…"
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              e.preventDefault();
+              open();
+            }
+          }}
+          style={{ flex: 1, fontFamily: 'var(--font-mono, monospace)' }}
+        />
+        <button
+          type="button"
+          className="btn btn-primary btn-sm"
+          onClick={open}
+          disabled={!value.trim()}
+        >
+          Открыть
+        </button>
+      </div>
+      <div style={{ fontSize: 11, color: 'var(--fg-3)', marginTop: 6 }}>
+        Подключите USB-сканер — он введёт код и нажмёт Enter автоматически.
+      </div>
+    </div>
+  );
+}
+
 export default function VetPage() {
   const [tab, setTab] = useState<'stock' | 'drugs' | 'accessories'>('stock');
   const [stockStatus, setStockStatus] = useState('');
+  const [stockSearch, setStockSearch] = useState('');
+  const [stockSearchDraft, setStockSearchDraft] = useState('');
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(50);
   const [selDrug, setSelDrug] = useState<VetDrug | null>(null);
@@ -86,8 +149,11 @@ export default function VetPage() {
     stockStatus ? { status: stockStatus } : {},
   );
 
+  const stockListFilter: Record<string, string | undefined> = {};
+  if (stockStatus) stockListFilter.status = stockStatus;
+  if (stockSearch) stockListFilter.search = stockSearch;
   const stockPage = stockBatchesCrud.useListPaginated(
-    stockStatus ? { status: stockStatus } : {}, page, pageSize,
+    stockListFilter, page, pageSize,
   );
   const treatmentsPage = treatmentsCrud.useListPaginated({}, page, pageSize);
   const drugsPage = drugsCrud.useListPaginated({ is_active: 'true' }, page, pageSize);
@@ -170,12 +236,45 @@ export default function VetPage() {
           onChange={(v) => { setTab(v as typeof tab); setPage(1); }}
         />
         {tab === 'stock' && (
-          <select className="input" value={stockStatus} onChange={(e) => { setStockStatus(e.target.value); setPage(1); }} style={{ width: 180 }}>
-            <option value="">Все статусы</option>
-            {Object.entries(STOCK_STATUS_LABEL).map(([v, l]) => (
-              <option key={v} value={v}>{l}</option>
-            ))}
-          </select>
+          <>
+            <select
+              className="input"
+              value={stockStatus}
+              onChange={(e) => { setStockStatus(e.target.value); setPage(1); }}
+              style={{ width: 180 }}
+            >
+              <option value="">Все статусы</option>
+              {Object.entries(STOCK_STATUS_LABEL).map(([v, l]) => (
+                <option key={v} value={v}>{l}</option>
+              ))}
+            </select>
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                setStockSearch(stockSearchDraft.trim());
+                setPage(1);
+              }}
+              style={{ display: 'flex', gap: 6, flex: 1, minWidth: 220 }}
+            >
+              <input
+                className="input"
+                placeholder="Поиск: имя препарата, SKU, lot, штрих-код, документ…"
+                value={stockSearchDraft}
+                onChange={(e) => setStockSearchDraft(e.target.value)}
+                style={{ flex: 1 }}
+              />
+              {stockSearch && (
+                <button
+                  type="button"
+                  className="btn btn-ghost btn-sm"
+                  onClick={() => { setStockSearchDraft(''); setStockSearch(''); setPage(1); }}
+                >
+                  ✕
+                </button>
+              )}
+              <button type="submit" className="btn btn-secondary btn-sm">Найти</button>
+            </form>
+          </>
         )}
       </div>
 
@@ -380,6 +479,7 @@ export default function VetPage() {
             ) : undefined
           }
         >
+          <ScanInputPanel />
           {selStock.barcode && (
             <div style={{
               padding: 12, marginBottom: 14,

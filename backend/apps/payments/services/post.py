@@ -70,7 +70,10 @@ class PaymentPostError(ValidationError):
 @dataclass
 class PaymentPostResult:
     payment: Payment
-    journal_entry: JournalEntry
+    # None для kind=OPENING_BALANCE_PREPAYMENT — синтетический Payment
+    # миграции без проводки в ГК (это не cash-движение, а факт переноса
+    # стартовой предоплаты из старой ERP).
+    journal_entry: JournalEntry | None
     affected_orders: list  # list[PurchaseOrder | SaleOrder]
 
 
@@ -236,6 +239,35 @@ def post_payment(payment: Payment, *, user=None) -> PaymentPostResult:
     if payment.status == Payment.Status.CANCELLED:
         raise PaymentPostError(
             {"status": "Отменённый платёж нельзя провести."}
+        )
+
+    # 2.5. OPENING_BALANCE_PREPAYMENT — синтетический Payment миграции.
+    # Это НЕ реальное cash-движение, а факт «клиент уже занёс деньги
+    # в старой ERP до миграции». Журнальную проводку не создаём
+    # (не было транзакции), cash_subaccount не трогаем (нет кассы-
+    # источника), сразу проводим как POSTED — Payment доступен для
+    # будущих allocations на новые SO/PO.
+    if payment.kind == Payment.Kind.OPENING_BALANCE_PREPAYMENT:
+        if not payment.doc_number:
+            payment.doc_number = next_doc_number(
+                Payment, organization=payment.organization,
+                prefix="ОБП", on_date=payment.date,
+            )
+        payment.status = Payment.Status.POSTED
+        payment.posted_at = timezone.now()
+        payment.save(update_fields=[
+            "doc_number", "status", "posted_at", "updated_at",
+        ])
+        audit_log(
+            organization=payment.organization,
+            module=payment.module,
+            actor=user,
+            action=AuditLog.Action.POST,
+            entity=payment,
+            action_verb=f"posted opening-balance prepayment {payment.doc_number}",
+        )
+        return PaymentPostResult(
+            payment=payment, journal_entry=None, affected_orders=[],
         )
 
     # 3. Аллокации (подтянем заранее для валидации)

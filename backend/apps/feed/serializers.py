@@ -514,6 +514,7 @@ class FeedBagLotSerializer(FinancialFieldsMixin, serializers.ModelSerializer):
             "withdrawal_period_days",
             "withdrawal_period_ends",
             "status",
+            "barcode",
             "notes",
             "nomenclature",
             "nomenclature_sku",

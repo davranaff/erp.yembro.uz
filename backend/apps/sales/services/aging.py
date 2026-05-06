@@ -175,6 +175,12 @@ def compute_aging_report(
             if days_overdue > row.oldest_overdue_days:
                 row.oldest_overdue_days = days_overdue
 
+    # Стартовые долги (миграция) теперь материализованы в SaleOrder
+    # с kind=OPENING_BALANCE — попадают в отчёт через основную выборку
+    # выше, как любые непогашенные счета. Никаких отдельных проходов
+    # по Counterparty.opening_debt_uzs здесь больше не нужно.
+    # Подробнее: apps/sales/services/opening_balance.py.
+
     rows = list(rows_by_customer.values())
     # Топ должников сверху (по total убыванию)
     rows.sort(key=lambda r: r.total, reverse=True)

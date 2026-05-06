@@ -43,6 +43,8 @@ export default function CounterpartyModal({ initial, onClose, onSaved }: Props) 
   const [maxOverdue, setMaxOverdue] = useState(
     initial?.max_overdue_days != null ? String(initial.max_overdue_days) : '',
   );
+  const [openingDebt, setOpeningDebt] = useState(initial?.opening_debt_uzs ?? '');
+  const [openingDate, setOpeningDate] = useState(initial?.opening_balance_date ?? '');
 
   useEffect(() => {
     if (!initial) return;
@@ -59,6 +61,8 @@ export default function CounterpartyModal({ initial, onClose, onSaved }: Props) 
     setMaxOverdue(
       initial.max_overdue_days != null ? String(initial.max_overdue_days) : '',
     );
+    setOpeningDebt(initial.opening_debt_uzs ?? '');
+    setOpeningDate(initial.opening_balance_date ?? '');
   }, [initial]);
 
   const fieldErrors =
@@ -79,6 +83,8 @@ export default function CounterpartyModal({ initial, onClose, onSaved }: Props) 
       is_active: isActive,
       credit_limit_uzs: creditLimit.trim() ? creditLimit.trim() : null,
       max_overdue_days: maxOverdue.trim() ? Number(maxOverdue.trim()) : null,
+      opening_debt_uzs: openingDebt.trim() || '0',
+      opening_balance_date: openingDate || null,
     };
     try {
       if (isEdit && initial) {
@@ -266,6 +272,52 @@ export default function CounterpartyModal({ initial, onClose, onSaved }: Props) 
             </div>
           </>
         )}
+
+        {/* Стартовый долг (миграция из другой ERP) — для всех kind. */}
+        <div style={{
+          gridColumn: '1 / -1',
+          marginTop: 6, paddingTop: 10,
+          borderTop: '1px solid var(--border)',
+        }}>
+          <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 4 }}>
+            Стартовый долг (миграция)
+          </div>
+          <div style={{ fontSize: 11, color: 'var(--fg-3)' }}>
+            Заполняется один раз при переносе данных с другой системы.
+            Прибавляется к live-долгу в отчётах и debt-проверках.
+            Знак: <b>+</b> — должны нам, <b>−</b> — мы должны (предоплата).
+          </div>
+        </div>
+        <div className="field">
+          <label>Стартовый долг, сум</label>
+          <input
+            className="input mono"
+            type="number"
+            step="0.01"
+            value={openingDebt}
+            onChange={(e) => setOpeningDebt(e.target.value)}
+            placeholder="0"
+          />
+          {fieldErrors.opening_debt_uzs && (
+            <div style={{ fontSize: 11, color: 'var(--danger)' }}>
+              {(fieldErrors.opening_debt_uzs as unknown as string[]).join(' · ')}
+            </div>
+          )}
+        </div>
+        <div className="field">
+          <label>Дата стартового долга</label>
+          <input
+            className="input"
+            type="date"
+            value={openingDate}
+            onChange={(e) => setOpeningDate(e.target.value)}
+          />
+          {fieldErrors.opening_balance_date && (
+            <div style={{ fontSize: 11, color: 'var(--danger)' }}>
+              {(fieldErrors.opening_balance_date as unknown as string[]).join(' · ')}
+            </div>
+          )}
+        </div>
       </div>
 
       {error && error.status !== 400 && (

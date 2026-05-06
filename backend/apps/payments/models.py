@@ -43,6 +43,16 @@ class Payment(UUIDModel, TimestampedModel):
         INCOME = "income", "Прочий доход"
         SALARY = "salary", "Зарплата"
         INTERNAL = "internal", "Внутренний перевод"
+        # Синтетический Payment для миграции стартовой ПРЕДОПЛАТЫ:
+        # «клиент Иванов уже занёс 500к в старой ERP за товар, который мы
+        # ещё не отгрузили». Никакого реального cash-движения нет — это
+        # факт от предыдущей системы. post_payment для этого kind пропускает
+        # JE/cash_subaccount и сразу проводит как POSTED, чтобы Payment
+        # доступен для allocations на будущие SO/PO.
+        OPENING_BALANCE_PREPAYMENT = (
+            "opening_balance_prepayment",
+            "Стартовая предоплата (миграция)",
+        )
 
     class Status(models.TextChoices):
         DRAFT = "draft", "Черновик"
@@ -75,7 +85,7 @@ class Payment(UUIDModel, TimestampedModel):
         max_length=16, choices=Status.choices, default=Status.DRAFT, db_index=True
     )
     kind = models.CharField(
-        max_length=16,
+        max_length=32,
         choices=Kind.choices,
         default=Kind.COUNTERPARTY,
         db_index=True,

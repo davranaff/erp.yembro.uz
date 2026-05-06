@@ -78,6 +78,10 @@ def check_customer_credit(
             new_sale_uzs=new_sale_uzs,
         )
 
+    # Стартовый долг (opening_debt_uzs) теперь живёт как синтетический
+    # SaleOrder с kind=OPENING_BALANCE — он попадает в aging_report
+    # как обычный непогашенный счёт. Никаких ручных «+ opening» здесь
+    # больше не нужно. См. apps/sales/services/opening_balance.py.
     report = compute_aging_report(organization, customer_id=str(customer.id))
     if report.rows:
         row = report.rows[0]

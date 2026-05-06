@@ -40,8 +40,10 @@ class VetPublicScanView(views.APIView):
 
     def get(self, request, barcode: str):
         # Поиск без фильтра по organization — barcode уникален в рамках org,
-        # но мы хотим работать кросс-орг для public. Сначала ищем среди
-        # лотов препаратов (VetStockBatch), потом среди аксессуаров.
+        # но мы хотим работать кросс-орг для public. Порядок поиска:
+        #   1. VetStockBatch (лот препарата)
+        #   2. VetAccessory (аксессуар)
+        #   3. FeedBagLot (партия фасованного корма)
         batch = (
             VetStockBatch.objects
             .select_related("drug__nomenclature", "unit")
@@ -62,6 +64,48 @@ class VetPublicScanView(views.APIView):
         if accessory is not None:
             data = VetAccessoryPublicSerializer(accessory).data
             data["source_kind"] = "accessory"
+            return Response(data)
+
+        # FeedBagLot — фасованный корм (партия мешков).
+        from apps.feed.models import FeedBagLot
+
+        bag_lot = (
+            FeedBagLot.objects
+            .select_related(
+                "recipe_version__recipe",
+                "source_feed_batch",
+                "storage_warehouse",
+            )
+            .filter(barcode=barcode)
+            .first()
+        )
+        if bag_lot is not None:
+            recipe = bag_lot.recipe_version.recipe
+            data = {
+                "source_kind": "feed_bag_lot",
+                "id": str(bag_lot.id),
+                "doc_number": bag_lot.doc_number,
+                "barcode": bag_lot.barcode,
+                "status": bag_lot.status,
+                "drug_name": f"{recipe.code} · {recipe.name}",
+                "lot_number": bag_lot.doc_number,
+                "bag_weight_kg": str(bag_lot.bag_weight_kg),
+                "bags_initial": bag_lot.bags_initial,
+                "bags_remaining": bag_lot.bags_remaining,
+                "current_quantity": str(bag_lot.bags_remaining),
+                "unit_code": "qop",
+                "is_medicated": bag_lot.is_medicated,
+                "withdrawal_period_days": bag_lot.withdrawal_period_days,
+                "withdrawal_period_ends": (
+                    bag_lot.withdrawal_period_ends.isoformat()
+                    if bag_lot.withdrawal_period_ends else None
+                ),
+                "packaged_at": bag_lot.packaged_at.isoformat(),
+                "warehouse_code": (
+                    bag_lot.storage_warehouse.code
+                    if bag_lot.storage_warehouse_id else None
+                ),
+            }
             return Response(data)
 
         return Response(

@@ -18,7 +18,8 @@ import {
   usePostPayment,
   useReversePayment,
 } from '@/hooks/usePayments';
-import { useHasLevel } from '@/hooks/usePermissions';
+import { useHasLevel, usePermissions } from '@/hooks/usePermissions';
+import { LEVEL_ORDER } from '@/types/auth';
 import type { GLSubaccount, Payment, PaymentKind, PaymentStatus } from '@/types/auth';
 
 import CashAccountModal from './CashAccountModal';
@@ -98,6 +99,27 @@ export default function CashboxPage() {
 
   const { data: subs } = useSubaccounts();
   const { data: modules } = useModules();
+
+  // Per-module-head изоляция: head вет-модуля не должен видеть feed-кассу
+  // и наоборот. Backend уже скоупит payments через get_queryset, но
+  // справочник субсчетов общий (используется во всех дропдаунах) —
+  // поэтому фильтрацию касс делаем здесь, на frontend.
+  //
+  // org-admin / ledger:admin → null (без ограничений).
+  // head'ы → set ID модулей, на которых у юзера ≥ rw.
+  const permissions = usePermissions();
+  const accessibleModuleIds = useMemo<Set<string> | null>(() => {
+    if (isOrgAdmin) return null;
+    if (!modules) return new Set();
+    const allowedCodes = new Set(
+      Object.entries(permissions)
+        .filter(([, lvl]) => LEVEL_ORDER[lvl] >= LEVEL_ORDER.rw)
+        .map(([code]) => code),
+    );
+    return new Set(
+      modules.filter((m) => allowedCodes.has(m.code)).map((m) => m.id),
+    );
+  }, [isOrgAdmin, modules, permissions]);
   const post = usePostPayment();
   const cancel = useCancelPayment();
   const reverse = useReversePayment();
@@ -134,14 +156,32 @@ export default function CashboxPage() {
   }, [payments, dateFrom, dateTo]);
 
   // Список «cash-аккаунтов» — субсчета под счётом 50 (касса) или 51 (банк).
-  // Если выбран фильтр «Модуль», карточки сужаются до его кассах.
+  // Скоупим:
+  //   1. По доступным модулям (head вет не видит feed-кассу и наоборот).
+  //      Кассы без module (общие, например 50.01) показываем только
+  //      org-admin'у, чтобы heads не путались между «своей» и «общей».
+  //   2. Дополнительно по выбранному в дропдауне moduleId, если задан.
   const cashAccounts = useMemo(() => {
     if (!subs) return [];
     return subs
       .filter((s) => s.code.startsWith('50.') || s.code.startsWith('51.'))
+      .filter((s) => {
+        if (accessibleModuleIds === null) return true; // org-admin
+        if (!s.module) return false;                   // null-module → только admin
+        return accessibleModuleIds.has(s.module);
+      })
       .filter((s) => !moduleId || s.module === moduleId)
       .sort((a, b) => a.code.localeCompare(b.code));
-  }, [subs, moduleId]);
+  }, [subs, moduleId, accessibleModuleIds]);
+
+  // Список модулей в дропдауне-фильтре: head'ам показываем только их,
+  // org-admin'у — все. Иначе head может выбрать «feed» и получить пустую
+  // таблицу (backend всё равно отфильтрует), что только запутывает.
+  const filterableModules = useMemo(() => {
+    if (!modules) return [];
+    if (accessibleModuleIds === null) return modules;
+    return modules.filter((m) => accessibleModuleIds.has(m.id));
+  }, [modules, accessibleModuleIds]);
 
   // Балансы по каждому cash-аккаунту + period totals.
   const balanceByAccount = useMemo(() => {
@@ -402,8 +442,8 @@ export default function CashboxPage() {
         <div className="filter-cell" style={{ minWidth: 200 }}>
           <label>Модуль</label>
           <select className="input" value={moduleId} onChange={(e) => { setModuleId(e.target.value); setPage(1); }}>
-            <option value="">Все</option>
-            {modules?.map((m) => (
+            <option value="">{accessibleModuleIds === null ? 'Все' : 'Все мои'}</option>
+            {filterableModules.map((m) => (
               <option key={m.id} value={m.id}>{m.name}</option>
             ))}
           </select>

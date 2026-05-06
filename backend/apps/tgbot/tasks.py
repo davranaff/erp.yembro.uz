@@ -226,6 +226,10 @@ def debt_reminder_daily_task() -> dict:
       - T+N: каждые 7 дней просрочки (T+1, T+8, T+15, …)
       - без due_date: раз в неделю по понедельникам (мягкое напоминание)
 
+    Стартовые долги (миграция) теперь живут как синтетические SaleOrder
+    с kind=opening_balance — попадают в эту же выборку и напоминания
+    работают по общему расписанию, без отдельной ветки.
+
     Это даёт клиенту 3 чётких касания до срока + еженедельный пинок
     при просрочке, без раздражения.
     """
@@ -248,7 +252,7 @@ def debt_reminder_daily_task() -> dict:
         queued += 1
 
     logger.info(
-        "debt_reminder_daily_task: queued=%d skipped=%d", queued, skipped
+        "debt_reminder_daily_task: queued=%d skipped=%d", queued, skipped,
     )
     return {"queued": queued, "skipped": skipped}
 

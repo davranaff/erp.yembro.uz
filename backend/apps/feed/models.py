@@ -913,6 +913,14 @@ class FeedBagLot(UUIDModel, TimestampedModel):
         default=Status.ACTIVE,
         db_index=True,
     )
+    barcode = models.CharField(
+        max_length=64, null=True, blank=True, db_index=True,
+        help_text=(
+            "Штрих-код партии мешков для розничной продажи и сканирования. "
+            "Авто-генерируется при создании в формате FEED-{recipe}-{rand4}. "
+            "Сканирование открывает /scan/<barcode> с инфой о партии."
+        ),
+    )
     notes = models.TextField(blank=True)
 
     created_by = models.ForeignKey(
@@ -925,12 +933,16 @@ class FeedBagLot(UUIDModel, TimestampedModel):
 
     class Meta:
         ordering = ["-packaged_at", "doc_number"]
-        unique_together = (("organization", "doc_number"),)
+        unique_together = (
+            ("organization", "doc_number"),
+            ("organization", "barcode"),
+        )
         indexes = [
             models.Index(fields=["organization", "status"]),
             models.Index(fields=["source_feed_batch", "status"]),
             models.Index(fields=["recipe_version", "status"]),
             models.Index(fields=["storage_warehouse", "status"]),
+            models.Index(fields=["organization", "barcode"]),
         ]
         verbose_name = "Партия фасованного корма"
         verbose_name_plural = "Партии фасованного корма"

@@ -29,16 +29,40 @@ class SaleOrder(UUIDModel, TimestampedModel):
         PAID = "paid", "Оплачен"
         OVERPAID = "overpaid", "Переплата"
 
+    class Kind(models.TextChoices):
+        # Обычная продажа: позиции, движения склада, журнальные проводки.
+        REGULAR = "regular", "Обычная"
+        # Синтетический счёт для миграции стартового долга. Без позиций,
+        # без движений склада, без выручкого журнала: уже существующий долг
+        # из другой ERP, мы только фиксируем «клиент должен X на дату Y» и
+        # пускаем его через стандартный пайплайн (касса, /tasks, aging).
+        OPENING_BALANCE = "opening_balance", "Стартовый долг (миграция)"
+
     organization = models.ForeignKey(
         "organizations.Organization",
         on_delete=models.PROTECT,
         related_name="sale_orders",
     )
+    kind = models.CharField(
+        max_length=20,
+        choices=Kind.choices,
+        default=Kind.REGULAR,
+        db_index=True,
+        help_text=(
+            "Источник заказа. REGULAR — обычная продажа. OPENING_BALANCE — "
+            "синтетический счёт миграции (без позиций / складов / выручки)."
+        ),
+    )
     module = models.ForeignKey(
         "modules.Module",
         on_delete=models.PROTECT,
         related_name="sale_orders",
-        help_text="Source module: vet/slaughter/feedlot/...",
+        null=True,
+        blank=True,
+        help_text=(
+            "Source module: vet/slaughter/feedlot/... NULL только для "
+            "kind=opening_balance."
+        ),
     )
     doc_number = models.CharField(max_length=32, db_index=True)
     date = models.DateField(db_index=True)
@@ -52,7 +76,12 @@ class SaleOrder(UUIDModel, TimestampedModel):
         "warehouses.Warehouse",
         on_delete=models.PROTECT,
         related_name="sale_orders",
-        help_text="Откуда отгружаем (склад источника).",
+        null=True,
+        blank=True,
+        help_text=(
+            "Откуда отгружаем (склад источника). NULL только для "
+            "kind=opening_balance — у синтетического счёта склада нет."
+        ),
     )
     status = models.CharField(
         max_length=16, choices=Status.choices, default=Status.DRAFT
@@ -165,6 +194,18 @@ class SaleOrder(UUIDModel, TimestampedModel):
             and self.customer.organization_id != self.organization_id
         ):
             raise ValidationError({"customer": "Покупатель из другой организации."})
+        # Опциональность module/warehouse разрешена только для
+        # синтетических счетов миграции — обычные продажи без склада/модуля
+        # ломают confirm_sale (стоковые движения, журнальные проводки).
+        if self.kind == self.Kind.REGULAR:
+            if self.warehouse_id is None:
+                raise ValidationError(
+                    {"warehouse": "Для обычной продажи склад обязателен."}
+                )
+            if self.module_id is None:
+                raise ValidationError(
+                    {"module": "Для обычной продажи модуль обязателен."}
+                )
 
     @property
     def margin_uzs(self):
