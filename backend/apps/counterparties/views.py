@@ -147,17 +147,24 @@ class CounterpartyViewSet(OrgScopedModelViewSet):
         self._sync_opening_balance(serializer.instance)
 
     def _sync_opening_balance(self, counterparty):
-        """Материализует opening_debt в синтетический SaleOrder.
+        """Материализует opening_debt в синтетический SaleOrder/PurchaseOrder.
 
         Без этого долг живёт только числом на карточке — касса не может
-        принять оплату, /tasks молчит, aging требует костыля. Подробнее
-        в apps/sales/services/opening_balance.py.
+        принять/выдать оплату, /tasks молчит, aging требует костыля.
+
+        Подробнее:
+            - apps/sales/services/opening_balance.py     (kind=buyer)
+            - apps/purchases/services/opening_balance.py (kind=supplier)
         """
+        from apps.purchases.services.opening_balance import (
+            sync_opening_balance_for_supplier,
+        )
         from apps.sales.services.opening_balance import (
             sync_opening_balance_for_counterparty,
         )
 
         sync_opening_balance_for_counterparty(counterparty)
+        sync_opening_balance_for_supplier(counterparty)
 
     @action(detail=False, methods=["get"], url_path="balances")
     def balances(self, request):
@@ -211,6 +218,8 @@ class CounterpartyViewSet(OrgScopedModelViewSet):
                 "ar_uzs": "0",
             }
 
+        # SaleOrder использует поле `customer` (а не counterparty), нужен
+        # отдельный alias для агрегации.
         ar_qs = (
             SaleOrder.objects.filter(
                 organization=org,
@@ -218,16 +227,16 @@ class CounterpartyViewSet(OrgScopedModelViewSet):
             )
             .exclude(payment_status=SaleOrder.PaymentStatus.PAID)
             .values(
-                "counterparty_id",
-                "counterparty__code",
-                "counterparty__name",
-                "counterparty__kind",
+                "customer_id",
+                "customer__code",
+                "customer__name",
+                "customer__kind",
             )
             .annotate(amount=Sum("amount_uzs"), paid=Sum("paid_amount_uzs"))
         )
 
         for row in ar_qs:
-            cp_id = row["counterparty_id"]
+            cp_id = row["customer_id"]
             if cp_id is None:
                 continue
             outstanding = (row["amount"] or Decimal("0")) - (row["paid"] or Decimal("0"))
@@ -239,9 +248,9 @@ class CounterpartyViewSet(OrgScopedModelViewSet):
             else:
                 rows[cp_id] = {
                     "counterparty_id": str(cp_id),
-                    "code": row["counterparty__code"],
-                    "name": row["counterparty__name"],
-                    "kind": row["counterparty__kind"],
+                    "code": row["customer__code"],
+                    "name": row["customer__name"],
+                    "kind": row["customer__kind"],
                     "ap_uzs": "0",
                     "ar_uzs": str(outstanding),
                 }

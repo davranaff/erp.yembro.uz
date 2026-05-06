@@ -35,15 +35,40 @@ class PurchaseOrder(UUIDModel, TimestampedModel):
         PAID = "paid", "Оплачен"
         OVERPAID = "overpaid", "Переплата"
 
+    class Kind(models.TextChoices):
+        # Обычный закуп: позиции, движения склада, журнальные проводки.
+        REGULAR = "regular", "Обычный"
+        # Синтетический счёт миграции стартового долга (мы должны поставщику)
+        # из предыдущей ERP. Без позиций / складов / приходных журналов:
+        # уже существующий долг просто фиксируется и пускается через
+        # стандартный пайплайн (касса/AP-баланс/aging/notify).
+        OPENING_BALANCE = "opening_balance", "Стартовый долг (миграция)"
+
     organization = models.ForeignKey(
         "organizations.Organization",
         on_delete=models.PROTECT,
         related_name="purchase_orders",
     )
+    kind = models.CharField(
+        max_length=20,
+        choices=Kind.choices,
+        default=Kind.REGULAR,
+        db_index=True,
+        help_text=(
+            "Источник заказа. REGULAR — обычный закуп. OPENING_BALANCE — "
+            "синтетический счёт миграции (без позиций / складов / прихода)."
+        ),
+    )
     module = models.ForeignKey(
         "modules.Module",
         on_delete=models.PROTECT,
         related_name="purchase_orders",
+        null=True,
+        blank=True,
+        help_text=(
+            "Source module. NULL только для kind=opening_balance — у "
+            "синтетического счёта модуля нет."
+        ),
     )
     doc_number = models.CharField(max_length=32, db_index=True)
     date = models.DateField(db_index=True)
@@ -57,6 +82,12 @@ class PurchaseOrder(UUIDModel, TimestampedModel):
         "warehouses.Warehouse",
         on_delete=models.PROTECT,
         related_name="purchase_orders",
+        null=True,
+        blank=True,
+        help_text=(
+            "Куда приход. NULL только для kind=opening_balance — у "
+            "синтетического счёта склада нет."
+        ),
     )
     status = models.CharField(
         max_length=16, choices=Status.choices, default=Status.DRAFT
@@ -148,6 +179,18 @@ class PurchaseOrder(UUIDModel, TimestampedModel):
             and self.batch.organization_id != self.organization_id
         ):
             raise ValidationError({"batch": "Партия из другой организации."})
+        # Опциональность module/warehouse разрешена только для синтетических
+        # счетов миграции. Обычный закуп без склада/модуля сломает
+        # confirm_purchase (стоковые движения, приходные проводки).
+        if self.kind == self.Kind.REGULAR:
+            if self.warehouse_id is None:
+                raise ValidationError(
+                    {"warehouse": "Для обычного закупа склад обязателен."}
+                )
+            if self.module_id is None:
+                raise ValidationError(
+                    {"module": "Для обычного закупа модуль обязателен."}
+                )
 
 
 class PurchaseAttachment(UUIDModel, TimestampedModel):
