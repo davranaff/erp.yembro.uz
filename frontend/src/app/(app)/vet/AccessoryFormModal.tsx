@@ -6,8 +6,11 @@ import Modal from '@/components/ui/Modal';
 import { ApiError } from '@/lib/api';
 import { useModules } from '@/hooks/useModules';
 import { useNomenclatureItems } from '@/hooks/useNomenclature';
-import { useWarehouses } from '@/hooks/useStockMovements';
-import { accessoriesCrud, useReceiveAccessory } from '@/hooks/useVet';
+import {
+  useWarehouseBalance,
+  useWarehouses,
+} from '@/hooks/useStockMovements';
+import { accessoriesCrud } from '@/hooks/useVet';
 import type { VetAccessory } from '@/types/auth';
 
 interface Props {
@@ -25,7 +28,6 @@ interface Props {
 export default function AccessoryFormModal({ initial, onClose }: Props) {
   const create = accessoriesCrud.useCreate();
   const update = accessoriesCrud.useUpdate();
-  const receive = useReceiveAccessory();
   const { data: modules } = useModules();
   // По умолчанию — только vet-номенклатура (категория «Ветпрепараты»
   // и любые другие категории, привязанные к модулю vet). Раньше показывали
@@ -49,16 +51,24 @@ export default function AccessoryFormModal({ initial, onClose }: Props) {
   const [warehouseId, setWarehouseId] = useState(initial?.warehouse ?? '');
   const [salePrice, setSalePrice] = useState(initial?.sale_price_uzs ?? '');
   const [costPrice, setCostPrice] = useState(initial?.cost_per_unit_uzs ?? '');
-  // Начальный остаток (только при create) — после сохранения карточки сразу
-  // дёргается /receive чтобы создать INCOMING StockMovement и оприходовать.
-  // Без этого карточка создавалась с qty=0 и оператор не понимал куда пропал
-  // его «закуп» (см. фидбэк).
-  const [initialQty, setInitialQty] = useState('');
   const [barcode, setBarcode] = useState(initial?.barcode ?? '');
   const [isActive, setIsActive] = useState(initial?.is_active ?? true);
   const [notes, setNotes] = useState(initial?.notes ?? '');
 
-  const error = isEdit ? update.error : (create.error ?? receive.error);
+  // Проверка: на выбранном складе есть приход по этому SKU? Без stock'а нельзя
+  // создать карточку — заставляем сначала оприходовать через /stock + приход
+  // или через PurchaseOrder.confirm. Это держит «склад → vet» инвариант
+  // (склад — единственный источник истины по физическому остатку).
+  const { data: warehouseBalance } = useWarehouseBalance(
+    !isEdit && warehouseId ? warehouseId : null,
+  );
+  const stockOnHand = !isEdit && warehouseId && nomenclatureId
+    ? (warehouseBalance?.rows ?? []).find((r) => r.nomenclature_id === nomenclatureId)
+    : null;
+  const stockQty = stockOnHand ? parseFloat(stockOnHand.balance_qty) : 0;
+  const hasStock = stockQty > 0;
+
+  const error = isEdit ? update.error : create.error;
   const fieldErrors = error instanceof ApiError && error.status === 400
     ? ((error.data as Record<string, unknown>) ?? {})
     : {};
@@ -74,7 +84,8 @@ export default function AccessoryFormModal({ initial, onClose }: Props) {
     warehouseId &&
     salePrice &&
     parseFloat(salePrice) > 0 &&
-    !create.isPending && !update.isPending && !receive.isPending;
+    (isEdit || hasStock) &&
+    !create.isPending && !update.isPending;
 
   const submit = async () => {
     if (!canSubmit) return;
@@ -92,19 +103,7 @@ export default function AccessoryFormModal({ initial, onClose }: Props) {
       if (isEdit && initial) {
         await update.mutateAsync({ id: initial.id, patch: payload });
       } else {
-        const created = await create.mutateAsync(payload as never);
-        // Если оператор задал начальный остаток — сразу оприходуем через
-        // /receive чтобы появилась запись StockMovement INCOMING и баланс
-        // склада обновился.
-        const qty = parseFloat(initialQty);
-        if (created?.id && !Number.isNaN(qty) && qty > 0) {
-          await receive.mutateAsync({
-            id: created.id,
-            quantity: initialQty,
-            unit_cost_uzs: costPrice || undefined,
-            notes: 'Начальная приёмка при создании карточки',
-          });
-        }
+        await create.mutateAsync(payload as never);
       }
       onClose();
     } catch {
@@ -124,20 +123,16 @@ export default function AccessoryFormModal({ initial, onClose }: Props) {
             disabled={!canSubmit}
             onClick={submit}
           >
-            {(create.isPending || update.isPending || receive.isPending)
-              ? 'Сохранение…'
-              : (!isEdit && parseFloat(initialQty) > 0
-                ? 'Создать и оприходовать'
-                : 'Сохранить')}
+            {(create.isPending || update.isPending) ? 'Сохранение…' : 'Сохранить'}
           </button>
         </>
       }
     >
       <div style={{ fontSize: 12, color: 'var(--fg-3)', marginBottom: 12 }}>
-        Аксессуары — товары для перепродажи без партионного учёта.
-        {isEdit
-          ? ' Себестоимость и остаток правятся через «Приёмку».'
-          : ' Если задать начальный остаток — он сразу оприходуется (создастся запись прихода в склад).'}
+        Аксессуары — товары для перепродажи. <b>Склад — единственный
+        источник истины:</b> чтобы создать карточку, на выбранном складе
+        уже должен быть приход по этому SKU (через <code>/stock → +приход</code>
+        или закуп). При продаже остаток списывается со склада.
       </div>
 
       <div className="field">
@@ -242,23 +237,32 @@ export default function AccessoryFormModal({ initial, onClose }: Props) {
         </div>
       </div>
 
-      {!isEdit && (
-        <div className="field">
-          <label>Начальный остаток (опц.)</label>
-          <input
-            className="input mono"
-            type="number"
-            step="0.001"
-            min={0}
-            value={initialQty}
-            onChange={(e) => setInitialQty(e.target.value)}
-            placeholder="0"
-          />
-          <div style={{ fontSize: 11, color: 'var(--fg-3)', marginTop: 4 }}>
-            Сколько уже привезли при создании карточки. Если задать &gt; 0 —
-            автоматически создастся приход в складе (StockMovement INCOMING)
-            на склад выше, по «Себестоимости» как unit_cost.
-          </div>
+      {!isEdit && warehouseId && nomenclatureId && (
+        <div style={{
+          padding: 10, marginTop: 4, marginBottom: 8,
+          borderRadius: 6, fontSize: 12,
+          background: hasStock ? 'var(--bg-soft)' : '#fef2f2',
+          border: `1px solid ${hasStock ? 'var(--border)' : 'var(--danger)'}`,
+        }}>
+          {hasStock ? (
+            <span>
+              ✅ <b>На складе:</b>{' '}
+              <span className="mono">
+                {stockQty.toLocaleString('ru-RU', { maximumFractionDigits: 2 })}
+                {stockOnHand?.unit ? ` ${stockOnHand.unit}` : ''}
+              </span>
+              <span style={{ color: 'var(--fg-3)', marginLeft: 6 }}>
+                — карточку создавать можно
+              </span>
+            </span>
+          ) : (
+            <span>
+              ⛔ <b>На складе ноль</b> по этому SKU. Сначала оприходуйте
+              товар через <code>/stock</code> → <b>+ Приход</b> (или
+              закупом через <code>/purchases</code>), потом возвращайтесь
+              сюда создавать карточку.
+            </span>
+          )}
         </div>
       )}
 
