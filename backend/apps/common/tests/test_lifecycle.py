@@ -50,7 +50,7 @@ def slaughter_line(org, m_slaughter):
 @pytest.fixture
 def chick_nom(org):
     cat = Category.objects.get_or_create(organization=org, name="Жив-LC")[0]
-    unit = Unit.objects.get_or_create(organization=org, code="шт", defaults={"name": "шт"})[0]
+    unit = Unit.objects.get_or_create(organization=org, code="ШТ", defaults={"name": "ШТ"})[0]
     return NomenclatureItem.objects.create(
         organization=org, sku="ЖП-LC-01", name="Цыпленок LC",
         category=cat, unit=unit,
@@ -60,7 +60,7 @@ def chick_nom(org):
 @pytest.fixture
 def carcass_nom(org):
     cat = Category.objects.get_or_create(organization=org, name="ГП-LC")[0]
-    unit_kg = Unit.objects.get_or_create(organization=org, code="кг", defaults={"name": "кг"})[0]
+    unit_kg = Unit.objects.get_or_create(organization=org, code="КГ", defaults={"name": "КГ"})[0]
     item, _ = NomenclatureItem.objects.get_or_create(
         organization=org, sku="CARCASS-WHOLE",
         defaults={"name": "Тушка целая", "category": cat, "unit": unit_kg},
@@ -154,7 +154,7 @@ def test_delete_reason_mixin_requires_reason(shift, carcass_nom):
     from apps.slaughter.views import SlaughterYieldViewSet
     from rest_framework.exceptions import ValidationError as DRFValidationError
 
-    unit_kg = Unit.objects.get(organization=shift.organization, code="кг")
+    unit_kg = Unit.objects.get(organization=shift.organization, code="КГ")
     y = SlaughterYield.objects.create(
         shift=shift, nomenclature=carcass_nom, unit=unit_kg,
         quantity=Decimal("100"),
@@ -176,7 +176,7 @@ def test_delete_reason_mixin_accepts_reason_in_body(shift, carcass_nom):
     from apps.slaughter.views import SlaughterYieldViewSet
     from apps.audit.models import AuditLog
 
-    unit_kg = Unit.objects.get(organization=shift.organization, code="кг")
+    unit_kg = Unit.objects.get(organization=shift.organization, code="КГ")
     y = SlaughterYield.objects.create(
         shift=shift, nomenclature=carcass_nom, unit=unit_kg,
         quantity=Decimal("100"),
@@ -200,7 +200,7 @@ def test_delete_reason_mixin_accepts_reason_in_query(shift, carcass_nom):
     """С ?reason=... в query."""
     from apps.slaughter.views import SlaughterYieldViewSet
 
-    unit_kg = Unit.objects.get(organization=shift.organization, code="кг")
+    unit_kg = Unit.objects.get(organization=shift.organization, code="КГ")
     y = SlaughterYield.objects.create(
         shift=shift, nomenclature=carcass_nom, unit=unit_kg,
         quantity=Decimal("100"),

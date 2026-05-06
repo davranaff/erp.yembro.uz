@@ -1,11 +1,18 @@
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import status as http_status
 from rest_framework.decorators import action
+from rest_framework.exceptions import PermissionDenied
 from rest_framework.exceptions import ValidationError as DRFValidationError
 from rest_framework.filters import OrderingFilter, SearchFilter
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
 from apps.common.lifecycle import DeleteReasonMixin, ImmutableStatusMixin
+from apps.common.permissions import (
+    HasAnyModuleRw,
+    get_user_rw_module_codes,
+    is_org_admin,
+)
 from apps.common.viewsets import OrgScopedModelViewSet
 
 from .models import Payment, PaymentAllocation
@@ -18,6 +25,12 @@ class PaymentViewSet(ImmutableStatusMixin, DeleteReasonMixin, OrgScopedModelView
     """
     /api/payments/ — платежи (AP + AR).
 
+    Доступ: cross-module — head'у любого модуля разрешено управлять кассой
+    своего модуля. Скоуп через get_queryset() (фильтр по `module__code IN
+    user.rw_modules`). На create/edit проверяется что body['module']
+    тоже в rw_modules. Org-admin (любой override level=admin) — без
+    ограничений.
+
     Жизненный цикл:
       POST /api/payments/                       → draft
       POST /api/payments/{id}/allocate/          → добавить аллокацию
@@ -25,15 +38,15 @@ class PaymentViewSet(ImmutableStatusMixin, DeleteReasonMixin, OrgScopedModelView
       POST /api/payments/{id}/cancel/            → отменить (из draft/confirmed)
     """
 
+    permission_classes = [IsAuthenticated, HasAnyModuleRw]
     serializer_class = PaymentSerializer
     queryset = Payment.objects.select_related(
         "counterparty", "currency", "exchange_rate_source",
         "cash_subaccount", "journal_entry",
     ).prefetch_related("allocations")
 
-    module_code = "purchases"  # пока платежи живут внутри модуля purchases
-    required_level = "r"
-    write_level = "rw"
+    # module_code не задан намеренно — HasAnyModuleRw + queryset-скоуп
+    # сами обеспечивают защиту. required_level/write_level тоже не нужны.
 
     # Проведённые/отменённые платежи иммутабельны (для reverse — отдельный action).
     immutable_statuses = ("posted", "cancelled")
@@ -48,6 +61,77 @@ class PaymentViewSet(ImmutableStatusMixin, DeleteReasonMixin, OrgScopedModelView
     search_fields = ["doc_number", "counterparty__name", "counterparty__code", "notes"]
     ordering_fields = ["date", "doc_number", "amount_uzs", "created_at"]
     ordering = ["-date"]
+
+    def _allowed_module_codes(self) -> set[str] | None:
+        """
+        Возвращает set кодов модулей, которыми текущий юзер может управлять.
+        None — без ограничения (org-admin).
+        """
+        membership = getattr(self.request, "membership", None)
+        if membership is None:
+            return set()
+        if is_org_admin(membership):
+            return None
+        return get_user_rw_module_codes(membership)
+
+    def get_queryset(self):
+        qs = super().get_queryset()
+        allowed = self._allowed_module_codes()
+        if allowed is None:
+            return qs
+        if not allowed:
+            return qs.none()
+        # Head видит платежи своего модуля + платежи без явного module,
+        # но привязанные к его кассе (cash_subaccount.module).
+        from django.db.models import Q
+        return qs.filter(
+            Q(module__code__in=allowed)
+            | Q(module__isnull=True, cash_subaccount__module__code__in=allowed)
+        )
+
+    def _check_module_allowed(self, module, cash_subaccount=None):
+        """
+        Разрешает операцию если у юзера rw на target module.
+        Если payment.module не задан — берём fallback с cash_subaccount.module
+        (касса привязана к модулю → значит платёж принадлежит этому модулю).
+        Org-admin проходит всё.
+        """
+        allowed = self._allowed_module_codes()
+        if allowed is None:
+            return
+
+        effective_module = module or (
+            cash_subaccount.module if cash_subaccount else None
+        )
+
+        if effective_module is None:
+            raise PermissionDenied({
+                "module": (
+                    "Платёж без модуля и без модульной кассы — только администратор. "
+                    "Выберите кассу с привязкой к модулю или укажите module."
+                ),
+            })
+        if effective_module.code not in allowed:
+            raise PermissionDenied({
+                "module": f"Нет прав rw на модуль «{effective_module.code}» — нельзя управлять его кассой.",
+            })
+
+    def perform_create(self, serializer):
+        self._check_module_allowed(
+            serializer.validated_data.get("module"),
+            cash_subaccount=serializer.validated_data.get("cash_subaccount"),
+        )
+        super().perform_create(serializer)
+
+    def perform_update(self, serializer):
+        # Защита от смены module на тот, к которому нет доступа
+        new_module = serializer.validated_data.get("module") or serializer.instance.module
+        new_cash = (
+            serializer.validated_data.get("cash_subaccount")
+            or serializer.instance.cash_subaccount
+        )
+        self._check_module_allowed(new_module, cash_subaccount=new_cash)
+        super().perform_update(serializer)
 
     @action(detail=True, methods=["post"])
     def post(self, request, pk=None):

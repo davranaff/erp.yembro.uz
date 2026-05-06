@@ -176,6 +176,79 @@ class HasModulePermission(BasePermission):
         return level_satisfies(actual, required)
 
 
+def get_user_rw_module_codes(membership) -> set[str]:
+    """
+    Список module-кодов на которые у membership уровень rw или admin.
+
+    Используется для скоупинга «cross-module» ресурсов (касса, сотрудники):
+    head модуля видит только записи модулей, которыми реально управляет.
+
+    Учитывает override и роли (effective level через _effective_level).
+    """
+    from apps.modules.models import Module
+    from apps.rbac.models import RolePermission, UserModuleAccessOverride
+
+    candidate_codes: set[str] = set()
+
+    # Коды модулей где есть override (любой level).
+    candidate_codes.update(
+        UserModuleAccessOverride.objects.filter(membership=membership)
+        .values_list("module__code", flat=True)
+    )
+
+    # Коды модулей где есть RolePermission через роли membership.
+    candidate_codes.update(
+        RolePermission.objects.filter(
+            role__in=membership.user_roles.values("role")
+        ).values_list("module__code", flat=True)
+    )
+
+    # Фильтруем по effective level >= rw
+    result: set[str] = set()
+    for code in candidate_codes:
+        actual = _effective_level(membership, code)
+        if level_satisfies(actual, "rw"):
+            result.add(code)
+
+    return result
+
+
+def is_org_admin(membership) -> bool:
+    """Эвристика: есть ли хоть один модуль с уровнем admin (override или роль)."""
+    from apps.rbac.models import RolePermission, UserModuleAccessOverride
+
+    if UserModuleAccessOverride.objects.filter(
+        membership=membership, level="admin"
+    ).exists():
+        return True
+    if RolePermission.objects.filter(
+        role__in=membership.user_roles.values("role"), level="admin"
+    ).exists():
+        return True
+    return False
+
+
+class HasAnyModuleRw(BasePermission):
+    """
+    Permission: проходит если у юзера есть rw (или admin) хотя бы на один модуль.
+
+    Используется для cross-module ресурсов (касса, сотрудники), которые
+    скоупятся через get_queryset() в самом viewset'е. Этот permission —
+    «грубая отсечка»: пускаем любого rw-юзера, а тонкая фильтрация
+    (по конкретным модулям) идёт уже в queryset.
+    """
+
+    message = "Нужны права rw хотя бы на один модуль."
+
+    def has_permission(self, request, view):
+        membership = getattr(request, "membership", None)
+        if membership is None:
+            return False
+        if is_org_admin(membership):
+            return True
+        return bool(get_user_rw_module_codes(membership))
+
+
 def can_see_finances(user, organization, module_code: str = "ledger") -> bool:
     """Проверка: может ли пользователь видеть деньги указанного модуля?
 

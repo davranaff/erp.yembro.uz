@@ -2,12 +2,21 @@
 Сервис `receive_vet_stock_batch` — приёмка партии ветпрепарата.
 
 Создаёт VetStockBatch (status=QUARANTINE по умолчанию) с авто-сгенерированным
-штрих-кодом. Не создаёт StockMovement/JE — приход препаратов ведётся
-отдельным закупом через PurchaseOrder (audit-trail: связь FK purchase).
+штрих-кодом. **Не создаёт** StockMovement — приход на склад фиксируется
+при `purchase.confirm()` (или ручным движением). Лот — это lot-метаданные
+поверх существующего остатка склада: партия делает carve-out из общего
+INCOMING закупа, а не дублирует его.
 
-Плюс отдельный сервис `release_vet_stock_from_quarantine` — перевод
-QUARANTINE → AVAILABLE после проверки (ветврач подтвердил, что лот
-цел и стерилен).
+Поток:
+    1. PurchaseOrder.confirm() → +qty INCOMING на warehouse
+    2. receive_vet_stock_batch(...) → создаёт лот (метаданные), физический
+       остаток уже на складе из шага 1
+    3. apply_treatment / sell → -qty OUTGOING декрементирует и лот,
+       и складской остаток
+    4. recall → -current_qty WRITE_OFF, чтобы списать остаток лота из склада
+
+Сервис `release_vet_stock_from_quarantine` — перевод QUARANTINE → AVAILABLE
+после проверки (ветврач подтвердил, что лот цел и стерилен).
 
 Atomic:
     1. Guards: cross-org (drug, warehouse, supplier, purchase); quantity > 0;

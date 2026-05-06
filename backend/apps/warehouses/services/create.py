@@ -109,6 +109,17 @@ def create_manual_movement(
             {"batch": "Партия из другой организации."}
         )
 
+    # Поставщик обязателен для INCOMING — без него мы не можем создать
+    # связанный закуп в /purchases. Это держит инвариант
+    # «приход ↔ закуп»: каждый приход на склад имеет источник-поставщика.
+    if kind == StockMovement.Kind.INCOMING and counterparty is None:
+        raise StockMovementCreateError(
+            {"counterparty": (
+                "Для прихода обязательно укажите поставщика — он автоматически "
+                "становится закупом в /purchases (для отслеживания долга и оплаты)."
+            )}
+        )
+
     when = date_value or timezone.now()
 
     doc_number = next_doc_number(
@@ -136,7 +147,84 @@ def create_manual_movement(
     )
     movement.full_clean(exclude=None)
     movement.save()
+
+    # Двунаправленный синк «приход ↔ закуп»: если ручной приход
+    # (INCOMING) сделан с указанием поставщика — автоматически создаём
+    # связанный PurchaseOrder в статусе CONFIRMED. Это даёт оператору
+    # симметрию: PO.confirm создаёт StockMovement, а manual /stock
+    # приход создаёт PO. Без дублирования INCOMING — наоборот, новый
+    # PO ссылается через source на существующий movement.
+    if (
+        kind == StockMovement.Kind.INCOMING
+        and counterparty is not None
+        and warehouse_to is not None
+    ):
+        _link_to_auto_purchase(movement, user=user)
+
     return StockMovementCreateResult(movement=movement)
+
+
+def _link_to_auto_purchase(movement: StockMovement, *, user=None) -> None:
+    """
+    Создать PurchaseOrder (CONFIRMED, unpaid) из ручного INCOMING-движения
+    и перепривязать movement.source → PO. Idempotent: если movement уже
+    привязан к источнику — выходим. Без JE/finance операций — это просто
+    зеркало для видимости в /purchases, бухгалтерскую проводку оператор
+    делает через payment.
+
+    Без него оператор оприходовал товар вручную, а в /purchases список
+    был пустой — невозможно было отслеживать долги поставщикам.
+    """
+    if movement.source_content_type_id or movement.source_object_id:
+        return
+
+    from django.contrib.contenttypes.models import ContentType
+    from apps.common.services.numbering import next_doc_number
+    from apps.purchases.models import PurchaseItem, PurchaseOrder
+
+    when = movement.date.date() if hasattr(movement.date, "date") else movement.date
+
+    po_number = next_doc_number(
+        PurchaseOrder,
+        organization=movement.organization,
+        prefix="ЗК",
+        on_date=when,
+    )
+    po = PurchaseOrder(
+        organization=movement.organization,
+        module=movement.module,
+        doc_number=po_number,
+        date=when,
+        counterparty=movement.counterparty,
+        warehouse=movement.warehouse_to,
+        currency=None,
+        batch=movement.batch,
+        notes=(
+            f"Авто-создан из ручного прихода {movement.doc_number} в /stock. "
+            f"Оплата — через /finance/cashbox или /purchases."
+        ),
+        amount_uzs=movement.amount_uzs,
+        status=PurchaseOrder.Status.CONFIRMED,
+        payment_status=PurchaseOrder.PaymentStatus.UNPAID,
+        created_by=user,
+    )
+    po.save()
+
+    PurchaseItem.objects.create(
+        order=po,
+        nomenclature=movement.nomenclature,
+        quantity=movement.quantity,
+        unit_price=movement.unit_price_uzs,
+        line_total_uzs=movement.amount_uzs,
+        received_qty=movement.quantity,
+    )
+
+    # Перепривязываем movement.source → новый PO
+    movement.source_content_type = ContentType.objects.get_for_model(PurchaseOrder)
+    movement.source_object_id = po.id
+    movement.save(update_fields=[
+        "source_content_type", "source_object_id", "updated_at",
+    ])
 
 
 def is_manual_movement(movement: StockMovement) -> bool:

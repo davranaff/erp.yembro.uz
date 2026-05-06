@@ -642,11 +642,54 @@ class VetAccessoryViewSet(OrgScopedModelViewSet):
 
     def perform_create(self, serializer):
         from apps.audit.models import AuditLog
+        from apps.warehouses.models import StockMovement
+        from apps.warehouses.services.balance import compute_warehouse_balance_for_sku
+        from rest_framework.exceptions import ValidationError as DRFValidationError
+
+        nomenclature = serializer.validated_data["nomenclature"]
+        warehouse = serializer.validated_data["warehouse"]
+
+        # Склад — единственный источник истины: создавать карточку аксессуара
+        # можно только если на этом складе уже есть приход по SKU (через
+        # ручное /stock движение или PO.confirm). Без этого инвариант
+        # «склад → vet» нарушается — карточка появляется без backing inventory.
+        on_hand = compute_warehouse_balance_for_sku(warehouse, nomenclature)
+        if on_hand <= 0:
+            raise DRFValidationError({
+                "warehouse": (
+                    f"На складе «{warehouse.code}» нет остатка по SKU "
+                    f"«{nomenclature.sku}». Сначала оприходуйте товар через "
+                    f"/stock → «+ Приход» или через закуп (/purchases), "
+                    f"потом создавайте карточку аксессуара."
+                ),
+            })
+
         kwargs = self._save_kwargs_for_create(serializer)
+
+        # Себестоимость авто-подтягиваем из последнего INCOMING на этом
+        # складе по этому SKU — оператор уже указал unit_price при приёмке
+        # в /stock или PO. Без этого пришлось бы вводить цену дважды.
+        # Frontend не отправляет cost_per_unit_uzs при create.
+        if not serializer.validated_data.get("cost_per_unit_uzs"):
+            last_in = (
+                StockMovement.objects
+                .filter(
+                    organization=warehouse.organization,
+                    warehouse_to=warehouse,
+                    nomenclature=nomenclature,
+                    kind=StockMovement.Kind.INCOMING,
+                )
+                .order_by("-date", "-created_at")
+                .values_list("unit_price_uzs", flat=True)
+                .first()
+            )
+            if last_in is not None:
+                kwargs["cost_per_unit_uzs"] = last_in
+
         # Auto-barcode если пользователь не задал. Формат:
         # `VET-A-{sku}-{rand4}` уникален в рамках org.
         if not serializer.validated_data.get("barcode"):
-            sku = serializer.validated_data["nomenclature"].sku.upper()[:16]
+            sku = nomenclature.sku.upper()[:16]
             kwargs["barcode"] = f"VET-A-{sku}-{secrets.token_hex(2).upper()}"
         instance = serializer.save(**kwargs)
         self._write_audit(AuditLog.Action.CREATE, instance)

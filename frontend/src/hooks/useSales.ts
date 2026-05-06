@@ -72,6 +72,9 @@ export const useReverseSale = salesCrud.makeAction<{ reason?: string }, SaleOrde
 
 export interface RecordPaymentInput {
   channel: 'cash' | 'transfer' | 'click' | 'other';
+  /** UUID кассы/счёта (GLSubaccount). Без этого backend подставит
+   * дефолтные 50.01/51.01 — все платежи свалятся в общий котёл. */
+  cash_subaccount?: string;
   amount_uzs?: string;
   date?: string;
   notes?: string;

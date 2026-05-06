@@ -1271,6 +1271,11 @@ export interface VetDrug {
   drug_type: DrugType;
   administration_route: DrugRoute;
   default_withdrawal_days: number;
+  /** Минимум диапазона температуры хранения, °C (целое со знаком). */
+  storage_temp_min_c: number | null;
+  /** Максимум диапазона температуры хранения, °C (целое со знаком). */
+  storage_temp_max_c: number | null;
+  /** Свободное поле для дополнительных условий (тёмное место, влажность). */
   storage_conditions: string;
   /**
    * Штрих-код SKU (shelf-tag) — ставится на полку, отдельный от

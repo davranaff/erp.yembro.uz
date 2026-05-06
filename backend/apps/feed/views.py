@@ -122,16 +122,49 @@ class RawMaterialBatchViewSet(OrgScopedModelViewSet):
 
     def perform_create(self, serializer):
         """
-        Авто-генерация doc_number если не задан + автоустановка module=feed.
-        После сохранения создаём привязанный StockMovement INCOMING — чтобы
-        партия отражалась в общем журнале склада (/stock).
+        Создание партии сырья. Инвариант «склад — источник истины»:
+        на складе уже должен быть приход по этому SKU (через /stock → +приход
+        или PO.confirm). Партия — это lot-метаданные (Дюваль, влажность,
+        карантин) поверх существующего остатка.
+
+        Если оператор уже сделал /stock → +приход, удобнее использовать
+        action `/promote` через StockMovementViewSet — он перепривязывает
+        существующий movement к новой партии без двойного INCOMING.
+        Этот endpoint оставлен для backward-compat и для случаев когда
+        партия создаётся через API.
+
+        Авто-генерация doc_number + module=feed.
         """
         from apps.common.services.numbering import next_doc_number
         from apps.modules.models import Module
-
-        from .services.raw_batch_stock import create_movement_for_raw_batch
+        from apps.warehouses.services.balance import compute_warehouse_balance_for_sku
+        from rest_framework.exceptions import ValidationError as DRFValidationError
 
         org = getattr(self.request, "organization", None)
+        nomenclature = serializer.validated_data.get("nomenclature")
+        warehouse = serializer.validated_data.get("warehouse")
+        qty = serializer.validated_data.get("quantity")
+
+        # Warehouse-first guard: на складе должен быть приход >= qty партии.
+        # Без backing inventory партия становится «фантомной» — журнал склада
+        # рассинхронизируется с lot-учётом (двойной счёт при будущем PO.confirm).
+        if warehouse and nomenclature and qty is not None:
+            on_hand = compute_warehouse_balance_for_sku(warehouse, nomenclature)
+            from decimal import Decimal
+            need = Decimal(str(qty))
+            if on_hand < need:
+                raise DRFValidationError({
+                    "warehouse": (
+                        f"На складе «{warehouse.code}» остаток по SKU "
+                        f"«{nomenclature.sku}» = {on_hand}, нужно ≥ {need}. "
+                        f"Сначала оприходуйте через /stock → «+ Приход» "
+                        f"(будет создан автозакуп) или через /purchases, "
+                        f"потом создавайте партию здесь. "
+                        f"Если приход уже есть — используйте «Превратить в "
+                        f"партию» на самой записи в /stock."
+                    ),
+                })
+
         kwargs = self._save_kwargs_for_create(serializer)
         if not serializer.validated_data.get("module"):
             try:
@@ -146,7 +179,11 @@ class RawMaterialBatchViewSet(OrgScopedModelViewSet):
                 on_date=serializer.validated_data.get("received_date"),
             )
         instance = serializer.save(**kwargs)
-        create_movement_for_raw_batch(instance, user=self.request.user)
+        # Партия НЕ создаёт свой StockMovement INCOMING — backing уже есть
+        # на складе (проверка выше). Это симметрия с vet:
+        # /stock → +приход + auto-PO → потом vet/feed lot-метаданные.
+        # Если пользователь хотел promote существующего movement — он делает
+        # это через StockMovementViewSet.promote_to_raw_batch (re-link source).
         from apps.audit.models import AuditLog
         self._write_audit(AuditLog.Action.CREATE, instance)
 

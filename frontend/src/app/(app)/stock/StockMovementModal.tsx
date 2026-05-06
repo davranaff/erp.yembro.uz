@@ -95,7 +95,10 @@ export default function StockMovementModal({ onClose, onSaved, onSwitchToFeedRaw
     !!unitPrice &&
     parseFloat(quantity) > 0 &&
     (!needFrom || !!whFrom) &&
-    (!needTo || !!whTo);
+    (!needTo || !!whTo) &&
+    // Для INCOMING поставщик обязателен — backend создаёт авто-PO,
+    // и без counterparty закуп не получится.
+    (kind !== 'incoming' || !!counterparty);
 
   const handleSave = async () => {
     const payload: ManualMovementPayload = {
@@ -316,7 +319,9 @@ export default function StockMovementModal({ onClose, onSaved, onSwitchToFeedRaw
         )}
 
         <div className="field" style={{ gridColumn: '1 / -1' }}>
-          <label>Контрагент (опционально)</label>
+          <label>
+            Контрагент {kind === 'incoming' ? '*' : '(опционально)'}
+          </label>
           <select
             className="input"
             value={counterparty}
@@ -329,6 +334,13 @@ export default function StockMovementModal({ onClose, onSaved, onSwitchToFeedRaw
               </option>
             ))}
           </select>
+          {kind === 'incoming' && (
+            <div style={{ fontSize: 11, color: 'var(--fg-3)', marginTop: 4 }}>
+              Для прихода поставщик обязателен — автоматически создастся
+              закуп в <code>/purchases</code>, чтобы видеть долги и оплачивать
+              из кассы.
+            </div>
+          )}
         </div>
 
         <div

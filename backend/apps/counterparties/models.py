@@ -1,11 +1,14 @@
 from django.db import models
 
 from apps.common.models import TimestampedModel, UUIDModel
+from apps.common.normalize import UpperCodeMixin
 
 from .validators import validate_inn
 
 
-class Counterparty(UUIDModel, TimestampedModel):
+class Counterparty(UpperCodeMixin, UUIDModel, TimestampedModel):
+    upper_code_fields = ("code",)
+
     class Kind(models.TextChoices):
         SUPPLIER = "supplier", "Поставщик"
         BUYER = "buyer", "Покупатель"

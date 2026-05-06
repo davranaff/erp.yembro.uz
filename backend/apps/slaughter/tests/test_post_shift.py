@@ -51,14 +51,14 @@ def user():
 @pytest.fixture
 def unit_kg(org):
     return Unit.objects.get_or_create(
-        organization=org, code="кг", defaults={"name": "кг"}
+        organization=org, code="КГ", defaults={"name": "КГ"}
     )[0]
 
 
 @pytest.fixture
 def unit_pcs(org):
     return Unit.objects.get_or_create(
-        organization=org, code="шт", defaults={"name": "шт"}
+        organization=org, code="ШТ", defaults={"name": "ШТ"}
     )[0]
 
 
@@ -79,7 +79,7 @@ def cat_fg(org):
 @pytest.fixture
 def chick_nom(org, cat_live, unit_pcs):
     return NomenclatureItem.objects.create(
-        organization=org, sku="ЖП-Сут-01", name="Цыпленок",
+        organization=org, sku="ЖП-СУТ-01", name="Цыпленок",
         category=cat_live, unit=unit_pcs,
     )
 
@@ -87,7 +87,7 @@ def chick_nom(org, cat_live, unit_pcs):
 @pytest.fixture
 def tushka_nom(org, cat_fg, unit_kg):
     return NomenclatureItem.objects.create(
-        organization=org, sku="ГП-Туш-01", name="Тушка",
+        organization=org, sku="ГП-ТУШ-01", name="Тушка",
         category=cat_fg, unit=unit_kg,
     )
 
@@ -95,7 +95,7 @@ def tushka_nom(org, cat_fg, unit_kg):
 @pytest.fixture
 def grudka_nom(org, cat_fg, unit_kg):
     return NomenclatureItem.objects.create(
-        organization=org, sku="ГП-Гр-01", name="Грудка",
+        organization=org, sku="ГП-ГР-01", name="Грудка",
         category=cat_fg, unit=unit_kg,
     )
 
@@ -190,10 +190,10 @@ def test_post_shift_creates_output_batches(
     assert len(result.output_batches) == 2
     # Проверка распределения cost: 10_000_000 * 60/100 = 6_000_000
     tushka = next(
-        b for b in result.output_batches if b.nomenclature.sku == "ГП-Туш-01"
+        b for b in result.output_batches if b.nomenclature.sku == "ГП-ТУШ-01"
     )
     grudka = next(
-        b for b in result.output_batches if b.nomenclature.sku == "ГП-Гр-01"
+        b for b in result.output_batches if b.nomenclature.sku == "ГП-ГР-01"
     )
     assert tushka.accumulated_cost_uzs == Decimal("6000000.00")
     assert grudka.accumulated_cost_uzs == Decimal("4000000.00")

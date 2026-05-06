@@ -4,10 +4,11 @@ import { useState } from 'react';
 
 import Modal from '@/components/ui/Modal';
 import { ApiError } from '@/lib/api';
+import { uppercaseChange } from '@/lib/forms';
 import { useCounterparties } from '@/hooks/useCounterparties';
-import { useUnits } from '@/hooks/useNomenclature';
+import { useNomenclatureItems, useUnits } from '@/hooks/useNomenclature';
 import { purchasesCrud } from '@/hooks/usePurchases';
-import { useWarehouses } from '@/hooks/useStockMovements';
+import { useWarehouseBalance, useWarehouses } from '@/hooks/useStockMovements';
 import { drugsCrud, useReceiveVetStock } from '@/hooks/useVet';
 
 interface Props {
@@ -27,11 +28,20 @@ export default function ReceiveModal({ onClose }: Props) {
   // в выпадашке «Закуп», что приводит к каше: можно случайно привязать
   // приёмку препарата к закупу комбикорма.
   const { data: purchases } = purchasesCrud.useList({ module_code: 'vet' });
+  // Справочник vet-номенклатуры — нужен чтобы отрезолвить sku/name по ID
+  // в позициях закупа. Без этого в blocке «состав закупа» оператор видел бы
+  // голые UUID'ы вместо «ВЕТ-АНТ-01 · Энрофлоксацин 10%».
+  const { data: nomenclatureList } = useNomenclatureItems({
+    module_code: 'vet', is_active: 'true',
+  });
   const receive = useReceiveVetStock();
 
   const [drug, setDrug] = useState('');
   const [lotNumber, setLotNumber] = useState('');
   const [warehouse, setWarehouse] = useState('');
+  // Подгружаем баланс склада, чтобы рядом с позициями закупа показать
+  // «уже есть на складе» — оператор сразу видит запас перед приёмкой.
+  const { data: warehouseBalance } = useWarehouseBalance(warehouse || null);
   const [supplier, setSupplier] = useState('');
   const [purchase, setPurchase] = useState('');
   const [receivedDate, setReceivedDate] = useState(new Date().toISOString().slice(0, 10));
@@ -102,7 +112,7 @@ export default function ReceiveModal({ onClose }: Props) {
         </div>
         <div className="field">
           <label>Lot № *</label>
-          <input className="input mono" value={lotNumber} onChange={(e) => setLotNumber(e.target.value)} placeholder="L-2603" />
+          <input className="input mono upper" value={lotNumber} onChange={uppercaseChange(setLotNumber)} placeholder="L-2603" />
           {fieldErrors.lot_number && <div style={{ fontSize: 11, color: 'var(--danger)' }}>{fieldErrors.lot_number.join(' · ')}</div>}
         </div>
         <div className="field">
@@ -146,21 +156,74 @@ export default function ReceiveModal({ onClose }: Props) {
           {purchase && (() => {
             const po = purchases?.find((p) => p.id === purchase);
             if (!po) return null;
+            // Map nomenclature_id → {sku, name, unit_code} (для отображения позиций)
+            const nomById = new Map(
+              (nomenclatureList ?? []).map((n) => [n.id, n] as const),
+            );
+            // Map nomenclature_id → balance_qty (на выбранном складе vet)
+            const balanceById = new Map(
+              (warehouseBalance?.rows ?? []).map(
+                (r) => [r.nomenclature_id, r] as const,
+              ),
+            );
             return (
               <div style={{
-                marginTop: 6, padding: '6px 10px',
+                marginTop: 6, padding: '8px 10px',
                 background: 'var(--bg-soft)', borderRadius: 5,
                 fontSize: 12, color: 'var(--fg-2)',
-                display: 'flex', gap: 16, flexWrap: 'wrap',
               }}>
-                {po.counterparty_name && <span>Поставщик: <b>{po.counterparty_name}</b></span>}
-                {po.amount_uzs && (
-                  <span>Сумма: <b className="mono">
-                    {parseFloat(po.amount_uzs).toLocaleString('ru-RU', { maximumFractionDigits: 0 })} сум
-                  </b></span>
-                )}
+                <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', marginBottom: po.items?.length ? 8 : 0 }}>
+                  {po.counterparty_name && <span>Поставщик: <b>{po.counterparty_name}</b></span>}
+                  {po.amount_uzs && (
+                    <span>Сумма: <b className="mono">
+                      {parseFloat(po.amount_uzs).toLocaleString('ru-RU', { maximumFractionDigits: 0 })} сум
+                    </b></span>
+                  )}
+                  {po.items && po.items.length > 0 && (
+                    <span>Позиций: <b>{po.items.length}</b></span>
+                  )}
+                </div>
                 {po.items && po.items.length > 0 && (
-                  <span>Позиций: <b>{po.items.length}</b></span>
+                  <div style={{
+                    borderTop: '1px solid var(--border)',
+                    paddingTop: 6,
+                    display: 'flex', flexDirection: 'column', gap: 3,
+                  }}>
+                    <div style={{ fontSize: 11, color: 'var(--fg-3)', marginBottom: 2 }}>
+                      В составе закупа{warehouse && warehouseBalance ? ` (остатки на ${warehouseBalance.warehouse.code})` : ''}:
+                    </div>
+                    {po.items.map((it) => {
+                      const nom = nomById.get(it.nomenclature);
+                      const bal = balanceById.get(it.nomenclature);
+                      const onHand = bal ? parseFloat(bal.balance_qty) : 0;
+                      const unit = nom?.unit_code ?? bal?.unit ?? '';
+                      return (
+                        <div key={it.id} style={{
+                          display: 'flex', gap: 8, alignItems: 'center',
+                          fontSize: 12,
+                        }}>
+                          <span className="mono" style={{ minWidth: 110, color: 'var(--fg-2)' }}>
+                            {nom?.sku ?? it.nomenclature.slice(0, 8) + '…'}
+                          </span>
+                          <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {nom?.name ?? '—'}
+                          </span>
+                          <span className="mono" style={{ color: 'var(--fg-3)' }}>
+                            {parseFloat(it.quantity).toLocaleString('ru-RU')} {unit}
+                          </span>
+                          {warehouse && (
+                            <span className="mono" style={{
+                              minWidth: 90, textAlign: 'right',
+                              color: onHand > 0 ? 'var(--success)' : 'var(--fg-3)',
+                              fontWeight: onHand > 0 ? 600 : 400,
+                            }}>
+                              на складе: {onHand.toLocaleString('ru-RU', { maximumFractionDigits: 2 })}
+                            </span>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
                 )}
               </div>
             );

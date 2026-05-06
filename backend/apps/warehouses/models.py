@@ -5,9 +5,12 @@ from django.core.exceptions import ValidationError
 from django.db import models
 
 from apps.common.models import TimestampedModel, UUIDModel
+from apps.common.normalize import UpperCodeMixin
 
 
-class ProductionBlock(UUIDModel, TimestampedModel):
+class ProductionBlock(UpperCodeMixin, UUIDModel, TimestampedModel):
+    upper_code_fields = ("code",)
+
     class Kind(models.TextChoices):
         MATOCHNIK = "matochnik", "Корпус маточника"
         INCUBATION = "incubation", "Инкубационный шкаф"
@@ -58,7 +61,8 @@ class ProductionBlock(UUIDModel, TimestampedModel):
         return f"{self.code} · {self.name}"
 
 
-class Warehouse(UUIDModel, TimestampedModel):
+class Warehouse(UpperCodeMixin, UUIDModel, TimestampedModel):
+    upper_code_fields = ("code",)
     organization = models.ForeignKey(
         "organizations.Organization",
         on_delete=models.PROTECT,

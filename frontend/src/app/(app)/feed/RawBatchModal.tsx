@@ -8,7 +8,11 @@ import { useProductionBlocks } from '@/hooks/useBlocks';
 import { useCounterparties } from '@/hooks/useCounterparties';
 import { rawBatchesCrud } from '@/hooks/useFeed';
 import { useNomenclatureItems } from '@/hooks/useNomenclature';
-import { useStockMovements, useWarehouses } from '@/hooks/useStockMovements';
+import {
+  useStockMovements,
+  useWarehouseBalance,
+  useWarehouses,
+} from '@/hooks/useStockMovements';
 import { ApiError } from '@/lib/api';
 import type { NomenclatureItem, RawMaterialBatch, StockMovement } from '@/types/auth';
 
@@ -197,12 +201,29 @@ export default function RawBatchModal({ initial, prefill, onClose, onPickStockMo
     ? ((error.data as Record<string, unknown>) ?? {})
     : {};
 
+  // Warehouse-first guard: на складе должен быть приход >= партии (qty).
+  // Без backing inventory партия становится «фантомной» (StockMovement
+  // не создаётся при create на бэкенде с этого момента).
+  const { data: warehouseBalance } = useWarehouseBalance(
+    !isEdit && warehouseId ? warehouseId : null,
+  );
+  const stockRow = !isEdit && warehouseId && nomenclatureId
+    ? (warehouseBalance?.rows ?? []).find((r) => r.nomenclature_id === nomenclatureId)
+    : null;
+  const stockQty = stockRow ? parseFloat(stockRow.balance_qty) : 0;
+  // Какое qty реально оприходуется в партию (gross или legacy)
+  const requestedQty = parseFloat(
+    (shrinkMode === 'none' ? legacyQuantity : grossKg) || '0',
+  );
+  const stockOk = isEdit || (stockQty > 0 && stockQty >= requestedQty);
+
   const canSubmit =
     nomenclatureId &&
     warehouseId &&
     receivedDate &&
     pricePerUnit &&
     (shrinkMode === 'none' ? legacyQuantity : grossKg) &&
+    stockOk &&
     !create.isPending &&
     !update.isPending;
 
@@ -398,7 +419,7 @@ export default function RawBatchModal({ initial, prefill, onClose, onPickStockMo
             Склад *
             <HelpHint
               text="Склад модуля «Корма»."
-              details="Каждая партия должна лежать на конкретном складе. Если складов нет — создайте их в /stock."
+              details="Партия — это lot-метаданные поверх остатка склада. На складе сначала должен быть приход (через /stock + Приход или закуп)."
             />
           </label>
           <select
@@ -412,6 +433,45 @@ export default function RawBatchModal({ initial, prefill, onClose, onPickStockMo
             ))}
           </select>
         </div>
+
+        {!isEdit && warehouseId && nomenclatureId && (
+          <div style={{
+            gridColumn: '1/3',
+            padding: 10, fontSize: 12, borderRadius: 6,
+            background: stockOk ? 'var(--bg-soft)' : '#fef2f2',
+            border: `1px solid ${stockOk ? 'var(--border)' : 'var(--danger)'}`,
+          }}>
+            {stockOk && stockQty > 0 ? (
+              <span>
+                ✅ <b>На складе:</b>{' '}
+                <span className="mono">
+                  {stockQty.toLocaleString('ru-RU', { maximumFractionDigits: 3 })}
+                  {stockRow?.unit ? ` ${stockRow.unit}` : ''}
+                </span>
+                {requestedQty > 0 && (
+                  <span style={{ color: 'var(--fg-3)', marginLeft: 8 }}>
+                    — нужно для партии {requestedQty.toLocaleString('ru-RU')}
+                    {stockQty < requestedQty ? ' (не хватает!)' : ' ✓'}
+                  </span>
+                )}
+              </span>
+            ) : stockQty > 0 && stockQty < requestedQty ? (
+              <span>
+                ⛔ <b>На складе только {stockQty}</b>, а партия запрашивает{' '}
+                {requestedQty}. Сначала довезите остаток через{' '}
+                <code>/stock → +Приход</code>.
+              </span>
+            ) : (
+              <span>
+                ⛔ <b>На складе ноль</b> по этому SKU. Сначала оприходуйте
+                товар через <code>/stock → +Приход</code> (создаст автозакуп
+                в /purchases) или через <code>/purchases</code>, потом
+                возвращайтесь сюда. Если приход уже есть — используйте
+                «Превратить в партию» прямо в /stock.
+              </span>
+            )}
+          </div>
+        )}
 
         <div className="field" style={{ gridColumn: '1/3' }}>
           <label>

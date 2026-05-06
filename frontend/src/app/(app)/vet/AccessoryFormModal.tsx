@@ -6,7 +6,10 @@ import Modal from '@/components/ui/Modal';
 import { ApiError } from '@/lib/api';
 import { useModules } from '@/hooks/useModules';
 import { useNomenclatureItems } from '@/hooks/useNomenclature';
-import { useWarehouses } from '@/hooks/useStockMovements';
+import {
+  useWarehouseBalance,
+  useWarehouses,
+} from '@/hooks/useStockMovements';
 import { accessoriesCrud } from '@/hooks/useVet';
 import type { VetAccessory } from '@/types/auth';
 
@@ -47,10 +50,26 @@ export default function AccessoryFormModal({ initial, onClose }: Props) {
   const [nomenclatureId, setNomenclatureId] = useState(initial?.nomenclature ?? '');
   const [warehouseId, setWarehouseId] = useState(initial?.warehouse ?? '');
   const [salePrice, setSalePrice] = useState(initial?.sale_price_uzs ?? '');
+  // Себестоимость в edit показываем read-only (правится через /stock приход).
+  // В create форме поля нет — backend подставит из последнего INCOMING.
   const [costPrice, setCostPrice] = useState(initial?.cost_per_unit_uzs ?? '');
-  const [barcode, setBarcode] = useState(initial?.barcode ?? '');
+  // Barcode на create скрыт — авто-генерируется на бэкенде. На edit
+  // тоже не редактируется через эту форму (если нужно — отдельный flow).
   const [isActive, setIsActive] = useState(initial?.is_active ?? true);
   const [notes, setNotes] = useState(initial?.notes ?? '');
+
+  // Проверка: на выбранном складе есть приход по этому SKU? Без stock'а нельзя
+  // создать карточку — заставляем сначала оприходовать через /stock + приход
+  // или через PurchaseOrder.confirm. Это держит «склад → vet» инвариант
+  // (склад — единственный источник истины по физическому остатку).
+  const { data: warehouseBalance } = useWarehouseBalance(
+    !isEdit && warehouseId ? warehouseId : null,
+  );
+  const stockOnHand = !isEdit && warehouseId && nomenclatureId
+    ? (warehouseBalance?.rows ?? []).find((r) => r.nomenclature_id === nomenclatureId)
+    : null;
+  const stockQty = stockOnHand ? parseFloat(stockOnHand.balance_qty) : 0;
+  const hasStock = stockQty > 0;
 
   const error = isEdit ? update.error : create.error;
   const fieldErrors = error instanceof ApiError && error.status === 400
@@ -68,20 +87,25 @@ export default function AccessoryFormModal({ initial, onClose }: Props) {
     warehouseId &&
     salePrice &&
     parseFloat(salePrice) > 0 &&
+    (isEdit || hasStock) &&
     !create.isPending && !update.isPending;
 
   const submit = async () => {
     if (!canSubmit) return;
-    const payload = {
+    const payload: Record<string, unknown> = {
       module: vetModuleId,
       nomenclature: nomenclatureId,
       warehouse: warehouseId,
       sale_price_uzs: salePrice,
-      cost_per_unit_uzs: costPrice || '0',
-      barcode: barcode || null,
       is_active: isActive,
       notes,
     };
+    // Себестоимость и barcode НЕ отправляем при create — backend
+    // подтянет cost из последнего INCOMING на складе и сгенерит barcode.
+    // При edit можно править cost (если оператор вручную поправил avg).
+    if (isEdit) {
+      payload.cost_per_unit_uzs = costPrice || '0';
+    }
     try {
       if (isEdit && initial) {
         await update.mutateAsync({ id: initial.id, patch: payload });
@@ -112,8 +136,10 @@ export default function AccessoryFormModal({ initial, onClose }: Props) {
       }
     >
       <div style={{ fontSize: 12, color: 'var(--fg-3)', marginBottom: 12 }}>
-        Аксессуары — товары для перепродажи без партионного учёта.
-        Себестоимость и остаток меняются только через «Приёмку».
+        Аксессуары — товары для перепродажи. <b>Склад — единственный
+        источник истины:</b> чтобы создать карточку, на выбранном складе
+        уже должен быть приход по этому SKU (через <code>/stock → +приход</code>
+        или закуп). При продаже остаток списывается со склада.
       </div>
 
       <div className="field">
@@ -184,9 +210,24 @@ export default function AccessoryFormModal({ initial, onClose }: Props) {
         )}
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+      <div className="field">
+        <label>Цена продажи, сум *</label>
+        <input
+          className="input mono"
+          type="number"
+          step="0.01"
+          min={0}
+          value={salePrice}
+          onChange={(e) => setSalePrice(e.target.value)}
+        />
+        <div style={{ fontSize: 11, color: 'var(--fg-3)', marginTop: 4 }}>
+          Меняется без переоценки склада.
+        </div>
+      </div>
+
+      {isEdit && (
         <div className="field">
-          <label>Себестоимость, сум{isEdit ? '' : ' *'}</label>
+          <label>Себестоимость, сум</label>
           <input
             className="input mono"
             type="number"
@@ -197,36 +238,43 @@ export default function AccessoryFormModal({ initial, onClose }: Props) {
             placeholder="0.00"
           />
           <div style={{ fontSize: 11, color: 'var(--fg-3)', marginTop: 4 }}>
-            {isEdit
-              ? 'Прямое изменение перезапишет текущий avg. Для корректной приёмки используйте «Принять».'
-              : 'Стартовая себестоимость. При следующей приёмке пересчитается weighted-avg.'}
+            Текущий avg-cost (берётся из последнего прихода). Прямое
+            изменение перезапишет — обычно не требуется.
           </div>
         </div>
-        <div className="field">
-          <label>Цена продажи, сум *</label>
-          <input
-            className="input mono"
-            type="number"
-            step="0.01"
-            min={0}
-            value={salePrice}
-            onChange={(e) => setSalePrice(e.target.value)}
-          />
-          <div style={{ fontSize: 11, color: 'var(--fg-3)', marginTop: 4 }}>
-            Меняется без переоценки склада.
-          </div>
-        </div>
-      </div>
+      )}
 
-      <div className="field">
-        <label>Штрих-код</label>
-        <input
-          className="input mono"
-          value={barcode}
-          onChange={(e) => setBarcode(e.target.value)}
-          placeholder="оставьте пустым — авто-генерация"
-        />
-      </div>
+      {!isEdit && warehouseId && nomenclatureId && (
+        <div style={{
+          padding: 10, marginTop: 4, marginBottom: 8,
+          borderRadius: 6, fontSize: 12,
+          background: hasStock ? 'var(--bg-soft)' : '#fef2f2',
+          border: `1px solid ${hasStock ? 'var(--border)' : 'var(--danger)'}`,
+        }}>
+          {hasStock ? (
+            <span>
+              ✅ <b>На складе:</b>{' '}
+              <span className="mono">
+                {stockQty.toLocaleString('ru-RU', { maximumFractionDigits: 2 })}
+                {stockOnHand?.unit ? ` ${stockOnHand.unit}` : ''}
+              </span>
+              <span style={{ color: 'var(--fg-3)', marginLeft: 6 }}>
+                — карточку создавать можно
+              </span>
+            </span>
+          ) : (
+            <span>
+              ⛔ <b>На складе ноль</b> по этому SKU. Сначала оприходуйте
+              товар через <code>/stock</code> → <b>+ Приход</b> (или
+              закупом через <code>/purchases</code>), потом возвращайтесь
+              сюда создавать карточку.
+            </span>
+          )}
+        </div>
+      )}
+
+      {/* Штрих-код скрыт — авто-генерируется на бэкенде в формате
+          VET-A-{SKU}-{rand4}. Если нужно ввести вручную — отдельный flow. */}
 
       <div className="field">
         <label>Заметки</label>

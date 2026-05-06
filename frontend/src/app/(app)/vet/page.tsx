@@ -67,7 +67,7 @@ function daysUntil(dateISO: string): number {
 }
 
 export default function VetPage() {
-  const [tab, setTab] = useState<'stock' | 'treatments' | 'drugs' | 'accessories'>('stock');
+  const [tab, setTab] = useState<'stock' | 'drugs' | 'accessories'>('stock');
   const [stockStatus, setStockStatus] = useState('');
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(50);
@@ -141,9 +141,6 @@ export default function VetPage() {
               </button>
               <OpexButton moduleCode="vet" suggestedContraCode="20.06" />
               <OpenSaleFromModule moduleCode="vet" />
-              <button className="btn btn-primary btn-sm" onClick={() => setTreatmentOpen(true)}>
-                <Icon name="pharma" size={14} /> Назначить лечение
-              </button>
             </>
           )}
         </div>
@@ -165,8 +162,7 @@ export default function VetPage() {
       <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
         <Seg
           options={[
-            { value: 'stock', label: 'Склад' },
-            { value: 'treatments', label: 'Журнал лечений' },
+            { value: 'stock', label: 'Лоты' },
             { value: 'drugs', label: 'SKU препаратов' },
             { value: 'accessories', label: 'Аксессуары' },
           ]}
@@ -282,82 +278,7 @@ export default function VetPage() {
         </Panel>
       )}
 
-      {tab === 'treatments' && (
-        <Panel flush>
-          <DataTable<VetTreatmentLog>
-            isLoading={trLoading}
-            rows={treatments}
-            rowKey={(t) => t.id}
-            emptyMessage={
-              <EmptyState
-                icon="book"
-                title="Записей лечения пока нет"
-                description="Журнал лечений фиксирует каждое применение препарата: какой стаде или партии, какой препарат, доза и срок каренции."
-                steps={[
-                  { label: 'Убедитесь, что на складе есть доступный препарат' },
-                  { label: 'Нажмите «+ Лечение» — выберите блок/стадо, препарат и дозу' },
-                  { label: 'Укажите количество голов и дату лечения' },
-                  { label: 'Запись автоматически включит каренцию для этого блока' },
-                ]}
-                action={{
-                  label: 'Записать лечение',
-                  onClick: () => setTreatmentOpen(true),
-                }}
-                hint="Каренция (период ожидания) рассчитывается по препарату — в это время продукция блокируется для реализации."
-              />
-            }
-            onRowClick={(t) => setSelTr(t)}
-            rowProps={(t) => ({ active: selTr?.id === t.id })}
-            columns={[
-              { key: 'doc', label: 'Документ',
-                render: (t) => <span className="badge id">{t.doc_number}</span> },
-              { key: 'date', label: 'Дата', mono: true, cellStyle: { fontSize: 12 },
-                render: (t) => t.treatment_date },
-              { key: 'block', label: 'Блок', mono: true, cellStyle: { fontSize: 12 },
-                render: (t) => t.target_block_code ?? '—' },
-              { key: 'drug', label: 'Препарат', mono: true, cellStyle: { fontSize: 12 },
-                render: (t) => t.drug_sku ?? '—' },
-              { key: 'lot', label: 'Lot', mono: true, cellStyle: { fontSize: 12 },
-                render: (t) => t.stock_batch_lot ?? '—' },
-              { key: 'dose', label: 'Доза', align: 'right', mono: true,
-                render: (t) => parseFloat(t.dose_quantity).toLocaleString('ru-RU') },
-              { key: 'heads', label: 'Голов', align: 'right', mono: true,
-                render: (t) => t.heads_treated.toLocaleString('ru-RU') },
-              { key: 'karen', label: 'Каренция', mono: true, cellStyle: { fontSize: 12 },
-                render: (t) => t.withdrawal_period_days > 0 ? `${t.withdrawal_period_days} дн` : '—' },
-              { key: 'state', label: 'Состояние',
-                render: (t) => t.cancelled_at
-                  ? <Badge tone="danger" dot>Отменено</Badge>
-                  : <Badge tone="success" dot>Проведено</Badge> },
-              { key: 'actions', label: '', width: 60, align: 'right',
-                render: (t) => canEdit ? (
-                  <RowActions
-                    actions={[
-                      {
-                        label: 'Отменить',
-                        danger: true,
-                        hidden: Boolean(t.cancelled_at),
-                        disabled: cancelTreatment.isPending,
-                        onClick: () => setCancelTreatmentFor(t),
-                      },
-                    ]}
-                  />
-                ) : null },
-            ]}
-          />
-          {treatmentsPage.data && (
-            <TablePagination
-              page={page}
-              pageSize={pageSize}
-              count={treatmentsPage.data.count}
-              hasPrev={Boolean(treatmentsPage.data.previous)}
-              hasNext={Boolean(treatmentsPage.data.next)}
-              onPageChange={setPage}
-              onPageSizeChange={setPageSize}
-            />
-          )}
-        </Panel>
-      )}
+      {/* Таб «Журнал лечений» удалён — лечение временно недоступно. */}
 
       {tab === 'drugs' && (
         <Panel flush>
@@ -637,7 +558,21 @@ export default function VetPage() {
               { k: 'Тип', v: DRUG_TYPE_LABEL[selDrug.drug_type] ?? selDrug.drug_type },
               { k: 'Путь введения', v: selDrug.administration_route },
               { k: 'Каренция', v: `${selDrug.default_withdrawal_days} дн` },
-              { k: 'Условия хранения', v: selDrug.storage_conditions || '—' },
+              {
+                k: 'Температура хранения',
+                v: (() => {
+                  const fmt = (v: number | null) => v == null ? null : (v >= 0 ? `+${v}` : `${v}`);
+                  const lo = fmt(selDrug.storage_temp_min_c);
+                  const hi = fmt(selDrug.storage_temp_max_c);
+                  if (lo == null && hi == null) return '—';
+                  if (lo != null && hi != null) return `${lo} … ${hi} °C`;
+                  return `${lo ?? hi} °C`;
+                })(),
+                mono: true,
+              },
+              ...(selDrug.storage_conditions
+                ? [{ k: 'Доп. условия', v: selDrug.storage_conditions }]
+                : []),
               { k: 'Статус', v: selDrug.is_active ? 'Активен' : 'Архив' },
               {
                 k: 'Σ остаток',

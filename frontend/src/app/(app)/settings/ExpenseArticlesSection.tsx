@@ -280,7 +280,7 @@ function ExpenseArticleModal({ initial, existing, onClose }: ModalProps) {
         <div className="field">
           <label>Код *</label>
           <input
-            className="input mono"
+            className="input mono upper"
             value={code}
             onChange={(e) => setCode(e.target.value.toUpperCase())}
             placeholder="GAS"

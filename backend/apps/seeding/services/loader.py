@@ -28,6 +28,18 @@ class SeedError(Exception):
     """Ошибка при загрузке/применении seed-конфига."""
 
 
+def _norm_code(value):
+    """
+    Нормализуем code-like значения к UPPERCASE — синхронно с UpperCodeMixin
+    на моделях. Без этого update_or_create(code='kg') не находит существующий
+    'KG' и роняется на unique_together (после первого save mixin переписал
+    'kg' → 'KG', второй seed-запуск пытается создать 'KG' заново).
+    """
+    if isinstance(value, str) and value:
+        return value.upper()
+    return value
+
+
 @dataclass
 class SeedReport:
     units_created: int = 0
@@ -165,6 +177,7 @@ class OrganizationSeeder:
         return self._modules[code]
 
     def _resolve_subaccount(self, code: Optional[str]):
+        code = _norm_code(code)
         if not code:
             return None
         if code not in self._subaccounts:
@@ -181,6 +194,7 @@ class OrganizationSeeder:
         return self._subaccounts[code]
 
     def _resolve_unit(self, code: Optional[str]):
+        code = _norm_code(code)
         if not code:
             return None
         if code not in self._units:
@@ -210,6 +224,7 @@ class OrganizationSeeder:
         return self._categories[name]
 
     def _resolve_block(self, code: Optional[str]):
+        code = _norm_code(code)
         if not code:
             return None
         if code not in self._blocks:
@@ -251,7 +266,7 @@ class OrganizationSeeder:
 
         rows = self.config.get("units") or []
         for row in rows:
-            code = row.get("code")
+            code = _norm_code(row.get("code"))
             name = row.get("name") or code
             if not code:
                 self.report.skipped.append("unit без code")
@@ -274,7 +289,7 @@ class OrganizationSeeder:
 
         rows = self.config.get("accounts") or []
         for row in rows:
-            code = row.get("code")
+            code = _norm_code(row.get("code"))
             name = row.get("name")
             type_ = row.get("type")
             if not (code and name and type_):
@@ -298,8 +313,8 @@ class OrganizationSeeder:
 
         rows = self.config.get("subaccounts") or []
         for row in rows:
-            code = row.get("code")
-            account_code = row.get("account")
+            code = _norm_code(row.get("code"))
+            account_code = _norm_code(row.get("account"))
             name = row.get("name")
             if not (code and account_code and name):
                 self.report.skipped.append(f"subaccount {code or '?'} — пропуск")
@@ -335,7 +350,7 @@ class OrganizationSeeder:
 
         # Pass 1: создаём всё без parent.
         for row in rows:
-            code = row.get("code")
+            code = _norm_code(row.get("code"))
             name = row.get("name")
             kind = row.get("kind", "expense")
             if not (code and name):
@@ -361,8 +376,8 @@ class OrganizationSeeder:
 
         # Pass 2: проставляем parent (теперь все записи существуют).
         for row in rows:
-            code = row.get("code")
-            parent_code = row.get("parent")
+            code = _norm_code(row.get("code"))
+            parent_code = _norm_code(row.get("parent"))
             if not parent_code:
                 continue
             obj = self._expense_articles.get(code)
@@ -410,10 +425,10 @@ class OrganizationSeeder:
 
         rows = self.config.get("nomenclature") or []
         for row in rows:
-            sku = row.get("sku")
+            sku = _norm_code(row.get("sku"))
             name = row.get("name")
             category_name = row.get("category")
-            unit_code = row.get("unit")
+            unit_code = _norm_code(row.get("unit"))
             if not (sku and name and category_name and unit_code):
                 self.report.skipped.append(f"nomenclature {sku or '?'} — пропуск")
                 continue
@@ -447,7 +462,7 @@ class OrganizationSeeder:
 
         rows = self.config.get("blocks") or []
         for row in rows:
-            code = row.get("code")
+            code = _norm_code(row.get("code"))
             name = row.get("name")
             kind = row.get("kind")
             module_code = row.get("module")
@@ -484,7 +499,7 @@ class OrganizationSeeder:
 
         rows = self.config.get("warehouses") or []
         for row in rows:
-            code = row.get("code")
+            code = _norm_code(row.get("code"))
             name = row.get("name")
             module_code = row.get("module")
             if not (code and name and module_code):
@@ -543,7 +558,7 @@ class OrganizationSeeder:
         all_modules = {m.code: m for m in Module.objects.all()}
 
         for row in rows:
-            code = row.get("code")
+            code = _norm_code(row.get("code"))
             if not code:
                 self.report.skipped.append(f"role without code: {row}")
                 continue

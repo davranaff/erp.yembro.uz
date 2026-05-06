@@ -5,12 +5,15 @@ from django.core.exceptions import ValidationError
 from django.db import models
 
 from apps.common.models import TimestampedModel, UUIDModel
+from apps.common.normalize import UpperCodeMixin
 
 
 # ─── Recipes ───────────────────────────────────────────────────────────────
 
 
-class Recipe(UUIDModel, TimestampedModel):
+class Recipe(UpperCodeMixin, UUIDModel, TimestampedModel):
+    upper_code_fields = ("code",)
+
     class Direction(models.TextChoices):
         BROILER = "broiler", "Бройлер"
         LAYER = "layer", "Несушка"

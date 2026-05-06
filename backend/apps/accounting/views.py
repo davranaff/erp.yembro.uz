@@ -19,11 +19,18 @@ from .serializers import (
 
 
 class GLAccountViewSet(OrgReadOnlyViewSet):
-    """/api/accounting/accounts/ — план счетов (read-only, верхний уровень)."""
+    """
+    /api/accounting/accounts/ — план счетов (read-only, верхний уровень).
+
+    READ открыт любому org-member: список счетов нужен heads модулей чтобы
+    создавать свои кассы (выбрать parent 50/51) и для contra-счёт-выбора в
+    OPEX. Сам план счетов это глобальный справочник, без чувствительной
+    информации.
+    """
 
     serializer_class = GLAccountSerializer
     queryset = GLAccount.objects.prefetch_related("subaccounts__module").order_by("code")
-    module_code = "ledger"
+    # module_code не задаём — справочник доступен любому org-member.
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
     filterset_fields = ["type"]
     search_fields = ["code", "name"]
@@ -34,15 +41,22 @@ class GLSubaccountViewSet(OrgScopedModelViewSet):
     """
     /api/accounting/subaccounts/ — субсчета (CRUD).
 
-    Создание/правка/удаление доступны только для уровня admin в модуле ledger.
+    Доступ:
+        - READ: любому org-member (нужно для выпадашек cashbox / contra-счёт).
+        - CREATE/UPDATE/DELETE: org-admin (admin-override на любом модуле)
+          ИЛИ head модуля для которого создаётся субсчёт (rw на target module).
+
+    Это позволяет head'ам модулей создавать собственные кассы (50.NN с
+    module=feed) и расчётные счета (51.NN с module=vet) — полная изоляция
+    на уровне модулей. Без требования общего ledger:admin.
+
     Удаление защищено PROTECT на JournalEntry/Payment — при попытке удалить
     используемый субсчёт вернём 409 с объяснением.
     """
 
     serializer_class = GLSubaccountSerializer
     queryset = GLSubaccount.objects.select_related("account", "module").order_by("code")
-    module_code = "ledger"
-    write_level = "admin"
+    # module_code/write_level не задаём — кастомная логика в _check_module_access
     organization_field = "account__organization"
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
     filterset_fields = ["account", "module"]
@@ -54,6 +68,34 @@ class GLSubaccountViewSet(OrgScopedModelViewSet):
     # select. Отключаем — отдаём весь справочник одним списком.
     pagination_class = None
 
+    def _check_module_access(self, module):
+        """
+        CRUD на план счетов / субсчета (включая кассы) — только org-admin.
+        Heads модулей могут только READ субсчета; создание/правка касс
+        делегируется владельцу/CFO. Это защита от случайных дублей касс
+        и финансовой каши при делегации.
+
+        (Раньше head'у разрешалось создавать кассы своего модуля. Откат
+        после фидбэка пользователя: «CRUD кассы только админ'ам пока что».)
+        """
+        from apps.common.permissions import is_org_admin
+        from rest_framework.exceptions import PermissionDenied
+
+        membership = getattr(self.request, "membership", None)
+        if membership is None or not is_org_admin(membership):
+            raise PermissionDenied({
+                "detail": "Управление кассами/счетами — только для администратора организации.",
+            })
+
+    def perform_create(self, serializer):
+        self._check_module_access(serializer.validated_data.get("module"))
+        super().perform_create(serializer)
+
+    def perform_update(self, serializer):
+        new_module = serializer.validated_data.get("module") or serializer.instance.module
+        self._check_module_access(new_module)
+        super().perform_update(serializer)
+
     def _save_kwargs_for_create(self, serializer) -> dict:
         """
         Override: у GLSubaccount нет поля organization (оно у parent account).
@@ -64,6 +106,7 @@ class GLSubaccountViewSet(OrgScopedModelViewSet):
 
     def perform_destroy(self, instance):
         """Защита от удаления субсчёта, на который есть ссылки."""
+        self._check_module_access(instance.module)
         self._write_audit(
             AuditLog.Action.DELETE,
             instance,

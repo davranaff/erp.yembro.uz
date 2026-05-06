@@ -10,7 +10,7 @@ import Panel from '@/components/ui/Panel';
 import RowActions from '@/components/ui/RowActions';
 import Seg from '@/components/ui/Seg';
 import TablePagination from '@/components/ui/TablePagination';
-import { useSubaccounts } from '@/hooks/useAccounts';
+import { useDeleteSubaccount, useSubaccounts } from '@/hooks/useAccounts';
 import { useModules } from '@/hooks/useModules';
 import {
   paymentsCrud,
@@ -19,8 +19,9 @@ import {
   useReversePayment,
 } from '@/hooks/usePayments';
 import { useHasLevel } from '@/hooks/usePermissions';
-import type { Payment, PaymentKind, PaymentStatus } from '@/types/auth';
+import type { GLSubaccount, Payment, PaymentKind, PaymentStatus } from '@/types/auth';
 
+import CashAccountModal from './CashAccountModal';
 import OpexModal from './OpexModal';
 import PaymentDrawer from './PaymentDrawer';
 
@@ -76,7 +77,9 @@ function daysAgoISO(days: number) {
 type StatusTab = 'all' | 'posted' | 'draft' | 'cancelled';
 
 export default function CashboxPage() {
-  const [accountCode, setAccountCode] = useState<'all' | '50.01' | '51.01'>('all');
+  // accountCode = 'all' | sub.code (динамический список — карточки и фильтр
+  // строятся из реально существующих 50.NN/51.NN субсчетов).
+  const [accountCode, setAccountCode] = useState<string>('all');
   const [dateFrom, setDateFrom] = useState(daysAgoISO(30));
   const [dateTo, setDateTo] = useState(todayISO());
   const [moduleId, setModuleId] = useState('');
@@ -84,10 +87,14 @@ export default function CashboxPage() {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(50);
   const [opexOpen, setOpexOpen] = useState<false | 'out' | 'in'>(false);
+  const [cashAccountOpen, setCashAccountOpen] = useState(false);
   const [drawerPayment, setDrawerPayment] = useState<Payment | null>(null);
 
   const hasLevel = useHasLevel();
   const canEdit = hasLevel('ledger', 'rw');
+  // Org-admin: только владелец/CFO. Управление кассами/счетами — это
+  // структурное изменение плана счетов, не делегируется heads.
+  const isOrgAdmin = hasLevel('admin', 'admin') || hasLevel('ledger', 'admin');
 
   const { data: subs } = useSubaccounts();
   const { data: modules } = useModules();
@@ -95,6 +102,8 @@ export default function CashboxPage() {
   const cancel = useCancelPayment();
   const reverse = useReversePayment();
   const remove = paymentsCrud.useDelete();
+  const deleteSubaccount = useDeleteSubaccount();
+  const [editingAccount, setEditingAccount] = useState<GLSubaccount | null>(null);
 
   // Фильтрованный список платежей
   const filter = useMemo(() => {
@@ -124,30 +133,45 @@ export default function CashboxPage() {
     });
   }, [payments, dateFrom, dateTo]);
 
-  // KPI: остаток кассы, остаток банка, приход и расход за период
-  // Считаем по всем posted-платежам, независимо от текущей вкладки.
-  const kpi = useMemo(() => {
-    if (!postedPayments) return null;
-    let cashBalance = 0;
-    let bankBalance = 0;
-    let periodIn = 0;
-    let periodOut = 0;
+  // Список «cash-аккаунтов» — субсчета под счётом 50 (касса) или 51 (банк).
+  // Если выбран фильтр «Модуль», карточки сужаются до его кассах.
+  const cashAccounts = useMemo(() => {
+    if (!subs) return [];
+    return subs
+      .filter((s) => s.code.startsWith('50.') || s.code.startsWith('51.'))
+      .filter((s) => !moduleId || s.module === moduleId)
+      .sort((a, b) => a.code.localeCompare(b.code));
+  }, [subs, moduleId]);
+
+  // Балансы по каждому cash-аккаунту + period totals.
+  const balanceByAccount = useMemo(() => {
+    const map = new Map<string, number>();
+    if (!postedPayments) return map;
     for (const p of postedPayments) {
+      if (!p.cash_subaccount) continue;
       const amt = parseFloat(p.amount_uzs || '0');
       if (Number.isNaN(amt)) continue;
-      const code = p.cash_subaccount_code;
-      const isCash = code === '50.01';
-      const isBank = code === '51.01';
       const delta = p.direction === 'in' ? amt : -amt;
-      if (isCash) cashBalance += delta;
-      if (isBank) bankBalance += delta;
-      if (p.date >= dateFrom && p.date <= dateTo) {
-        if (p.direction === 'in') periodIn += amt;
-        else periodOut += amt;
-      }
+      map.set(p.cash_subaccount, (map.get(p.cash_subaccount) ?? 0) + delta);
     }
-    return { cashBalance, bankBalance, periodIn, periodOut };
-  }, [postedPayments, dateFrom, dateTo]);
+    return map;
+  }, [postedPayments]);
+
+  const periodTotals = useMemo(() => {
+    let periodIn = 0;
+    let periodOut = 0;
+    if (!postedPayments) return { periodIn, periodOut };
+    const accountIds = new Set(cashAccounts.map((s) => s.id));
+    for (const p of postedPayments) {
+      if (!p.cash_subaccount || !accountIds.has(p.cash_subaccount)) continue;
+      if (p.date < dateFrom || p.date > dateTo) continue;
+      const amt = parseFloat(p.amount_uzs || '0');
+      if (Number.isNaN(amt)) continue;
+      if (p.direction === 'in') periodIn += amt;
+      else periodOut += amt;
+    }
+    return { periodIn, periodOut };
+  }, [postedPayments, cashAccounts, dateFrom, dateTo]);
 
   const handlePost = async (p: Payment) => {
     if (!window.confirm('Провести платёж ' + p.doc_number + '? Будет создана проводка в ГК.')) return;
@@ -191,9 +215,18 @@ export default function CashboxPage() {
       <div className="page-hdr">
         <div>
           <h1>Касса и банк</h1>
-          <div className="sub">Движения наличных (50.01) и расчётного счёта (51.01) · приход/расход по модулям</div>
+          <div className="sub">Кассы (50.NN) и расчётные счета (51.NN) — каждый со своим модулем</div>
         </div>
         <div className="actions">
+          {isOrgAdmin && (
+            <button
+              className="btn btn-ghost btn-sm"
+              onClick={() => { setEditingAccount(null); setCashAccountOpen(true); }}
+              title="Создать новую кассу или расчётный счёт под выбранный модуль (только админ)"
+            >
+              <Icon name="plus" size={14} /> Касса/Банк
+            </button>
+          )}
           {canEdit && (
             <>
               <button className="btn btn-secondary btn-sm" onClick={() => setOpexOpen('in')}>
@@ -208,38 +241,127 @@ export default function CashboxPage() {
       </div>
 
       <div className="kpi-row">
-        <KpiCard
-          tone={kpi && kpi.cashBalance >= 0 ? 'green' : 'red'}
-          iconName="bag"
-          label="Касса 50.01"
-          sub="текущий остаток"
-          value={kpi ? fmtUzs(kpi.cashBalance) + ' сум' : '—'}
-        />
-        <KpiCard
-          tone={kpi && kpi.bankBalance >= 0 ? 'green' : 'red'}
-          iconName="book"
-          label="Расчётный счёт 51.01"
-          sub="текущий остаток"
-          value={kpi ? fmtUzs(kpi.bankBalance) + ' сум' : '—'}
-        />
+        {cashAccounts.length === 0 && (
+          <KpiCard
+            tone="orange"
+            iconName="bag"
+            label="Нет касс/счетов"
+            sub={moduleId ? 'для выбранного модуля' : 'создайте через «+ Касса/Банк»'}
+            value="—"
+          />
+        )}
+        {cashAccounts.map((acc) => {
+          const balance = balanceByAccount.get(acc.id) ?? 0;
+          const isBank = acc.code.startsWith('51.');
+          const moduleLabel = acc.module
+            ? modules?.find((m) => m.id === acc.module)?.name
+            : null;
+          return (
+            <KpiCard
+              key={acc.id}
+              tone={balance >= 0 ? 'green' : 'red'}
+              iconName={isBank ? 'book' : 'bag'}
+              label={`${isBank ? 'Банк' : 'Касса'} ${acc.code}`}
+              sub={moduleLabel ? `${acc.name} · ${moduleLabel}` : acc.name}
+              value={postedPayments ? fmtUzs(balance) + ' сум' : '—'}
+            />
+          );
+        })}
         <KpiCard
           tone="blue"
           iconName="download"
           label="Приход за период"
           sub={`${dateFrom} — ${dateTo}`}
-          value={kpi ? fmtUzs(kpi.periodIn, true) : '—'}
+          value={postedPayments ? fmtUzs(periodTotals.periodIn, true) : '—'}
         />
         <KpiCard
           tone="red"
           iconName="arrow-right"
           label="Расход за период"
           sub={`${dateFrom} — ${dateTo}`}
-          value={kpi ? fmtUzs(kpi.periodOut, true) : '—'}
+          value={postedPayments ? fmtUzs(periodTotals.periodOut, true) : '—'}
         />
       </div>
 
+      {/* Список касс/счетов — управление только для org-admin */}
+      {cashAccounts.length > 0 && (
+        <Panel
+          title={`Кассы и счета (${cashAccounts.length})`}
+          flush
+        >
+          <table style={{ width: '100%', fontSize: 13, borderCollapse: 'collapse' }}>
+            <thead>
+              <tr style={{ color: 'var(--fg-3)', fontSize: 11, textAlign: 'left' }}>
+                <th style={{ padding: '6px 12px' }}>Код</th>
+                <th style={{ padding: '6px 12px' }}>Тип</th>
+                <th style={{ padding: '6px 12px' }}>Наименование</th>
+                <th style={{ padding: '6px 12px' }}>Модуль</th>
+                <th style={{ padding: '6px 12px', textAlign: 'right' }}>Баланс, сум</th>
+                {isOrgAdmin && <th style={{ padding: '6px 12px', width: 60 }}></th>}
+              </tr>
+            </thead>
+            <tbody>
+              {cashAccounts.map((acc) => {
+                const isBank = acc.code.startsWith('51.');
+                const balance = balanceByAccount.get(acc.id) ?? 0;
+                const moduleLabel = acc.module
+                  ? modules?.find((m) => m.id === acc.module)?.name ?? '—'
+                  : <span style={{ color: 'var(--fg-3)' }}>общий</span>;
+                return (
+                  <tr key={acc.id} style={{ borderTop: '1px solid var(--border)' }}>
+                    <td className="mono" style={{ padding: '8px 12px', fontWeight: 500 }}>
+                      {acc.code}
+                    </td>
+                    <td style={{ padding: '8px 12px', fontSize: 12 }}>
+                      {isBank ? 'Банк' : 'Касса'}
+                    </td>
+                    <td style={{ padding: '8px 12px' }}>{acc.name}</td>
+                    <td style={{ padding: '8px 12px', fontSize: 12 }}>{moduleLabel}</td>
+                    <td className="mono" style={{
+                      padding: '8px 12px', textAlign: 'right',
+                      color: balance >= 0 ? 'var(--success)' : 'var(--danger)',
+                      fontWeight: 600,
+                    }}>
+                      {fmtUzs(balance)}
+                    </td>
+                    {isOrgAdmin && (
+                      <td style={{ padding: '8px 12px', textAlign: 'right' }}>
+                        <RowActions
+                          actions={[
+                            {
+                              label: 'Редактировать',
+                              onClick: () => { setEditingAccount(acc); setCashAccountOpen(true); },
+                            },
+                            {
+                              label: 'Удалить',
+                              danger: true,
+                              disabled: deleteSubaccount.isPending || balance !== 0,
+                              onClick: async () => {
+                                if (!window.confirm(
+                                  `Удалить кассу/счёт ${acc.code} «${acc.name}»? ` +
+                                  `Если есть привязанные платежи — удаление невозможно.`,
+                                )) return;
+                                try {
+                                  await deleteSubaccount.mutateAsync(acc.id);
+                                } catch (e) {
+                                  alert(e instanceof Error ? e.message : 'Не удалось удалить');
+                                }
+                              },
+                            },
+                          ]}
+                        />
+                      </td>
+                    )}
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </Panel>
+      )}
+
       {/* Статус-табы */}
-      <div style={{ marginBottom: 12 }}>
+      <div style={{ marginBottom: 12, marginTop: 12 }}>
         <Seg
           options={[
             { value: 'posted',    label: 'Проведённые' },
@@ -254,17 +376,20 @@ export default function CashboxPage() {
 
       {/* Фильтры */}
       <div className="filter-bar">
-        <div className="filter-cell">
+        <div className="filter-cell" style={{ minWidth: 220 }}>
           <label>Счёт</label>
-          <Seg
-            options={[
-              { value: 'all', label: 'Касса + Банк' },
-              { value: '50.01', label: 'Только касса' },
-              { value: '51.01', label: 'Только банк' },
-            ]}
+          <select
+            className="input"
             value={accountCode}
-            onChange={(v) => { setAccountCode(v as typeof accountCode); setPage(1); }}
-          />
+            onChange={(e) => { setAccountCode(e.target.value); setPage(1); }}
+          >
+            <option value="all">Все кассы и банки</option>
+            {cashAccounts.map((acc) => (
+              <option key={acc.id} value={acc.code}>
+                {acc.code} · {acc.name}
+              </option>
+            ))}
+          </select>
         </div>
         <div className="filter-cell">
           <label>С</label>
@@ -394,6 +519,14 @@ export default function CashboxPage() {
         <OpexModal
           preselect={{ direction: opexOpen }}
           onClose={() => setOpexOpen(false)}
+        />
+      )}
+
+      {cashAccountOpen && (
+        <CashAccountModal
+          initial={editingAccount}
+          defaultModuleId={moduleId || undefined}
+          onClose={() => { setCashAccountOpen(false); setEditingAccount(null); }}
         />
       )}
 
