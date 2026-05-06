@@ -19,6 +19,8 @@ class CounterpartySerializer(serializers.ModelSerializer):
             "balance_uzs",
             "credit_limit_uzs",
             "max_overdue_days",
+            "opening_debt_uzs",
+            "opening_balance_date",
             "is_active",
             "notes",
             "created_at",

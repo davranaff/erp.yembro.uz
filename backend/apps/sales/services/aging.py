@@ -175,6 +175,34 @@ def compute_aging_report(
             if days_overdue > row.oldest_overdue_days:
                 row.oldest_overdue_days = days_overdue
 
+    # Стартовые долги от миграции — добавляем к total строки. Если у клиента
+    # нет активных заказов, но есть opening_debt > 0 — создаём для него
+    # row, чтобы он попал в отчёт. Бакет: распределяем на «current» (без
+    # точной даты — миграция изначально без просрочки).
+    from apps.counterparties.models import Counterparty
+
+    cp_qs = Counterparty.objects.filter(
+        organization=organization,
+        opening_debt_uzs__gt=0,
+    ).only("id", "code", "name", "opening_debt_uzs")
+    if customer_id:
+        cp_qs = cp_qs.filter(id=customer_id)
+    for cp in cp_qs:
+        cp_id = str(cp.id)
+        opening = Decimal(cp.opening_debt_uzs or 0)
+        if opening <= 0:
+            continue
+        row = rows_by_customer.get(cp_id)
+        if row is None:
+            row = AgingRow(
+                counterparty_id=cp_id,
+                code=cp.code,
+                name=cp.name,
+            )
+            rows_by_customer[cp_id] = row
+        row.current += opening
+        row.total += opening
+
     rows = list(rows_by_customer.values())
     # Топ должников сверху (по total убыванию)
     rows.sort(key=lambda r: r.total, reverse=True)

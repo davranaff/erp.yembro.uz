@@ -500,6 +500,11 @@ export interface Counterparty {
   credit_limit_uzs: string | null;
   /** Макс. допустимая просрочка в днях. NULL = без ограничения. */
   max_overdue_days: number | null;
+  /** Стартовый долг (миграция из другой ERP). Знак: + клиент должен,
+   * − предоплата (для buyer); + мы должны, − переплата (для supplier). */
+  opening_debt_uzs: string;
+  /** Дата на которую зафиксирован стартовый долг. */
+  opening_balance_date: string | null;
   is_active: boolean;
   notes: string;
   created_at: string;

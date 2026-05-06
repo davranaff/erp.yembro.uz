@@ -69,22 +69,27 @@ def check_customer_credit(
     """
     limit = customer.credit_limit_uzs
     max_od = customer.max_overdue_days
+    # Стартовый долг от миграции с другой ERP — добавляется к live-долгу.
+    # Положительное = клиент должен, отрицательное = предоплата.
+    opening = Decimal(customer.opening_debt_uzs or 0)
 
     # Если ни один лимит не задан — fast-path без агрегации.
+    # Opening учитываем как «уже существующий долг» — но если оба лимита
+    # NULL, всё равно проверять не надо.
     if limit is None and max_od is None:
         return CreditCheckResult(
             ok=True,
-            current_debt_uzs=Decimal("0"),
+            current_debt_uzs=opening,
             new_sale_uzs=new_sale_uzs,
         )
 
     report = compute_aging_report(organization, customer_id=str(customer.id))
     if report.rows:
         row = report.rows[0]
-        current_debt = row.total
+        current_debt = row.total + opening
         oldest = row.oldest_overdue_days
     else:
-        current_debt = Decimal("0")
+        current_debt = opening
         oldest = 0
 
     result = CreditCheckResult(
