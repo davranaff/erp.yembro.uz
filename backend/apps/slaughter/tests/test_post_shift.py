@@ -51,14 +51,14 @@ def user():
 @pytest.fixture
 def unit_kg(org):
     return Unit.objects.get_or_create(
-        organization=org, code="кг", defaults={"name": "кг"}
+        organization=org, code="КГ", defaults={"name": "КГ"}
     )[0]
 
 
 @pytest.fixture
 def unit_pcs(org):
     return Unit.objects.get_or_create(
-        organization=org, code="шт", defaults={"name": "шт"}
+        organization=org, code="ШТ", defaults={"name": "ШТ"}
     )[0]
 
 

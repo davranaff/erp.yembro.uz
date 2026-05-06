@@ -95,7 +95,7 @@ def test_seed_on_empty_org_creates_everything(fresh_org, minimal_config):
     # Проверка ссылочной целостности
     nom = NomenclatureItem.objects.get(organization=fresh_org, sku="FEED-START")
     assert nom.category.name == "Корма"
-    assert nom.unit.code == "kg"
+    assert nom.unit.code == "KG"  # UpperCodeMixin нормализует
     assert nom.default_gl_subaccount.code == "10.05"
 
     wh = Warehouse.objects.get(organization=fresh_org, code="СК-К")
