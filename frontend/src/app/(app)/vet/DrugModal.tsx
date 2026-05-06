@@ -84,6 +84,18 @@ export default function DrugModal({ initial, onClose }: Props) {
   const [withdrawalDays, setWithdrawalDays] = useState(
     String(initial?.default_withdrawal_days ?? 0),
   );
+  // Температура хранения — храним абсолютное значение + знак в state'ах.
+  // На submit складываем в signed int. По умолчанию знак «+» (плюс).
+  const initMinSign: '+' | '-' = (initial?.storage_temp_min_c ?? 0) < 0 ? '-' : '+';
+  const initMaxSign: '+' | '-' = (initial?.storage_temp_max_c ?? 0) < 0 ? '-' : '+';
+  const [tempMinSign, setTempMinSign] = useState<'+' | '-'>(initMinSign);
+  const [tempMin, setTempMin] = useState(
+    initial?.storage_temp_min_c != null ? String(Math.abs(initial.storage_temp_min_c)) : '',
+  );
+  const [tempMaxSign, setTempMaxSign] = useState<'+' | '-'>(initMaxSign);
+  const [tempMax, setTempMax] = useState(
+    initial?.storage_temp_max_c != null ? String(Math.abs(initial.storage_temp_max_c)) : '',
+  );
   const [storage, setStorage] = useState(initial?.storage_conditions ?? '');
   const [notes, setNotes] = useState(initial?.notes ?? '');
   const [isActive, setIsActive] = useState(initial?.is_active ?? true);
@@ -129,12 +141,23 @@ export default function DrugModal({ initial, onClose }: Props) {
         nomenclatureId = item.id;
       }
 
+      // Складываем знак + значение в signed int. Если поле пустое — null.
+      const composeTemp = (value: string, sign: '+' | '-'): number | null => {
+        const trimmed = value.trim();
+        if (!trimmed) return null;
+        const n = Number(trimmed);
+        if (Number.isNaN(n)) return null;
+        return sign === '-' ? -Math.abs(n) : Math.abs(n);
+      };
+
       const body = {
         module: vetModuleId,
         nomenclature: nomenclatureId,
         drug_type: drugType,
         administration_route: route,
         default_withdrawal_days: Number(withdrawalDays || 0),
+        storage_temp_min_c: composeTemp(tempMin, tempMinSign),
+        storage_temp_max_c: composeTemp(tempMax, tempMaxSign),
         storage_conditions: storage,
         notes,
         is_active: isActive,
@@ -316,14 +339,58 @@ export default function DrugModal({ initial, onClose }: Props) {
           />
         </div>
         <div className="field">
-          <label>Условия хранения</label>
-          <input
-            className="input"
-            value={storage}
-            onChange={(e) => setStorage(e.target.value)}
-            placeholder="+2…+8 °C, тёмное место"
-          />
+          <label>Температура хранения, °C</label>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <span style={{ fontSize: 12, color: 'var(--fg-3)', minWidth: 18 }}>от</span>
+            <select
+              className="input"
+              value={tempMinSign}
+              onChange={(e) => setTempMinSign(e.target.value as '+' | '-')}
+              style={{ width: 54 }}
+            >
+              <option value="+">+</option>
+              <option value="-">−</option>
+            </select>
+            <input
+              className="input mono"
+              type="number"
+              min="0"
+              value={tempMin}
+              onChange={(e) => setTempMin(e.target.value)}
+              placeholder="2"
+              style={{ flex: 1 }}
+            />
+            <span style={{ fontSize: 12, color: 'var(--fg-3)', minWidth: 18 }}>до</span>
+            <select
+              className="input"
+              value={tempMaxSign}
+              onChange={(e) => setTempMaxSign(e.target.value as '+' | '-')}
+              style={{ width: 54 }}
+            >
+              <option value="+">+</option>
+              <option value="-">−</option>
+            </select>
+            <input
+              className="input mono"
+              type="number"
+              min="0"
+              value={tempMax}
+              onChange={(e) => setTempMax(e.target.value)}
+              placeholder="8"
+              style={{ flex: 1 }}
+            />
+          </div>
         </div>
+      </div>
+
+      <div className="field">
+        <label>Доп. условия хранения</label>
+        <input
+          className="input"
+          value={storage}
+          onChange={(e) => setStorage(e.target.value)}
+          placeholder="тёмное место, влажность ≤ 65%"
+        />
       </div>
 
       <div className="field">

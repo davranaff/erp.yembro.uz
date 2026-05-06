@@ -60,6 +60,18 @@ class VetDrug(UUIDModel, TimestampedModel):
     )
     administration_route = models.CharField(max_length=16, choices=Route.choices)
     default_withdrawal_days = models.PositiveSmallIntegerField(default=0)
+    # Структурированный диапазон температуры хранения (°C). Можно задать
+    # либо границы по отдельности, либо обе. Если оставить пустыми — без
+    # температурных требований. Положительные/отрицательные знаком ввода.
+    storage_temp_min_c = models.SmallIntegerField(
+        null=True, blank=True,
+        help_text="Минимальная температура хранения, °C (целое со знаком).",
+    )
+    storage_temp_max_c = models.SmallIntegerField(
+        null=True, blank=True,
+        help_text="Максимальная температура хранения, °C (целое со знаком).",
+    )
+    # Свободное поле для дополнительных условий (тёмное место, влажность и т.п.).
     storage_conditions = models.CharField(max_length=128, blank=True)
     is_active = models.BooleanField(default=True)
     barcode = models.CharField(

@@ -642,7 +642,21 @@ export default function VetPage() {
               { k: 'Тип', v: DRUG_TYPE_LABEL[selDrug.drug_type] ?? selDrug.drug_type },
               { k: 'Путь введения', v: selDrug.administration_route },
               { k: 'Каренция', v: `${selDrug.default_withdrawal_days} дн` },
-              { k: 'Условия хранения', v: selDrug.storage_conditions || '—' },
+              {
+                k: 'Температура хранения',
+                v: (() => {
+                  const fmt = (v: number | null) => v == null ? null : (v >= 0 ? `+${v}` : `${v}`);
+                  const lo = fmt(selDrug.storage_temp_min_c);
+                  const hi = fmt(selDrug.storage_temp_max_c);
+                  if (lo == null && hi == null) return '—';
+                  if (lo != null && hi != null) return `${lo} … ${hi} °C`;
+                  return `${lo ?? hi} °C`;
+                })(),
+                mono: true,
+              },
+              ...(selDrug.storage_conditions
+                ? [{ k: 'Доп. условия', v: selDrug.storage_conditions }]
+                : []),
               { k: 'Статус', v: selDrug.is_active ? 'Активен' : 'Архив' },
               {
                 k: 'Σ остаток',

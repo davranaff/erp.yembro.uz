@@ -34,6 +34,8 @@ class VetDrugSerializer(serializers.ModelSerializer):
             "drug_type",
             "administration_route",
             "default_withdrawal_days",
+            "storage_temp_min_c",
+            "storage_temp_max_c",
             "storage_conditions",
             "barcode",
             "is_active",
