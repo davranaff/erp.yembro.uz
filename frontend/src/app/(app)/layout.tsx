@@ -5,8 +5,10 @@ import { usePathname } from 'next/navigation';
 import RequireRouteAccess from '@/components/auth/RequireRouteAccess';
 import Sidebar from '@/components/layout/Sidebar';
 import Topbar from '@/components/layout/Topbar';
+import ScannerIndicator from '@/components/ScannerIndicator';
 import { AuthProvider, useAuth } from '@/contexts/AuthContext';
 import { LayoutProvider, useLayout } from '@/contexts/LayoutContext';
+import { useBarcodeScanner } from '@/hooks/useBarcodeScanner';
 import { useTrackRecentPage } from '@/lib/recentPages';
 
 import AuthGuard from './AuthGuard';
@@ -49,6 +51,11 @@ function Shell({ children }: { children: React.ReactNode }) {
   // Запоминаем последние посещённые страницы для CommandPalette (⌘K)
   useTrackRecentPage();
 
+  // Глобальный обработчик HID-сканера штрих-кодов: на любой странице
+  // сканер ловит код + Enter и роутит на /scan/<barcode>. Не вмешивается
+  // в обычный ввод (если фокус в input/textarea/contenteditable).
+  const { scannerActive } = useBarcodeScanner();
+
   const orgLabel = org?.name ?? 'YemBro ERP';
   const tail = CRUMB_MAP[pathname] ?? [];
   const crumbs = [{ label: orgLabel }, ...tail.map((label) => ({ label }))];
@@ -68,6 +75,7 @@ function Shell({ children }: { children: React.ReactNode }) {
           <RequireRouteAccess>{children}</RequireRouteAccess>
         </div>
       </div>
+      <ScannerIndicator active={scannerActive} />
     </div>
   );
 }

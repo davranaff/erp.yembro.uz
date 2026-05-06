@@ -235,6 +235,45 @@ class VetPublicSellView(views.APIView):
                 "customer_name": result.sale_order.customer.name,
             }, status=status.HTTP_201_CREATED)
 
+        # FeedBagLot — фасованный корм. Тот же public-flow, отдельный сервис
+        # потому что quantity = шт мешков, нет дефолтной отпускной цены,
+        # и SaleItem.feed_bag_lot пишется в свой собственный FK.
+        from apps.feed.models import FeedBagLot
+        from apps.feed.services.sell_feed_bag import (
+            FeedBagSellError,
+            sell_feed_bag_lot,
+        )
+
+        bag_lot = (
+            FeedBagLot.objects
+            .filter(organization=organization, barcode=barcode)
+            .first()
+        )
+        if bag_lot is not None:
+            try:
+                result = sell_feed_bag_lot(
+                    bag_lot=bag_lot,
+                    quantity=qty,
+                    seller_user=request.user,
+                    organization=organization,
+                    customer=customer,
+                    unit_price_uzs=unit_price,
+                )
+            except FeedBagSellError as exc:
+                raise DRFValidationError(
+                    exc.message_dict if hasattr(exc, "message_dict") else exc.messages
+                )
+            return Response({
+                "source_kind": "feed_bag_lot",
+                "sale_order_id": str(result.sale_order.id),
+                "sale_order_doc": result.sale_order.doc_number,
+                "total_uzs": str(result.total_uzs),
+                "remaining_qty": str(result.remaining_bags),
+                "lot_status": result.bag_lot.status,
+                "customer_id": str(result.sale_order.customer_id),
+                "customer_name": result.sale_order.customer.name,
+            }, status=status.HTTP_201_CREATED)
+
         raise DRFValidationError(
             {"barcode": "Товар не найден в организации токена."}
         )

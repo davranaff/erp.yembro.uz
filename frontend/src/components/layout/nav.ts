@@ -76,6 +76,8 @@ export const NAV: NavEntry[] = [
     aliases: ['ветеринар', 'препараты', 'лекарства'] },
   { key: 'vet-tokens', label: 'Токены продавцов', icon: 'users', href: '/vet/seller-tokens', module: 'vet',
     aliases: ['токен', 'api'] },
+  { key: 'feed-tokens', label: 'Токены продавцов корма', icon: 'users', href: '/feed/seller-tokens', module: 'feed',
+    aliases: ['токен', 'продавец', 'feed-seller'] },
 
   { group: 'Учёт и отчёты' },
   { key: 'stock',     label: 'Склад и движения', icon: 'box',   href: '/stock',           module: 'stock',
