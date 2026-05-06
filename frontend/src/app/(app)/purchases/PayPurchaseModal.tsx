@@ -72,10 +72,12 @@ export default function PayPurchaseModal({ order, onClose }: Props) {
 
   const handleSubmit = async () => {
     try {
-      // 1. Создать платёж типа counterparty (OUT)
+      // 1. Создать платёж типа counterparty (OUT). Module берём с закупа —
+      // backend (PaymentViewSet) скоупит платежи по модулям, на которые у
+      // юзера rw. Без module=null head'ы получали 403.
       const payment = await create.mutateAsync({
         date,
-        module: null,
+        module: order.module,
         direction: 'out',
         channel,
         kind: 'counterparty',

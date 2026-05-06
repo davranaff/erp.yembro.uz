@@ -81,26 +81,56 @@ class PaymentViewSet(ImmutableStatusMixin, DeleteReasonMixin, OrgScopedModelView
             return qs
         if not allowed:
             return qs.none()
-        return qs.filter(module__code__in=allowed)
+        # Head видит платежи своего модуля + платежи без явного module,
+        # но привязанные к его кассе (cash_subaccount.module).
+        from django.db.models import Q
+        return qs.filter(
+            Q(module__code__in=allowed)
+            | Q(module__isnull=True, cash_subaccount__module__code__in=allowed)
+        )
 
-    def _check_module_allowed(self, module):
+    def _check_module_allowed(self, module, cash_subaccount=None):
+        """
+        Разрешает операцию если у юзера rw на target module.
+        Если payment.module не задан — берём fallback с cash_subaccount.module
+        (касса привязана к модулю → значит платёж принадлежит этому модулю).
+        Org-admin проходит всё.
+        """
         allowed = self._allowed_module_codes()
         if allowed is None:
             return
-        if module is None or module.code not in allowed:
-            code = module.code if module else "(не задан)"
+
+        effective_module = module or (
+            cash_subaccount.module if cash_subaccount else None
+        )
+
+        if effective_module is None:
             raise PermissionDenied({
-                "module": f"Нет прав rw на модуль «{code}» — нельзя управлять его кассой.",
+                "module": (
+                    "Платёж без модуля и без модульной кассы — только администратор. "
+                    "Выберите кассу с привязкой к модулю или укажите module."
+                ),
+            })
+        if effective_module.code not in allowed:
+            raise PermissionDenied({
+                "module": f"Нет прав rw на модуль «{effective_module.code}» — нельзя управлять его кассой.",
             })
 
     def perform_create(self, serializer):
-        self._check_module_allowed(serializer.validated_data.get("module"))
+        self._check_module_allowed(
+            serializer.validated_data.get("module"),
+            cash_subaccount=serializer.validated_data.get("cash_subaccount"),
+        )
         super().perform_create(serializer)
 
     def perform_update(self, serializer):
         # Защита от смены module на тот, к которому нет доступа
         new_module = serializer.validated_data.get("module") or serializer.instance.module
-        self._check_module_allowed(new_module)
+        new_cash = (
+            serializer.validated_data.get("cash_subaccount")
+            or serializer.instance.cash_subaccount
+        )
+        self._check_module_allowed(new_module, cash_subaccount=new_cash)
         super().perform_update(serializer)
 
     @action(detail=True, methods=["post"])
