@@ -162,7 +162,7 @@ export default function VetPage() {
       <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
         <Seg
           options={[
-            { value: 'stock', label: 'Склад' },
+            { value: 'stock', label: 'Лоты' },
             { value: 'drugs', label: 'SKU препаратов' },
             { value: 'accessories', label: 'Аксессуары' },
           ]}
