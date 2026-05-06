@@ -75,7 +75,13 @@ class VetStockBatchViewSet(OrgScopedModelViewSet):
     module_code = "vet"
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
     filterset_fields = ["drug", "warehouse", "status"]
-    search_fields = ["doc_number", "lot_number", "barcode"]
+    search_fields = [
+        "doc_number",
+        "lot_number",
+        "barcode",
+        "drug__nomenclature__sku",
+        "drug__nomenclature__name",
+    ]
     ordering = ["-received_date"]
 
     @action(detail=False, methods=["post"])

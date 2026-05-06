@@ -69,6 +69,8 @@ function daysUntil(dateISO: string): number {
 export default function VetPage() {
   const [tab, setTab] = useState<'stock' | 'drugs' | 'accessories'>('stock');
   const [stockStatus, setStockStatus] = useState('');
+  const [stockSearch, setStockSearch] = useState('');
+  const [stockSearchDraft, setStockSearchDraft] = useState('');
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(50);
   const [selDrug, setSelDrug] = useState<VetDrug | null>(null);
@@ -86,8 +88,11 @@ export default function VetPage() {
     stockStatus ? { status: stockStatus } : {},
   );
 
+  const stockListFilter: Record<string, string | undefined> = {};
+  if (stockStatus) stockListFilter.status = stockStatus;
+  if (stockSearch) stockListFilter.search = stockSearch;
   const stockPage = stockBatchesCrud.useListPaginated(
-    stockStatus ? { status: stockStatus } : {}, page, pageSize,
+    stockListFilter, page, pageSize,
   );
   const treatmentsPage = treatmentsCrud.useListPaginated({}, page, pageSize);
   const drugsPage = drugsCrud.useListPaginated({ is_active: 'true' }, page, pageSize);
@@ -170,12 +175,45 @@ export default function VetPage() {
           onChange={(v) => { setTab(v as typeof tab); setPage(1); }}
         />
         {tab === 'stock' && (
-          <select className="input" value={stockStatus} onChange={(e) => { setStockStatus(e.target.value); setPage(1); }} style={{ width: 180 }}>
-            <option value="">Все статусы</option>
-            {Object.entries(STOCK_STATUS_LABEL).map(([v, l]) => (
-              <option key={v} value={v}>{l}</option>
-            ))}
-          </select>
+          <>
+            <select
+              className="input"
+              value={stockStatus}
+              onChange={(e) => { setStockStatus(e.target.value); setPage(1); }}
+              style={{ width: 180 }}
+            >
+              <option value="">Все статусы</option>
+              {Object.entries(STOCK_STATUS_LABEL).map(([v, l]) => (
+                <option key={v} value={v}>{l}</option>
+              ))}
+            </select>
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                setStockSearch(stockSearchDraft.trim());
+                setPage(1);
+              }}
+              style={{ display: 'flex', gap: 6, flex: 1, minWidth: 220 }}
+            >
+              <input
+                className="input"
+                placeholder="Поиск: имя препарата, SKU, lot, штрих-код, документ…"
+                value={stockSearchDraft}
+                onChange={(e) => setStockSearchDraft(e.target.value)}
+                style={{ flex: 1 }}
+              />
+              {stockSearch && (
+                <button
+                  type="button"
+                  className="btn btn-ghost btn-sm"
+                  onClick={() => { setStockSearchDraft(''); setStockSearch(''); setPage(1); }}
+                >
+                  ✕
+                </button>
+              )}
+              <button type="submit" className="btn btn-secondary btn-sm">Найти</button>
+            </form>
+          </>
         )}
       </div>
 
