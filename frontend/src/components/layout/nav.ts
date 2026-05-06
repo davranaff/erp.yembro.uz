@@ -57,7 +57,7 @@ export const NAV: NavEntry[] = [
     aliases: ['откорм', 'птичник', 'feedlot'] },
   { key: 'slaughter',  label: 'Убойня',           icon: 'building',  href: '/slaughter',  module: 'slaughter',
     aliases: ['разделка', 'тушка'] },
-  { key: 'transfers',  label: 'Межмод. передачи', icon: 'chart',     href: '/transfers',  module: 'stock',
+  { key: 'transfers',  label: 'Межмод. передачи', icon: 'chart',     href: '/transfers',  module: 'stock', min: 'rw',
     aliases: ['передача', 'transfer'] },
 
   { group: 'Обеспечение' },
