@@ -2,21 +2,21 @@
 Сервис `receive_vet_stock_batch` — приёмка партии ветпрепарата.
 
 Создаёт VetStockBatch (status=QUARANTINE по умолчанию) с авто-сгенерированным
-штрих-кодом, плюс привязанный StockMovement INCOMING (источник = VetStockBatch).
-Без INCOMING остаток в журнале склада был отрицательный (только OUTGOING при
-лечении/продаже) — формула balance = incoming − outgoing давала кашу.
-Симметрично паттерну feed `create_movement_for_raw_batch` и
-vet `receive_vet_accessory`.
+штрих-кодом. **Не создаёт** StockMovement — приход на склад фиксируется
+при `purchase.confirm()` (или ручным движением). Лот — это lot-метаданные
+поверх существующего остатка склада: партия делает carve-out из общего
+INCOMING закупа, а не дублирует его.
 
-Замечание про PurchaseOrder: confirm() закупа тоже создаёт INCOMING на
-warehouse_to. Чтобы не словить двойной счёт по vet-лотам, штатный
-flow таков: PurchaseOrder остаётся в DRAFT (служит audit-FK), а physical
-receipt идёт через эту функцию. Тесты подтверждают что в проде PO.confirm
-для vet не вызывается, а движений в журнале склада не было.
+Поток:
+    1. PurchaseOrder.confirm() → +qty INCOMING на warehouse
+    2. receive_vet_stock_batch(...) → создаёт лот (метаданные), физический
+       остаток уже на складе из шага 1
+    3. apply_treatment / sell → -qty OUTGOING декрементирует и лот,
+       и складской остаток
+    4. recall → -current_qty WRITE_OFF, чтобы списать остаток лота из склада
 
-Плюс отдельный сервис `release_vet_stock_from_quarantine` — перевод
-QUARANTINE → AVAILABLE после проверки (ветврач подтвердил, что лот
-цел и стерилен).
+Сервис `release_vet_stock_from_quarantine` — перевод QUARANTINE → AVAILABLE
+после проверки (ветврач подтвердил, что лот цел и стерилен).
 
 Atomic:
     1. Guards: cross-org (drug, warehouse, supplier, purchase); quantity > 0;
@@ -26,10 +26,7 @@ Atomic:
     3. Авто-генерация barcode: `VET-{sku}-{lot}-{rand4}` уникален в рамках org.
     4. Create VetStockBatch со status=start_status (default QUARANTINE).
        current_quantity = quantity.
-    5. Create StockMovement(kind=INCOMING, warehouse_to=warehouse,
-       source=VetStockBatch). Idempotent — если для этого лота уже есть
-       привязанный INCOMING, не дублируем.
-    6. AuditLog.
+    5. AuditLog.
 """
 from __future__ import annotations
 
@@ -39,10 +36,8 @@ from datetime import date as date_type
 from decimal import Decimal
 from typing import Optional
 
-from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import ValidationError
 from django.db import transaction
-from django.utils import timezone
 
 from apps.audit.models import AuditLog
 from apps.audit.services.writer import audit_log
@@ -51,7 +46,7 @@ from apps.counterparties.models import Counterparty
 from apps.modules.models import Module
 from apps.nomenclature.models import Unit
 from apps.purchases.models import PurchaseOrder
-from apps.warehouses.models import StockMovement, Warehouse
+from apps.warehouses.models import Warehouse
 
 from ..models import VetDrug, VetStockBatch
 
@@ -63,7 +58,6 @@ class VetStockReceiveError(ValidationError):
 @dataclass
 class VetStockReceiveResult:
     stock_batch: VetStockBatch
-    stock_movement: StockMovement
 
 
 @transaction.atomic
@@ -169,8 +163,6 @@ def receive_vet_stock_batch(
     sb.full_clean()
     sb.save()
 
-    sm = _create_incoming_movement_for_lot(sb, user=user)
-
     audit_log(
         organization=organization,
         module=vet_module,
@@ -183,56 +175,7 @@ def receive_vet_stock_batch(
         ),
     )
 
-    return VetStockReceiveResult(stock_batch=sb, stock_movement=sm)
-
-
-def _create_incoming_movement_for_lot(
-    batch: VetStockBatch, *, user=None,
-) -> StockMovement:
-    """
-    Создать привязанный StockMovement INCOMING для лота препарата.
-
-    Idempotent: если для этой VetStockBatch уже есть INCOMING (предыдущий
-    запуск, или лот создан старым кодом и потом перепринят) — возвращаем
-    существующий без создания дубля.
-    """
-    ct = ContentType.objects.get_for_model(VetStockBatch)
-    existing = StockMovement.objects.filter(
-        source_content_type=ct, source_object_id=batch.id,
-        kind=StockMovement.Kind.INCOMING,
-    ).first()
-    if existing is not None:
-        return existing
-
-    qty = Decimal(batch.quantity).quantize(Decimal("0.001"))
-    price = Decimal(batch.price_per_unit_uzs)
-    amount = (qty * price).quantize(Decimal("0.01"))
-
-    sm_number = next_doc_number(
-        StockMovement, organization=batch.organization,
-        prefix="СД", on_date=batch.received_date,
-    )
-
-    sm = StockMovement(
-        organization=batch.organization,
-        module=batch.module,
-        doc_number=sm_number,
-        kind=StockMovement.Kind.INCOMING,
-        date=timezone.now(),
-        nomenclature=batch.drug.nomenclature,
-        quantity=qty,
-        unit_price_uzs=price,
-        amount_uzs=amount,
-        warehouse_from=None,
-        warehouse_to=batch.warehouse,
-        counterparty=batch.supplier,
-        source_content_type=ct,
-        source_object_id=batch.id,
-        created_by=user,
-    )
-    sm.full_clean(exclude=None)
-    sm.save()
-    return sm
+    return VetStockReceiveResult(stock_batch=sb)
 
 
 @transaction.atomic
