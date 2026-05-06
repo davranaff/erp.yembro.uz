@@ -7,7 +7,7 @@ import { ApiError } from '@/lib/api';
 import { useModules } from '@/hooks/useModules';
 import { useNomenclatureItems } from '@/hooks/useNomenclature';
 import { useWarehouses } from '@/hooks/useStockMovements';
-import { accessoriesCrud } from '@/hooks/useVet';
+import { accessoriesCrud, useReceiveAccessory } from '@/hooks/useVet';
 import type { VetAccessory } from '@/types/auth';
 
 interface Props {
@@ -25,6 +25,7 @@ interface Props {
 export default function AccessoryFormModal({ initial, onClose }: Props) {
   const create = accessoriesCrud.useCreate();
   const update = accessoriesCrud.useUpdate();
+  const receive = useReceiveAccessory();
   const { data: modules } = useModules();
   // По умолчанию — только vet-номенклатура (категория «Ветпрепараты»
   // и любые другие категории, привязанные к модулю vet). Раньше показывали
@@ -48,11 +49,16 @@ export default function AccessoryFormModal({ initial, onClose }: Props) {
   const [warehouseId, setWarehouseId] = useState(initial?.warehouse ?? '');
   const [salePrice, setSalePrice] = useState(initial?.sale_price_uzs ?? '');
   const [costPrice, setCostPrice] = useState(initial?.cost_per_unit_uzs ?? '');
+  // Начальный остаток (только при create) — после сохранения карточки сразу
+  // дёргается /receive чтобы создать INCOMING StockMovement и оприходовать.
+  // Без этого карточка создавалась с qty=0 и оператор не понимал куда пропал
+  // его «закуп» (см. фидбэк).
+  const [initialQty, setInitialQty] = useState('');
   const [barcode, setBarcode] = useState(initial?.barcode ?? '');
   const [isActive, setIsActive] = useState(initial?.is_active ?? true);
   const [notes, setNotes] = useState(initial?.notes ?? '');
 
-  const error = isEdit ? update.error : create.error;
+  const error = isEdit ? update.error : (create.error ?? receive.error);
   const fieldErrors = error instanceof ApiError && error.status === 400
     ? ((error.data as Record<string, unknown>) ?? {})
     : {};
@@ -68,7 +74,7 @@ export default function AccessoryFormModal({ initial, onClose }: Props) {
     warehouseId &&
     salePrice &&
     parseFloat(salePrice) > 0 &&
-    !create.isPending && !update.isPending;
+    !create.isPending && !update.isPending && !receive.isPending;
 
   const submit = async () => {
     if (!canSubmit) return;
@@ -86,7 +92,19 @@ export default function AccessoryFormModal({ initial, onClose }: Props) {
       if (isEdit && initial) {
         await update.mutateAsync({ id: initial.id, patch: payload });
       } else {
-        await create.mutateAsync(payload as never);
+        const created = await create.mutateAsync(payload as never);
+        // Если оператор задал начальный остаток — сразу оприходуем через
+        // /receive чтобы появилась запись StockMovement INCOMING и баланс
+        // склада обновился.
+        const qty = parseFloat(initialQty);
+        if (created?.id && !Number.isNaN(qty) && qty > 0) {
+          await receive.mutateAsync({
+            id: created.id,
+            quantity: initialQty,
+            unit_cost_uzs: costPrice || undefined,
+            notes: 'Начальная приёмка при создании карточки',
+          });
+        }
       }
       onClose();
     } catch {
@@ -106,14 +124,20 @@ export default function AccessoryFormModal({ initial, onClose }: Props) {
             disabled={!canSubmit}
             onClick={submit}
           >
-            {(create.isPending || update.isPending) ? 'Сохранение…' : 'Сохранить'}
+            {(create.isPending || update.isPending || receive.isPending)
+              ? 'Сохранение…'
+              : (!isEdit && parseFloat(initialQty) > 0
+                ? 'Создать и оприходовать'
+                : 'Сохранить')}
           </button>
         </>
       }
     >
       <div style={{ fontSize: 12, color: 'var(--fg-3)', marginBottom: 12 }}>
         Аксессуары — товары для перепродажи без партионного учёта.
-        Себестоимость и остаток меняются только через «Приёмку».
+        {isEdit
+          ? ' Себестоимость и остаток правятся через «Приёмку».'
+          : ' Если задать начальный остаток — он сразу оприходуется (создастся запись прихода в склад).'}
       </div>
 
       <div className="field">
@@ -199,7 +223,7 @@ export default function AccessoryFormModal({ initial, onClose }: Props) {
           <div style={{ fontSize: 11, color: 'var(--fg-3)', marginTop: 4 }}>
             {isEdit
               ? 'Прямое изменение перезапишет текущий avg. Для корректной приёмки используйте «Принять».'
-              : 'Стартовая себестоимость. При следующей приёмке пересчитается weighted-avg.'}
+              : 'Цена за единицу при первой приёмке. После — пересчёт weighted-avg.'}
           </div>
         </div>
         <div className="field">
@@ -217,6 +241,26 @@ export default function AccessoryFormModal({ initial, onClose }: Props) {
           </div>
         </div>
       </div>
+
+      {!isEdit && (
+        <div className="field">
+          <label>Начальный остаток (опц.)</label>
+          <input
+            className="input mono"
+            type="number"
+            step="0.001"
+            min={0}
+            value={initialQty}
+            onChange={(e) => setInitialQty(e.target.value)}
+            placeholder="0"
+          />
+          <div style={{ fontSize: 11, color: 'var(--fg-3)', marginTop: 4 }}>
+            Сколько уже привезли при создании карточки. Если задать &gt; 0 —
+            автоматически создастся приход в складе (StockMovement INCOMING)
+            на склад выше, по «Себестоимости» как unit_cost.
+          </div>
+        </div>
+      )}
 
       <div className="field">
         <label>Штрих-код</label>
