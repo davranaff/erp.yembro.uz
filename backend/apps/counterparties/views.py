@@ -106,6 +106,36 @@ def _build_debt_summary(counterparty, organization) -> dict:
     else:
         utilization_pct = None
 
+    # Свободный кредит из стартовой предоплаты (kind=opening_balance_prepayment).
+    # Если у клиента/поставщика был отрицательный opening_debt — здесь сидит
+    # POSTED Payment без allocations. Кассир может применить часть к новой
+    # SO/PO через /api/payments/{id}/apply_prepayment/.
+    from django.db.models import Sum
+
+    from apps.payments.models import Payment
+
+    prepayments = []
+    prepay_qs = Payment.objects.filter(
+        organization=organization,
+        counterparty=counterparty,
+        kind=Payment.Kind.OPENING_BALANCE_PREPAYMENT,
+        status=Payment.Status.POSTED,
+    ).prefetch_related("allocations")
+    for pay in prepay_qs:
+        used = pay.allocations.aggregate(s=Sum("amount_uzs"))["s"] or Decimal("0")
+        free = Decimal(pay.amount_uzs) - used
+        if free <= 0:
+            continue
+        prepayments.append({
+            "id": str(pay.id),
+            "doc_number": pay.doc_number,
+            "date": pay.date.isoformat(),
+            "amount_uzs": str(pay.amount_uzs),
+            "used_uzs": str(used),
+            "free_uzs": str(free),
+            "direction": pay.direction,
+        })
+
     return {
         "counterparty": CounterpartySerializer(counterparty).data,
         "aging": aging_row,
@@ -116,6 +146,13 @@ def _build_debt_summary(counterparty, organization) -> dict:
         "open_orders_count": len(open_orders),
         "communications": comms,
         "communications_count": len(comms),
+        "prepayments": prepayments,
+        "prepayments_total_free_uzs": str(
+            sum(
+                (Decimal(p["free_uzs"]) for p in prepayments),
+                Decimal("0"),
+            )
+        ),
     }
 
 
@@ -147,15 +184,25 @@ class CounterpartyViewSet(OrgScopedModelViewSet):
         self._sync_opening_balance(serializer.instance)
 
     def _sync_opening_balance(self, counterparty):
-        """Материализует opening_debt в синтетический SaleOrder/PurchaseOrder.
+        """Материализует opening_debt в синтетический документ.
 
-        Без этого долг живёт только числом на карточке — касса не может
-        принять/выдать оплату, /tasks молчит, aging требует костыля.
+        Без этого «снимок миграции» живёт только числом на карточке и не
+        участвует в стандартных пайплайнах (касса/aging/tasks).
 
-        Подробнее:
-            - apps/sales/services/opening_balance.py     (kind=buyer)
-            - apps/purchases/services/opening_balance.py (kind=supplier)
+        Положительное opening_debt:
+            - kind=buyer    → SaleOrder      (мы выставляем счёт клиенту)
+            - kind=supplier → PurchaseOrder  (поставщик выставил нам счёт)
+
+        Отрицательное opening_debt (стартовая предоплата):
+            - kind=buyer    → Payment(IN)    (клиент уже занёс)
+            - kind=supplier → Payment(OUT)   (мы уже заплатили авансом)
+
+        Все три ветки идемпотентны — повторные save'ы карточки не плодят
+        дубликаты.
         """
+        from apps.payments.services.opening_balance_prepayment import (
+            sync_opening_balance_prepayment_for_counterparty,
+        )
         from apps.purchases.services.opening_balance import (
             sync_opening_balance_for_supplier,
         )
@@ -165,6 +212,7 @@ class CounterpartyViewSet(OrgScopedModelViewSet):
 
         sync_opening_balance_for_counterparty(counterparty)
         sync_opening_balance_for_supplier(counterparty)
+        sync_opening_balance_prepayment_for_counterparty(counterparty)
 
     @action(detail=False, methods=["get"], url_path="balances")
     def balances(self, request):

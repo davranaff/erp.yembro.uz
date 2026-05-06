@@ -129,6 +129,22 @@ export interface CounterpartyDebtSummary {
     updated_at: string;
   }>;
   communications_count: number;
+  /**
+   * Стартовые предоплаты (kind=opening_balance_prepayment) — синтетические
+   * Payment'ы миграции с отрицательного opening_debt. Кассир может
+   * аллоцировать `free_uzs` к новым SO/PO через
+   * POST /api/payments/{id}/apply_prepayment/.
+   */
+  prepayments: Array<{
+    id: string;
+    doc_number: string;
+    date: string;
+    amount_uzs: string;
+    used_uzs: string;
+    free_uzs: string;
+    direction: 'in' | 'out';
+  }>;
+  prepayments_total_free_uzs: string;
 }
 
 export function useCounterparty(id: string | null | undefined) {
