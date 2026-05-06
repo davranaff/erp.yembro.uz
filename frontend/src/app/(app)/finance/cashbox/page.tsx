@@ -10,7 +10,7 @@ import Panel from '@/components/ui/Panel';
 import RowActions from '@/components/ui/RowActions';
 import Seg from '@/components/ui/Seg';
 import TablePagination from '@/components/ui/TablePagination';
-import { useSubaccounts } from '@/hooks/useAccounts';
+import { useDeleteSubaccount, useSubaccounts } from '@/hooks/useAccounts';
 import { useModules } from '@/hooks/useModules';
 import {
   paymentsCrud,
@@ -19,7 +19,7 @@ import {
   useReversePayment,
 } from '@/hooks/usePayments';
 import { useHasLevel } from '@/hooks/usePermissions';
-import type { Payment, PaymentKind, PaymentStatus } from '@/types/auth';
+import type { GLSubaccount, Payment, PaymentKind, PaymentStatus } from '@/types/auth';
 
 import CashAccountModal from './CashAccountModal';
 import OpexModal from './OpexModal';
@@ -92,6 +92,9 @@ export default function CashboxPage() {
 
   const hasLevel = useHasLevel();
   const canEdit = hasLevel('ledger', 'rw');
+  // Org-admin: только владелец/CFO. Управление кассами/счетами — это
+  // структурное изменение плана счетов, не делегируется heads.
+  const isOrgAdmin = hasLevel('admin', 'admin') || hasLevel('ledger', 'admin');
 
   const { data: subs } = useSubaccounts();
   const { data: modules } = useModules();
@@ -99,6 +102,8 @@ export default function CashboxPage() {
   const cancel = useCancelPayment();
   const reverse = useReversePayment();
   const remove = paymentsCrud.useDelete();
+  const deleteSubaccount = useDeleteSubaccount();
+  const [editingAccount, setEditingAccount] = useState<GLSubaccount | null>(null);
 
   // Фильтрованный список платежей
   const filter = useMemo(() => {
@@ -213,15 +218,17 @@ export default function CashboxPage() {
           <div className="sub">Кассы (50.NN) и расчётные счета (51.NN) — каждый со своим модулем</div>
         </div>
         <div className="actions">
+          {isOrgAdmin && (
+            <button
+              className="btn btn-ghost btn-sm"
+              onClick={() => { setEditingAccount(null); setCashAccountOpen(true); }}
+              title="Создать новую кассу или расчётный счёт под выбранный модуль (только админ)"
+            >
+              <Icon name="plus" size={14} /> Касса/Банк
+            </button>
+          )}
           {canEdit && (
             <>
-              <button
-                className="btn btn-ghost btn-sm"
-                onClick={() => setCashAccountOpen(true)}
-                title="Создать новую кассу или расчётный счёт под выбранный модуль"
-              >
-                <Icon name="plus" size={14} /> Касса/Банк
-              </button>
               <button className="btn btn-secondary btn-sm" onClick={() => setOpexOpen('in')}>
                 <Icon name="download" size={14} /> Приход
               </button>
@@ -276,8 +283,85 @@ export default function CashboxPage() {
         />
       </div>
 
+      {/* Список касс/счетов — управление только для org-admin */}
+      {cashAccounts.length > 0 && (
+        <Panel
+          title={`Кассы и счета (${cashAccounts.length})`}
+          flush
+        >
+          <table style={{ width: '100%', fontSize: 13, borderCollapse: 'collapse' }}>
+            <thead>
+              <tr style={{ color: 'var(--fg-3)', fontSize: 11, textAlign: 'left' }}>
+                <th style={{ padding: '6px 12px' }}>Код</th>
+                <th style={{ padding: '6px 12px' }}>Тип</th>
+                <th style={{ padding: '6px 12px' }}>Наименование</th>
+                <th style={{ padding: '6px 12px' }}>Модуль</th>
+                <th style={{ padding: '6px 12px', textAlign: 'right' }}>Баланс, сум</th>
+                {isOrgAdmin && <th style={{ padding: '6px 12px', width: 60 }}></th>}
+              </tr>
+            </thead>
+            <tbody>
+              {cashAccounts.map((acc) => {
+                const isBank = acc.code.startsWith('51.');
+                const balance = balanceByAccount.get(acc.id) ?? 0;
+                const moduleLabel = acc.module
+                  ? modules?.find((m) => m.id === acc.module)?.name ?? '—'
+                  : <span style={{ color: 'var(--fg-3)' }}>общий</span>;
+                return (
+                  <tr key={acc.id} style={{ borderTop: '1px solid var(--border)' }}>
+                    <td className="mono" style={{ padding: '8px 12px', fontWeight: 500 }}>
+                      {acc.code}
+                    </td>
+                    <td style={{ padding: '8px 12px', fontSize: 12 }}>
+                      {isBank ? 'Банк' : 'Касса'}
+                    </td>
+                    <td style={{ padding: '8px 12px' }}>{acc.name}</td>
+                    <td style={{ padding: '8px 12px', fontSize: 12 }}>{moduleLabel}</td>
+                    <td className="mono" style={{
+                      padding: '8px 12px', textAlign: 'right',
+                      color: balance >= 0 ? 'var(--success)' : 'var(--danger)',
+                      fontWeight: 600,
+                    }}>
+                      {fmtUzs(balance)}
+                    </td>
+                    {isOrgAdmin && (
+                      <td style={{ padding: '8px 12px', textAlign: 'right' }}>
+                        <RowActions
+                          actions={[
+                            {
+                              label: 'Редактировать',
+                              onClick: () => { setEditingAccount(acc); setCashAccountOpen(true); },
+                            },
+                            {
+                              label: 'Удалить',
+                              danger: true,
+                              disabled: deleteSubaccount.isPending || balance !== 0,
+                              onClick: async () => {
+                                if (!window.confirm(
+                                  `Удалить кассу/счёт ${acc.code} «${acc.name}»? ` +
+                                  `Если есть привязанные платежи — удаление невозможно.`,
+                                )) return;
+                                try {
+                                  await deleteSubaccount.mutateAsync(acc.id);
+                                } catch (e) {
+                                  alert(e instanceof Error ? e.message : 'Не удалось удалить');
+                                }
+                              },
+                            },
+                          ]}
+                        />
+                      </td>
+                    )}
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </Panel>
+      )}
+
       {/* Статус-табы */}
-      <div style={{ marginBottom: 12 }}>
+      <div style={{ marginBottom: 12, marginTop: 12 }}>
         <Seg
           options={[
             { value: 'posted',    label: 'Проведённые' },
@@ -440,8 +524,9 @@ export default function CashboxPage() {
 
       {cashAccountOpen && (
         <CashAccountModal
+          initial={editingAccount}
           defaultModuleId={moduleId || undefined}
-          onClose={() => setCashAccountOpen(false)}
+          onClose={() => { setCashAccountOpen(false); setEditingAccount(null); }}
         />
       )}
 

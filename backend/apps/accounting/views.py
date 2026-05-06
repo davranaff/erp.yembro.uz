@@ -70,29 +70,21 @@ class GLSubaccountViewSet(OrgScopedModelViewSet):
 
     def _check_module_access(self, module):
         """
-        Разрешает write-операцию если:
-            • org-admin (admin override на любом модуле), либо
-            • у юзера rw на target module (если subaccount привязан к модулю), либо
-            • если module=None (общий субсчёт), нужен admin.
+        CRUD на план счетов / субсчета (включая кассы) — только org-admin.
+        Heads модулей могут только READ субсчета; создание/правка касс
+        делегируется владельцу/CFO. Это защита от случайных дублей касс
+        и финансовой каши при делегации.
+
+        (Раньше head'у разрешалось создавать кассы своего модуля. Откат
+        после фидбэка пользователя: «CRUD кассы только админ'ам пока что».)
         """
-        from apps.common.permissions import (
-            get_user_rw_module_codes, is_org_admin,
-        )
+        from apps.common.permissions import is_org_admin
         from rest_framework.exceptions import PermissionDenied
 
         membership = getattr(self.request, "membership", None)
-        if membership is None:
-            raise PermissionDenied({"detail": "Нет membership."})
-        if is_org_admin(membership):
-            return
-        if module is None:
+        if membership is None or not is_org_admin(membership):
             raise PermissionDenied({
-                "module": "Общие субсчёта (без модуля) — только для администратора.",
-            })
-        rw_modules = get_user_rw_module_codes(membership)
-        if module.code not in rw_modules:
-            raise PermissionDenied({
-                "module": f"Нет прав rw на модуль «{module.code}».",
+                "detail": "Управление кассами/счетами — только для администратора организации.",
             })
 
     def perform_create(self, serializer):

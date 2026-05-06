@@ -3,15 +3,23 @@
 import { useMemo, useState } from 'react';
 
 import Modal from '@/components/ui/Modal';
-import { useAccounts, useCreateSubaccount, useSubaccounts } from '@/hooks/useAccounts';
+import {
+  useAccounts,
+  useCreateSubaccount,
+  useSubaccounts,
+  useUpdateSubaccount,
+} from '@/hooks/useAccounts';
 import { useModules } from '@/hooks/useModules';
 import { ApiError } from '@/lib/api';
 import { uppercaseChange } from '@/lib/forms';
+import type { GLSubaccount } from '@/types/auth';
 
 interface Props {
   onClose: () => void;
   /** Дефолтный модуль (например модуль активной страницы). */
   defaultModuleId?: string;
+  /** Если задан — режим редактирования. */
+  initial?: GLSubaccount | null;
 }
 
 type Kind = 'cash' | 'bank';
@@ -30,16 +38,19 @@ const KIND_META: Record<Kind, { label: string; parentCode: string; placeholder: 
  * Код субсчёта подсказывается автоматически: 50.NN или 51.NN — следующий
  * свободный номер.
  */
-export default function CashAccountModal({ onClose, defaultModuleId }: Props) {
+export default function CashAccountModal({ onClose, defaultModuleId, initial }: Props) {
+  const isEdit = Boolean(initial);
   const create = useCreateSubaccount();
+  const update = useUpdateSubaccount();
   const { data: accounts } = useAccounts();
   const { data: subaccounts } = useSubaccounts();
   const { data: modules } = useModules();
 
-  const [kind, setKind] = useState<Kind>('cash');
-  const [name, setName] = useState('');
-  const [moduleId, setModuleId] = useState(defaultModuleId ?? '');
-  const [code, setCode] = useState('');
+  const initialKind: Kind = initial?.code.startsWith('51.') ? 'bank' : 'cash';
+  const [kind, setKind] = useState<Kind>(initialKind);
+  const [name, setName] = useState(initial?.name ?? '');
+  const [moduleId, setModuleId] = useState(initial?.module ?? defaultModuleId ?? '');
+  const [code, setCode] = useState(initial?.code ?? '');
 
   const parentAccount = useMemo(
     () => accounts?.find((a) => a.code === KIND_META[kind].parentCode),
@@ -58,7 +69,7 @@ export default function CashAccountModal({ onClose, defaultModuleId }: Props) {
 
   const effectiveCode = code.trim() || suggestedCode;
 
-  const error = create.error;
+  const error = create.error ?? update.error;
   const fieldErrors = error instanceof ApiError && error.status === 400
     ? ((error.data as Record<string, unknown>) ?? {})
     : {};
@@ -70,17 +81,27 @@ export default function CashAccountModal({ onClose, defaultModuleId }: Props) {
   };
 
   const canSubmit =
-    Boolean(parentAccount) && name.trim() && moduleId && !create.isPending;
+    Boolean(parentAccount) && name.trim() && moduleId
+    && !create.isPending && !update.isPending;
 
   const handleSubmit = async () => {
     if (!parentAccount || !canSubmit) return;
     try {
-      await create.mutateAsync({
-        account: parentAccount.id,
-        code: effectiveCode,
-        name: name.trim(),
-        module: moduleId,
-      });
+      if (isEdit && initial) {
+        // При edit меняем только name + module (code/parent иммутабельны —
+        // на них могут ссылаться существующие платежи).
+        await update.mutateAsync({
+          id: initial.id,
+          patch: { name: name.trim(), module: moduleId },
+        });
+      } else {
+        await create.mutateAsync({
+          account: parentAccount.id,
+          code: effectiveCode,
+          name: name.trim(),
+          module: moduleId,
+        });
+      }
       onClose();
     } catch {
       /* ошибка через fieldErrors */
@@ -89,13 +110,19 @@ export default function CashAccountModal({ onClose, defaultModuleId }: Props) {
 
   return (
     <Modal
-      title={kind === 'cash' ? 'Новая касса' : 'Новый расчётный счёт'}
+      title={
+        isEdit
+          ? `Редактировать ${kind === 'cash' ? 'кассу' : 'счёт'} ${initial?.code ?? ''}`
+          : kind === 'cash' ? 'Новая касса' : 'Новый расчётный счёт'
+      }
       onClose={onClose}
       footer={
         <>
           <button className="btn btn-ghost" onClick={onClose}>Отмена</button>
           <button className="btn btn-primary" disabled={!canSubmit} onClick={handleSubmit}>
-            {create.isPending ? 'Создание…' : 'Создать'}
+            {create.isPending || update.isPending
+              ? 'Сохранение…'
+              : isEdit ? 'Сохранить' : 'Создать'}
           </button>
         </>
       }
@@ -107,22 +134,24 @@ export default function CashAccountModal({ onClose, defaultModuleId }: Props) {
         ({kind === 'cash' ? 'Касса' : 'Расчётные счета'}).
       </div>
 
-      <div className="field">
-        <label>Тип счёта *</label>
-        <div style={{ display: 'flex', gap: 6 }}>
-          {(['cash', 'bank'] as Kind[]).map((k) => (
-            <button
-              key={k}
-              type="button"
-              className={'btn btn-sm ' + (kind === k ? 'btn-primary' : 'btn-ghost')}
-              onClick={() => { setKind(k); setCode(''); }}
-              style={{ flex: 1 }}
-            >
-              {KIND_META[k].label}
-            </button>
-          ))}
+      {!isEdit && (
+        <div className="field">
+          <label>Тип счёта *</label>
+          <div style={{ display: 'flex', gap: 6 }}>
+            {(['cash', 'bank'] as Kind[]).map((k) => (
+              <button
+                key={k}
+                type="button"
+                className={'btn btn-sm ' + (kind === k ? 'btn-primary' : 'btn-ghost')}
+                onClick={() => { setKind(k); setCode(''); }}
+                style={{ flex: 1 }}
+              >
+                {KIND_META[k].label}
+              </button>
+            ))}
+          </div>
         </div>
-      </div>
+      )}
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
         <div className="field">
@@ -141,12 +170,13 @@ export default function CashAccountModal({ onClose, defaultModuleId }: Props) {
         </div>
 
         <div className="field">
-          <label>Код (опц., авто-{suggestedCode})</label>
+          <label>{isEdit ? 'Код' : `Код (опц., авто-${suggestedCode})`}</label>
           <input
             className="input mono upper"
             value={code}
             onChange={uppercaseChange(setCode)}
             placeholder={suggestedCode}
+            disabled={isEdit}
           />
           {getErr('code') && <div style={{ fontSize: 11, color: 'var(--danger)' }}>{getErr('code')}</div>}
         </div>
