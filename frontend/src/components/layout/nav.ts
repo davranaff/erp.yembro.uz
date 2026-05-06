@@ -57,7 +57,11 @@ export const NAV: NavEntry[] = [
     aliases: ['откорм', 'птичник', 'feedlot'] },
   { key: 'slaughter',  label: 'Убойня',           icon: 'building',  href: '/slaughter',  module: 'slaughter',
     aliases: ['разделка', 'тушка'] },
-  { key: 'transfers',  label: 'Межмод. передачи', icon: 'chart',     href: '/transfers',  module: 'stock', min: 'rw',
+  // Передачи между модулями — управляющая операция: доступна только
+  // администрации (ceo/owner). Heads пользуются IncomingTransfersPanel
+  // на своих страницах (/vet, /feedlot, ...) — там они принимают входящие
+  // трансферы без необходимости заходить на /transfers.
+  { key: 'transfers',  label: 'Межмод. передачи', icon: 'chart',     href: '/transfers',  module: 'admin', min: 'admin',
     aliases: ['передача', 'transfer'] },
 
   { group: 'Обеспечение' },
