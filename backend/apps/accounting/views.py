@@ -19,11 +19,18 @@ from .serializers import (
 
 
 class GLAccountViewSet(OrgReadOnlyViewSet):
-    """/api/accounting/accounts/ — план счетов (read-only, верхний уровень)."""
+    """
+    /api/accounting/accounts/ — план счетов (read-only, верхний уровень).
+
+    READ открыт любому org-member: список счетов нужен heads модулей чтобы
+    создавать свои кассы (выбрать parent 50/51) и для contra-счёт-выбора в
+    OPEX. Сам план счетов это глобальный справочник, без чувствительной
+    информации.
+    """
 
     serializer_class = GLAccountSerializer
     queryset = GLAccount.objects.prefetch_related("subaccounts__module").order_by("code")
-    module_code = "ledger"
+    # module_code не задаём — справочник доступен любому org-member.
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
     filterset_fields = ["type"]
     search_fields = ["code", "name"]
