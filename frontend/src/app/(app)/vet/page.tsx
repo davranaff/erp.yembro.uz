@@ -141,7 +141,12 @@ export default function VetPage() {
               </button>
               <OpexButton moduleCode="vet" suggestedContraCode="20.06" />
               <OpenSaleFromModule moduleCode="vet" />
-              <button className="btn btn-primary btn-sm" onClick={() => setTreatmentOpen(true)}>
+              <button
+                className="btn btn-primary btn-sm"
+                onClick={() => setTreatmentOpen(true)}
+                disabled
+                title="Временно недоступно"
+              >
                 <Icon name="pharma" size={14} /> Назначить лечение
               </button>
             </>
