@@ -43,7 +43,10 @@ export const NAV: NavEntry[] = [
     aliases: ['товары', 'sku', 'позиции'] },
   { key: 'accounts',       label: 'План счетов',  icon: 'book',    href: '/accounts',       module: 'ledger',
     aliases: ['gl', 'субсчета'] },
-  { key: 'people',         label: 'Сотрудники',   icon: 'users',   href: '/people',         module: 'admin',
+  // Сотрудники: видны любому head'у (cross-module). Backend в MembershipViewSet
+  // фильтрует список — head видит только сотрудников с пересечением модулей,
+  // org-admin видит всех. CRUD на membership разрешён только org-admin'у.
+  { key: 'people',         label: 'Сотрудники',   icon: 'users',   href: '/people',
     aliases: ['пользователи', 'membership'] },
   { key: 'blocks',         label: 'Блоки',        icon: 'factory', href: '/blocks',         module: 'core',
     aliases: ['корпус', 'птичник', 'шкаф', 'линия'] },
@@ -83,7 +86,10 @@ export const NAV: NavEntry[] = [
     aliases: ['продажа', 'отгрузка', 'so'] },
   { key: 'tasks',     label: 'Задачи по долгам', icon: 'bag',   href: '/tasks',           module: 'sales',
     aliases: ['обзвон', 'напоминание', 'collection', 'follow-up'] },
-  { key: 'cashbox',   label: 'Касса и банк',     icon: 'book',  href: '/finance/cashbox', module: 'ledger',
+  // Касса и банк: видна любому head'у (cross-module). Backend в PaymentViewSet
+  // фильтрует список платежей по модулям, на которые у юзера rw, и не даёт
+  // создавать/править платежи чужого модуля.
+  { key: 'cashbox',   label: 'Касса и банк',     icon: 'book',  href: '/finance/cashbox',
     aliases: ['платёж', 'оплата', 'банк', 'касса'] },
   { key: 'ledger',    label: 'Проводки',         icon: 'book',  href: '/ledger',          module: 'ledger',
     aliases: ['журнал', 'je', 'gl'] },
