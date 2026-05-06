@@ -11,14 +11,18 @@ Atomic-транзакция:
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import List
+from decimal import Decimal
+from typing import List, Optional
 
+from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.utils import timezone
 
 from apps.audit.models import AuditLog
 from apps.audit.services.writer import audit_log
+from apps.common.services.numbering import next_doc_number
+from apps.warehouses.models import StockMovement
 
 from ..models import VetStockBatch, VetTreatmentLog
 from .cancel import cancel_vet_treatment
@@ -32,6 +36,7 @@ class VetRecallError(ValidationError):
 class VetRecallResult:
     stock_batch: VetStockBatch
     cancelled_treatments: List[VetTreatmentLog] = field(default_factory=list)
+    write_off_movement: Optional[StockMovement] = None
 
 
 @transaction.atomic
@@ -91,6 +96,7 @@ def recall_vet_stock_batch(
     # Важно: после cancel'ов остаток мог увеличиться (мы вернули списания).
     # При recall физическая партия списывается со склада → current_quantity = 0.
     stock_batch.refresh_from_db()
+    write_off_qty = Decimal(stock_batch.current_quantity or 0)
     stock_batch.status = VetStockBatch.Status.RECALLED
     stock_batch.recalled_at = timezone.now()
     stock_batch.recall_reason = reason
@@ -98,6 +104,37 @@ def recall_vet_stock_batch(
     stock_batch.save(update_fields=[
         "status", "recalled_at", "recall_reason", "current_quantity", "updated_at"
     ])
+
+    # 4. Compensating WRITE_OFF в журнал склада — иначе остаётся «фантомный»
+    # положительный баланс (у нас INCOMING на receive есть, но физически
+    # партия больше не существует). Симметрично receive_vet_stock_batch
+    # который создаёт INCOMING — recall закрывает баланс.
+    write_off_sm = None
+    if write_off_qty > 0:
+        sm_number = next_doc_number(
+            StockMovement, organization=org, prefix="СД",
+        )
+        price = Decimal(stock_batch.price_per_unit_uzs)
+        amount = (write_off_qty * price).quantize(Decimal("0.01"))
+        ct = ContentType.objects.get_for_model(VetStockBatch)
+        write_off_sm = StockMovement(
+            organization=org,
+            module=stock_batch.module,
+            doc_number=sm_number,
+            kind=StockMovement.Kind.WRITE_OFF,
+            date=timezone.now(),
+            nomenclature=stock_batch.drug.nomenclature,
+            quantity=write_off_qty,
+            unit_price_uzs=price,
+            amount_uzs=amount,
+            warehouse_from=stock_batch.warehouse,
+            warehouse_to=None,
+            source_content_type=ct,
+            source_object_id=stock_batch.id,
+            created_by=user,
+        )
+        write_off_sm.full_clean(exclude=None)
+        write_off_sm.save()
 
     audit_log(
         organization=org,
@@ -111,4 +148,8 @@ def recall_vet_stock_batch(
         ),
     )
 
-    return VetRecallResult(stock_batch=stock_batch, cancelled_treatments=cancelled)
+    return VetRecallResult(
+        stock_batch=stock_batch,
+        cancelled_treatments=cancelled,
+        write_off_movement=write_off_sm,
+    )
