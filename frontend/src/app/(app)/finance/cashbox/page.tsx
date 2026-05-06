@@ -21,6 +21,7 @@ import {
 import { useHasLevel } from '@/hooks/usePermissions';
 import type { Payment, PaymentKind, PaymentStatus } from '@/types/auth';
 
+import CashAccountModal from './CashAccountModal';
 import OpexModal from './OpexModal';
 import PaymentDrawer from './PaymentDrawer';
 
@@ -84,6 +85,7 @@ export default function CashboxPage() {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(50);
   const [opexOpen, setOpexOpen] = useState<false | 'out' | 'in'>(false);
+  const [cashAccountOpen, setCashAccountOpen] = useState(false);
   const [drawerPayment, setDrawerPayment] = useState<Payment | null>(null);
 
   const hasLevel = useHasLevel();
@@ -196,6 +198,13 @@ export default function CashboxPage() {
         <div className="actions">
           {canEdit && (
             <>
+              <button
+                className="btn btn-ghost btn-sm"
+                onClick={() => setCashAccountOpen(true)}
+                title="Создать новую кассу или расчётный счёт под выбранный модуль"
+              >
+                <Icon name="plus" size={14} /> Касса/Банк
+              </button>
               <button className="btn btn-secondary btn-sm" onClick={() => setOpexOpen('in')}>
                 <Icon name="download" size={14} /> Приход
               </button>
@@ -394,6 +403,13 @@ export default function CashboxPage() {
         <OpexModal
           preselect={{ direction: opexOpen }}
           onClose={() => setOpexOpen(false)}
+        />
+      )}
+
+      {cashAccountOpen && (
+        <CashAccountModal
+          defaultModuleId={moduleId || undefined}
+          onClose={() => setCashAccountOpen(false)}
         />
       )}
 
