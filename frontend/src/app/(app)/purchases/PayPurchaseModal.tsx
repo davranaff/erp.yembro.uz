@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
 import { useQueryClient } from '@tanstack/react-query';
 import Modal from '@/components/ui/Modal';
@@ -37,19 +37,29 @@ export default function PayPurchaseModal({ order, onClose }: Props) {
   const [cashSubId, setCashSubId] = useState('');
   const [notes, setNotes] = useState('');
 
-  useEffect(() => {
-    if (!cashSubId && subaccounts && subaccounts.length > 0) {
-      const def = subaccounts.find((s) => s.code === '50.01');
-      if (def) setCashSubId(def.id);
-    }
-  }, [subaccounts, cashSubId]);
+  // Кассы для выбора: только 50.NN/51.NN, и сужаем по модулю закупа
+  // (vet-закуп → не показываем feed-кассу, чтобы платёж не попал в чужой
+  // котёл). Кассы без модуля («общие» 50.01/51.01) показываем всегда.
+  const filteredSubs = useMemo(() => {
+    if (!subaccounts) return [];
+    return subaccounts
+      .filter((s) => s.code.startsWith('50.') || s.code.startsWith('51.'))
+      .filter((s) => !order.module || !s.module || s.module === order.module);
+  }, [subaccounts, order.module]);
 
+  // Авто-выбор: при смене канала/субсчета подхватываем первую подходящую
+  // кассу (приоритет — модульная, общая 50.01/51.01 как fallback).
   useEffect(() => {
-    if (!subaccounts || subaccounts.length === 0) return;
-    const want = channel === 'cash' ? '50.01' : '51.01';
-    const target = subaccounts.find((s) => s.code === want);
-    if (target && target.id !== cashSubId) setCashSubId(target.id);
-  }, [channel, subaccounts]); // eslint-disable-line react-hooks/exhaustive-deps
+    if (!filteredSubs.length) return;
+    const wantPrefix = channel === 'cash' ? '50.' : '51.';
+    const candidates = filteredSubs.filter((s) => s.code.startsWith(wantPrefix));
+    if (!candidates.length) return;
+    // Если уже выбрана подходящая по prefix — не трогаем
+    if (cashSubId && candidates.some((s) => s.id === cashSubId)) return;
+    // Приоритет: модульная > общая
+    const moduleMatch = candidates.find((s) => s.module === order.module);
+    setCashSubId((moduleMatch ?? candidates[0]).id);
+  }, [channel, filteredSubs, order.module, cashSubId]);
 
   const isPending = create.isPending || post.isPending || allocate.isPending;
 
@@ -204,13 +214,16 @@ export default function PayPurchaseModal({ order, onClose }: Props) {
             value={cashSubId}
             onChange={(e) => setCashSubId(e.target.value)}
           >
-            <option value="">—</option>
-            {subaccounts
-              ?.filter((s) => s.code.startsWith('50.') || s.code.startsWith('51.'))
-              .map((s) => (
-                <option key={s.id} value={s.id}>{s.code} · {s.name}</option>
-              ))}
+            <option value="">— выберите —</option>
+            {filteredSubs.map((s) => (
+              <option key={s.id} value={s.id}>{s.code} · {s.name}</option>
+            ))}
           </select>
+          {!filteredSubs.length && (
+            <div style={{ fontSize: 11, color: 'var(--danger)', marginTop: 4 }}>
+              Нет доступных касс/счетов в этом модуле — попросите админа создать.
+            </div>
+          )}
           {getErr('cash_subaccount') && (
             <div style={{ fontSize: 11, color: 'var(--danger)' }}>{getErr('cash_subaccount')}</div>
           )}

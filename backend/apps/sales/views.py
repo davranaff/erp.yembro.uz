@@ -241,6 +241,23 @@ class SaleOrderViewSet(ImmutableStatusMixin, DeleteReasonMixin, OrgScopedModelVi
         else:
             pay_date = date_cls.today()
 
+        # cash_subaccount: явный выбор кассы куда поступила оплата.
+        # Без этого все sale-платежи валились в дефолтную 50.01/51.01
+        # (из CASH_SUBACCOUNT_BY_CHANNEL), оператор не мог раскидать
+        # по модульным кассам (50.02 vet, 50.03 feed и т.п.).
+        cash_subaccount = None
+        cash_id = request.data.get("cash_subaccount")
+        if cash_id:
+            from apps.accounting.models import GLSubaccount
+            try:
+                cash_subaccount = GLSubaccount.objects.select_related("account").get(
+                    pk=cash_id, account__organization=order.organization,
+                )
+            except GLSubaccount.DoesNotExist:
+                raise DRFValidationError(
+                    {"cash_subaccount": "Касса/счёт не найдены в этой организации."}
+                )
+
         # Кредит-статус ДО оплаты — для notify_credit_status_change.
         # Если был not_ok и оплата сняла блок → клиент получит push.
         from apps.sales.services.credit_check import check_customer_credit
@@ -257,6 +274,7 @@ class SaleOrderViewSet(ImmutableStatusMixin, DeleteReasonMixin, OrgScopedModelVi
                 amount_uzs=amount,
                 date=pay_date,
                 module=order.module,
+                cash_subaccount=cash_subaccount,
                 allocations=[{"target": order, "amount_uzs": amount}],
                 notes=request.data.get("notes", f"Оплата по {order.doc_number}"),
                 user=request.user,

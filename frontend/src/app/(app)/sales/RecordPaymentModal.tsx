@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react';
 
 import HelpHint from '@/components/ui/HelpHint';
 import Modal from '@/components/ui/Modal';
+import { useSubaccounts } from '@/hooks/useAccounts';
 import { useRecordSalePayment } from '@/hooks/useSales';
 import { ApiError } from '@/lib/api';
 import type { SaleOrder } from '@/types/auth';
@@ -27,6 +28,7 @@ function fmtUzs(v: string | number): string {
  */
 export default function RecordPaymentModal({ order, onClose }: Props) {
   const record = useRecordSalePayment();
+  const { data: subs } = useSubaccounts();
 
   const remaining = useMemo(() => {
     const total = parseFloat(order.amount_uzs || '0');
@@ -34,10 +36,31 @@ export default function RecordPaymentModal({ order, onClose }: Props) {
     return Math.max(0, total - paid);
   }, [order]);
 
+  // Кассы и банки доступные для приёма (50.NN / 51.NN). Сужаем по модулю
+  // продажи если он задан — оператор не должен случайно зачислить vet-оплату
+  // на feed-кассу.
+  const cashAccounts = useMemo(() => {
+    if (!subs) return [];
+    return subs
+      .filter((s) => s.code.startsWith('50.') || s.code.startsWith('51.'))
+      .filter((s) => !order.module || !s.module || s.module === order.module)
+      .sort((a, b) => a.code.localeCompare(b.code));
+  }, [subs, order.module]);
+
   const [channel, setChannel] = useState<'cash' | 'transfer' | 'click' | 'other'>('cash');
+  const [cashSubId, setCashSubId] = useState('');
   const [amount, setAmount] = useState(String(remaining));
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
   const [notes, setNotes] = useState('');
+
+  // Авто-выбор кассы при смене канала: первая 50.NN для cash, первая 51.NN
+  // для transfer/click. Если оператор уже руками выбрал — не перезатираем.
+  useMemo(() => {
+    if (cashSubId || cashAccounts.length === 0) return;
+    const wantPrefix = channel === 'cash' ? '50.' : '51.';
+    const match = cashAccounts.find((s) => s.code.startsWith(wantPrefix));
+    if (match) setCashSubId(match.id);
+  }, [channel, cashAccounts, cashSubId]);
 
   const error = record.error;
   const fieldErrors = error instanceof ApiError && error.status === 400
@@ -46,7 +69,7 @@ export default function RecordPaymentModal({ order, onClose }: Props) {
 
   const amt = parseFloat(amount || '0');
   const overPay = amt > remaining;
-  const canSubmit = amt > 0 && date && !record.isPending;
+  const canSubmit = amt > 0 && date && Boolean(cashSubId) && !record.isPending;
 
   const handleSubmit = async () => {
     try {
@@ -54,6 +77,7 @@ export default function RecordPaymentModal({ order, onClose }: Props) {
         id: order.id,
         body: {
           channel,
+          cash_subaccount: cashSubId,
           amount_uzs: amount,
           date,
           notes,
@@ -120,25 +144,57 @@ export default function RecordPaymentModal({ order, onClose }: Props) {
           <label>
             Канал *
             <HelpHint
-              text="Куда поступили деньги."
+              text="Способ передачи денег."
               details={
-                '• Наличные (касса 50.01) — клиент отдал налом.\n'
-                + '• Перечисление (банк 51.01) — пришло на расчётный счёт.\n'
-                + '• Click — электронный платёж Click/Payme (тоже на 51.01).\n'
-                + '• Прочее — нестандартный способ, потребует явного выбора cash_subaccount.'
+                '• Наличные — клиент отдал налом.\n'
+                + '• Перечисление — пришло на банковский счёт.\n'
+                + '• Click — электронный платёж Click/Payme.\n'
+                + '• Прочее — нестандартный способ.\n\n'
+                + 'Конкретная касса выбирается рядом — это позволяет раскидать '
+                + 'платежи по модульным кассам (50.02 vet, 50.03 feed и т.п.)'
               }
             />
           </label>
           <select
             className="input"
             value={channel}
-            onChange={(e) => setChannel(e.target.value as typeof channel)}
+            onChange={(e) => {
+              setChannel(e.target.value as typeof channel);
+              setCashSubId(''); // сбрасываем чтобы автовыбор подобрал нужную
+            }}
           >
-            <option value="cash">Наличные (касса 50.01)</option>
-            <option value="transfer">Перечисление (банк 51.01)</option>
-            <option value="click">Click / Payme (51.01)</option>
+            <option value="cash">Наличные</option>
+            <option value="transfer">Перечисление</option>
+            <option value="click">Click / Payme</option>
             <option value="other">Прочее</option>
           </select>
+        </div>
+
+        <div className="field">
+          <label>
+            Касса/счёт *
+            <HelpHint
+              text="В какую кассу или на какой счёт зачислить оплату."
+              details="Список сужен по модулю продажи. Если нужной кассы нет — попросите админа создать в /finance/cashbox → «+ Касса/Банк»."
+            />
+          </label>
+          <select
+            className="input"
+            value={cashSubId}
+            onChange={(e) => setCashSubId(e.target.value)}
+          >
+            <option value="">— выберите кассу —</option>
+            {cashAccounts.map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.code} · {s.name}
+              </option>
+            ))}
+          </select>
+          {!cashAccounts.length && (
+            <div style={{ fontSize: 11, color: 'var(--danger)', marginTop: 4 }}>
+              Нет доступных касс/счетов{order.module ? ' в этом модуле' : ''}.
+            </div>
+          )}
         </div>
 
         <div className="field">
