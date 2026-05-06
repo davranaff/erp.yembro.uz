@@ -5,6 +5,7 @@ import { useState } from 'react';
 import HelpHint from '@/components/ui/HelpHint';
 import Modal from '@/components/ui/Modal';
 import { ApiError } from '@/lib/api';
+import { uppercaseChange } from '@/lib/forms';
 import { recipesCrud } from '@/hooks/useFeed';
 import type { Recipe } from '@/types/auth';
 
@@ -71,7 +72,7 @@ export default function RecipeModal({ initial, onClose }: Props) {
               details="Например «Р-БР-СТ» (старт бройлера) или «Р-НЕС-ПК» (несушка пик). Используется в документах и отчётах."
             />
           </label>
-          <input className="input mono" value={code} onChange={(e) => setCode(e.target.value)} disabled={isEdit} placeholder="Р-БР-СТ" />
+          <input className="input mono upper" value={code} onChange={uppercaseChange(setCode)} disabled={isEdit} placeholder="Р-БР-СТ" />
           {fieldErrors.code && <div style={{ fontSize: 11, color: 'var(--danger)' }}>{fieldErrors.code.join(' · ')}</div>}
         </div>
         <div className="field">

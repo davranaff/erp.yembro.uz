@@ -530,6 +530,10 @@ textarea.input { height: auto; padding: 8px 10px; }
 }
 .input.num { font-family: var(--font-mono); text-align: right; }
 .input.err { border-color: var(--danger); }
+/* Поля «ключ» — sku, code, lot_number и т.п. Включает uppercase визуально;
+   обработчик onChange должен также делать .toUpperCase() (см. uppercaseChange
+   в lib/forms.ts), чтобы значение в state и на бэкенде было uppercase. */
+.input.upper { text-transform: uppercase; }
 select.input {
   appearance: none;
   background-image: linear-gradient(45deg, transparent 50%, var(--fg-2) 50%), linear-gradient(135deg, var(--fg-2) 50%, transparent 50%);

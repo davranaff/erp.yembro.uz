@@ -1,9 +1,11 @@
 from django.db import models
 
 from apps.common.models import TimestampedModel, UUIDModel
+from apps.common.normalize import UpperCodeMixin
 
 
-class Unit(UUIDModel, TimestampedModel):
+class Unit(UpperCodeMixin, UUIDModel, TimestampedModel):
+    upper_code_fields = ("code",)
     organization = models.ForeignKey(
         "organizations.Organization",
         on_delete=models.PROTECT,
@@ -69,7 +71,8 @@ class Category(UUIDModel, TimestampedModel):
         return self.name
 
 
-class NomenclatureItem(UUIDModel, TimestampedModel):
+class NomenclatureItem(UpperCodeMixin, UUIDModel, TimestampedModel):
+    upper_code_fields = ("sku",)
     organization = models.ForeignKey(
         "organizations.Organization",
         on_delete=models.PROTECT,

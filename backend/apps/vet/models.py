@@ -5,6 +5,7 @@ from django.core.exceptions import ValidationError
 from django.db import models
 
 from apps.common.models import TimestampedModel, UUIDModel
+from apps.common.normalize import UpperCodeMixin
 
 
 class DrugType(models.TextChoices):
@@ -108,8 +109,10 @@ class VetDrug(UUIDModel, TimestampedModel):
             )
 
 
-class VetStockBatch(UUIDModel, TimestampedModel):
+class VetStockBatch(UpperCodeMixin, UUIDModel, TimestampedModel):
     """Партия (lot) препарата на вет-складе."""
+
+    upper_code_fields = ("lot_number",)
 
     class Status(models.TextChoices):
         AVAILABLE = "available", "Доступна"

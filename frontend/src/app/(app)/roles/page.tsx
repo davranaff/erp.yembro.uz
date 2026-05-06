@@ -319,7 +319,7 @@ function CreateRoleModal({
       <div className="field">
         <label>Код (уникален) *</label>
         <input
-          className="input mono"
+          className="input mono upper"
           value={code}
           onChange={(e) => setCode(e.target.value.toUpperCase())}
           placeholder="TECHNOLOG"

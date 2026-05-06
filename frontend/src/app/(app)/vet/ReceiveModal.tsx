@@ -4,6 +4,7 @@ import { useState } from 'react';
 
 import Modal from '@/components/ui/Modal';
 import { ApiError } from '@/lib/api';
+import { uppercaseChange } from '@/lib/forms';
 import { useCounterparties } from '@/hooks/useCounterparties';
 import { useUnits } from '@/hooks/useNomenclature';
 import { purchasesCrud } from '@/hooks/usePurchases';
@@ -102,7 +103,7 @@ export default function ReceiveModal({ onClose }: Props) {
         </div>
         <div className="field">
           <label>Lot № *</label>
-          <input className="input mono" value={lotNumber} onChange={(e) => setLotNumber(e.target.value)} placeholder="L-2603" />
+          <input className="input mono upper" value={lotNumber} onChange={uppercaseChange(setLotNumber)} placeholder="L-2603" />
           {fieldErrors.lot_number && <div style={{ fontSize: 11, color: 'var(--danger)' }}>{fieldErrors.lot_number.join(' · ')}</div>}
         </div>
         <div className="field">

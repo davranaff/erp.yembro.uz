@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 
 import Modal from '@/components/ui/Modal';
 import { ApiError } from '@/lib/api';
+import { uppercaseChange } from '@/lib/forms';
 import {
   useCreateCounterparty,
   useUpdateCounterparty,
@@ -116,9 +117,9 @@ export default function CounterpartyModal({ initial, onClose, onSaved }: Props) 
         <div className="field">
           <label>Код *</label>
           <input
-            className="input mono"
+            className="input mono upper"
             value={code}
-            onChange={(e) => setCode(e.target.value)}
+            onChange={uppercaseChange(setCode)}
             disabled={isEdit}
             placeholder="К-001"
           />

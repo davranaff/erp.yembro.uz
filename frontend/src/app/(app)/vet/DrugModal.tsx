@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react';
 
 import HelpHint from '@/components/ui/HelpHint';
 import Modal from '@/components/ui/Modal';
+import { uppercaseChange } from '@/lib/forms';
 import { useModules } from '@/hooks/useModules';
 import {
   useCategories,
@@ -242,9 +243,9 @@ export default function DrugModal({ initial, onClose }: Props) {
             <div className="field">
               <label>SKU *</label>
               <input
-                className="input mono"
+                className="input mono upper"
                 value={newSku}
-                onChange={(e) => setNewSku(e.target.value)}
+                onChange={uppercaseChange(setNewSku)}
                 placeholder="ВП-АНТ-01"
               />
               {renderFieldError('sku')}

@@ -12,6 +12,7 @@ import {
   type WarehousePayload,
 } from '@/hooks/useStockMovements';
 import { ApiError } from '@/lib/api';
+import { uppercaseChange } from '@/lib/forms';
 import type { WarehouseRef } from '@/types/auth';
 
 interface Props {
@@ -98,9 +99,9 @@ export default function WarehouseModal({ initial, onClose, onSaved }: Props) {
         <div className="field">
           <label>Код *</label>
           <input
-            className="input mono"
+            className="input mono upper"
             value={code}
-            onChange={(e) => setCode(e.target.value)}
+            onChange={uppercaseChange(setCode)}
             disabled={isEdit}
             placeholder="СК-Ф"
           />

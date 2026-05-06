@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 
 import Modal from '@/components/ui/Modal';
 import { ApiError } from '@/lib/api';
+import { uppercaseChange } from '@/lib/forms';
 import { useCreateBlock, useUpdateBlock } from '@/hooks/useBlocks';
 import { useModules } from '@/hooks/useModules';
 import { useUnits } from '@/hooks/useNomenclature';
@@ -111,9 +112,9 @@ export default function BlockModal({ initial, onClose, onSaved }: Props) {
         <div className="field">
           <label>Код *</label>
           <input
-            className="input mono"
+            className="input mono upper"
             value={code}
-            onChange={(e) => setCode(e.target.value)}
+            onChange={uppercaseChange(setCode)}
             disabled={isEdit}
             placeholder="ПТ-А1"
           />

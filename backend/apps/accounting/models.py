@@ -5,9 +5,12 @@ from django.core.exceptions import ValidationError
 from django.db import models
 
 from apps.common.models import TimestampedModel, UUIDModel
+from apps.common.normalize import UpperCodeMixin
 
 
-class GLAccount(UUIDModel, TimestampedModel):
+class GLAccount(UpperCodeMixin, UUIDModel, TimestampedModel):
+    upper_code_fields = ("code",)
+
     class Type(models.TextChoices):
         ASSET = "asset", "Актив"
         LIABILITY = "liability", "Пассив"
@@ -35,11 +38,13 @@ class GLAccount(UUIDModel, TimestampedModel):
         return f"{self.code} · {self.name}"
 
 
-class GLSubaccount(UUIDModel, TimestampedModel):
+class GLSubaccount(UpperCodeMixin, UUIDModel, TimestampedModel):
     """
     Организация унаследуется через `account.organization` —
     прямого FK нет, чтобы не денормализовать.
     """
+
+    upper_code_fields = ("code",)
 
     account = models.ForeignKey(
         GLAccount, on_delete=models.PROTECT, related_name="subaccounts"
@@ -65,7 +70,7 @@ class GLSubaccount(UUIDModel, TimestampedModel):
         return f"{self.code} · {self.name}"
 
 
-class ExpenseArticle(UUIDModel, TimestampedModel):
+class ExpenseArticle(UpperCodeMixin, UUIDModel, TimestampedModel):
     """
     Статья расходов/доходов — аналитическое измерение поверх плана счетов.
 
@@ -86,6 +91,8 @@ class ExpenseArticle(UUIDModel, TimestampedModel):
         - parent — иерархия (Коммуналка → Газ, Электричество, Вода)
         - is_active — мягкое архивирование
     """
+
+    upper_code_fields = ("code",)
 
     class Kind(models.TextChoices):
         EXPENSE = "expense", "Расход"

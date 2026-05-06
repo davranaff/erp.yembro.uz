@@ -6,6 +6,7 @@ import Modal from '@/components/ui/Modal';
 import { useCreateSubaccount, useUpdateSubaccount } from '@/hooks/useAccounts';
 import { useModules } from '@/hooks/useModules';
 import { ApiError } from '@/lib/api';
+import { uppercaseChange } from '@/lib/forms';
 import type { GLAccount, GLSubaccount } from '@/types/auth';
 
 interface Props {
@@ -110,9 +111,9 @@ export default function SubaccountModal({ initial, accounts, defaultAccountId, o
         <div className="field">
           <label>Код *</label>
           <input
-            className="input mono"
+            className="input mono upper"
             value={code}
-            onChange={(e) => setCode(e.target.value)}
+            onChange={uppercaseChange(setCode)}
             placeholder={codePlaceholder}
           />
           {getFieldErr('code') && (

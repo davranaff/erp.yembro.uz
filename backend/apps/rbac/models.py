@@ -3,6 +3,7 @@ from django.core.exceptions import ValidationError
 from django.db import models
 
 from apps.common.models import TimestampedModel, UUIDModel
+from apps.common.normalize import UpperCodeMixin
 
 
 class AccessLevel(models.TextChoices):
@@ -12,7 +13,8 @@ class AccessLevel(models.TextChoices):
     ADMIN = "admin", "Администратор модуля"
 
 
-class Role(UUIDModel, TimestampedModel):
+class Role(UpperCodeMixin, UUIDModel, TimestampedModel):
+    upper_code_fields = ("code",)
     organization = models.ForeignKey(
         "organizations.Organization",
         on_delete=models.CASCADE,

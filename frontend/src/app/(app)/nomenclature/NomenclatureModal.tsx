@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react';
 import HelpHint from '@/components/ui/HelpHint';
 import Modal from '@/components/ui/Modal';
 import { ApiError } from '@/lib/api';
+import { uppercaseChange } from '@/lib/forms';
 import {
   useCategories,
   useCreateCategory,
@@ -139,11 +140,11 @@ export default function NomenclatureModal({ initial, onClose, onSaved }: Props) 
         <div className="field">
           <label>Артикул (SKU) *</label>
           <input
-            className="input mono"
+            className="input mono upper"
             value={sku}
-            onChange={(e) => setSku(e.target.value)}
+            onChange={uppercaseChange(setSku)}
             disabled={isEdit}
-            placeholder="КМ-Ст-01"
+            placeholder="КМ-СТ-01"
           />
           {fieldErrors.sku && (
             <div style={{ fontSize: 11, color: 'var(--danger)' }}>
@@ -222,10 +223,10 @@ export default function NomenclatureModal({ initial, onClose, onSaved }: Props) 
           </select>
           <div style={{ display: 'flex', gap: 4, marginTop: 4 }}>
             <input
-              className="input mono"
+              className="input mono upper"
               placeholder="код"
               value={newUnitCode}
-              onChange={(e) => setNewUnitCode(e.target.value)}
+              onChange={uppercaseChange(setNewUnitCode)}
               style={{ width: 70, fontSize: 12, height: 26 }}
             />
             <input
