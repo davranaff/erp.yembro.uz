@@ -962,6 +962,12 @@ export interface FeedBagLot {
   withdrawal_period_days: number;
   withdrawal_period_ends: string | null;
   status: FeedBagLotStatus;
+  /**
+   * Штрих-код партии мешков (Code128). Авто-генерируется при packaging
+   * в формате FEED-{recipe}-{rand4}. Сканер на /scan/<barcode> открывает
+   * розничную карточку партии с возможностью продажи.
+   */
+  barcode: string | null;
   notes: string;
   /** Авто-резолв через recipe.code → NomenclatureItem.sku. */
   nomenclature: string | null;

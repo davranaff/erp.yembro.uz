@@ -4,6 +4,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
 import { useMemo, useState } from 'react';
 
+import BarcodeLabel from '@/components/BarcodeLabel';
 import DetailDrawer, { KV } from '@/components/DetailDrawer';
 import IncomingTransfersPanel from '@/components/IncomingTransfersPanel';
 import OpexButton from '@/components/OpexButton';
@@ -1706,6 +1707,59 @@ export default function FeedPage() {
           }
           onClose={() => setSelBagLot(null)}
         >
+          {selBagLot.barcode && (
+            <div style={{
+              padding: 12, marginBottom: 14,
+              background: 'var(--bg-soft)', borderRadius: 6,
+              border: '1px solid var(--border)',
+            }}>
+              <div style={{
+                fontSize: 11, fontWeight: 700, color: 'var(--fg-3)',
+                textTransform: 'uppercase', letterSpacing: '.04em',
+                marginBottom: 8,
+              }}>
+                Штрих-код
+              </div>
+              <div style={{ marginBottom: 10, overflowX: 'auto' }}>
+                <BarcodeLabel
+                  barcode={selBagLot.barcode}
+                  drugName={selBagLot.nomenclature_name}
+                  lotNumber={selBagLot.doc_number}
+                  expirationDate={selBagLot.withdrawal_period_ends}
+                />
+              </div>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                <button
+                  className="btn btn-ghost btn-sm"
+                  onClick={() => {
+                    navigator.clipboard?.writeText(selBagLot.barcode!);
+                    alert('Скопировано');
+                  }}
+                >
+                  Копировать
+                </button>
+                <button
+                  className="btn btn-secondary btn-sm"
+                  onClick={() => {
+                    const p = new URLSearchParams({
+                      barcode: selBagLot.barcode!,
+                      ...(selBagLot.nomenclature_name ? { drug: selBagLot.nomenclature_name } : {}),
+                      ...(selBagLot.doc_number ? { lot: selBagLot.doc_number } : {}),
+                      ...(selBagLot.withdrawal_period_ends
+                        ? { exp: selBagLot.withdrawal_period_ends }
+                        : {}),
+                    });
+                    window.open(`/print/vet-label?${p}`, '_blank');
+                  }}
+                >
+                  Печать этикетки
+                </button>
+              </div>
+              <div style={{ fontSize: 11, color: 'var(--fg-3)', marginTop: 6 }}>
+                Сканер открывает: <code>/scan/{selBagLot.barcode}</code>
+              </div>
+            </div>
+          )}
           <KV
             items={[
               { k: 'Документ', v: selBagLot.doc_number, mono: true },
