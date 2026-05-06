@@ -592,6 +592,9 @@ export default function SaleOrderModal({ initial, preselect, onClose }: Props) {
                               available_quantity: lot?.current_quantity,
                               batch_doc: lot?.doc_number,
                               unit_code: lot?.unit_code ?? '',
+                              // Авто-подстановка цены за единицу из price_per_unit_uzs лота —
+                              // если оператор уже задал цену вручную, не перезатираем.
+                              unit_price_uzs: it.unit_price_uzs || lot?.price_per_unit_uzs || '',
                             });
                           }}
                         >
