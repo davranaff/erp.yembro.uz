@@ -2,9 +2,11 @@
 
 import { Suspense, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
+import { useQueryClient } from '@tanstack/react-query';
 
 import Icon from '@/components/ui/Icon';
 import { ApiError, apiFetch } from '@/lib/api';
+import { ME_QUERY_KEY } from '@/hooks/useUser';
 import { setTokens, writeOrgCookie } from '@/lib/tokens';
 import type { Membership, TokenPair, User } from '@/types/auth';
 
@@ -32,6 +34,7 @@ function Logo() {
 function LoginInner() {
   const router = useRouter();
   const search = useSearchParams();
+  const queryClient = useQueryClient();
   const nextPath = search.get('next') ?? '/dashboard';
   const errorParam = search.get('error');
 
@@ -54,6 +57,13 @@ function LoginInner() {
     setError(null);
     setSubmitting(true);
     try {
+      // Чистим React Query кеш ПЕРЕД логином — иначе если в этой
+      // вкладке раньше был залогинен другой юзер (или этот же с другими
+      // правами), Sidebar/permissions отрендерятся со старым ['me']
+      // до того как новый запрос отработает (staleTime 60s). Симптом:
+      // юзер видит nav-пункты предыдущего пользователя.
+      queryClient.clear();
+
       const tokens = await apiFetch<TokenPair>('/api/auth/token/', {
         method: 'POST',
         body: { email, password },
@@ -63,6 +73,10 @@ function LoginInner() {
       setTokens(tokens.access, tokens.refresh);
 
       const me = await apiFetch<User>('/api/users/me/', { skipOrg: true });
+      // Сразу прогреваем React Query кеш свежим /me — чтобы первый рендер
+      // AuthGuard/Sidebar после redirect'а увидел корректные права без
+      // моргания (loading → потом обновление).
+      queryClient.setQueryData(ME_QUERY_KEY, me);
       const ms = me.memberships ?? [];
 
       if (ms.length === 0) {
