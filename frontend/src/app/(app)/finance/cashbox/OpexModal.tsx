@@ -394,7 +394,7 @@ export default function OpexModal({ preselect, onClose }: Props) {
             {subaccounts
               ?.filter((s) => s.code.startsWith('50.') || s.code.startsWith('51.'))
               .map((s) => (
-                <option key={s.id} value={s.id}>{s.code} · {s.name}</option>
+                <option key={s.id} value={s.id}>{s.name}</option>
               ))}
           </select>
         )}
@@ -579,7 +579,6 @@ export default function OpexModal({ preselect, onClose }: Props) {
               <option key={s.id} value={s.id}>
                 {s.name}
                 {s.module_code ? ` · ${s.module_code}` : ''}
-                <> · </>{s.code}
               </option>
             ))}
           </select>
