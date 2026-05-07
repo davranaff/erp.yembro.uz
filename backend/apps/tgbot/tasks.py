@@ -503,12 +503,15 @@ def pre_block_warning_daily_task() -> dict:
 
 @shared_task(name="apps.tgbot.head_morning_brief_task")
 def head_morning_brief_task() -> dict:
-    """Утренний brief каждому head'у модуля (level=admin на свой модуль).
+    """Вечерний brief каждому head'у модуля (level=admin на свой модуль).
 
-    Логика: для каждой org — ищем head'ов production-модулей (admin
-    доступ). Каждому шлём mini-сводку его модуля (sotuvlar/xaridlar/
-    qoldiq за вчера) — чтобы день начинался с свежей картинки без
-    необходимости открывать бот.
+    Срабатывает в 18:00 (после рабочего дня). Для каждой org — ищем
+    head'ов production-модулей (admin доступ). Каждому шлём mini-сводку
+    его модуля (sotuvlar/xaridlar/qoldiq за СЕГОДНЯ) — оператор закрывает
+    день видя итог.
+
+    Имя task'а оставлено `morning_brief` для обратной совместимости с
+    Celery Beat schedules; смысловая нагрузка теперь evening, см. cron.
     """
     from apps.organizations.models import Organization
 
@@ -819,3 +822,146 @@ def models_q_active_or_default(org):
     return Q(active_organization=org) | Q(
         active_organization__isnull=True, organization=org,
     )
+
+
+# ─── Excel-отчёты в TG (22:00 ежедневно) ──────────────────────────────
+
+
+@shared_task(name="apps.tgbot.daily_stock_excel_task")
+def daily_stock_excel_task() -> dict:
+    """Каждый день в 22:00 шлёт admin/owner Excel-файл остатков по всем
+    складам.
+
+    Имя файла: <YYYY-MM-DD>_otchet_o_sklade.xlsx.
+    Получатели: TgLink с уровнем admin на 'admin' или 'ledger' модулях.
+    """
+    from datetime import date as _date
+
+    from apps.organizations.models import Organization
+
+    from .bot import send_document
+    from .models import TgLink
+    from .services.excel_reports import (
+        generate_stock_balance_xlsx,
+        stock_filename,
+    )
+
+    today = _date.today()
+    total_sent = 0
+    total_orgs = 0
+
+    for org in Organization.objects.filter(is_active=True).iterator():
+        # Получатели: владельцы + бухгалтерия. Используем готовый helper
+        # _resolve_allowed_users для обоих модулей.
+        recipient_ids = _resolve_allowed_users(
+            organization_id=str(org.id),
+            user_ids=list(
+                TgLink.objects.filter(
+                    organization=org, is_active=True, user__isnull=False,
+                ).values_list("user_id", flat=True),
+            ),
+            module_code="admin",
+            min_level="admin",
+        )
+        recipient_ids |= _resolve_allowed_users(
+            organization_id=str(org.id),
+            user_ids=list(
+                TgLink.objects.filter(
+                    organization=org, is_active=True, user__isnull=False,
+                ).values_list("user_id", flat=True),
+            ),
+            module_code="ledger",
+            min_level="admin",
+        )
+        if not recipient_ids:
+            continue
+
+        try:
+            blob = generate_stock_balance_xlsx(org, today=today)
+        except Exception:  # noqa: BLE001
+            logger.exception("daily_stock_excel: org=%s build failed", org.code)
+            continue
+        fname = stock_filename(today)
+        caption = f"📦 Отчёт по складам · {org.name} · {today.isoformat()}"
+
+        total_orgs += 1
+        sent_chats: set = set()
+        for link in TgLink.objects.filter(
+            organization=org, is_active=True, user_id__in=recipient_ids,
+        ):
+            if link.chat_id in sent_chats:
+                continue
+            if send_document(link.chat_id, blob, fname, caption=caption):
+                sent_chats.add(link.chat_id)
+                total_sent += 1
+
+    payload = {"orgs": total_orgs, "sent": total_sent}
+    logger.info("daily_stock_excel_task: %s", payload)
+    return payload
+
+
+@shared_task(name="apps.tgbot.daily_debtors_excel_task")
+def daily_debtors_excel_task() -> dict:
+    """Каждый день в 22:00 шлёт admin/owner/sales Excel-файл со списком
+    дебиторов с aging-разбивкой.
+
+    Имя файла: <YYYY-MM-DD>_spisok_doljnikov.xlsx.
+    Получатели: admin, ledger, sales (admin-уровень).
+    """
+    from datetime import date as _date
+
+    from apps.organizations.models import Organization
+
+    from .bot import send_document
+    from .models import TgLink
+    from .services.excel_reports import (
+        debtors_filename,
+        generate_debtors_xlsx,
+    )
+
+    today = _date.today()
+    total_sent = 0
+    total_orgs = 0
+
+    for org in Organization.objects.filter(is_active=True).iterator():
+        link_user_ids = list(
+            TgLink.objects.filter(
+                organization=org, is_active=True, user__isnull=False,
+            ).values_list("user_id", flat=True),
+        )
+        if not link_user_ids:
+            continue
+
+        recipient_ids: set = set()
+        for mc in ("admin", "ledger", "sales"):
+            recipient_ids |= _resolve_allowed_users(
+                organization_id=str(org.id),
+                user_ids=link_user_ids,
+                module_code=mc,
+                min_level="admin",
+            )
+        if not recipient_ids:
+            continue
+
+        try:
+            blob = generate_debtors_xlsx(org, today=today)
+        except Exception:  # noqa: BLE001
+            logger.exception("daily_debtors_excel: org=%s build failed", org.code)
+            continue
+        fname = debtors_filename(today)
+        caption = f"💼 Список должников · {org.name} · {today.isoformat()}"
+
+        total_orgs += 1
+        sent_chats: set = set()
+        for link in TgLink.objects.filter(
+            organization=org, is_active=True, user_id__in=recipient_ids,
+        ):
+            if link.chat_id in sent_chats:
+                continue
+            if send_document(link.chat_id, blob, fname, caption=caption):
+                sent_chats.add(link.chat_id)
+                total_sent += 1
+
+    payload = {"orgs": total_orgs, "sent": total_sent}
+    logger.info("daily_debtors_excel_task: %s", payload)
+    return payload

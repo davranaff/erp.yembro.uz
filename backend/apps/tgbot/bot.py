@@ -176,3 +176,50 @@ def reset_bot_username_cache() -> None:
     """Сбросить кеш юзернейма (для тестов и при смене токена)."""
     global _BOT_USERNAME_CACHE
     _BOT_USERNAME_CACHE = None
+
+
+def send_document(
+    chat_id: int,
+    file_bytes: bytes,
+    filename: str,
+    *,
+    caption: Optional[str] = None,
+    parse_mode: str = "HTML",
+) -> bool:
+    """POST /sendDocument с in-memory файлом.
+
+    Используется для рассылки Excel-отчётов (stock balance, debtors list).
+    Параметры:
+        chat_id    — Telegram chat id получателя
+        file_bytes — содержимое файла (из openpyxl.save в BytesIO)
+        filename   — имя файла как пользователь увидит (в нашем случае
+                     `<YYYY-MM-DD>_<тип>.xlsx`)
+        caption    — опциональная подпись (HTML)
+
+    Не использует _post т.к. multipart/form-data, не json.
+    """
+    url = _api_url("sendDocument")
+    if url is None:
+        return False
+    files = {
+        "document": (
+            filename, file_bytes,
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        ),
+    }
+    data: dict[str, Any] = {"chat_id": str(chat_id)}
+    if caption:
+        data["caption"] = caption
+        data["parse_mode"] = parse_mode
+    try:
+        resp = requests.post(url, files=files, data=data, timeout=30)
+        if not resp.ok:
+            logger.warning(
+                "Telegram sendDocument failed: %s %s",
+                resp.status_code, resp.text[:300],
+            )
+            return False
+        return True
+    except requests.RequestException as exc:
+        logger.error("Telegram sendDocument error: %s", exc)
+        return False
