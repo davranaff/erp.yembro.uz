@@ -11,11 +11,11 @@ import RowActions from '@/components/ui/RowActions';
 import Seg from '@/components/ui/Seg';
 import TablePagination from '@/components/ui/TablePagination';
 import { useHasLevel } from '@/hooks/usePermissions';
-import { useSendDebtReminder } from '@/hooks/useTgBot';
 import { salesCrud, useConfirmSale, useReverseSale } from '@/hooks/useSales';
 import type { SaleOrder, SalePaymentStatus, SaleStatus } from '@/types/auth';
 
 import RecordPaymentModal from './RecordPaymentModal';
+import RemindModal from './RemindModal';
 import SaleCommunicationsModal from './SaleCommunicationsModal';
 import SaleConfirmGuardModal from './SaleConfirmGuardModal';
 import SaleOrderModal from './SaleOrderModal';
@@ -61,6 +61,7 @@ export default function SalesPage() {
   const [editing, setEditing] = useState<SaleOrder | null>(null);
   const [payFor, setPayFor] = useState<SaleOrder | null>(null);
   const [commsFor, setCommsFor] = useState<SaleOrder | null>(null);
+  const [remindFor, setRemindFor] = useState<SaleOrder | null>(null);
   const [confirmingFor, setConfirmingFor] = useState<SaleOrder | null>(null);
 
   const hasLevel = useHasLevel();
@@ -78,7 +79,6 @@ export default function SalesPage() {
 
   const confirmMutation = useConfirmSale();
   const reverseMutation = useReverseSale();
-  const sendReminder = useSendDebtReminder();
 
   const totals = useMemo(() => {
     const list = allOrders ?? [];
@@ -260,16 +260,12 @@ export default function SalesPage() {
                       onClick: () => setPayFor(o),
                     },
                     {
-                      label: 'Напомнить в TG',
+                      label: 'Напомнить в TG…',
                       hidden: !(
                         o.status === 'confirmed' &&
                         (o.payment_status === 'unpaid' || o.payment_status === 'partial')
                       ),
-                      disabled: sendReminder.isPending,
-                      onClick: () => sendReminder.mutate(
-                        { sale_order_id: o.id },
-                        { onSuccess: () => alert('Напоминание отправлено в Telegram'), onError: (e) => alert('Ошибка: ' + e.message) }
-                      ),
+                      onClick: () => setRemindFor(o),
                     },
                     {
                       label: 'Касания клиента',
@@ -318,6 +314,12 @@ export default function SalesPage() {
         <SaleCommunicationsModal
           order={commsFor}
           onClose={() => setCommsFor(null)}
+        />
+      )}
+      {remindFor && (
+        <RemindModal
+          order={remindFor}
+          onClose={() => setRemindFor(null)}
         />
       )}
       {confirmingFor && (

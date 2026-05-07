@@ -5,9 +5,11 @@ import { useMemo, useState } from 'react';
 import HelpHint from '@/components/ui/HelpHint';
 import Modal from '@/components/ui/Modal';
 import { useSubaccounts } from '@/hooks/useAccounts';
+import { useModules } from '@/hooks/useModules';
+import { useHasLevel, usePermissions } from '@/hooks/usePermissions';
 import { useRecordSalePayment } from '@/hooks/useSales';
 import { ApiError } from '@/lib/api';
-import type { SaleOrder } from '@/types/auth';
+import { LEVEL_ORDER, type ModuleLevel, type SaleOrder } from '@/types/auth';
 
 interface Props {
   order: SaleOrder;
@@ -29,6 +31,26 @@ function fmtUzs(v: string | number): string {
 export default function RecordPaymentModal({ order, onClose }: Props) {
   const record = useRecordSalePayment();
   const { data: subs } = useSubaccounts();
+  const { data: modules } = useModules();
+  const hasLevel = useHasLevel();
+  const permissions = usePermissions();
+  const isOrgAdmin = hasLevel('admin', 'admin') || hasLevel('ledger', 'admin');
+
+  // Множество module-id, на которые у юзера есть rw. null = org-admin
+  // (видит все). Без этого head вет-модуля видел в дропдауне feed-кассы
+  // и мог случайно зачислить туда оплату.
+  const accessibleModuleIds = useMemo<Set<string> | null>(() => {
+    if (isOrgAdmin) return null;
+    if (!modules) return new Set();
+    const allowedCodes = new Set(
+      Object.entries(permissions)
+        .filter(([, lvl]) => LEVEL_ORDER[lvl as ModuleLevel] >= LEVEL_ORDER.rw)
+        .map(([code]) => code),
+    );
+    return new Set(
+      modules.filter((m) => allowedCodes.has(m.code)).map((m) => m.id),
+    );
+  }, [isOrgAdmin, modules, permissions]);
 
   const remaining = useMemo(() => {
     const total = parseFloat(order.amount_uzs || '0');
@@ -36,16 +58,24 @@ export default function RecordPaymentModal({ order, onClose }: Props) {
     return Math.max(0, total - paid);
   }, [order]);
 
-  // Кассы и банки доступные для приёма (50.NN / 51.NN). Сужаем по модулю
-  // продажи если он задан — оператор не должен случайно зачислить vet-оплату
-  // на feed-кассу.
+  // Кассы и банки доступные для приёма (50.NN / 51.NN). Двойной фильтр:
+  //   1. По модулям юзера (head feed не должен зачислять на vet-кассу)
+  //   2. По модулю продажи (если в SO явно указан модуль)
+  // org-admin / ledger:admin видят всё, как раньше.
   const cashAccounts = useMemo(() => {
     if (!subs) return [];
     return subs
       .filter((s) => s.code.startsWith('50.') || s.code.startsWith('51.'))
+      // (1) фильтр по правам пользователя
+      .filter((s) => {
+        if (accessibleModuleIds === null) return true;        // org-admin
+        if (!s.module) return false;                          // null-module → admin only
+        return accessibleModuleIds.has(s.module);
+      })
+      // (2) фильтр по модулю продажи (если задан)
       .filter((s) => !order.module || !s.module || s.module === order.module)
       .sort((a, b) => a.code.localeCompare(b.code));
-  }, [subs, order.module]);
+  }, [subs, order.module, accessibleModuleIds]);
 
   const [channel, setChannel] = useState<'cash' | 'transfer' | 'click' | 'other'>('cash');
   const [cashSubId, setCashSubId] = useState('');
@@ -186,7 +216,7 @@ export default function RecordPaymentModal({ order, onClose }: Props) {
             <option value="">— выберите кассу —</option>
             {cashAccounts.map((s) => (
               <option key={s.id} value={s.id}>
-                {s.code} · {s.name}
+                {s.name}
               </option>
             ))}
           </select>

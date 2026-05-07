@@ -80,11 +80,34 @@ export function useDisconnectCounterpartyTg(counterpartyId: string) {
 }
 
 export function useSendDebtReminder() {
-  return useMutation<{ queued: boolean }, Error, { sale_order_id: string }>({
+  return useMutation<
+    { queued: boolean },
+    Error,
+    { sale_order_id: string; text?: string }
+  >({
     mutationFn: (body) =>
       apiFetch('/api/tg/send-debt-reminder/', {
         method: 'POST',
         body,
       }),
+  });
+}
+
+export interface DebtReminderPreview {
+  text: string;
+  has_tg_link: boolean;
+  tg_username: string | null;
+  customer_name: string;
+  doc_number: string;
+}
+
+export function usePreviewDebtReminder(saleOrderId: string | null) {
+  return useQuery<DebtReminderPreview, Error>({
+    queryKey: ['tg', 'preview-debt-reminder', saleOrderId ?? ''],
+    enabled: Boolean(saleOrderId),
+    queryFn: () => apiFetch<DebtReminderPreview>(
+      `/api/tg/preview-debt-reminder/?sale_order_id=${saleOrderId}`,
+    ),
+    staleTime: 0,
   });
 }

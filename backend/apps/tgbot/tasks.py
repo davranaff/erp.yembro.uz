@@ -181,8 +181,15 @@ def _resolve_allowed_users(
 
 
 @shared_task(name="apps.tgbot.send_debt_reminder_task")
-def send_debt_reminder_task(sale_order_id: str) -> dict:
-    """Отправляет напоминание о долге по конкретному SaleOrder."""
+def send_debt_reminder_task(
+    sale_order_id: str, custom_text: str | None = None,
+) -> dict:
+    """Отправляет напоминание о долге по конкретному SaleOrder.
+
+    custom_text — опциональный override текста (когда оператор отредактировал
+    шаблон в превью-модалке). Если None — используется стандартный шаблон
+    fmt_debt_reminder_uz.
+    """
     from apps.sales.models import SaleOrder
 
     from .bot import send_message
@@ -209,7 +216,7 @@ def send_debt_reminder_task(sale_order_id: str) -> dict:
     if not link:
         return {"error": "no_tg_link", "order": sale_order_id}
 
-    text = fmt_debt_reminder_uz(order, order.customer)
+    text = custom_text if custom_text else fmt_debt_reminder_uz(order, order.customer)
     ok = send_message(link.chat_id, text)
     return {"sent": ok, "chat_id": link.chat_id}
 

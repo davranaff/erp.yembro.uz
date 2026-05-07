@@ -1,6 +1,7 @@
 from django.urls import path
 
 from .views import (
+    PreviewDebtReminderView,
     SendDebtReminderView,
     TelegramWebhookView,
     TgCounterpartyLinkView,
@@ -14,4 +15,5 @@ urlpatterns = [
     path("links/me/", TgMyLinkView.as_view(), name="tg-link-me"),
     path("links/counterparty/<uuid:pk>/", TgCounterpartyLinkView.as_view(), name="tg-link-counterparty"),
     path("send-debt-reminder/", SendDebtReminderView.as_view(), name="tg-send-debt-reminder"),
+    path("preview-debt-reminder/", PreviewDebtReminderView.as_view(), name="tg-preview-debt-reminder"),
 ]

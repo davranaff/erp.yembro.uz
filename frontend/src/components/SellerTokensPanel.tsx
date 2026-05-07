@@ -217,9 +217,30 @@ export default function SellerTokensPanel({
           title="Токен создан"
           onClose={() => setCreatedToken(null)}
           footer={
-            <button className="btn btn-primary" onClick={() => setCreatedToken(null)}>
-              Я скопировал токен
-            </button>
+            <div style={{ display: 'flex', gap: 8, width: '100%' }}>
+              <button
+                className="btn btn-secondary"
+                onClick={() => {
+                  // Применить ЭТОТ токен на текущем устройстве — кладём в
+                  // localStorage и редирект на /scan. Удобно для админа,
+                  // когда он создаёт токен прямо на терминале продавца.
+                  if (typeof window !== 'undefined' && createdToken.token) {
+                    localStorage.setItem('vet_seller_token', createdToken.token);
+                    localStorage.setItem(
+                      'vet_seller_label',
+                      createdToken.label || createdToken.user_full_name,
+                    );
+                    window.location.href = '/scan';
+                  }
+                }}
+              >
+                Применить на этом устройстве → /scan
+              </button>
+              <div style={{ flex: 1 }} />
+              <button className="btn btn-primary" onClick={() => setCreatedToken(null)}>
+                Я скопировал токен
+              </button>
+            </div>
           }
         >
           <div style={{ fontSize: 13, marginBottom: 12 }}>
@@ -257,10 +278,13 @@ export default function SellerTokensPanel({
               Копировать
             </button>
           </div>
-          <div style={{ fontSize: 12, color: 'var(--fg-3)' }}>
-            Передайте продавцу: пусть откроет <code>/scan/login</code> и введёт токен.
-            После этого сканирование штрих-кода ведёт на <code>/scan/&lt;barcode&gt;</code>
-            и кнопка «Продать» работает.
+          <div style={{ fontSize: 12, color: 'var(--fg-3)', lineHeight: 1.5 }}>
+            <b>Два варианта:</b><br/>
+            • <b>Применить на этом устройстве</b> — токен сразу сохранится в
+            этот браузер и откроется /scan. Удобно если ты настраиваешь
+            терминал продавца за него.<br/>
+            • <b>Передать продавцу</b> — скопируй токен, пусть он откроет{' '}
+            <code>/scan/login</code> на своём устройстве и вставит код.
           </div>
         </Modal>
       )}
