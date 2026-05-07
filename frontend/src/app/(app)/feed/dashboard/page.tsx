@@ -457,9 +457,12 @@ export default function FeedDashboardPage() {
                 border: '1px solid var(--warning, #F59E0B)', borderRadius: 999,
                 fontSize: 11,
               }}>
-                <strong className="mono">{r.sku}</strong>
+                <strong>{r.name}</strong>
+                <span className="mono" style={{ color: 'var(--fg-3)', marginLeft: 4 }}>
+                  {r.sku}
+                </span>
                 <span style={{ color: 'var(--fg-3)', marginLeft: 4 }}>
-                  {r.name} · {fmtNum(r.balance, 0)} кг
+                  · {fmtNum(r.balance, 0)} кг
                 </span>
               </span>
             ))}
@@ -616,9 +619,13 @@ export default function FeedDashboardPage() {
                         background: 'var(--bg-card, #fff)',
                         fontSize: 12, zIndex: 1,
                       }}>
-                        <span className="mono" style={{ fontWeight: 500 }}>{ing.sku}</span>
-                        <span style={{ color: 'var(--fg-3)', marginLeft: 6, fontSize: 11 }}>
+                        <span style={{ fontWeight: 500, color: 'var(--fg-1)' }}>
                           {ing.name}
+                        </span>
+                        <span className="mono" style={{
+                          color: 'var(--fg-3)', marginLeft: 6, fontSize: 11,
+                        }}>
+                          {ing.sku}
                         </span>
                       </td>
                       <td className="mono" style={{
@@ -778,8 +785,8 @@ export default function FeedDashboardPage() {
                       )}
                     </td>
                     <td style={{ padding: '6px 10px' }}>
-                      <div className="mono" style={{ fontWeight: 500 }}>{row.sku}</div>
-                      <div style={{ fontSize: 11, color: 'var(--fg-3)' }}>{row.name}</div>
+                      <div style={{ fontWeight: 500 }}>{row.name}</div>
+                      <div className="mono" style={{ fontSize: 11, color: 'var(--fg-3)' }}>{row.sku}</div>
                     </td>
                     <td className="mono" style={{ padding: '6px 10px', textAlign: 'right', fontWeight: 600 }}>
                       {fmtNum(row.qty, 1)}
@@ -818,8 +825,8 @@ export default function FeedDashboardPage() {
                       <span className="mono" style={{ fontSize: 11, color: 'var(--fg-3)' }}>{row.doc}</span>
                     </td>
                     <td style={{ padding: '6px 10px' }}>
-                      <div className="mono" style={{ fontWeight: 500 }}>{row.sku}</div>
-                      <div style={{ fontSize: 11, color: 'var(--fg-3)' }}>{row.name}</div>
+                      <div style={{ fontWeight: 500 }}>{row.name}</div>
+                      <div className="mono" style={{ fontSize: 11, color: 'var(--fg-3)' }}>{row.sku}</div>
                     </td>
                     <td className="mono" style={{ padding: '6px 10px', textAlign: 'right', fontWeight: 600 }}>
                       {fmtNum(row.qty, 1)}
@@ -862,8 +869,8 @@ export default function FeedDashboardPage() {
                   <tr key={p.doc} style={{ borderBottom: '1px solid var(--border)' }}>
                     <td className="mono" style={{ padding: '6px 10px', fontSize: 11, color: 'var(--fg-3)' }}>{p.doc}</td>
                     <td style={{ padding: '6px 10px' }}>
-                      <div className="mono" style={{ fontWeight: 500 }}>{p.recipe_code}</div>
-                      <div style={{ fontSize: 11, color: 'var(--fg-3)' }}>{p.recipe_name}</div>
+                      <div style={{ fontWeight: 500 }}>{p.recipe_name}</div>
+                      <div className="mono" style={{ fontSize: 11, color: 'var(--fg-3)' }}>{p.recipe_code}</div>
                     </td>
                     <td className="mono" style={{ padding: '6px 10px', textAlign: 'right', fontWeight: 600 }}>
                       {fmtNum(p.qty_kg, 0)} кг
@@ -910,9 +917,13 @@ export default function FeedDashboardPage() {
                   return (
                     <tr key={s.sku} style={{ borderBottom: '1px solid var(--border)' }}>
                       <td style={{ padding: '6px 10px' }}>
-                        <span className="mono" style={{ fontWeight: 500 }}>{s.sku}</span>
-                        <span style={{ marginLeft: 6, fontSize: 11, color: 'var(--fg-3)' }}>
+                        <span style={{ fontWeight: 500, color: 'var(--fg-1)' }}>
                           {s.name}
+                        </span>
+                        <span className="mono" style={{
+                          marginLeft: 6, fontSize: 11, color: 'var(--fg-3)',
+                        }}>
+                          {s.sku}
                         </span>
                       </td>
                       <td className="mono" style={{ padding: '6px 10px', textAlign: 'right', color: 'var(--success)' }}>
