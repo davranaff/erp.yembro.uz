@@ -21,15 +21,15 @@
  * можно зайти.
  */
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import Script from 'next/script';
 import { useQueryClient } from '@tanstack/react-query';
 
 import { ApiError, apiFetch } from '@/lib/api';
 import { ME_QUERY_KEY } from '@/hooks/useUser';
 import { setTokens, writeOrgCookie } from '@/lib/tokens';
 import type { User } from '@/types/auth';
+import '@/types/telegram';
 
 interface MiniAppAuthLinked {
   linked: true;
@@ -45,119 +45,108 @@ interface MiniAppAuthUnlinked {
 
 type MiniAppAuthResponse = MiniAppAuthLinked | MiniAppAuthUnlinked;
 
-interface TelegramWebAppLite {
-  initData: string;
-  version?: string;
-  isFullscreen?: boolean;
-  ready?: () => void;
-  expand?: () => void;
-  /** Bot API 8.0+. На desktop / старых клиентах метода нет — оборачиваем в try/catch. */
-  requestFullscreen?: () => void;
-  /** Bot API 8.0+. true → iOS swipe-down не свернёт WebApp при скролле. */
-  disableVerticalSwipes?: () => void;
-  isVersionAtLeast?: (v: string) => boolean;
-}
-
-declare global {
-  interface Window {
-    Telegram?: { WebApp?: TelegramWebAppLite };
-  }
-}
-
 export default function TgMiniAppPage() {
   const router = useRouter();
   const queryClient = useQueryClient();
-  const [sdkReady, setSdkReady] = useState(false);
   // Защита от повторного auth при HMR/StrictMode dev double-invoke.
   const startedRef = useRef(false);
 
   useEffect(() => {
-    if (!sdkReady || startedRef.current) return;
-    startedRef.current = true;
+    if (startedRef.current) return;
 
-    const tg = typeof window !== 'undefined' ? window.Telegram?.WebApp : undefined;
-    const initData = tg?.initData ?? '';
+    // SDK грузится в root layout (afterInteractive). К моменту mount /tg
+    // он может быть ещё не готов — ждём появления WebApp до 5с.
+    let cancelled = false;
+    let tries = 0;
 
-    // Если страница открыта вне Telegram (например DevTools) — initData пуст.
-    // Отправлять нечего, сразу на лендинг.
-    if (!initData) {
-      router.replace('/');
-      return;
-    }
-
-    tg?.ready?.();
-    tg?.expand?.();
-
-    // Bot API 8.0+: переключаем в full-screen на телефоне. На desktop /
-    // старых клиентах метода может не быть (или он бросит "UNSUPPORTED")
-    // — игнорируем, expand() уже даст max-height в обычном режиме.
-    try {
-      if (tg?.isVersionAtLeast?.('8.0') && !tg.isFullscreen) {
-        tg.requestFullscreen?.();
-        // В full-screen iOS swipe-down закроет WebApp на любом скролле —
-        // отключаем вертикальный жест, чтобы юзер не сворачивал нас
-        // случайно при прокрутке таблиц.
-        tg.disableVerticalSwipes?.();
-      }
-    } catch {
-      // Telegram <8.0 / desktop — silent. UI остаётся в expand-режиме.
-    }
-
-    (async () => {
-      try {
-        const res = await apiFetch<MiniAppAuthResponse>('/api/tg/miniapp/auth/', {
-          method: 'POST',
-          body: { init_data: initData },
-          skipAuth: true,
-          skipOrg: true,
-        });
-
-        if (!res.linked) {
-          router.replace('/');
+    const start = () => {
+      if (cancelled || startedRef.current) return;
+      const tg = window.Telegram?.WebApp;
+      if (!tg) {
+        tries += 1;
+        if (tries < 50) {
+          setTimeout(start, 100);
           return;
         }
-
-        setTokens(res.access, res.refresh);
-        writeOrgCookie(res.preferred_org);
-        queryClient.setQueryData(ME_QUERY_KEY, res.user);
-        router.replace('/dashboard');
-      } catch (err) {
-        // 401 (битая подпись / просрочено) и любые сетевые — на лендинг.
-        // Логируем чтобы при отладке Mini App видеть в DevTools.
-        // eslint-disable-next-line no-console
-        console.error('Mini App auth failed', err instanceof ApiError ? err.status : err);
+        // SDK не приехал — мы не в Telegram, идём на лендинг.
         router.replace('/');
+        return;
       }
-    })();
-  }, [sdkReady, router, queryClient]);
+      startedRef.current = true;
+
+      const initData = tg.initData ?? '';
+      if (!initData) {
+        router.replace('/');
+        return;
+      }
+
+      tg.ready?.();
+      tg.expand?.();
+
+      // Bot API 8.0+: переключаем в full-screen на телефоне. На desktop /
+      // старых клиентах метода может не быть — игнорируем, expand() даёт
+      // max-height в обычном режиме.
+      try {
+        if (tg.isVersionAtLeast?.('8.0') && !tg.isFullscreen) {
+          tg.requestFullscreen?.();
+          tg.disableVerticalSwipes?.();
+        }
+      } catch {
+        /* Telegram <8.0 / desktop — silent. */
+      }
+
+      void (async () => {
+        try {
+          const res = await apiFetch<MiniAppAuthResponse>('/api/tg/miniapp/auth/', {
+            method: 'POST',
+            body: { init_data: initData },
+            skipAuth: true,
+            skipOrg: true,
+          });
+
+          if (!res.linked) {
+            router.replace('/');
+            return;
+          }
+
+          setTokens(res.access, res.refresh);
+          writeOrgCookie(res.preferred_org);
+          queryClient.setQueryData(ME_QUERY_KEY, res.user);
+          router.replace('/dashboard');
+        } catch (err) {
+          // eslint-disable-next-line no-console
+          console.error('Mini App auth failed', err instanceof ApiError ? err.status : err);
+          router.replace('/');
+        }
+      })();
+    };
+
+    start();
+    return () => {
+      cancelled = true;
+    };
+  }, [router, queryClient]);
 
   return (
-    <>
-      <Script
-        src="https://telegram.org/js/telegram-web-app.js"
-        strategy="afterInteractive"
-        onLoad={() => setSdkReady(true)}
-        onError={() => router.replace('/')}
-      />
-      <div
-        style={{
-          // 100dvh + safe-area: в full-screen Mini App статус-бар iOS / home
-          // indicator не налезают на текст.
-          minHeight: '100dvh',
-          display: 'grid',
-          placeItems: 'center',
-          background: 'var(--bg)',
-          color: 'var(--fg-3)',
-          fontSize: 13,
-          paddingTop: 'max(24px, env(safe-area-inset-top))',
-          paddingBottom: 'max(24px, env(safe-area-inset-bottom))',
-          paddingLeft: 'max(24px, env(safe-area-inset-left))',
-          paddingRight: 'max(24px, env(safe-area-inset-right))',
-          textAlign: 'center',
-        }}
-      >
-        Авторизация через Telegram…
-      </div>
-    </>
+    <div
+      style={{
+        // 100dvh + safe-area: в full-screen Mini App Telegram-pill'ы и
+        // home indicator не налезают на текст. --tg-safe-* проставляются
+        // TgFrameSync из root layout.
+        minHeight: '100dvh',
+        display: 'grid',
+        placeItems: 'center',
+        background: 'var(--bg)',
+        color: 'var(--fg-3)',
+        fontSize: 13,
+        paddingTop: 'max(24px, env(safe-area-inset-top), var(--tg-safe-top, 0px))',
+        paddingBottom: 'max(24px, env(safe-area-inset-bottom), var(--tg-safe-bottom, 0px))',
+        paddingLeft: 'max(24px, env(safe-area-inset-left), var(--tg-safe-left, 0px))',
+        paddingRight: 'max(24px, env(safe-area-inset-right), var(--tg-safe-right, 0px))',
+        textAlign: 'center',
+      }}
+    >
+      Авторизация через Telegram…
+    </div>
   );
 }
