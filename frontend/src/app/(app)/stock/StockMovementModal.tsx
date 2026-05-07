@@ -55,7 +55,11 @@ export default function StockMovementModal({ onClose, onSaved, onSwitchToFeedRaw
   const { data: modules } = useModules();
   const hasLevel = useHasLevel();
   const permissions = usePermissions();
-  const isOrgAdmin = hasLevel('admin', 'admin') || hasLevel('stock', 'admin');
+  // Только настоящий org-admin (модуль 'admin') видит все модули.
+  // stock:admin — это «полный доступ к модулю склад в своих модулях»,
+  // НЕ кросс-модульный байпас. Раньше я по ошибке включал его в обход
+  // фильтра — head feed-модуля со stock:admin видел склады vet/slaughter.
+  const isOrgAdmin = hasLevel('admin', 'admin');
 
   // ID-сет модулей где у юзера есть rw. null = org-admin (видит всё).
   // Без этого head feed мог в этой модалке корректировать остатки vet
