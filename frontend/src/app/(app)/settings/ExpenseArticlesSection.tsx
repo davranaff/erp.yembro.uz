@@ -55,7 +55,7 @@ export default function ExpenseArticlesSection() {
 
   const handleDelete = (a: ExpenseArticle) => {
     if (!window.confirm(
-      `Удалить статью «${a.code} · ${a.name}»?\n` +
+      `Удалить категорию «${a.code} · ${a.name}»?\n` +
       `Если она использовалась в платежах — будет ошибка PROTECT.\n` +
       `Лучше деактивировать (is_active=false).`,
     )) return;
@@ -65,12 +65,12 @@ export default function ExpenseArticlesSection() {
   return (
     <>
       <div style={{ marginBottom: 16 }}>
-        <h2 style={{ margin: 0, fontSize: 20 }}>Статьи расходов/доходов</h2>
+        <h2 style={{ margin: 0, fontSize: 20 }}>Категории расходов и доходов</h2>
         <div style={{ fontSize: 13, color: 'var(--fg-3)', marginTop: 4 }}>
-          Аналитический справочник поверх плана счетов. Используется в OPEX-модалке
-          и в отчётах. Один субсчёт ГК (например 26.01) можно детализировать в статьях
-          «Газ», «Электричество», «Вода» — это даст разрез аналитики, не раздувая
-          план счетов.
+          Управление категориями для формы прихода/расхода в кассе.
+          Каждая категория привязана к бухгалтерскому субсчёту — оператор
+          в кассе видит только название («Обед», «Аренда»), а в отчётности
+          расходы корректно группируются по плану счетов.
         </div>
       </div>
 
@@ -100,7 +100,7 @@ export default function ExpenseArticlesSection() {
               className="btn btn-primary btn-sm"
               onClick={() => { setEditing(null); setModalOpen(true); }}
             >
-              <Icon name="plus" size={14} /> Новая статья
+              <Icon name="plus" size={14} /> Новая категория
             </button>
           </div>
         )}
@@ -265,7 +265,7 @@ function ExpenseArticleModal({ initial, existing, onClose }: ModalProps) {
 
   return (
     <Modal
-      title={isEdit ? `Статья · ${initial?.code}` : 'Новая статья'}
+      title={isEdit ? `Категория · ${initial?.code}` : 'Новая категория'}
       onClose={onClose}
       footer={
         <>
@@ -322,7 +322,7 @@ function ExpenseArticleModal({ initial, existing, onClose }: ModalProps) {
             ))}
           </select>
           <div style={{ fontSize: 11, color: 'var(--fg-3)', marginTop: 4 }}>
-            При выборе этой статьи в OPEX-модалке субсчёт подставится автоматически.
+            При выборе этой категории в форме прихода/расхода субсчёт подставится автоматически.
           </div>
         </div>
 
@@ -337,7 +337,7 @@ function ExpenseArticleModal({ initial, existing, onClose }: ModalProps) {
         </div>
 
         <div className="field">
-          <label>Родительская статья (опц.)</label>
+          <label>Родительская категория (опц.)</label>
           <select className="input" value={parentId} onChange={(e) => setParentId(e.target.value)}>
             <option value="">— нет —</option>
             {parentOptions.map((p) => (

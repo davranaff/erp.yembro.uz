@@ -222,11 +222,23 @@ export default function OpexModal({ preselect, onClose }: Props) {
   const submitNewArticle = async () => {
     const name = newArticleName.trim();
     if (!name) {
-      alert('Введите название статьи (например «Обед»).');
+      alert('Введите название категории (например «Обед»).');
       return;
     }
-    if (!newArticleSubId) {
-      alert('Выберите субсчёт ГК — куда списывать.');
+    // Если оператор не выбрал субсчёт (или это не админ — у него вообще
+    // нет дропдауна) — auto-fallback на «Прочие». Так оператор не страдает
+    // бухгалтерией: создал «Обед» → попало в 91.02. Админ потом может
+    // переразнести на правильный субсчёт через /settings → Категории.
+    let subId = newArticleSubId;
+    if (!subId && subaccounts) {
+      const fallbackCode = direction === 'out' ? '91.02' : '91.01';
+      const fallback = subaccounts.find((s) => s.code === fallbackCode);
+      if (fallback) {
+        subId = fallback.id;
+      }
+    }
+    if (!subId) {
+      alert('Не удалось определить субсчёт по умолчанию. Попросите админа.');
       return;
     }
     // code: автогенерим из name (cyrillic→translit базовый, обрезаем до 16).
@@ -235,27 +247,24 @@ export default function OpexModal({ preselect, onClose }: Props) {
       .toUpperCase()
       .replace(/[^A-ZА-ЯЁ0-9]+/gu, '_')
       .replace(/^_+|_+$/g, '')
-      .slice(0, 16) || 'STATYA';
+      .slice(0, 16) || 'KATEGORIYA';
     const code = `${codeBase}_${Date.now().toString().slice(-4)}`;
     try {
       const created = await createArticle.mutateAsync({
         code,
         name,
         kind: direction === 'out' ? 'expense' : 'income',
-        default_subaccount: newArticleSubId,
+        default_subaccount: subId,
         default_module: moduleId || null,
       });
-      // После создания react-query инвалидирует кеш, но articles до
-      // следующего render'а не обновится — выбираем новую статью по id
-      // напрямую из result.
       if (created?.id) {
         setArticleId(created.id);
-        setContraSubId(newArticleSubId);
+        setContraSubId(subId);
       }
       setCreatingArticle(false);
     } catch (e) {
       const msg = e instanceof ApiError ? (e.message || 'Ошибка') : 'Ошибка';
-      alert(`Не удалось создать статью: ${msg}`);
+      alert(`Не удалось создать категорию: ${msg}`);
     }
   };
 
@@ -457,7 +466,7 @@ export default function OpexModal({ preselect, onClose }: Props) {
       </div>
 
       <div className="field">
-        <label>Статья *</label>
+        <label>Категория *</label>
         {!creatingArticle ? (
           <>
             <select
@@ -473,7 +482,7 @@ export default function OpexModal({ preselect, onClose }: Props) {
             >
               <option value="">— выберите —</option>
               <option value="__create__" style={{ fontWeight: 600, color: 'var(--brand-orange)' }}>
-                ＋ Создать новую статью…
+                ＋ Создать новую категорию…
               </option>
               {articleOptions.length > 0 && (
                 <option disabled>──────────</option>
@@ -483,12 +492,16 @@ export default function OpexModal({ preselect, onClose }: Props) {
               ))}
             </select>
             <span className="hint">
-              Например «Электричество», «Зарплата технолога», «Обед». Субсчёт подставится сам.
-              Если статьи нет в списке — выберите «＋ Создать новую статью…».
+              Например «Обед», «Канцтовары», «Премия», «Бензин».
+              Полный CRUD категорий — в /settings → «Категории расходов».
             </span>
           </>
         ) : (
-          // ─── Inline-форма создания статьи ──────────────────────────
+          // ─── Inline-форма создания категории ──────────────────────
+          // Оператор видит только название. GL-субсчёт назначается
+          // автоматически («Прочие расходы» 91.02 для расходов,
+          // «Прочие доходы» 91.01 для доходов). Бухгалтер позже может
+          // переразнести в /settings → Категории если нужна точность.
           <div style={{
             padding: 12, marginTop: 4,
             background: 'var(--bg-soft)',
@@ -500,7 +513,7 @@ export default function OpexModal({ preselect, onClose }: Props) {
               textTransform: 'uppercase', letterSpacing: '.04em',
               marginBottom: 8,
             }}>
-              Новая статья {direction === 'out' ? 'расхода' : 'дохода'}
+              Новая категория {direction === 'out' ? 'расхода' : 'дохода'}
             </div>
             <div className="field" style={{ marginBottom: 8 }}>
               <label style={{ fontSize: 12 }}>Название *</label>
@@ -512,26 +525,35 @@ export default function OpexModal({ preselect, onClose }: Props) {
                 placeholder="Обед / Канцтовары / Премия"
               />
             </div>
-            <div className="field" style={{ marginBottom: 8 }}>
-              <label style={{ fontSize: 12 }}>
-                Куда списать (бухгалтерский субсчёт) *
-              </label>
-              <select
-                className="input"
-                value={newArticleSubId}
-                onChange={(e) => setNewArticleSubId(e.target.value)}
-              >
-                <option value="">— выберите —</option>
-                {contraOptions.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.name}
-                    {s.module_code ? ` · ${s.module_code}` : ''}
-                  </option>
-                ))}
-              </select>
-              <span className="hint">
-                Один раз настроите — потом всегда подставится автоматом
-              </span>
+            {isOrgAdmin && (
+              <div className="field" style={{ marginBottom: 8 }}>
+                <label style={{ fontSize: 12 }}>
+                  Бухгалтерский субсчёт{' '}
+                  <span style={{ color: 'var(--fg-3)', fontWeight: 400 }}>
+                    (для админа · можно пропустить)
+                  </span>
+                </label>
+                <select
+                  className="input"
+                  value={newArticleSubId}
+                  onChange={(e) => setNewArticleSubId(e.target.value)}
+                >
+                  <option value="">— по умолчанию (Прочие) —</option>
+                  {contraOptions.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.name}
+                      {s.module_code ? ` · ${s.module_code}` : ''}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+            <div style={{ fontSize: 11, color: 'var(--fg-3)', marginBottom: 8 }}>
+              {isOrgAdmin
+                ? 'Если не выберете субсчёт — будет привязка к «Прочие расходы/доходы».'
+                : 'Категория попадёт в «Прочие расходы» в отчётности. Если нужна '
+                  + 'точная бухгалтерская группировка — попросите админа настроить '
+                  + 'в /settings → Категории.'}
             </div>
             <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
               <button
@@ -546,7 +568,7 @@ export default function OpexModal({ preselect, onClose }: Props) {
                 type="button"
                 className="btn btn-primary btn-sm"
                 onClick={submitNewArticle}
-                disabled={createArticle.isPending || !newArticleName.trim() || !newArticleSubId}
+                disabled={createArticle.isPending || !newArticleName.trim()}
               >
                 {createArticle.isPending ? 'Создание…' : 'Создать и выбрать'}
               </button>
@@ -557,7 +579,9 @@ export default function OpexModal({ preselect, onClose }: Props) {
 
       {/* Подтверждение что субсчёт подставился из статьи. Не дропдаун
           с кодами — просто строка для прозрачности. */}
-      {articleId && selectedContra && !showAdvanced && (
+      {/* Подтверждение subaccount — теперь видно ТОЛЬКО админу. Оператору
+          бухгалтерская подкладка не нужна и только запутывает. */}
+      {isOrgAdmin && articleId && selectedContra && !showAdvanced && (
         <div
           className="field"
           style={{
@@ -583,11 +607,9 @@ export default function OpexModal({ preselect, onClose }: Props) {
         </div>
       )}
 
-      {/* Бухгалтерская секция: явный выбор субсчёта по плану счетов.
-          Скрыта когда выбрана статья. Раскрывается ссылкой
-          «Указать субсчёт вручную (для бухгалтерии)» — для редкого случая
-          когда нужна корректировка. Всегда доступна если статья не выбрана. */}
-      {(showAdvanced || (!articleId && !creatingArticle)) && (
+      {/* Ручной выбор субсчёта — только для админа. Оператору эта секция
+          не показывается ВООБЩЕ: чисто бухгалтерский флоу. */}
+      {isOrgAdmin && (showAdvanced || (!articleId && !creatingArticle)) && (
         <div className="field">
           <label>
             Субсчёт ГК *
@@ -625,13 +647,14 @@ export default function OpexModal({ preselect, onClose }: Props) {
             ))}
           </select>
           <span className="hint">
-            Бухгалтерский план счетов. Если не уверены — лучше выбрать «Статья» выше.
+            Бухгалтерский план счетов. Если не уверены — выберите «Категория» выше.
           </span>
         </div>
       )}
 
-      {/* Ссылка-toggle для бухгалтера если выбрана статья и не открыто. */}
-      {articleId && !showAdvanced && (
+      {/* Ссылка «указать субсчёт вручную» — только админу. Оператор её
+          не видит, ему достаточно «Категория». */}
+      {isOrgAdmin && articleId && !showAdvanced && (
         <div style={{ marginBottom: 8 }}>
           <button
             type="button"
