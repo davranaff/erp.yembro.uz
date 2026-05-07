@@ -22,19 +22,22 @@ import type { ModuleLevel, SellerDeviceToken } from '@/types/auth';
 /**
  * UI для управления Bearer-токенами продавцов (`SellerDeviceToken`).
  *
- * Сами токены org-scoped, не привязаны к конкретному модулю — один токен
- * позволяет продавать любые public-сканируемые товары (vet drugs, vet
- * accessories, feed bags). Поэтому компонент общий, а конкретная страница
- * (vet/seller-tokens, feed/seller-tokens) задаёт только `permissionModule`
- * — какой модульный rw нужен чтобы создавать/отзывать токены.
+ * Сами токены org-scoped, не привязаны к модулю — один токен продаёт
+ * всё подряд (vet drugs, vet accessories, feed bags). Раньше было две
+ * страницы (/vet/seller-tokens и /feed/seller-tokens) — это создавало
+ * иллюзию что токены модульные. Свернули в одну.
+ *
+ * canEdit — rw на ЛЮБОЙ из перечисленных модулей. По дефолту: vet или
+ * feed (тот кто продаёт что-то на public-сканере должен мочь рулить
+ * токенами).
  */
 export default function SellerTokensPanel({
-  permissionModule,
+  permissionModules = ['vet', 'feed'],
   title = 'Токены продавцов',
   subtitle,
 }: {
-  /** Какой модуль обеспечивает rw на CRUD токенов (vet | feed). */
-  permissionModule: string;
+  /** Любой rw на этих модулях разрешает CRUD токенов. */
+  permissionModules?: string[];
   title?: string;
   subtitle?: React.ReactNode;
 }) {
@@ -47,7 +50,9 @@ export default function SellerTokensPanel({
   const { data: people } = usePeople({ is_active: 'true' });
 
   const hasLevel = useHasLevel();
-  const canEdit = hasLevel(permissionModule, 'rw' as ModuleLevel);
+  const canEdit = permissionModules.some(
+    (m) => hasLevel(m, 'rw' as ModuleLevel),
+  );
 
   const [createOpen, setCreateOpen] = useState(false);
   const [user, setUser] = useState('');
