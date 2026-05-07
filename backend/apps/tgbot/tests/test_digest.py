@@ -61,6 +61,22 @@ def test_digest_command_sends_preview(tg_link, fake_send):
     assert "Сводка за" in text
 
 
+def test_digest_command_uses_today_not_yesterday(tg_link, fake_send):
+    """
+    Регрессия: интерактивный /digest должен возвращать сводку за СЕГОДНЯ,
+    а не за вчера. Авторассылка 08:00 продолжает считать за вчера —
+    это покрывает test_owner_digest_task_*.
+    """
+    from django.utils import timezone
+
+    dispatch_message(_msg(tg_link.chat_id, "/digest"))
+    text = fake_send.calls[0][1]
+    today = timezone.localdate().isoformat()
+    yesterday = (timezone.localdate() - timedelta(days=1)).isoformat()
+    assert today in text, f"expected {today} in digest, got: {text[:200]}"
+    assert yesterday not in text, "yesterday's date leaked into interactive /digest"
+
+
 def test_digest_off_disables_subscription(tg_link, fake_send):
     assert tg_link.digest_enabled is True
     dispatch_message(_msg(tg_link.chat_id, "/digest_off"))
