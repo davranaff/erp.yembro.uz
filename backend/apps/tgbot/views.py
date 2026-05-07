@@ -132,8 +132,11 @@ class TgCounterpartyLinkView(OrganizationContextMixin, APIView):
 class SendDebtReminderView(OrganizationContextMixin, APIView):
     """
     POST /api/tg/send-debt-reminder/
-    Body: {"sale_order_id": "<uuid>"}
-    Ручная отправка напоминания должнику.
+    Body: {"sale_order_id": "<uuid>", "text": "<override?>"}
+
+    Ручная отправка напоминания должнику. Если в body есть text — используется
+    как есть (оператор отредактировал в превью-модалке), иначе берётся
+    стандартный шаблон fmt_debt_reminder_uz.
     """
     permission_classes = [IsAuthenticated]
 
@@ -144,5 +147,54 @@ class SendDebtReminderView(OrganizationContextMixin, APIView):
                 {"sale_order_id": "Обязательное поле."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
-        result = send_debt_reminder_task.delay(str(sale_order_id))
+        custom_text = (request.data.get("text") or "").strip() or None
+        result = send_debt_reminder_task.delay(str(sale_order_id), custom_text)
         return Response({"task_id": result.id, "queued": True})
+
+
+class PreviewDebtReminderView(OrganizationContextMixin, APIView):
+    """
+    GET /api/tg/preview-debt-reminder/?sale_order_id=<uuid>
+
+    Возвращает рендеренный текст напоминания (без отправки) — для
+    превью-модалки в UI. Оператор может отредактировать и потом
+    отправить через send-debt-reminder с body.text.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        from apps.sales.models import SaleOrder
+        from .models import TgLink
+        from .notifications import fmt_debt_reminder_uz
+
+        sale_order_id = request.query_params.get("sale_order_id")
+        if not sale_order_id:
+            return Response(
+                {"sale_order_id": "Обязательное поле."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        try:
+            order = SaleOrder.objects.select_related(
+                "customer", "organization",
+            ).get(id=sale_order_id, organization=request.organization)
+        except SaleOrder.DoesNotExist:
+            return Response(
+                {"detail": "Продажа не найдена."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        # Проверяем что у клиента подключён TG — иначе превью бессмысленно.
+        link = TgLink.objects.filter(
+            organization=order.organization,
+            counterparty=order.customer,
+            is_active=True,
+        ).first()
+
+        text = fmt_debt_reminder_uz(order, order.customer)
+        return Response({
+            "text": text,
+            "has_tg_link": link is not None,
+            "tg_username": link.tg_username if link else None,
+            "customer_name": order.customer.name,
+            "doc_number": order.doc_number,
+        })

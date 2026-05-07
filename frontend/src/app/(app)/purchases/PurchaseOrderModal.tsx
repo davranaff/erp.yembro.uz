@@ -306,7 +306,7 @@ export default function PurchaseOrderModal({ initial, onClose }: Props) {
                 >
                   <option value="">—</option>
                   {nomenclature?.map((n) => (
-                    <option key={n.id} value={n.id}>{n.sku} · {n.name}</option>
+                    <option key={n.id} value={n.id}>{n.name}</option>
                   ))}
                 </select>
               </div>

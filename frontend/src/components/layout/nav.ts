@@ -74,8 +74,11 @@ export const NAV: NavEntry[] = [
     aliases: ['усушка', 'shrinkage', 'потери', 'испарение'] },
   { key: 'vet', label: 'Вет. аптека', icon: 'pharma', href: '/vet', module: 'vet',
     aliases: ['ветеринар', 'препараты', 'лекарства'] },
-  { key: 'vet-tokens', label: 'Токены продавцов', icon: 'users', href: '/vet/seller-tokens', module: 'vet',
-    aliases: ['токен', 'api'] },
+  // Токены org-scoped, один работает и для vet, и для feed —
+  // поэтому один пункт без `module`-гейта (видимость через canEdit
+  // в самой странице: rw на vet ИЛИ feed).
+  { key: 'seller-tokens', label: 'Токены продавцов', icon: 'users', href: '/vet/seller-tokens',
+    aliases: ['токен', 'api', 'продавец', 'scan'] },
 
   { group: 'Учёт и отчёты' },
   { key: 'stock',     label: 'Склад и движения', icon: 'box',   href: '/stock',           module: 'stock',

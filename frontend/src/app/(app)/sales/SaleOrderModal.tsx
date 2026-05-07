@@ -640,7 +640,7 @@ export default function SaleOrderModal({ initial, preselect, onClose }: Props) {
                             <option value="">— выберите аксессуар —</option>
                             {sellable.map((a) => (
                               <option key={a.id} value={a.id}>
-                                {a.nomenclature_sku} · {a.nomenclature_name} ·
+                                {a.nomenclature_name} ·
                                 {' '}остаток {parseFloat(a.current_quantity).toLocaleString('ru-RU')} {a.unit_code ?? ''}
                                 {' '}· {parseFloat(a.sale_price_uzs).toLocaleString('ru-RU', { maximumFractionDigits: 0 })} сум/шт
                               </option>

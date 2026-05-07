@@ -5,9 +5,11 @@ import { useEffect, useMemo, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import Modal from '@/components/ui/Modal';
 import { useSubaccounts } from '@/hooks/useAccounts';
+import { useModules } from '@/hooks/useModules';
+import { useHasLevel, usePermissions } from '@/hooks/usePermissions';
 import { ApiError } from '@/lib/api';
 import { useAllocatePayment, usePostPayment, paymentsCrud } from '@/hooks/usePayments';
-import type { PurchaseOrder } from '@/types/auth';
+import { LEVEL_ORDER, type ModuleLevel, type PurchaseOrder } from '@/types/auth';
 
 interface Props {
   order: PurchaseOrder;
@@ -23,7 +25,26 @@ function fmtUzs(v: string | null | undefined): string {
 
 export default function PayPurchaseModal({ order, onClose }: Props) {
   const { data: subaccounts } = useSubaccounts();
+  const { data: modules } = useModules();
+  const hasLevel = useHasLevel();
+  const permissions = usePermissions();
+  const isOrgAdmin = hasLevel('admin', 'admin') || hasLevel('ledger', 'admin');
   const qc = useQueryClient();
+
+  // ID-сет модулей где у юзера ≥ rw. Если null — org-admin (видит всё).
+  // Без этого head закупов мог зачислить vet-платёж на feed-кассу.
+  const accessibleModuleIds = useMemo<Set<string> | null>(() => {
+    if (isOrgAdmin) return null;
+    if (!modules) return new Set();
+    const allowedCodes = new Set(
+      Object.entries(permissions)
+        .filter(([, lvl]) => LEVEL_ORDER[lvl as ModuleLevel] >= LEVEL_ORDER.rw)
+        .map(([code]) => code),
+    );
+    return new Set(
+      modules.filter((m) => allowedCodes.has(m.code)).map((m) => m.id),
+    );
+  }, [isOrgAdmin, modules, permissions]);
 
   const create = paymentsCrud.useCreate();
   const post = usePostPayment();
@@ -37,15 +58,21 @@ export default function PayPurchaseModal({ order, onClose }: Props) {
   const [cashSubId, setCashSubId] = useState('');
   const [notes, setNotes] = useState('');
 
-  // Кассы для выбора: только 50.NN/51.NN, и сужаем по модулю закупа
-  // (vet-закуп → не показываем feed-кассу, чтобы платёж не попал в чужой
-  // котёл). Кассы без модуля («общие» 50.01/51.01) показываем всегда.
+  // Кассы для выбора: только 50.NN/51.NN, двойной фильтр —
+  //   1) по модулям где у юзера rw (head feed не видит vet-кассу)
+  //   2) по модулю закупа (если задан, тогда только его модуль)
+  // org-admin / ledger:admin видят все, как раньше.
   const filteredSubs = useMemo(() => {
     if (!subaccounts) return [];
     return subaccounts
       .filter((s) => s.code.startsWith('50.') || s.code.startsWith('51.'))
+      .filter((s) => {
+        if (accessibleModuleIds === null) return true;
+        if (!s.module) return false;
+        return accessibleModuleIds.has(s.module);
+      })
       .filter((s) => !order.module || !s.module || s.module === order.module);
-  }, [subaccounts, order.module]);
+  }, [subaccounts, order.module, accessibleModuleIds]);
 
   // Авто-выбор: при смене канала/субсчета подхватываем первую подходящую
   // кассу (приоритет — модульная, общая 50.01/51.01 как fallback).
@@ -216,7 +243,7 @@ export default function PayPurchaseModal({ order, onClose }: Props) {
           >
             <option value="">— выберите —</option>
             {filteredSubs.map((s) => (
-              <option key={s.id} value={s.id}>{s.code} · {s.name}</option>
+              <option key={s.id} value={s.id}>{s.name}</option>
             ))}
           </select>
           {!filteredSubs.length && (

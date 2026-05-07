@@ -52,15 +52,23 @@ export function clearSellerToken() {
 
 
 /**
- * Анонимно: данные лота/аксессуара по barcode (read-only).
- * Backend ищет в обоих местах и отдаёт discriminated union с `source_kind`.
+ * Данные лота/аксессуара/feed-партии по barcode (read-only).
+ *
+ * Endpoint позволяет анонимный доступ, но если в localStorage есть
+ * seller-токен — отправляем Bearer. Тогда backend добавляет приватные
+ * поля для продавца (себестоимость, рекомендуемая цена). Без токена —
+ * публичный минимум.
  */
 export async function fetchPublicLot(
   barcode: string,
 ): Promise<ScanResult | null> {
+  const tok = getSellerToken();
   const res = await fetch(
     `${API_URL}/api/vet/public/scan/${encodeURIComponent(barcode)}/`,
-    { method: 'GET' },
+    {
+      method: 'GET',
+      headers: tok ? { Authorization: `Bearer ${tok}` } : {},
+    },
   );
   if (res.status === 404) return null;
   if (!res.ok) {

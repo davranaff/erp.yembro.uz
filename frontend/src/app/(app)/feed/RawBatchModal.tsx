@@ -340,8 +340,8 @@ export default function RawBatchModal({ initial, prefill, onClose, onPickStockMo
                   <span style={{ minWidth: 90, color: 'var(--fg-3)', fontSize: 11 }}>
                     {new Date(m.date).toLocaleDateString('ru')}
                   </span>
-                  <span className="mono" style={{ fontWeight: 500, flex: 1, minWidth: 0 }}>
-                    {m.nomenclature_sku} · {m.nomenclature_name}
+                  <span style={{ fontWeight: 500, flex: 1, minWidth: 0 }}>
+                    {m.nomenclature_name}
                   </span>
                   <span className="mono" style={{ fontWeight: 600 }}>
                     {parseFloat(m.quantity).toLocaleString('ru-RU')} кг
@@ -368,7 +368,7 @@ export default function RawBatchModal({ initial, prefill, onClose, onPickStockMo
             <option value="">—</option>
             {noms?.map((n) => (
               <option key={n.id} value={n.id}>
-                {n.sku} · {n.name}
+                {n.name}
                 {n.base_moisture_pct ? ` (базис. вл. ${n.base_moisture_pct}%)` : ''}
               </option>
             ))}

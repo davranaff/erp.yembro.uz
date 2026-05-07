@@ -158,7 +158,7 @@ export default function AccessoryFormModal({ initial, onClose }: Props) {
           <option value="">— выбрать —</option>
           {nomenclature?.map((n) => (
             <option key={n.id} value={n.id}>
-              {n.sku} · {n.name}
+              {n.name}
               {n.category_name ? ` · ${n.category_name}` : ''}
             </option>
           ))}

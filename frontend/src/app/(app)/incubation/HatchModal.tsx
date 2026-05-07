@@ -71,7 +71,7 @@ export default function HatchModal({ run, onClose }: Props) {
         <label>Номенклатура цыплят *</label>
         <select className="input" value={chickNom} onChange={(e) => setChickNom(e.target.value)}>
           <option value="">—</option>
-          {items?.map((it) => <option key={it.id} value={it.id}>{it.sku} · {it.name}</option>)}
+          {items?.map((it) => <option key={it.id} value={it.id}>{it.name}</option>)}
         </select>
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>

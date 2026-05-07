@@ -242,7 +242,7 @@ export default function DrugModal({ initial, onClose }: Props) {
             <option value="">— выберите —</option>
             {items?.map((it) => (
               <option key={it.id} value={it.id}>
-                {it.sku} · {it.name}
+                {it.name}
               </option>
             ))}
           </select>

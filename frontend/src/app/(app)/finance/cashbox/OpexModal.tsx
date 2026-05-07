@@ -74,7 +74,16 @@ export default function OpexModal({ preselect, onClose }: Props) {
   const [moduleId, setModuleId] = useState('');
   const [counterpartyId, setCounterpartyId] = useState('');
   const [notes, setNotes] = useState('');
-  const [editContra, setEditContra] = useState(false);
+  // Раскрыть «бухгалтерскую» секцию (выбор субсчёта вручную). Обычный
+  // пользователь её не видит — статья сама подставляет правильный субсчёт.
+  // Раскрытие нужно только если статьи нет, или для корректировки.
+  const [showAdvanced, setShowAdvanced] = useState(false);
+  // Inline-создание новой статьи прямо из дропдауна — кейс «у нас нет
+  // статьи "Обед", надо добавить» без ухода в /settings.
+  const [creatingArticle, setCreatingArticle] = useState(false);
+  const [newArticleName, setNewArticleName] = useState('');
+  const [newArticleSubId, setNewArticleSubId] = useState('');
+  const createArticle = expenseArticlesCrud.useCreate();
 
   // Preselect модуль по коду
   useEffect(() => {
@@ -131,7 +140,6 @@ export default function OpexModal({ preselect, onClose }: Props) {
 
   const handleArticleChange = (id: string) => {
     setArticleId(id);
-    setEditContra(false);
     if (!id) return;
     const a = articles?.find((x) => x.id === id);
     if (!a) return;
@@ -144,6 +152,70 @@ export default function OpexModal({ preselect, onClose }: Props) {
     if (a.kind === 'salary') setKind('salary');
     else if (direction === 'out') setKind('opex');
     else setKind('income');
+  };
+
+  // Дефолтный субсчёт для новой статьи: если direction=out → берём первый
+  // частый расходный (НЗП модуля если есть, иначе 91.02 «Прочие расходы»).
+  // Для income → 91.01.
+  const defaultNewArticleSub = useMemo(() => {
+    if (!subaccounts) return '';
+    if (direction === 'out') {
+      // Сначала НЗП модуля, потом «прочие расходы»
+      if (nzpCodeForModule) {
+        const s = subaccounts.find((x) => x.code === nzpCodeForModule);
+        if (s) return s.id;
+      }
+      const other = subaccounts.find((x) => x.code === '91.02');
+      return other?.id ?? '';
+    }
+    const inc = subaccounts.find((x) => x.code === '91.01');
+    return inc?.id ?? '';
+  }, [subaccounts, direction, nzpCodeForModule]);
+
+  const openCreateArticle = () => {
+    setCreatingArticle(true);
+    setNewArticleName('');
+    setNewArticleSubId(defaultNewArticleSub);
+  };
+
+  const submitNewArticle = async () => {
+    const name = newArticleName.trim();
+    if (!name) {
+      alert('Введите название статьи (например «Обед»).');
+      return;
+    }
+    if (!newArticleSubId) {
+      alert('Выберите субсчёт ГК — куда списывать.');
+      return;
+    }
+    // code: автогенерим из name (cyrillic→translit базовый, обрезаем до 16).
+    // Бекенд требует unique, добавим суффикс через timestamp если коллизия.
+    const codeBase = name
+      .toUpperCase()
+      .replace(/[^A-ZА-ЯЁ0-9]+/gu, '_')
+      .replace(/^_+|_+$/g, '')
+      .slice(0, 16) || 'STATYA';
+    const code = `${codeBase}_${Date.now().toString().slice(-4)}`;
+    try {
+      const created = await createArticle.mutateAsync({
+        code,
+        name,
+        kind: direction === 'out' ? 'expense' : 'income',
+        default_subaccount: newArticleSubId,
+        default_module: moduleId || null,
+      });
+      // После создания react-query инвалидирует кеш, но articles до
+      // следующего render'а не обновится — выбираем новую статью по id
+      // напрямую из result.
+      if (created?.id) {
+        setArticleId(created.id);
+        setContraSubId(newArticleSubId);
+      }
+      setCreatingArticle(false);
+    } catch (e) {
+      const msg = e instanceof ApiError ? (e.message || 'Ошибка') : 'Ошибка';
+      alert(`Не удалось создать статью: ${msg}`);
+    }
   };
 
   const contraOptions = useMemo(() => {
@@ -220,7 +292,6 @@ export default function OpexModal({ preselect, onClose }: Props) {
 
   const title = direction === 'out' ? 'Новый расход' : 'Новый приход';
   const selectedContra = subaccounts?.find((s) => s.id === contraSubId);
-  const contraIsAutoFromArticle = Boolean(articleId) && !editContra;
 
   return (
     <Modal
@@ -323,7 +394,7 @@ export default function OpexModal({ preselect, onClose }: Props) {
             {subaccounts
               ?.filter((s) => s.code.startsWith('50.') || s.code.startsWith('51.'))
               .map((s) => (
-                <option key={s.id} value={s.id}>{s.code} · {s.name}</option>
+                <option key={s.id} value={s.id}>{s.name}</option>
               ))}
           </select>
         )}
@@ -344,48 +415,137 @@ export default function OpexModal({ preselect, onClose }: Props) {
       </div>
 
       <div className="field">
-        <label>Статья</label>
-        <select
-          className="input"
-          value={articleId}
-          onChange={(e) => handleArticleChange(e.target.value)}
-        >
-          <option value="">— выбрать субсчёт вручную —</option>
-          {articleOptions.map((a) => (
-            <option key={a.id} value={a.id}>
-              {a.code} · {a.name}
-              {a.default_subaccount_code ? ` → ${a.default_subaccount_code}` : ''}
-            </option>
-          ))}
-        </select>
-        <span className="hint">
-          Что именно — напр. «Газ», «Электричество», «Зарплата технолога». Субсчёт подставится сам
-        </span>
+        <label>Статья *</label>
+        {!creatingArticle ? (
+          <>
+            <select
+              className="input"
+              value={articleId}
+              onChange={(e) => {
+                if (e.target.value === '__create__') {
+                  openCreateArticle();
+                } else {
+                  handleArticleChange(e.target.value);
+                }
+              }}
+            >
+              <option value="">— выберите —</option>
+              <option value="__create__" style={{ fontWeight: 600, color: 'var(--brand-orange)' }}>
+                ＋ Создать новую статью…
+              </option>
+              {articleOptions.length > 0 && (
+                <option disabled>──────────</option>
+              )}
+              {articleOptions.map((a) => (
+                <option key={a.id} value={a.id}>{a.name}</option>
+              ))}
+            </select>
+            <span className="hint">
+              Например «Электричество», «Зарплата технолога», «Обед». Субсчёт подставится сам.
+              Если статьи нет в списке — выберите «＋ Создать новую статью…».
+            </span>
+          </>
+        ) : (
+          // ─── Inline-форма создания статьи ──────────────────────────
+          <div style={{
+            padding: 12, marginTop: 4,
+            background: 'var(--bg-soft)',
+            border: '1px solid var(--brand-orange)',
+            borderRadius: 6,
+          }}>
+            <div style={{
+              fontSize: 11, fontWeight: 700, color: 'var(--brand-orange)',
+              textTransform: 'uppercase', letterSpacing: '.04em',
+              marginBottom: 8,
+            }}>
+              Новая статья {direction === 'out' ? 'расхода' : 'дохода'}
+            </div>
+            <div className="field" style={{ marginBottom: 8 }}>
+              <label style={{ fontSize: 12 }}>Название *</label>
+              <input
+                className="input"
+                autoFocus
+                value={newArticleName}
+                onChange={(e) => setNewArticleName(e.target.value)}
+                placeholder="Обед / Канцтовары / Премия"
+              />
+            </div>
+            <div className="field" style={{ marginBottom: 8 }}>
+              <label style={{ fontSize: 12 }}>
+                Куда списать (бухгалтерский субсчёт) *
+              </label>
+              <select
+                className="input"
+                value={newArticleSubId}
+                onChange={(e) => setNewArticleSubId(e.target.value)}
+              >
+                <option value="">— выберите —</option>
+                {contraOptions.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.name}
+                    {s.module_code ? ` · ${s.module_code}` : ''}
+                  </option>
+                ))}
+              </select>
+              <span className="hint">
+                Один раз настроите — потом всегда подставится автоматом
+              </span>
+            </div>
+            <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
+              <button
+                type="button"
+                className="btn btn-ghost btn-sm"
+                onClick={() => setCreatingArticle(false)}
+                disabled={createArticle.isPending}
+              >
+                Отмена
+              </button>
+              <button
+                type="button"
+                className="btn btn-primary btn-sm"
+                onClick={submitNewArticle}
+                disabled={createArticle.isPending || !newArticleName.trim() || !newArticleSubId}
+              >
+                {createArticle.isPending ? 'Создание…' : 'Создать и выбрать'}
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
-      {/* Субсчёт ГК — скрываем когда выбрана статья (показываем строкой). */}
-      {contraIsAutoFromArticle && selectedContra ? (
+      {/* Подтверждение что субсчёт подставился из статьи. Не дропдаун
+          с кодами — просто строка для прозрачности. */}
+      {articleId && selectedContra && !showAdvanced && (
         <div
           className="field"
           style={{
-            background: 'var(--bg-subtle)', borderRadius: 6, padding: '8px 10px',
+            background: 'var(--bg-soft)', borderRadius: 6, padding: '8px 10px',
             display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12,
+            fontSize: 12,
           }}
         >
           <Icon name="check" size={14} />
-          <div style={{ flex: 1, fontSize: 12 }}>
-            Субсчёт: <b>{selectedContra.code} · {selectedContra.name}</b>
-            <div className="hint">Подставлен из статьи</div>
+          <div style={{ flex: 1 }}>
+            Субсчёт: <b>{selectedContra.name}</b>
+            <span style={{ color: 'var(--fg-3)', marginLeft: 6, fontSize: 11 }}>
+              {selectedContra.code}
+            </span>
           </div>
           <button
             type="button"
             className="btn btn-sm btn-ghost"
-            onClick={() => setEditContra(true)}
+            onClick={() => setShowAdvanced(true)}
           >
             Изменить
           </button>
         </div>
-      ) : (
+      )}
+
+      {/* Бухгалтерская секция: явный выбор субсчёта по плану счетов.
+          Скрыта когда выбрана статья. Раскрывается ссылкой
+          «Указать субсчёт вручную (для бухгалтерии)» — для редкого случая
+          когда нужна корректировка. Всегда доступна если статья не выбрана. */}
+      {(showAdvanced || (!articleId && !creatingArticle)) && (
         <div className="field">
           <label>
             Субсчёт ГК *
@@ -404,7 +564,7 @@ export default function OpexModal({ preselect, onClose }: Props) {
                   onClick={() => setContraSubId(q.id)}
                   className={'btn btn-sm ' + (contraSubId === q.id ? 'btn-primary' : 'btn-ghost')}
                 >
-                  {q.label}
+                  {q.label.replace(/^\d+\.\d+\s·\s/, '')}
                 </button>
               ))}
             </div>
@@ -417,14 +577,28 @@ export default function OpexModal({ preselect, onClose }: Props) {
             <option value="">— выберите субсчёт —</option>
             {contraOptions.map((s) => (
               <option key={s.id} value={s.id}>
-                {s.code} · {s.name}
-                {s.module_code ? ` · [${s.module_code}]` : ''}
+                {s.name}
+                {s.module_code ? ` · ${s.module_code}` : ''}
               </option>
             ))}
           </select>
           <span className="hint">
-            Куда списываем по плану счетов. Используйте кнопки выше для частых вариантов
+            Бухгалтерский план счетов. Если не уверены — лучше выбрать «Статья» выше.
           </span>
+        </div>
+      )}
+
+      {/* Ссылка-toggle для бухгалтера если выбрана статья и не открыто. */}
+      {articleId && !showAdvanced && (
+        <div style={{ marginBottom: 8 }}>
+          <button
+            type="button"
+            className="btn btn-ghost btn-sm"
+            onClick={() => setShowAdvanced(true)}
+            style={{ fontSize: 11, color: 'var(--fg-3)' }}
+          >
+            ⚙ Указать субсчёт вручную (для бухгалтерии)
+          </button>
         </div>
       )}
 

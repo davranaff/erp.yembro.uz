@@ -7,6 +7,7 @@ import { useMemo, useState } from 'react';
 import BarcodeLabel from '@/components/BarcodeLabel';
 import DetailDrawer, { KV } from '@/components/DetailDrawer';
 import IncomingTransfersPanel from '@/components/IncomingTransfersPanel';
+import ScanInputPanel from '@/components/ScanInputPanel';
 import OpexButton from '@/components/OpexButton';
 import { OpenSaleFromModule } from '@/components/SellBatchButton';
 import ShrinkageWidget from '@/components/ShrinkageWidget';
@@ -1707,6 +1708,7 @@ export default function FeedPage() {
           }
           onClose={() => setSelBagLot(null)}
         >
+          <ScanInputPanel />
           {selBagLot.barcode && (
             <div style={{
               padding: 12, marginBottom: 14,

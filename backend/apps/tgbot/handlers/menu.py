@@ -25,26 +25,39 @@ from ..services.menu_scope import (
 logger = logging.getLogger(__name__)
 
 
-# Каждый кортеж: (label, callback_data, section_key для RBAC).
-# «Modullar» (бывшее Ishlab chiqarish) — единая точка входа в любой модуль
-# (касса/склады/партии модуля). «Partiyalar» убрали — всё внутри модулей.
-_ALL_SECTIONS = [
-    ("💰 Moliya",        "home:fin",     "fin"),
-    ("🐔 Modullar",      "home:modules", "modules"),
-    ("📊 Hisobotlar",    "home:reports", "reports"),
+# Главное меню — плоское: все финансовые подразделы + 2 кнопки скачивания
+# Excel. Раньше были «Moliya / Modullar / Hisobotlar», но Modullar и
+# Hisobotlar были редко-используемыми навигационными слоями — оператор
+# хотел сразу попасть в финансовые отчёты, поэтому свернули.
+#
+# Формат: (label, callback_data, [required_modules])
+# Кнопка показывается если у юзера есть r-доступ ХОТЯ БЫ К ОДНОМУ модулю
+# из списка. Owner видит всё.
+_MAIN_BUTTONS: list[tuple[str, str, list[str]]] = [
+    ("💵 Kassa/bank",            "fin:cash",        ["ledger", "reports"]),
+    ("👥 Mijoz qarzi",           "fin:debt",        ["sales", "reports"]),
+    ("🏢 Yetkazib beruvchi qarzi", "fin:cred",      ["purchases", "reports"]),
+    ("📈 P&L",                   "fin:pnl:week",    ["reports", "ledger"]),
+    ("💸 Sotuvlar",              "fin:sales:week",  ["sales", "reports"]),
+    ("📦 Sklad qoldiqlari",      "fin:stock",       ["stock", "reports"]),
+    ("📥 Mijoz qarzi (Excel)",   "dl:debtors",      ["sales", "reports"]),
+    ("📥 Sklad qoldiqlari (Excel)", "dl:stock",     ["stock", "reports", "ledger"]),
 ]
 
 
 def _menu_buttons_for(link) -> list[tuple[str, str]]:
-    """Только кнопки разделов, к которым у юзера есть доступ.
+    """Список кнопок главного меню после RBAC-фильтра.
 
-    Если юзер не видит ничего (странно — но возможно если убрали все
-    permissions) — оставим хотя бы /help чтобы было что нажать.
+    Если юзер не видит ничего — оставим /help чтобы было что нажать.
     """
+    from ..services.menu_scope import has_any_access
+
     levels = user_module_levels(link)
+    if is_owner(levels):
+        return [(label, cb) for label, cb, _ in _MAIN_BUTTONS]
     buttons = [
-        (label, cb) for (label, cb, section) in _ALL_SECTIONS
-        if can_see_section(levels, section)
+        (label, cb) for (label, cb, mods) in _MAIN_BUTTONS
+        if has_any_access(levels, mods)
     ]
     if not buttons:
         return [("ℹ️ Yordam", "home:help")]
@@ -52,24 +65,24 @@ def _menu_buttons_for(link) -> list[tuple[str, str]]:
 
 
 def _menu_text(link) -> str:
-    """Заголовок меню. Если owner — без подписи; иначе подпишем «scope: …»
-    чтобы юзер понимал, почему кнопок мало."""
+    """Заголовок меню. Если owner — без подписи; иначе подпишем сколько
+    из доступных кнопок видно — чтобы юзер понимал, почему мало."""
+    from ..services.menu_scope import has_any_access
+
     levels = user_module_levels(link)
     if is_owner(levels):
         return "🏠 <b>Asosiy menyu</b>\n\nBo'limni tanlang:"
-    visible = [
-        label for label, _, section in _ALL_SECTIONS
-        if can_see_section(levels, section)
-    ]
-    if not visible:
+    visible_count = sum(
+        1 for _, _, mods in _MAIN_BUTTONS if has_any_access(levels, mods)
+    )
+    if visible_count == 0:
         return (
             "🏠 <b>Asosiy menyu</b>\n\n"
-            "Sizda hech qanday modulga ruxsat yo'q. Administrator bilan bog'laning."
+            "Sizda hech qanday bo'limga ruxsat yo'q. Administrator bilan bog'laning."
         )
-    scope_hint = ", ".join(s for s in visible)
     return (
         f"🏠 <b>Asosiy menyu</b>\n"
-        f"<i>Sizning ruxsatingiz: {scope_hint}</i>\n\n"
+        f"<i>{visible_count} ta bo'lim mavjud</i>\n\n"
         f"Bo'limni tanlang:"
     )
 

@@ -304,12 +304,12 @@ def fmt_promise_broken_uz(sale_order, communication) -> str:
 
 
 def fmt_head_brief_uz(org, module_code: str) -> str | None:
-    """Утренний brief head'у модуля: за вчера sotuv / xarid / cash-снимок.
+    """Вечерний brief head'у модуля: что произошло за СЕГОДНЯ.
 
-    Возвращает None если по модулю за вчера ничего не происходило —
+    Возвращает None если по модулю за сегодня ничего не происходило —
     тогда не шлём (без шума).
     """
-    from datetime import date as _date, timedelta
+    from datetime import date as _date
     from decimal import Decimal
     from django.db.models import Q, Sum
     from apps.modules.models import Module
@@ -321,12 +321,12 @@ def fmt_head_brief_uz(org, module_code: str) -> str | None:
     except Module.DoesNotExist:
         return None
 
-    yesterday = _date.today() - timedelta(days=1)
+    today = _date.today()
 
-    # Sales вчера: distinct orders с item этого модуля
+    # Sales сегодня: distinct orders с item этого модуля
     so_qs = SaleOrder.objects.filter(
         organization=org, status=SaleOrder.Status.CONFIRMED,
-        date=yesterday,
+        date=today,
     )
     if module_code == "feed":
         so_qs = so_qs.filter(
@@ -355,7 +355,7 @@ def fmt_head_brief_uz(org, module_code: str) -> str | None:
     po_agg = PurchaseOrder.objects.filter(
         organization=org, module=module,
         status=PurchaseOrder.Status.CONFIRMED,
-        date=yesterday,
+        date=today,
     ).aggregate(
         n=_count_zero(),
         s=Sum("amount_uzs"),
@@ -365,14 +365,14 @@ def fmt_head_brief_uz(org, module_code: str) -> str | None:
     purch_invoiced = Decimal(po_agg["s"] or 0)
     purch_paid = Decimal(po_agg["p"] or 0)
 
-    # Если за вчера вообще ничего — пустой brief не шлём
+    # Если за сегодня вообще ничего — пустой brief не шлём
     if sales_count == 0 and purch_count == 0:
         return None
 
     label = MODULE_LABEL_BRIEF.get(module_code, module_code)
     lines = [
-        f"☀️ <b>Tongi brief — {label}</b>",
-        f"<i>Kechagi kun: {yesterday}</i>",
+        f"📊 <b>Kunlik brief — {label}</b>",
+        f"<i>Bugun: {today}</i>",
         "",
     ]
     if sales_count > 0:
