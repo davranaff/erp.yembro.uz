@@ -7,7 +7,7 @@ import Icon from '@/components/ui/Icon';
 import Modal from '@/components/ui/Modal';
 import { useCounterparties } from '@/hooks/useCounterparties';
 import { POPULAR_CURRENCY_CODES, useCurrenciesSorted, useRateOnDate } from '@/hooks/useCurrencyRates';
-import { feedBagLotsCrud, feedBatchesCrud } from '@/hooks/useFeed';
+import { feedBagLotsCrud, feedBatchesCrud, rawBatchesCrud } from '@/hooks/useFeed';
 import { useModules } from '@/hooks/useModules';
 import { salesCrud } from '@/hooks/useSales';
 import { useWarehouses } from '@/hooks/useStockMovements';
@@ -20,7 +20,8 @@ export type SaleSourceKind =
   | 'vet_stock_batch'
   | 'vet_accessory'
   | 'feed_batch'
-  | 'feed_bag_lot';
+  | 'feed_bag_lot'
+  | 'raw_batch';
 
 /**
  * Preselect из drawer любой партии: "открыть модалку продаж с уже выбранным
@@ -51,6 +52,7 @@ interface ItemDraft {
   vet_accessory: string;
   feed_batch: string;
   feed_bag_lot: string;
+  raw_batch: string;
   /**
    * Per-item kind override. Используется в vet-модуле (препарат vs аксессуар)
    * и в feed (насыпь vs мешки).
@@ -78,6 +80,7 @@ function makeItemDraft(overrides: Partial<ItemDraft> = {}): ItemDraft {
     vet_accessory: '',
     feed_batch: '',
     feed_bag_lot: '',
+    raw_batch: '',
     quantity: '',
     unit_price_uzs: '',
     ...overrides,
@@ -110,6 +113,7 @@ export default function SaleOrderModal({ initial, preselect, onClose }: Props) {
   const { data: vetAccessories } = accessoriesCrud.useList({ is_active: 'true' });
   const { data: feedLots } = feedBatchesCrud.useList();
   const { data: feedBagLots } = feedBagLotsCrud.useList({ status: 'active' });
+  const { data: rawBatches } = rawBatchesCrud.useList({ status: 'available' });
 
   // Состояние формы
   const [moduleId, setModuleId] = useState(initial?.module ?? '');
@@ -133,9 +137,11 @@ export default function SaleOrderModal({ initial, preselect, onClose }: Props) {
       return initial.items.map((it): ItemDraft => {
         const vetAcc = (it as { vet_accessory?: string | null }).vet_accessory ?? '';
         const bagLot = (it as { feed_bag_lot?: string | null }).feed_bag_lot ?? '';
+        const rawBatch = (it as { raw_batch?: string | null }).raw_batch ?? '';
         let kindOverride: SaleSourceKind | undefined;
         if (vetAcc) kindOverride = 'vet_accessory';
         else if (bagLot) kindOverride = 'feed_bag_lot';
+        else if (rawBatch) kindOverride = 'raw_batch';
         return {
           key: it.id,
           nomenclature: it.nomenclature,
@@ -144,6 +150,7 @@ export default function SaleOrderModal({ initial, preselect, onClose }: Props) {
           vet_accessory: vetAcc,
           feed_batch: it.feed_batch ?? '',
           feed_bag_lot: bagLot,
+          raw_batch: rawBatch,
           kindOverride,
           quantity: it.quantity,
           unit_price_uzs: it.unit_price_uzs,
@@ -163,6 +170,10 @@ export default function SaleOrderModal({ initial, preselect, onClose }: Props) {
       if (preselect.sourceKind === 'feed_bag_lot') {
         draft.feed_bag_lot = preselect.batchId;
         draft.kindOverride = 'feed_bag_lot';
+      }
+      if (preselect.sourceKind === 'raw_batch') {
+        draft.raw_batch = preselect.batchId;
+        draft.kindOverride = 'raw_batch';
       }
       return [draft];
     }
@@ -253,7 +264,7 @@ export default function SaleOrderModal({ initial, preselect, onClose }: Props) {
     setModuleId(newId);
     setItems((prev) => prev.map((it) => ({
       ...it, batch: '', vet_stock_batch: '', vet_accessory: '',
-      feed_batch: '', feed_bag_lot: '',
+      feed_batch: '', feed_bag_lot: '', raw_batch: '',
       kindOverride: undefined,
     })));
   };
@@ -265,6 +276,7 @@ export default function SaleOrderModal({ initial, preselect, onClose }: Props) {
     if (k === 'vet_accessory') return Boolean(it.vet_accessory);
     if (k === 'feed_batch') return Boolean(it.feed_batch);
     if (k === 'feed_bag_lot') return Boolean(it.feed_bag_lot);
+    if (k === 'raw_batch') return Boolean(it.raw_batch);
     return false;
   };
 
@@ -306,6 +318,7 @@ export default function SaleOrderModal({ initial, preselect, onClose }: Props) {
         vet_accessory: it.vet_accessory || null,
         feed_batch: it.feed_batch || null,
         feed_bag_lot: it.feed_bag_lot || null,
+        raw_batch: it.raw_batch || null,
         quantity: it.quantity,
         unit_price_uzs: it.unit_price_uzs,
       })),
@@ -661,7 +674,7 @@ export default function SaleOrderModal({ initial, preselect, onClose }: Props) {
                   <>
                     <div className="field">
                       <label>Тип отгрузки</label>
-                      <div style={{ display: 'flex', gap: 12, fontSize: 12 }}>
+                      <div style={{ display: 'flex', gap: 12, fontSize: 12, flexWrap: 'wrap' }}>
                         <label style={{ display: 'flex', gap: 4, alignItems: 'center', cursor: 'pointer' }}>
                           <input
                             type="radio"
@@ -669,12 +682,12 @@ export default function SaleOrderModal({ initial, preselect, onClose }: Props) {
                             checked={itemSourceKind(it) === 'feed_batch'}
                             onChange={() => updateItem(it.key, {
                               kindOverride: undefined,
-                              feed_bag_lot: '',
+                              feed_bag_lot: '', raw_batch: '',
                               nomenclature: '', quantity: '', available_quantity: undefined,
                               unit_code: '', batch_doc: undefined,
                             })}
                           />
-                          Насыпью (кг)
+                          Готовый корм (насыпью, кг)
                         </label>
                         <label style={{ display: 'flex', gap: 4, alignItems: 'center', cursor: 'pointer' }}>
                           <input
@@ -683,12 +696,26 @@ export default function SaleOrderModal({ initial, preselect, onClose }: Props) {
                             checked={itemSourceKind(it) === 'feed_bag_lot'}
                             onChange={() => updateItem(it.key, {
                               kindOverride: 'feed_bag_lot',
-                              feed_batch: '',
+                              feed_batch: '', raw_batch: '',
                               nomenclature: '', quantity: '', available_quantity: undefined,
                               unit_code: '', batch_doc: undefined,
                             })}
                           />
-                          В мешках (шт)
+                          Готовый корм (мешки, шт)
+                        </label>
+                        <label style={{ display: 'flex', gap: 4, alignItems: 'center', cursor: 'pointer' }}>
+                          <input
+                            type="radio"
+                            name={`feedkind-${it.key}`}
+                            checked={itemSourceKind(it) === 'raw_batch'}
+                            onChange={() => updateItem(it.key, {
+                              kindOverride: 'raw_batch',
+                              feed_batch: '', feed_bag_lot: '',
+                              nomenclature: '', quantity: '', available_quantity: undefined,
+                              unit_code: '', batch_doc: undefined,
+                            })}
+                          />
+                          Сырьё (кг)
                         </label>
                       </div>
                     </div>
@@ -789,6 +816,58 @@ export default function SaleOrderModal({ initial, preselect, onClose }: Props) {
                             <div style={{ fontSize: 11, color: 'var(--warning)', marginTop: 4 }}>
                               Нет активных партий мешков. Расфасуйте готовый
                               корм в /feed → таб «Готовые партии» → «Расфасовать в мешки».
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })()}
+
+                    {itemSourceKind(it) === 'raw_batch' && (() => {
+                      const sellable = (rawBatches ?? []).filter(
+                        (r) => r.status === 'available'
+                          && parseFloat(r.current_quantity) > 0,
+                      );
+                      return (
+                        <div className="field">
+                          <label>Партия сырья *</label>
+                          <select
+                            className="input"
+                            value={it.raw_batch}
+                            onChange={(e) => {
+                              const rb = sellable.find((r) => r.id === e.target.value);
+                              updateItem(it.key, {
+                                raw_batch: e.target.value,
+                                nomenclature: rb?.nomenclature ?? '',
+                                quantity: it.quantity || rb?.current_quantity || '',
+                                available_quantity: rb?.current_quantity,
+                                batch_doc: rb?.doc_number,
+                                unit_code: rb?.unit_code ?? 'кг',
+                                // Дефолтная цена = закупочная (при необходимости
+                                // оператор поднимет с наценкой).
+                                unit_price_uzs: it.unit_price_uzs || rb?.price_per_unit_uzs || '',
+                              });
+                            }}
+                          >
+                            <option value="">— выберите партию сырья —</option>
+                            {sellable.map((r) => (
+                              <option key={r.id} value={r.id}>
+                                {r.nomenclature_name ?? r.nomenclature_sku ?? '—'} ·
+                                {' '}остаток {parseFloat(r.current_quantity).toLocaleString('ru-RU')} {r.unit_code ?? 'кг'}
+                                {' '}· {parseFloat(r.price_per_unit_uzs).toLocaleString('ru-RU', { maximumFractionDigits: 0 })} сум/{r.unit_code ?? 'кг'}
+                                {' '}· {r.doc_number}
+                              </option>
+                            ))}
+                          </select>
+                          {it.raw_batch && !it.nomenclature && (
+                            <div style={{ fontSize: 11, color: 'var(--danger)', marginTop: 4 }}>
+                              У партии сырья не определена номенклатурная позиция —
+                              продажа невозможна.
+                            </div>
+                          )}
+                          {sellable.length === 0 && (
+                            <div style={{ fontSize: 11, color: 'var(--warning)', marginTop: 4 }}>
+                              Нет доступных партий сырья (статус «В наличии»). Приходи́те
+                              сырьё в /feed → «+ Партия сырья».
                             </div>
                           )}
                         </div>

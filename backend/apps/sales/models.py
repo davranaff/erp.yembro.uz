@@ -366,6 +366,19 @@ class SaleItem(UUIDModel, TimestampedModel):
             "bags_remaining, quantity хранится в штуках мешков."
         ),
     )
+    raw_batch = models.ForeignKey(
+        "feed.RawMaterialBatch",
+        null=True,
+        blank=True,
+        on_delete=models.PROTECT,
+        related_name="sale_items",
+        help_text=(
+            "Партия сырья комбикорма (зерно/премикс/жмых). Продаётся когда "
+            "у фермера остатки и он хочет продать вместо переработки. При "
+            "sale-confirm декрементится current_quantity (в кг), цена за ед. "
+            "= закупочная (price_per_unit_uzs из приёмки)."
+        ),
+    )
 
     quantity = models.DecimalField(max_digits=18, decimal_places=3)
     unit_price_uzs = models.DecimalField(
@@ -398,6 +411,7 @@ class SaleItem(UUIDModel, TimestampedModel):
         sources = [
             self.batch_id, self.vet_stock_batch_id,
             self.vet_accessory_id, self.feed_batch_id, self.feed_bag_lot_id,
+            self.raw_batch_id,
         ]
         non_null = [s for s in sources if s]
         if len(non_null) != 1:
@@ -405,8 +419,8 @@ class SaleItem(UUIDModel, TimestampedModel):
                 {
                     "__all__": (
                         "Должен быть указан ровно один источник: "
-                        "batch, vet_stock_batch, vet_accessory, feed_batch "
-                        "или feed_bag_lot."
+                        "batch, vet_stock_batch, vet_accessory, feed_batch, "
+                        "feed_bag_lot или raw_batch."
                     )
                 }
             )

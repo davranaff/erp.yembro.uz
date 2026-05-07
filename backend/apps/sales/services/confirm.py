@@ -149,6 +149,12 @@ def _compute_cost_per_unit(item: SaleItem) -> Decimal:
         # (наследуется при фасовке = source.unit_cost_uzs × bag_weight_kg).
         bl = item.feed_bag_lot
         return _quantize_money(Decimal(bl.unit_cost_uzs or 0))
+    if item.raw_batch_id:
+        # RawMaterialBatch.price_per_unit_uzs — закупочная цена при приёмке.
+        # Усушка/просрочка не влияют на cost basis для бухгалтерии — берём
+        # как есть.
+        rb = item.raw_batch
+        return _quantize_money(Decimal(rb.price_per_unit_uzs or 0))
     return Decimal("0.00")
 
 
@@ -294,6 +300,35 @@ def _check_and_decrement_source(item: SaleItem, qty: Decimal):
             bl.save(update_fields=["status", "updated_at"])
         return bl
 
+    if item.raw_batch_id:
+        # Сырьё (зерно/жмых/премикс) — продаётся в кг. Только из статуса
+        # AVAILABLE; quarantine/rejected/depleted блокируем.
+        from apps.feed.models import RawMaterialBatch
+        rb = RawMaterialBatch.objects.select_for_update().get(pk=item.raw_batch_id)
+        if rb.status != RawMaterialBatch.Status.AVAILABLE:
+            raise SaleConfirmError(
+                {"items": (
+                    f"Партия сырья {rb.doc_number} в статусе "
+                    f"{rb.get_status_display()} — продажа возможна только из "
+                    f"«В наличии»."
+                )}
+            )
+        if Decimal(rb.current_quantity) < qty:
+            raise SaleConfirmError(
+                {"items": (
+                    f"Недостаточно остатка сырья {rb.doc_number}: "
+                    f"требуется {qty}, доступно {rb.current_quantity}."
+                )}
+            )
+        RawMaterialBatch.objects.filter(pk=rb.pk).update(
+            current_quantity=F("current_quantity") - qty,
+        )
+        rb.refresh_from_db(fields=["current_quantity"])
+        if rb.current_quantity == 0 and rb.status == RawMaterialBatch.Status.AVAILABLE:
+            rb.status = RawMaterialBatch.Status.DEPLETED
+            rb.save(update_fields=["status", "updated_at"])
+        return rb
+
     raise SaleConfirmError({"items": "Item без указания источника партии."})
 
 
@@ -332,7 +367,7 @@ def confirm_sale(
         order.items.select_related(
             "nomenclature", "nomenclature__category",
             "nomenclature__default_gl_subaccount",
-            "batch", "feed_batch", "vet_stock_batch",
+            "batch", "feed_batch", "vet_stock_batch", "raw_batch",
         )
     )
     if not items:
