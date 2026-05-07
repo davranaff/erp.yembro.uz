@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 
 import HelpHint from '@/components/ui/HelpHint';
 import Modal from '@/components/ui/Modal';
@@ -38,28 +38,6 @@ interface Props {
    * movement (там уже правильный flow для конвертации).
    */
   onPickStockMovement?: (movement: StockMovement) => void;
-}
-
-type ShrinkMode = 'duval' | 'direct' | 'none';
-
-/**
- * Чистый расчёт зачётного веса (зеркало backend services/shrinkage.py)
- * для live-preview в форме.
- */
-function duvalShrinkPct(actual: number, base: number): number {
-  if (!actual || !base || actual <= base) return 0;
-  if (base >= 100) return 0;
-  return (100 * (actual - base)) / (100 - base);
-}
-
-function settlementFromGross(gross: number, shrinkPct: number): number {
-  if (gross <= 0) return 0;
-  if (shrinkPct <= 0) return gross;
-  return gross * (1 - shrinkPct / 100);
-}
-
-function fmtKg(v: number): string {
-  return v.toLocaleString('ru-RU', { maximumFractionDigits: 3 });
 }
 
 function fmtMoney(v: number): string {
@@ -114,15 +92,13 @@ export default function RawBatchModal({ initial, prefill, onClose, onPickStockMo
   );
   const [notes, setNotes] = useState(initial?.notes ?? '');
 
-  // Веса / усушка
-  const [shrinkMode, setShrinkMode] = useState<ShrinkMode>('duval');
-  const [grossKg, setGrossKg] = useState(
-    initial?.gross_weight_kg ?? prefill?.quantity ?? '',
+  // Простой учёт без расчёта усушки: оператор вводит итоговое количество
+  // как уже договорились с поставщиком. Backend хранит это в `quantity`
+  // (legacy-режим). Если позже понадобится Дюваль / профили усушки — можно
+  // вернуть отдельной формой.
+  const [quantity, setQuantity] = useState(
+    initial?.quantity ?? prefill?.quantity ?? '',
   );
-  const [moistureActual, setMoistureActual] = useState(initial?.moisture_pct_actual ?? '');
-  const [dockageActual, setDockageActual] = useState(initial?.dockage_pct_actual ?? '0');
-  const [directShrink, setDirectShrink] = useState(initial?.shrinkage_pct ?? '');
-  const [legacyQuantity, setLegacyQuantity] = useState(initial?.quantity ?? '');
 
   // Карантин
   const [putToQuarantine, setPutToQuarantine] = useState(true);
@@ -136,65 +112,14 @@ export default function RawBatchModal({ initial, prefill, onClose, onPickStockMo
     () => noms?.find((n) => n.id === nomenclatureId),
     [noms, nomenclatureId],
   );
-  const baseMoisture = selectedNom?.base_moisture_pct
-    ? parseFloat(selectedNom.base_moisture_pct)
-    : null;
 
-  // Авто-фокус режима, когда выбрана номенклатура: если у неё есть base_moisture
-  // — режим Дюваля, иначе — direct.
-  useEffect(() => {
-    if (!isEdit && selectedNom) {
-      setShrinkMode(baseMoisture != null ? 'duval' : 'direct');
-    }
-  }, [isEdit, selectedNom, baseMoisture]);
-
-  // ── Live preview ──────────────────────────────────────────────────────
-  const preview = useMemo(() => {
-    const gross = parseFloat(grossKg || '0');
-    const price = parseFloat(pricePerUnit || '0');
-
-    if (shrinkMode === 'none') {
-      const q = parseFloat(legacyQuantity || '0');
-      return {
-        settlement: q,
-        shrinkPct: 0,
-        total: q * price,
-        mode: 'legacy',
-      };
-    }
-    if (gross <= 0) {
-      return { settlement: 0, shrinkPct: 0, total: 0, mode: shrinkMode };
-    }
-
-    if (shrinkMode === 'duval') {
-      const actual = parseFloat(moistureActual || '0');
-      const dockage = parseFloat(dockageActual || '0');
-      if (baseMoisture == null || actual <= 0) {
-        return { settlement: gross, shrinkPct: 0, total: gross * price, mode: 'duval-empty' };
-      }
-      const duv = duvalShrinkPct(actual, baseMoisture);
-      const total = duv + dockage;
-      const settlement = settlementFromGross(gross, total);
-      return {
-        settlement,
-        shrinkPct: total,
-        total: settlement * price,
-        mode: 'duval',
-      };
-    }
-    // direct
-    const sh = parseFloat(directShrink || '0');
-    const settlement = settlementFromGross(gross, sh);
-    return {
-      settlement,
-      shrinkPct: sh,
-      total: settlement * price,
-      mode: 'direct',
-    };
-  }, [
-    shrinkMode, grossKg, pricePerUnit, legacyQuantity,
-    moistureActual, dockageActual, baseMoisture, directShrink,
-  ]);
+  // ── Live preview: qty × price ────────────────────────────────────────
+  const totalUzs = useMemo(() => {
+    const q = parseFloat(quantity || '0');
+    const p = parseFloat(pricePerUnit || '0');
+    if (!Number.isFinite(q) || !Number.isFinite(p)) return 0;
+    return q * p;
+  }, [quantity, pricePerUnit]);
 
   const error = create.error ?? update.error;
   const fieldErrors = error instanceof ApiError && error.status === 400
@@ -211,10 +136,7 @@ export default function RawBatchModal({ initial, prefill, onClose, onPickStockMo
     ? (warehouseBalance?.rows ?? []).find((r) => r.nomenclature_id === nomenclatureId)
     : null;
   const stockQty = stockRow ? parseFloat(stockRow.balance_qty) : 0;
-  // Какое qty реально оприходуется в партию (gross или legacy)
-  const requestedQty = parseFloat(
-    (shrinkMode === 'none' ? legacyQuantity : grossKg) || '0',
-  );
+  const requestedQty = parseFloat(quantity || '0');
   const stockOk = isEdit || (stockQty > 0 && stockQty >= requestedQty);
 
   const canSubmit =
@@ -222,7 +144,7 @@ export default function RawBatchModal({ initial, prefill, onClose, onPickStockMo
     warehouseId &&
     receivedDate &&
     pricePerUnit &&
-    (shrinkMode === 'none' ? legacyQuantity : grossKg) &&
+    quantity &&
     stockOk &&
     !create.isPending &&
     !update.isPending;
@@ -240,18 +162,7 @@ export default function RawBatchModal({ initial, prefill, onClose, onPickStockMo
       notes,
       status: putToQuarantine ? 'quarantine' as const : 'available' as const,
       quarantine_until: putToQuarantine ? quarantineUntil : null,
-      // Веса
-      ...(shrinkMode === 'none'
-        ? { quantity: legacyQuantity }
-        : {
-            gross_weight_kg: grossKg,
-            ...(shrinkMode === 'duval'
-              ? {
-                  moisture_pct_actual: moistureActual || undefined,
-                  dockage_pct_actual: dockageActual || undefined,
-                }
-              : { shrinkage_pct: directShrink || undefined }),
-          }),
+      quantity,
     };
 
     try {
@@ -285,8 +196,7 @@ export default function RawBatchModal({ initial, prefill, onClose, onPickStockMo
       }
     >
       <div style={{ fontSize: 11, color: 'var(--fg-3)', marginBottom: 10 }}>
-        Приёмка сырья на склад модуля «Корма». При повышенной влажности
-        зачётный вес рассчитается по формуле Дюваля.
+        Приёмка сырья на склад модуля «Корма».
       </div>
 
       {/* Импорт из существующего INCOMING-движения /stock — чтобы не вводить
@@ -510,200 +420,39 @@ export default function RawBatchModal({ initial, prefill, onClose, onPickStockMo
         </div>
       </div>
 
-      {/* ── Веса и усушка ────────────────────────────────────────────── */}
-      <div style={{ marginTop: 14, marginBottom: 6, display: 'flex', alignItems: 'center', gap: 6 }}>
-        <b style={{ fontSize: 13 }}>Веса и усушка</b>
-        <HelpHint
-          text="Расчёт зачётного веса."
-          details={
-            'Усушка — потеря массы сырья при сушке из-за испарения влаги. '
-            + 'Если фактическая влажность выше базисной (14% по ГОСТ для зерна), '
-            + 'часть массы «уйдёт» при сушке. Формула Дюваля: '
-            + 'Хв = 100×(A−B)/(100−B). Зачётный вес = брутто × (1 − усушка/100). '
-            + 'Поставщику платят именно за зачётный вес.'
-          }
+      {/* ── Количество ─────────────────────────────────────────────── */}
+      <div className="field" style={{ marginTop: 10 }}>
+        <label>
+          Количество, кг *
+          <HelpHint
+            text="Сколько кг сырья оприходуется на склад."
+            details={
+              'Учётное количество как уже договорились с поставщиком. '
+              + 'Если позже понадобится расчёт по влажности (формула Дюваля) '
+              + 'или периодическое списание усушки — это другие сценарии и '
+              + 'делаются отдельно.'
+            }
+          />
+        </label>
+        <input
+          className="input mono"
+          type="number"
+          step="0.001"
+          min="0"
+          value={quantity}
+          onChange={(e) => setQuantity(e.target.value)}
+          placeholder="10000.000"
         />
       </div>
 
-      <div style={{ display: 'flex', gap: 4, marginBottom: 8 }}>
-        <button
-          type="button"
-          className={'btn btn-sm ' + (shrinkMode === 'duval' ? 'btn-primary' : 'btn-ghost')}
-          onClick={() => setShrinkMode('duval')}
-          style={{ flex: 1, fontSize: 12 }}
-        >
-          По влажности (Дюваль)
-        </button>
-        <button
-          type="button"
-          className={'btn btn-sm ' + (shrinkMode === 'direct' ? 'btn-primary' : 'btn-ghost')}
-          onClick={() => setShrinkMode('direct')}
-          style={{ flex: 1, fontSize: 12 }}
-        >
-          Указать % напрямую
-        </button>
-        <button
-          type="button"
-          className={'btn btn-sm ' + (shrinkMode === 'none' ? 'btn-primary' : 'btn-ghost')}
-          onClick={() => setShrinkMode('none')}
-          style={{ flex: 1, fontSize: 12 }}
-        >
-          Без расчёта
-        </button>
-      </div>
-
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-        {shrinkMode === 'duval' && (
-          <>
-            <div className="field">
-              <label>
-                Брутто вес, кг *
-                <HelpHint
-                  text="Физический вес на весах при приёмке."
-                  details="Это фактическая масса как привезли, до любых поправок."
-                />
-              </label>
-              <input
-                className="input mono"
-                type="number"
-                step="0.001"
-                value={grossKg}
-                onChange={(e) => setGrossKg(e.target.value)}
-                placeholder="10000.000"
-              />
-            </div>
-
-            <div className="field">
-              <label>
-                Влажность факт, %
-                <HelpHint
-                  text="По лаборатории или сертификату."
-                  details={
-                    `Базисная влажность для этого SKU: ${baseMoisture ?? '—'}%. `
-                    + 'Если фактическая выше — считается усушка по Дювалю.'
-                  }
-                />
-              </label>
-              <input
-                className="input mono"
-                type="number"
-                step="0.01"
-                value={moistureActual}
-                onChange={(e) => setMoistureActual(e.target.value)}
-                placeholder={baseMoisture != null ? `> ${baseMoisture}` : '18.00'}
-                disabled={baseMoisture == null}
-              />
-              {baseMoisture == null && nomenclatureId && (
-                <div style={{ fontSize: 10, color: 'var(--warning)', marginTop: 2 }}>
-                  Базисная влажность не задана у этой номенклатуры
-                </div>
-              )}
-              {baseMoisture != null && (
-                <div style={{ fontSize: 10, color: 'var(--fg-3)', marginTop: 2 }}>
-                  Базисная: {baseMoisture}%
-                </div>
-              )}
-            </div>
-
-            <div className="field" style={{ gridColumn: '1/3' }}>
-              <label>
-                Сорность, %
-                <HelpHint
-                  text="Доля примесей."
-                  details="Прибавляется к усушке Дюваля. Если измерения нет — оставьте 0."
-                />
-              </label>
-              <input
-                className="input mono"
-                type="number"
-                step="0.01"
-                value={dockageActual}
-                onChange={(e) => setDockageActual(e.target.value)}
-                placeholder="0"
-              />
-            </div>
-          </>
-        )}
-
-        {shrinkMode === 'direct' && (
-          <>
-            <div className="field">
-              <label>
-                Брутто вес, кг *
-                <HelpHint
-                  text="Физический вес на весах."
-                  details="Фактическая масса как привезли."
-                />
-              </label>
-              <input
-                className="input mono"
-                type="number"
-                step="0.001"
-                value={grossKg}
-                onChange={(e) => setGrossKg(e.target.value)}
-                placeholder="10000.000"
-              />
-            </div>
-            <div className="field">
-              <label>
-                Усушка, % *
-                <HelpHint
-                  text="Прямой % потери массы от брутто."
-                  details="Например по опыту работы с поставщиком: «обычно скидывает 3%». Settlement = брутто × (1 − %/100)."
-                />
-              </label>
-              <input
-                className="input mono"
-                type="number"
-                step="0.01"
-                value={directShrink}
-                onChange={(e) => setDirectShrink(e.target.value)}
-                placeholder="3.00"
-              />
-            </div>
-          </>
-        )}
-
-        {shrinkMode === 'none' && (
-          <div className="field" style={{ gridColumn: '1/3' }}>
-            <label>
-              Зачётный вес, кг *
-              <HelpHint
-                text="Учётный вес без расчётов."
-                details="Используйте если усушка уже учтена в накладной поставщика."
-              />
-            </label>
-            <input
-              className="input mono"
-              type="number"
-              step="0.001"
-              value={legacyQuantity}
-              onChange={(e) => setLegacyQuantity(e.target.value)}
-              placeholder="9700.000"
-            />
-          </div>
-        )}
-      </div>
-
-      {/* Live preview — компактнее */}
+      {/* Live preview: qty × price */}
       <div style={{
         marginTop: 8, padding: '8px 10px', background: 'var(--bg-soft)',
         borderRadius: 6, fontSize: 12,
-        display: 'flex', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap',
+        display: 'flex', justifyContent: 'flex-end', gap: 16, flexWrap: 'wrap',
       }}>
-        <span>
-          Зачёт. вес:{' '}
-          <b className="mono" style={{ fontSize: 13 }}>
-            {fmtKg(preview.settlement)} кг
-          </b>
-          {preview.shrinkPct > 0 && (
-            <span style={{ color: 'var(--fg-3)', marginLeft: 4 }}>
-              (− {preview.shrinkPct.toFixed(2)}%)
-            </span>
-          )}
-        </span>
         <span style={{ color: 'var(--fg-2)' }}>
-          К оплате: <b className="mono">{fmtMoney(preview.total)}</b>
+          К оплате: <b className="mono">{fmtMoney(totalUzs)}</b>
         </span>
       </div>
 

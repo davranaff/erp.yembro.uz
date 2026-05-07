@@ -40,7 +40,7 @@ const SECTIONS: Section[] = [
     module: 'admin',  min: 'r' },
   { key: 'acc',      title: 'План счетов',     desc: 'Счета и субсчета',            group: 'company',
     module: 'ledger', min: 'r' },
-  { key: 'expense',  title: 'Статьи расходов', desc: 'Газ, электричество, ЗП…',     group: 'company',
+  { key: 'expense',  title: 'Категории расходов', desc: 'Обед, аренда, бензин, ЗП…',  group: 'company',
     module: 'ledger', min: 'r' },
   { key: 'role',     title: 'Роли и права',    desc: 'Матрица доступов',            group: 'company',
     module: 'admin',  min: 'r' },

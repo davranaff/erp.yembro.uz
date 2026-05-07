@@ -1656,13 +1656,15 @@ export interface SaleItem {
   nomenclature_sku?: string | null;
   nomenclature_name?: string | null;
 
-  // XOR: ровно одна партия из пяти
+  // XOR: ровно одна партия из шести
   batch: string | null;
   vet_stock_batch: string | null;
   vet_accessory?: string | null;
   feed_batch: string | null;
   /** FeedBagLot — партия фасованного корма (мешки), quantity = шт мешков. */
   feed_bag_lot?: string | null;
+  /** RawMaterialBatch — сырьё корма (зерно/жмых/премикс), quantity = кг. */
+  raw_batch?: string | null;
 
   quantity: string;
   unit_price_uzs: string;

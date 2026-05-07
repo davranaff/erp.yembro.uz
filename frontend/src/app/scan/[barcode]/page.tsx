@@ -188,12 +188,18 @@ export default function ScanBarcodePage({
           <p style={{ fontSize: 13, color: '#6B7280', marginTop: 8 }}>
             Штрих-код <code>{barcode}</code> не зарегистрирован в системе.
           </p>
-          <a href="/scan" style={{
-            display: 'inline-block', marginTop: 16,
-            color: '#E8751A', textDecoration: 'underline', fontSize: 14,
-          }}>
-            ← Назад к сканеру
-          </a>
+          <div style={{ display: 'flex', gap: 12, marginTop: 16, flexWrap: 'wrap' }}>
+            <a href="/scan" style={{
+              color: '#E8751A', textDecoration: 'underline', fontSize: 14,
+            }}>
+              ← Назад к сканеру
+            </a>
+            <a href="/dashboard" style={{
+              color: '#374151', textDecoration: 'underline', fontSize: 14,
+            }}>
+              ⌂ В систему
+            </a>
+          </div>
         </div>
       </div>
     );
@@ -239,6 +245,28 @@ export default function ScanBarcodePage({
         border: '1px solid #E5E7EB',
         padding: 20,
       }}>
+        {/* Шапка-ссылка обратно в систему — всегда видна, не нужно
+            скроллить до футера. */}
+        <div style={{
+          display: 'flex', justifyContent: 'space-between',
+          alignItems: 'center', marginBottom: 12,
+          paddingBottom: 10, borderBottom: '1px solid #F3F4F6',
+        }}>
+          <a href="/dashboard" style={{
+            display: 'inline-flex', alignItems: 'center', gap: 6,
+            color: '#374151', fontSize: 12, fontWeight: 500,
+            textDecoration: 'none',
+          }}>
+            ← В систему
+          </a>
+          <a href="/scan" style={{
+            color: '#E8751A', fontSize: 12, fontWeight: 500,
+            textDecoration: 'none',
+          }}>
+            Сканировать другой
+          </a>
+        </div>
+
         <div style={{
           display: 'inline-block',
           padding: '4px 12px',
@@ -673,9 +701,18 @@ export default function ScanBarcodePage({
           </div>
         )}
 
-        <div style={{ marginTop: 24, textAlign: 'center', fontSize: 12, color: '#6B7280' }}>
-          {sellerLabel && <>{sellerLabel} · </>}
-          <a href="/scan" style={{ color: '#E8751A' }}>← Сканировать другой</a>
+        <div style={{
+          marginTop: 24, textAlign: 'center', fontSize: 12, color: '#6B7280',
+          display: 'flex', flexDirection: 'column', gap: 8,
+        }}>
+          {sellerLabel && <div>{sellerLabel}</div>}
+          <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' }}>
+            <a href="/scan" style={{ color: '#E8751A' }}>← Сканировать другой</a>
+            <span style={{ color: '#D1D5DB' }}>|</span>
+            <a href="/dashboard" style={{ color: '#374151', fontWeight: 500 }}>
+              ⌂ В систему
+            </a>
+          </div>
         </div>
       </div>
     </div>

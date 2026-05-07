@@ -25,6 +25,7 @@ class SaleItemSerializer(serializers.ModelSerializer):
             "vet_accessory",
             "feed_batch",
             "feed_bag_lot",
+            "raw_batch",
             "quantity",
             "unit_price_uzs",
             "cost_per_unit_uzs",
@@ -377,6 +378,51 @@ class SaleOrderSerializer(serializers.ModelSerializer):
                         f"Партия мешков {bl.doc_number}: запрошено "
                         f"{requested_qty} шт, доступно {available} шт "
                         f"(остаток {bl.bags_remaining}, "
+                        f"зарезервировано в черновиках {reserved})."
+                    )}
+                )
+
+        # ── Валидация RawMaterialBatch (сырьё, продаём излишки) ──────────
+        # Учёт в кг (quantity = килограммы). Только AVAILABLE.
+        from apps.feed.models import RawMaterialBatch
+
+        qty_by_raw: dict = defaultdict(lambda: Decimal("0"))
+        for item in items_data:
+            rb = item.get("raw_batch")
+            if not rb:
+                continue
+            qty_by_raw[rb.id] += Decimal(str(item["quantity"]))
+
+        for rb_id, requested_qty in qty_by_raw.items():
+            rb = RawMaterialBatch.objects.filter(pk=rb_id).first()
+            if rb is None:
+                raise serializers.ValidationError(
+                    {"items": f"Партия сырья {rb_id} не найдена."}
+                )
+            if rb.status != RawMaterialBatch.Status.AVAILABLE:
+                raise serializers.ValidationError(
+                    {"items": (
+                        f"Партия сырья {rb.doc_number} в статусе "
+                        f"«{rb.get_status_display()}» — продавать можно "
+                        f"только доступные."
+                    )}
+                )
+            reserve_qs = SaleItem.objects.filter(
+                raw_batch_id=rb_id,
+                order__status=SaleOrder.Status.DRAFT,
+            )
+            if instance_id:
+                reserve_qs = reserve_qs.exclude(order_id=instance_id)
+            reserved = Decimal(reserve_qs.aggregate(s=Sum("quantity"))["s"] or 0)
+            available = Decimal(rb.current_quantity or 0) - reserved
+            if available < 0:
+                available = Decimal("0")
+            if requested_qty > available:
+                raise serializers.ValidationError(
+                    {"items": (
+                        f"Партия сырья {rb.doc_number}: запрошено "
+                        f"{requested_qty} кг, доступно {available} кг "
+                        f"(остаток {rb.current_quantity}, "
                         f"зарезервировано в черновиках {reserved})."
                     )}
                 )
