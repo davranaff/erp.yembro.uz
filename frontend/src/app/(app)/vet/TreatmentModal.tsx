@@ -298,7 +298,7 @@ export default function TreatmentModal({ onClose }: Props) {
             <option value="">—</option>
             {drugs?.map((d) => (
               <option key={d.id} value={d.id}>
-                {d.nomenclature_sku} · {d.nomenclature_name}
+                {d.nomenclature_name}
               </option>
             ))}
           </select>

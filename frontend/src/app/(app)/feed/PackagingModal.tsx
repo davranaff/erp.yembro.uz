@@ -261,7 +261,7 @@ export default function PackagingModal({ batch, onClose }: Props) {
               {autoBagSku ? ` → ${autoBagSku.sku}` : ' (не найден SKU для текущего веса)'}
             </option>
             {bagSkus.map((it) => (
-              <option key={it.id} value={it.id}>{it.sku} · {it.name}</option>
+              <option key={it.id} value={it.id}>{it.name}</option>
             ))}
           </select>
           {effectiveBagSku ? (

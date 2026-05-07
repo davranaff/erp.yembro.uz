@@ -106,7 +106,7 @@ export default function YieldModal({ shift, yieldRow, onClose }: Props) {
           <option value="">—</option>
           {items?.map((it) => (
             <option key={it.id} value={it.id}>
-              {it.sku} · {it.name}
+              {it.name}
             </option>
           ))}
         </select>

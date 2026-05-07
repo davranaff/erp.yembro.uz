@@ -245,7 +245,7 @@ export default function StockMovementModal({ onClose, onSaved, onSwitchToFeedRaw
             <option value="">{moduleId ? '— выберите —' : 'выберите модуль'}</option>
             {items?.map((i) => (
               <option key={i.id} value={i.id}>
-                {i.sku} · {i.name}
+                {i.name}
               </option>
             ))}
           </select>

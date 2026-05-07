@@ -180,7 +180,7 @@ export default function ComponentModal({ version, initial, onClose }: Props) {
         <select className="input" value={nomenclature} onChange={(e) => setNomenclature(e.target.value)}>
           <option value="">—</option>
           {items?.map((it) => (
-            <option key={it.id} value={it.id}>{it.sku} · {it.name}</option>
+            <option key={it.id} value={it.id}>{it.name}</option>
           ))}
         </select>
       </div>
