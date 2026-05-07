@@ -47,8 +47,15 @@ type MiniAppAuthResponse = MiniAppAuthLinked | MiniAppAuthUnlinked;
 
 interface TelegramWebAppLite {
   initData: string;
+  version?: string;
+  isFullscreen?: boolean;
   ready?: () => void;
   expand?: () => void;
+  /** Bot API 8.0+. На desktop / старых клиентах метода нет — оборачиваем в try/catch. */
+  requestFullscreen?: () => void;
+  /** Bot API 8.0+. true → iOS swipe-down не свернёт WebApp при скролле. */
+  disableVerticalSwipes?: () => void;
+  isVersionAtLeast?: (v: string) => boolean;
 }
 
 declare global {
@@ -80,6 +87,21 @@ export default function TgMiniAppPage() {
 
     tg?.ready?.();
     tg?.expand?.();
+
+    // Bot API 8.0+: переключаем в full-screen на телефоне. На desktop /
+    // старых клиентах метода может не быть (или он бросит "UNSUPPORTED")
+    // — игнорируем, expand() уже даст max-height в обычном режиме.
+    try {
+      if (tg?.isVersionAtLeast?.('8.0') && !tg.isFullscreen) {
+        tg.requestFullscreen?.();
+        // В full-screen iOS swipe-down закроет WebApp на любом скролле —
+        // отключаем вертикальный жест, чтобы юзер не сворачивал нас
+        // случайно при прокрутке таблиц.
+        tg.disableVerticalSwipes?.();
+      }
+    } catch {
+      // Telegram <8.0 / desktop — silent. UI остаётся в expand-режиме.
+    }
 
     (async () => {
       try {
