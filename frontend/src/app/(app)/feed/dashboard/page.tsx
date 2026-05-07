@@ -472,9 +472,13 @@ export default function FeedDashboardPage() {
         display: 'flex', alignItems: 'center', gap: 10,
         padding: 10, marginBottom: 0,
         background: whatIfKg > 0 ? 'rgba(232,117,26,0.08)' : 'var(--bg-soft)',
-        border: `1px solid ${whatIfKg > 0 ? 'var(--brand-orange)' : 'var(--border)'}`,
+        // Используем longhand-свойства целиком: React ругается если
+        // смешивать shorthand `border` с longhand `borderBottom: none`,
+        // потому что при rerender'е порядок применения непредсказуем.
+        borderTop: `1px solid ${whatIfKg > 0 ? 'var(--brand-orange)' : 'var(--border)'}`,
+        borderLeft: `1px solid ${whatIfKg > 0 ? 'var(--brand-orange)' : 'var(--border)'}`,
+        borderRight: `1px solid ${whatIfKg > 0 ? 'var(--brand-orange)' : 'var(--border)'}`,
         borderTopLeftRadius: 6, borderTopRightRadius: 6,
-        borderBottom: 'none',
       }}>
         <span style={{
           fontSize: 11, fontWeight: 700, color: 'var(--fg-3)',
