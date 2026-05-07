@@ -119,13 +119,18 @@ export default function TgMiniAppPage() {
       />
       <div
         style={{
-          minHeight: '100vh',
+          // 100dvh + safe-area: в full-screen Mini App статус-бар iOS / home
+          // indicator не налезают на текст.
+          minHeight: '100dvh',
           display: 'grid',
           placeItems: 'center',
           background: 'var(--bg)',
           color: 'var(--fg-3)',
           fontSize: 13,
-          padding: 24,
+          paddingTop: 'max(24px, env(safe-area-inset-top))',
+          paddingBottom: 'max(24px, env(safe-area-inset-bottom))',
+          paddingLeft: 'max(24px, env(safe-area-inset-left))',
+          paddingRight: 'max(24px, env(safe-area-inset-right))',
           textAlign: 'center',
         }}
       >
