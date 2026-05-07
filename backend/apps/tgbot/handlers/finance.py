@@ -236,6 +236,72 @@ def handle_noop_callback(ctx: HandlerCtx) -> None:
     return
 
 
+# ─── Excel-выгрузки on-demand (callback `dl:debtors` / `dl:stock`) ───────
+
+
+@on_callback("dl:debtors")
+def handle_download_debtors(ctx: HandlerCtx) -> None:
+    """Сгенерить и сразу прислать файл со списком должников.
+
+    Тот же отчёт что в 22:00 рассылается автоматически — но юзер может
+    запросить когда захочет, не дожидаясь ночи.
+    """
+    if not _check_or_deny(ctx, modules=["sales", "reports"]):
+        return
+    from datetime import date as _date
+
+    from ..bot import send_document, send_message
+    from ..services.excel_reports import (
+        debtors_filename,
+        generate_debtors_xlsx,
+    )
+
+    org = ctx.org()
+    today = _date.today()
+    try:
+        blob = generate_debtors_xlsx(org, today=today)
+    except Exception:  # noqa: BLE001
+        logger.exception("dl:debtors: build failed for org=%s", org.code)
+        send_message(ctx.chat_id, "❌ Hisobot tayyorlashda xato yuz berdi.")
+        return
+
+    fname = debtors_filename(today)
+    caption = f"💼 Mijoz qarzlari · {today.isoformat()}"
+    send_document(ctx.chat_id, blob, fname, caption=caption)
+
+
+@on_callback("dl:stock")
+def handle_download_stock(ctx: HandlerCtx) -> None:
+    """Сгенерить и сразу прислать файл с остатками по всем складам.
+
+    Колонки: Склад / Модуль / SKU / Наименование / Ед / Σ Приход /
+    Σ Расход / Остаток. Каждая пара (склад, SKU) — отдельная строка,
+    т.е. видно остатки досконально по каждому складу.
+    """
+    if not _check_or_deny(ctx, modules=["stock", "reports", "ledger"]):
+        return
+    from datetime import date as _date
+
+    from ..bot import send_document, send_message
+    from ..services.excel_reports import (
+        generate_stock_balance_xlsx,
+        stock_filename,
+    )
+
+    org = ctx.org()
+    today = _date.today()
+    try:
+        blob = generate_stock_balance_xlsx(org, today=today)
+    except Exception:  # noqa: BLE001
+        logger.exception("dl:stock: build failed for org=%s", org.code)
+        send_message(ctx.chat_id, "❌ Hisobot tayyorlashda xato yuz berdi.")
+        return
+
+    fname = stock_filename(today)
+    caption = f"📦 Sklad qoldiqlari · {today.isoformat()}"
+    send_document(ctx.chat_id, blob, fname, caption=caption)
+
+
 @on_callback("fin:debt")
 def handle_debt_callback(ctx: HandlerCtx) -> None:
     if not _check_or_deny(ctx, modules=["sales", "reports"]):
