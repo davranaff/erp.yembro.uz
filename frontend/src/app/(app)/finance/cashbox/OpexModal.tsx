@@ -8,9 +8,10 @@ import { useCounterparties } from '@/hooks/useCounterparties';
 import { expenseArticlesCrud } from '@/hooks/useExpenseArticles';
 import { useModules } from '@/hooks/useModules';
 import { paymentsCrud, usePostPayment } from '@/hooks/usePayments';
+import { useHasLevel, usePermissions } from '@/hooks/usePermissions';
 import { useSubaccounts } from '@/hooks/useAccounts';
 import { ApiError } from '@/lib/api';
-import type { ExpenseArticle } from '@/types/auth';
+import { LEVEL_ORDER, type ExpenseArticle, type ModuleLevel } from '@/types/auth';
 
 export interface OpexPreselect {
   /** Preselect модуль (когда открыто из feed/slaughter/...). */
@@ -44,13 +45,17 @@ const MODULE_NZP: Record<string, string> = {
   vet: '20.06',
 };
 
-type PayMethod = 'cash' | 'bank' | 'other';
-
-const METHOD_TO_CHANNEL: Record<PayMethod, 'cash' | 'transfer' | 'other'> = {
-  cash: 'cash',
-  bank: 'transfer',
-  other: 'other',
-};
+/**
+ * Channel вычисляется по коду выбранного субсчёта, не указывается отдельно.
+ * 50.NN — наличные, 51.NN — банк/перечисление. Остальные коды (если кому-то
+ * понадобится платёж не из 50/51) — 'other'.
+ */
+function deriveChannel(code: string | undefined): 'cash' | 'transfer' | 'other' {
+  if (!code) return 'other';
+  if (code.startsWith('50.')) return 'cash';
+  if (code.startsWith('51.')) return 'transfer';
+  return 'other';
+}
 
 export default function OpexModal({ preselect, onClose }: Props) {
   const create = paymentsCrud.useCreate();
@@ -60,13 +65,15 @@ export default function OpexModal({ preselect, onClose }: Props) {
   const { data: subaccounts } = useSubaccounts();
   const { data: counterparties } = useCounterparties();
   const { data: articles } = expenseArticlesCrud.useList({ is_active: 'true' });
+  const hasLevel = useHasLevel();
+  const permissions = usePermissions();
+  const isOrgAdmin = hasLevel('admin', 'admin') || hasLevel('ledger', 'admin');
 
   const [direction, setDirection] = useState<'out' | 'in'>(preselect?.direction ?? 'out');
   const [kind, setKind] = useState<'opex' | 'income' | 'salary'>(
     KIND_FOR_DIRECTION[preselect?.direction ?? 'out'],
   );
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
-  const [method, setMethod] = useState<PayMethod>('cash');
   const [amount, setAmount] = useState('');
   const [cashSubId, setCashSubId] = useState('');
   const [contraSubId, setContraSubId] = useState('');
@@ -85,6 +92,50 @@ export default function OpexModal({ preselect, onClose }: Props) {
   const [newArticleSubId, setNewArticleSubId] = useState('');
   const createArticle = expenseArticlesCrud.useCreate();
 
+  // ── Доступные модули юзера ────────────────────────────────────────
+  // Бухгалтер (ledger:admin) и org-admin видят все кассы; head feed —
+  // только свои. Без этого head feed мог зачислить расход на vet-кассу
+  // что нарушает изоляцию финансов между модулями.
+  const accessibleModuleIds = useMemo<Set<string> | null>(() => {
+    if (isOrgAdmin) return null;
+    if (!modules) return new Set();
+    const allowedCodes = new Set(
+      Object.entries(permissions)
+        .filter(([, lvl]) => LEVEL_ORDER[lvl as ModuleLevel] >= LEVEL_ORDER.rw)
+        .map(([code]) => code),
+    );
+    return new Set(
+      modules.filter((m) => allowedCodes.has(m.code)).map((m) => m.id),
+    );
+  }, [isOrgAdmin, modules, permissions]);
+
+  // Кассы доступные текущему юзеру: 50.NN и 51.NN, + RBAC фильтр.
+  // Если юзер видит ровно одну кассу — авто-выбираем её, чтобы не
+  // заставлять кликать.
+  const cashOptions = useMemo(() => {
+    if (!subaccounts) return [];
+    return subaccounts
+      .filter((s) => s.code.startsWith('50.') || s.code.startsWith('51.'))
+      .filter((s) => {
+        if (accessibleModuleIds === null) return true;
+        if (!s.module) return false; // null-module («общая» 50.01) — только админ
+        return accessibleModuleIds.has(s.module);
+      })
+      .sort((a, b) => a.code.localeCompare(b.code));
+  }, [subaccounts, accessibleModuleIds]);
+
+  // Авто-выбор если ровно одна доступная касса.
+  useEffect(() => {
+    if (!cashSubId && cashOptions.length === 1) {
+      setCashSubId(cashOptions[0].id);
+    }
+    // Если выбранная касса больше не в списке (юзер сменил модуль или
+    // у неё пропал доступ) — сбрасываем.
+    if (cashSubId && !cashOptions.some((s) => s.id === cashSubId)) {
+      setCashSubId('');
+    }
+  }, [cashOptions, cashSubId]);
+
   // Preselect модуль по коду
   useEffect(() => {
     if (preselect?.moduleCode && modules && !moduleId) {
@@ -93,18 +144,8 @@ export default function OpexModal({ preselect, onClose }: Props) {
     }
   }, [preselect, modules, moduleId]);
 
-  // Способ оплаты → касса/банк
-  useEffect(() => {
-    if (!subaccounts || subaccounts.length === 0) return;
-    if (method === 'cash') {
-      const s = subaccounts.find((x) => x.code === '50.01');
-      if (s) setCashSubId(s.id);
-    } else if (method === 'bank') {
-      const s = subaccounts.find((x) => x.code === '51.01');
-      if (s) setCashSubId(s.id);
-    }
-    // method === 'other' → пользователь выбирает сам
-  }, [method, subaccounts]);
+  // (старая логика «method → 50.01/51.01» удалена — теперь юзер
+  // выбирает кассу явно из своего отфильтрованного списка)
 
   // Preselect contra (suggestedContraCode)
   useEffect(() => {
@@ -267,12 +308,13 @@ export default function OpexModal({ preselect, onClose }: Props) {
   };
 
   const handleSubmit = async () => {
+    const selectedCash = cashOptions.find((s) => s.id === cashSubId);
     try {
       const created = await create.mutateAsync({
         date,
         module: moduleId || null,
         direction,
-        channel: METHOD_TO_CHANNEL[method],
+        channel: deriveChannel(selectedCash?.code),
         kind,
         counterparty: counterpartyId || null,
         amount_uzs: amount,
@@ -363,41 +405,41 @@ export default function OpexModal({ preselect, onClose }: Props) {
         </div>
       </div>
 
-      {/* ───── Способ оплаты ───── */}
+      {/* ───── Касса/счёт ───── */}
       <div className="field">
-        <label>Способ оплаты *</label>
-        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-          <MethodChip active={method === 'cash'} onClick={() => setMethod('cash')}>
-            Наличные
-          </MethodChip>
-          <MethodChip active={method === 'bank'} onClick={() => setMethod('bank')}>
-            Банк / Карта
-          </MethodChip>
-          <MethodChip active={method === 'other'} onClick={() => setMethod('other')}>
-            Прочее
-          </MethodChip>
-        </div>
-        <span className="hint">
-          {method === 'cash' && 'Касса 50.01 проставится автоматически'}
-          {method === 'bank' && 'Банковский счёт 51.01 проставится автоматически'}
-          {method === 'other' && 'Выберите счёт ниже вручную'}
-        </span>
-
-        {method === 'other' && (
+        <label>Касса / счёт *</label>
+        {cashOptions.length === 0 ? (
+          <div style={{
+            padding: 8, fontSize: 12, color: 'var(--danger)',
+            background: 'var(--danger-soft, #FEF2F2)',
+            border: '1px solid var(--danger)', borderRadius: 6,
+          }}>
+            У вас нет доступных касс/счетов. Попросите администратора
+            создать кассу для вашего модуля в /finance/cashbox.
+          </div>
+        ) : (
           <select
             className="input"
-            style={{ marginTop: 6 }}
             value={cashSubId}
             onChange={(e) => setCashSubId(e.target.value)}
           >
-            <option value="">— выберите счёт —</option>
-            {subaccounts
-              ?.filter((s) => s.code.startsWith('50.') || s.code.startsWith('51.'))
-              .map((s) => (
-                <option key={s.id} value={s.id}>{s.name}</option>
-              ))}
+            <option value="">— выберите кассу —</option>
+            {cashOptions.map((s) => {
+              const isCash = s.code.startsWith('50.');
+              return (
+                <option key={s.id} value={s.id}>
+                  {isCash ? '💵 ' : '🏦 '}{s.name}
+                  {s.module_code ? ` · ${s.module_code}` : ''}
+                </option>
+              );
+            })}
           </select>
         )}
+        <span className="hint">
+          {direction === 'out'
+            ? 'Откуда списываются деньги. Видите только свои кассы (по модулям где у вас rw).'
+            : 'Куда зачисляются деньги. Видите только свои кассы.'}
+        </span>
       </div>
 
       {/* ───── На что ───── */}
@@ -653,21 +695,3 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
   );
 }
 
-function MethodChip({
-  active, onClick, children,
-}: {
-  active: boolean;
-  onClick: () => void;
-  children: React.ReactNode;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={'btn btn-sm ' + (active ? 'btn-primary' : 'btn-ghost')}
-      style={{ flex: 1, minWidth: 110 }}
-    >
-      {children}
-    </button>
-  );
-}
