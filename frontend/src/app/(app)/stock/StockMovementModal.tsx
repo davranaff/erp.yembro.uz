@@ -6,13 +6,14 @@ import Modal from '@/components/ui/Modal';
 import { useCounterparties } from '@/hooks/useCounterparties';
 import { useModules } from '@/hooks/useModules';
 import { useNomenclatureItems } from '@/hooks/useNomenclature';
+import { useHasLevel, usePermissions } from '@/hooks/usePermissions';
 import {
   useCreateManualMovement,
   useWarehouses,
   type ManualMovementPayload,
 } from '@/hooks/useStockMovements';
 import { ApiError } from '@/lib/api';
-import type { StockMovement, StockMovementKind } from '@/types/auth';
+import { LEVEL_ORDER, type ModuleLevel, type StockMovement, type StockMovementKind } from '@/types/auth';
 
 const KIND_OPTIONS: { value: StockMovementKind; label: string; help: string }[] = [
   { value: 'incoming',  label: 'Приход',       help: 'Поступление на склад без закупа (инвентарная корректировка).' },
@@ -52,11 +53,51 @@ export default function StockMovementModal({ onClose, onSaved, onSwitchToFeedRaw
   const [counterparty, setCounterparty] = useState('');
 
   const { data: modules } = useModules();
+  const hasLevel = useHasLevel();
+  const permissions = usePermissions();
+  const isOrgAdmin = hasLevel('admin', 'admin') || hasLevel('stock', 'admin');
+
+  // ID-сет модулей где у юзера есть rw. null = org-admin (видит всё).
+  // Без этого head feed мог в этой модалке корректировать остатки vet
+  // или slaughter — что нарушает изоляцию модулей.
+  const accessibleModuleIds = useMemo<Set<string> | null>(() => {
+    if (isOrgAdmin) return null;
+    if (!modules) return new Set();
+    const allowedCodes = new Set(
+      Object.entries(permissions)
+        .filter(([, lvl]) => LEVEL_ORDER[lvl as ModuleLevel] >= LEVEL_ORDER.rw)
+        .map(([code]) => code),
+    );
+    return new Set(
+      modules.filter((m) => allowedCodes.has(m.code)).map((m) => m.id),
+    );
+  }, [isOrgAdmin, modules, permissions]);
+
   const moduleCode = useMemo(
     () => modules?.find((m) => m.id === moduleId)?.code,
     [modules, moduleId],
   );
+
+  // Список модулей в дропдауне — только те, где у юзера rw.
+  const visibleModules = useMemo(() => {
+    if (!modules) return [];
+    if (accessibleModuleIds === null) return modules;
+    return modules.filter((m) => accessibleModuleIds.has(m.id));
+  }, [modules, accessibleModuleIds]);
+
   const { data: warehouses } = useWarehouses();
+  // Склады — фильтруются и по выбранному модулю (как раньше), и по
+  // правам юзера. Чтобы не оказалось так что в дропдауне «На склад»
+  // висит склад модуля к которому у юзера нет доступа.
+  const visibleWarehouses = useMemo(() => {
+    if (!warehouses) return [];
+    return warehouses.filter((w) => {
+      if (accessibleModuleIds === null) return true;
+      // У склада module всегда заполнен (warehouse-first инвариант).
+      if (!w.module) return false;
+      return accessibleModuleIds.has(w.module);
+    });
+  }, [warehouses, accessibleModuleIds]);
   const { data: items } = useNomenclatureItems({
     module_code: moduleCode,
     is_active: 'true',
@@ -225,7 +266,7 @@ export default function StockMovementModal({ onClose, onSaved, onSwitchToFeedRaw
             }}
           >
             <option value="">— выберите —</option>
-            {modules?.map((m) => (
+            {visibleModules.map((m) => (
               <option key={m.id} value={m.id}>
                 {m.name}
               </option>
@@ -289,9 +330,9 @@ export default function StockMovementModal({ onClose, onSaved, onSwitchToFeedRaw
               onChange={(e) => setWhFrom(e.target.value)}
             >
               <option value="">— выберите —</option>
-              {warehouses?.map((w) => (
+              {visibleWarehouses.map((w) => (
                 <option key={w.id} value={w.id}>
-                  {w.code} · {w.name}
+                  {w.name}
                 </option>
               ))}
             </select>
@@ -308,9 +349,9 @@ export default function StockMovementModal({ onClose, onSaved, onSwitchToFeedRaw
               onChange={(e) => setWhTo(e.target.value)}
             >
               <option value="">— выберите —</option>
-              {warehouses?.map((w) => (
+              {visibleWarehouses.map((w) => (
                 <option key={w.id} value={w.id}>
-                  {w.code} · {w.name}
+                  {w.name}
                 </option>
               ))}
             </select>
