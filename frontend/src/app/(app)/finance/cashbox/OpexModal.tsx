@@ -607,9 +607,13 @@ export default function OpexModal({ preselect, onClose }: Props) {
         </div>
       )}
 
-      {/* Ручной выбор субсчёта — только для админа. Оператору эта секция
-          не показывается ВООБЩЕ: чисто бухгалтерский флоу. */}
-      {isOrgAdmin && (showAdvanced || (!articleId && !creatingArticle)) && (
+      {/* Ручной выбор субсчёта — только для админа и ТОЛЬКО при явном
+          раскрытии. Раньше показывалась когда нет articleId — это
+          путало даже админа при первом открытии формы (форма пустая,
+          ничего не выбрано → выскакивала бухгалтерская секция).
+          Теперь: открывается только если admin кликнул «⚙ Указать
+          вручную» (showAdvanced=true). Базовый флоу — через «Категория». */}
+      {isOrgAdmin && showAdvanced && (
         <div className="field">
           <label>
             Субсчёт ГК *
@@ -649,12 +653,21 @@ export default function OpexModal({ preselect, onClose }: Props) {
           <span className="hint">
             Бухгалтерский план счетов. Если не уверены — выберите «Категория» выше.
           </span>
+          <button
+            type="button"
+            className="btn btn-ghost btn-sm"
+            onClick={() => { setShowAdvanced(false); setContraSubId(''); }}
+            style={{ fontSize: 11, color: 'var(--fg-3)', marginTop: 4 }}
+          >
+            ← Свернуть и пользоваться категориями
+          </button>
         </div>
       )}
 
-      {/* Ссылка «указать субсчёт вручную» — только админу. Оператор её
-          не видит, ему достаточно «Категория». */}
-      {isOrgAdmin && articleId && !showAdvanced && (
+      {/* Ссылка «указать субсчёт вручную» — только админу и только когда
+          секция не раскрыта. Оператор её не видит, ему достаточно
+          «Категория». */}
+      {isOrgAdmin && !showAdvanced && (
         <div style={{ marginBottom: 8 }}>
           <button
             type="button"
