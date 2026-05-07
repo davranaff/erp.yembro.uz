@@ -31,12 +31,37 @@ class VetPublicScanView(views.APIView):
     """
     GET /api/vet/public/scan/<barcode>/
 
-    Анонимно. Возвращает лот по штрих-коду со скрытыми чувствительными
-    полями. Если лот в RECALLED/EXPIRED — возвращаем данные но с флагом.
+    Анонимный доступ для кросс-орг просмотра. Если в Authorization есть
+    валидный Bearer seller-token — добавляем «приватные» поля для
+    продавца (себестоимость, рекомендуемая цена). Без токена — публичный
+    минимум, чтобы случайный посетитель не видел маржу.
     """
 
     permission_classes = [permissions.AllowAny]
-    authentication_classes = []  # анонимно
+    authentication_classes = []  # auth делаем вручную (см. _try_seller_auth)
+
+    def _try_seller_auth(self, request) -> bool:
+        """Тихая попытка авторизоваться как продавец.
+
+        Возвращает True если Bearer-токен валиден. Невалидный/отсутствующий
+        токен → False (без 401), чтобы анонимный пользователь мог смотреть
+        публичную карточку без авторизации.
+        """
+        from .models import SellerDeviceToken
+
+        auth_header = request.META.get("HTTP_AUTHORIZATION", "")
+        if not auth_header:
+            return False
+        parts = auth_header.split()
+        if len(parts) != 2 or parts[0] != "Bearer":
+            return False
+        try:
+            tok = SellerDeviceToken.objects.get(token=parts[1])
+        except SellerDeviceToken.DoesNotExist:
+            return False
+        if not tok.is_active or tok.revoked_at is not None:
+            return False
+        return True
 
     def get(self, request, barcode: str):
         # Поиск без фильтра по organization — barcode уникален в рамках org,
@@ -81,6 +106,7 @@ class VetPublicScanView(views.APIView):
         )
         if bag_lot is not None:
             recipe = bag_lot.recipe_version.recipe
+            from decimal import Decimal as _D
             data = {
                 "source_kind": "feed_bag_lot",
                 "id": str(bag_lot.id),
@@ -106,6 +132,23 @@ class VetPublicScanView(views.APIView):
                     if bag_lot.storage_warehouse_id else None
                 ),
             }
+            # Приватные поля: видны только если запрос пришёл с валидным
+            # seller-токеном. Без этого любой посетитель увидел бы
+            # внутреннюю себестоимость.
+            if self._try_seller_auth(request):
+                cost = _D(bag_lot.unit_cost_uzs or 0)
+                # Рекомендованная розничная цена = себестоимость × 1.30
+                # (30% маржа). Это hint для продавца, можно перебить вручную.
+                suggested = (cost * _D("1.30")).quantize(_D("1"))
+                bags_remaining = _D(bag_lot.bags_remaining or 0)
+                bag_weight = _D(bag_lot.bag_weight_kg or 0)
+                data.update({
+                    "unit_cost_uzs": str(cost),
+                    "suggested_price_uzs": str(suggested),
+                    "total_remaining_kg": str(bags_remaining * bag_weight),
+                    "recipe_code": recipe.code,
+                    "recipe_name": recipe.name,
+                })
             return Response(data)
 
         return Response(

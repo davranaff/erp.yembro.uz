@@ -1417,6 +1417,14 @@ export interface FeedBagLotPublic {
   withdrawal_period_ends: string | null;
   packaged_at: string;
   warehouse_code: string | null;
+  // ── Приватные поля, заполняются только если запрос с seller-токеном.
+  // Анонимному посетителю /scan/<barcode> их не показываем (себестоимость
+  // — внутренняя информация).
+  unit_cost_uzs?: string;
+  suggested_price_uzs?: string;
+  total_remaining_kg?: string;
+  recipe_code?: string;
+  recipe_name?: string;
 }
 
 /** Discriminated union — что отдаёт public scan. */

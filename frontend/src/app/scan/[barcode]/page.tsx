@@ -87,10 +87,13 @@ export default function ScanBarcodePage({
         setItem(data);
         if (data) {
           // Цены по дефолту: accessory → sale_price, vet drug → price_per_unit,
-          // feed bag — нет дефолтной (продавец вводит сам).
+          // feed bag → suggested_price_uzs (себестоимость × 1.30, приходит
+          // только для авторизованного продавца). Если суггешн не пришёл
+          // — оставляем пусто, продавец вводит сам.
           const defaultPrice =
             data.source_kind === 'accessory' ? data.sale_price_uzs
             : data.source_kind === 'drug_lot' ? data.price_per_unit_uzs
+            : data.source_kind === 'feed_bag_lot' ? (data.suggested_price_uzs ?? '')
             : '';
           setPriceOverride(defaultPrice ? String(defaultPrice) : '');
         }
@@ -146,6 +149,8 @@ export default function ScanBarcodePage({
           ? updated.sale_price_uzs
           : updated.source_kind === 'drug_lot'
           ? updated.price_per_unit_uzs
+          : updated.source_kind === 'feed_bag_lot'
+          ? (updated.suggested_price_uzs ?? '')
           : '';
         setPriceOverride(defaultPrice ? String(defaultPrice) : '');
       }
@@ -205,12 +210,13 @@ export default function ScanBarcodePage({
     : isFeedBag
     ? item.doc_number
     : item.drug_sku;
-  // У feed-партии нет дефолтной отпускной цены — продавец вписывает
-  // сам в input «Цена за ед.» (ниже preselect возьмёт пустую строку).
+  // unitPrice — то, что пишем в карточке «ЦЕНА ЗА ЕД.» (отпускная).
+  // Для feed используем suggested_price_uzs (себестоимость × 1.30) —
+  // приходит только для авторизованного продавца через Bearer.
   const unitPrice = isAccessory
     ? item.sale_price_uzs
     : isFeedBag
-    ? null
+    ? (item.suggested_price_uzs ?? null)
     : item.price_per_unit_uzs;
 
   const canSell = (() => {
@@ -324,38 +330,132 @@ export default function ScanBarcodePage({
         )}
 
         {isFeedBag && (
-          <div style={{ marginTop: 16, fontSize: 13 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0' }}>
-              <span style={{ color: '#6B7280' }}>Партия</span>
-              <span className="mono">{item.lot_number}</span>
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0' }}>
-              <span style={{ color: '#6B7280' }}>Вес мешка</span>
-              <span className="mono">
-                {parseFloat(item.bag_weight_kg).toLocaleString('ru-RU')} кг
-              </span>
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0' }}>
-              <span style={{ color: '#6B7280' }}>Остаток</span>
-              <span className="mono">
-                {item.bags_remaining}/{item.bags_initial} шт
-              </span>
-            </div>
-            {item.is_medicated && (
-              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0' }}>
-                <span style={{ color: '#6B7280' }}>Каренция до</span>
-                <span style={{
-                  color: '#F59E0B', fontWeight: 600,
+          <>
+            {/* Финансовый блок: видим только продавцу (cost приходит с Bearer).
+                Без token блок просто не отрисовывается — анон видит остаток
+                и характеристики, но не маржу. */}
+            {item.unit_cost_uzs !== undefined && (
+              <div style={{
+                marginTop: 14,
+                padding: 12,
+                background: '#F0FDF4',
+                border: '1px solid #86EFAC',
+                borderRadius: 8,
+              }}>
+                <div style={{
+                  fontSize: 11, fontWeight: 700, color: '#14532D',
+                  textTransform: 'uppercase', letterSpacing: '.04em',
+                  marginBottom: 8,
                 }}>
-                  {item.withdrawal_period_ends ?? `${item.withdrawal_period_days} дн`}
-                </span>
+                  💰 Себестоимость и маржа
+                </div>
+                <div style={{
+                  display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8,
+                  fontSize: 12,
+                }}>
+                  <div>
+                    <div style={{ color: '#6B7280', fontSize: 10 }}>Себест. 1 мешок</div>
+                    <div className="mono" style={{ fontWeight: 600, color: '#111827' }}>
+                      {fmtMoney(item.unit_cost_uzs)}
+                    </div>
+                  </div>
+                  <div>
+                    <div style={{ color: '#6B7280', fontSize: 10 }}>Себест. 1 кг</div>
+                    <div className="mono" style={{ fontWeight: 600, color: '#111827' }}>
+                      {fmtMoney(
+                        parseFloat(item.unit_cost_uzs) /
+                        Math.max(parseFloat(item.bag_weight_kg), 0.0001),
+                      )}
+                    </div>
+                  </div>
+                  {item.suggested_price_uzs && (
+                    <>
+                      <div>
+                        <div style={{ color: '#6B7280', fontSize: 10 }}>Реком. цена (×1.30)</div>
+                        <div className="mono" style={{ fontWeight: 700, color: '#15803D' }}>
+                          {fmtMoney(item.suggested_price_uzs)}
+                        </div>
+                      </div>
+                      <div>
+                        <div style={{ color: '#6B7280', fontSize: 10 }}>Маржа на мешок</div>
+                        <div className="mono" style={{ fontWeight: 700, color: '#15803D' }}>
+                          +{fmtMoney(
+                            parseFloat(item.suggested_price_uzs) -
+                            parseFloat(item.unit_cost_uzs)
+                          )}
+                        </div>
+                      </div>
+                    </>
+                  )}
+                </div>
+                {priceOverride && parseFloat(priceOverride) > 0 && parseFloat(priceOverride) < parseFloat(item.unit_cost_uzs) && (
+                  <div style={{
+                    marginTop: 8, fontSize: 11, color: '#B91C1C',
+                    fontWeight: 600,
+                  }}>
+                    ⚠ Цена ниже себестоимости — будет убыток!
+                  </div>
+                )}
               </div>
             )}
-            <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0' }}>
-              <span style={{ color: '#6B7280' }}>Штрих-код</span>
-              <span className="mono" style={{ fontSize: 11 }}>{item.barcode}</span>
+
+            <div style={{ marginTop: 16, fontSize: 13 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0' }}>
+                <span style={{ color: '#6B7280' }}>Партия</span>
+                <span className="mono">{item.lot_number}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0' }}>
+                <span style={{ color: '#6B7280' }}>Вес мешка</span>
+                <span className="mono">
+                  {parseFloat(item.bag_weight_kg).toLocaleString('ru-RU')} кг
+                </span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0' }}>
+                <span style={{ color: '#6B7280' }}>Остаток</span>
+                <span className="mono">
+                  {item.bags_remaining}/{item.bags_initial} шт
+                  {item.total_remaining_kg && (
+                    <span style={{ color: '#6B7280', marginLeft: 6, fontSize: 11 }}>
+                      ≈ {parseFloat(item.total_remaining_kg).toLocaleString('ru-RU', {
+                        maximumFractionDigits: 0,
+                      })} кг
+                    </span>
+                  )}
+                </span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0' }}>
+                <span style={{ color: '#6B7280' }}>Расфасовано</span>
+                <span className="mono" style={{ fontSize: 12 }}>
+                  {new Date(item.packaged_at).toLocaleDateString('ru-RU', {
+                    day: 'numeric', month: 'long', year: 'numeric',
+                  })}
+                </span>
+              </div>
+              {item.warehouse_code && (
+                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0' }}>
+                  <span style={{ color: '#6B7280' }}>Склад</span>
+                  <span className="mono">{item.warehouse_code}</span>
+                </div>
+              )}
+              {item.is_medicated && (
+                <div style={{
+                  marginTop: 6, padding: '8px 10px',
+                  background: '#FFFBEB',
+                  border: '1px solid #F59E0B',
+                  borderRadius: 6,
+                  fontSize: 12, color: '#92400E',
+                }}>
+                  ⚠ <b>Медикаментозный корм.</b> Каренция до{' '}
+                  <b>{item.withdrawal_period_ends ?? `${item.withdrawal_period_days} дн`}</b>
+                  {' '}— до этого срока птицу с него на убой нельзя.
+                </div>
+              )}
+              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0' }}>
+                <span style={{ color: '#6B7280' }}>Штрих-код</span>
+                <span className="mono" style={{ fontSize: 11 }}>{item.barcode}</span>
+              </div>
             </div>
-          </div>
+          </>
         )}
 
         {isAccessory && (
