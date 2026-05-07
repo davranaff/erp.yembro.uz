@@ -117,11 +117,12 @@ html, body {
 .content {
   flex: 1; overflow-y: auto; overflow-x: hidden;
   padding-top: 20px;
-  /* В full-screen Mini App на iOS home-indicator налезает на низ
-     контента — учитываем safe-area-inset-bottom. На десктопе env()=0. */
-  padding-bottom: max(20px, env(safe-area-inset-bottom));
-  padding-left: max(24px, env(safe-area-inset-left));
-  padding-right: max(24px, env(safe-area-inset-right));
+  /* В full-screen Mini App на iOS home-indicator + Telegram-pill снизу
+     налезают на контент — учитываем env() и --tg-safe-* (последний
+     заполняется TgFrameSync из WebApp.contentSafeAreaInset). */
+  padding-bottom: max(20px, env(safe-area-inset-bottom), var(--tg-safe-bottom, 0px));
+  padding-left: max(24px, env(safe-area-inset-left), var(--tg-safe-left, 0px));
+  padding-right: max(24px, env(safe-area-inset-right), var(--tg-safe-right, 0px));
   min-width: 0;
 }
 
@@ -195,15 +196,17 @@ html, body {
 
 /* ===== Topbar ===== */
 .topbar {
-  /* В full-screen Telegram Mini App / PWA на iOS статус-бар налезает
-     на topbar — добавляем safe-area-inset-top. На десктопе env()=0,
-     высота остаётся прежней. */
-  height: calc(var(--topbar-h) + env(safe-area-inset-top));
-  padding-top: env(safe-area-inset-top);
+  /* В full-screen Telegram Mini App Telegram-pill'ы (Закрыть слева,
+     меню справа) живут поверх WebView — env(safe-area-inset-*) про них
+     не знает. TgFrameSync читает WebApp.contentSafeAreaInset и кладёт
+     в --tg-safe-*. Берём максимум из двух источников. На десктопе
+     обе величины = 0. */
+  height: calc(var(--topbar-h) + max(env(safe-area-inset-top), var(--tg-safe-top, 0px)));
+  padding-top: max(env(safe-area-inset-top), var(--tg-safe-top, 0px));
   background: var(--bg-card); border-bottom: 1px solid var(--border);
   display: flex; align-items: center;
-  padding-left: max(20px, env(safe-area-inset-left));
-  padding-right: max(20px, env(safe-area-inset-right));
+  padding-left: max(20px, env(safe-area-inset-left), var(--tg-safe-left, 0px));
+  padding-right: max(20px, env(safe-area-inset-right), var(--tg-safe-right, 0px));
   gap: 14px;
   flex: 0 0 auto; z-index: var(--z-topbar);
 }
@@ -1192,9 +1195,11 @@ body.navigating * {
     display: inline-flex;
   }
 
-  /* Topbar: сжимаем padding, скрываем breadcrumbs (оставляем только последний) */
+  /* Topbar: сжимаем padding, скрываем breadcrumbs (оставляем только последний).
+     padding-top наследуется из основного правила (env + var(--tg-safe-top)). */
   .topbar {
-    padding: 0 10px;
+    padding-left: max(10px, env(safe-area-inset-left), var(--tg-safe-left, 0px));
+    padding-right: max(10px, env(safe-area-inset-right), var(--tg-safe-right, 0px));
     gap: 4px;
   }
 
@@ -1356,12 +1361,6 @@ body.navigating * {
     max-width: none !important;
     max-height: calc(100dvh - var(--topbar-h) - 16px);
     overflow-y: auto;
-  }
-
-  /* Topbar safe-area: notch не должен налезать на крошки */
-  .topbar {
-    padding-left: max(10px, env(safe-area-inset-left));
-    padding-right: max(10px, env(safe-area-inset-right));
   }
 
   /* UserMenu: скрываем имя, оставляем только аватар + chevron */

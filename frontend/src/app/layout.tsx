@@ -1,10 +1,12 @@
 import type { Metadata, Viewport } from 'next';
 import { Manrope, JetBrains_Mono } from 'next/font/google';
+import Script from 'next/script';
 import { Suspense } from 'react';
 
 import RouteProgress from '@/components/layout/RouteProgress';
 import OfflineIndicator from '@/components/OfflineIndicator';
 import ServiceWorkerRegistration from '@/components/ServiceWorkerRegistration';
+import TgFrameSync from '@/components/telegram/TgFrameSync';
 import { NavigationProvider } from '@/contexts/NavigationContext';
 import QueryProvider from '@/providers/QueryProvider';
 
@@ -65,6 +67,14 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="ru">
       <body className={`${manrope.variable} ${jetbrainsMono.variable}`}>
+        {/* Telegram WebApp SDK — грузим глобально, чтобы insets можно было
+            читать на любой странице (refresh на /dashboard внутри Mini App).
+            На не-Telegram страницах SDK ничего не делает. */}
+        <Script
+          src="https://telegram.org/js/telegram-web-app.js"
+          strategy="afterInteractive"
+        />
+        <TgFrameSync />
         <NavigationProvider>
           <Suspense fallback={null}>
             <RouteProgress />
