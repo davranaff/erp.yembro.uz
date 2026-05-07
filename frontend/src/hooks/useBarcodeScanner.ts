@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { usePathname, useRouter } from 'next/navigation';
+import { usePathname } from 'next/navigation';
 
 /**
  * Глобальный обработчик HID-сканера штрих-кодов.
@@ -16,7 +16,9 @@ import { usePathname, useRouter } from 'next/navigation';
  *     даёт спокойно печатать.
  *   - Если уже на /scan/* или /scan/login — игнорирует (там свой ввод).
  *   - Накапливает символы в буфер, сбрасывает если интервал > 50мс.
- *   - На Enter с буфером ≥ 6 симв и быстрой накачкой → router.push(/scan/<barcode>).
+ *   - На Enter с буфером ≥ 6 симв и быстрой накачкой → window.open(...,
+ *     '_blank') — открываем продажную карточку в НОВОЙ вкладке, чтобы
+ *     текущая страница (где админ работает) не пропадала.
  *
  * `scannerActive` — короткий флаг (true пока идёт быстрая накачка),
  * для индикатора в UI.
@@ -36,7 +38,6 @@ function isInputFocused(): boolean {
 }
 
 export function useBarcodeScanner(): { scannerActive: boolean } {
-  const router = useRouter();
   const pathname = usePathname();
   const [scannerActive, setScannerActive] = useState(false);
   const activeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -70,7 +71,14 @@ export function useBarcodeScanner(): { scannerActive: boolean } {
         // gap здесь — интервал от ПОСЛЕДНЕГО keydown до Enter; обычно < 30мс.
         if (code.length >= MIN_BARCODE_LEN && gap < SCAN_GAP_MS) {
           e.preventDefault();
-          router.push(`/scan/${encodeURIComponent(code)}`);
+          // Открываем в новой вкладке — текущая страница админа (например
+          // /sales или /feed) остаётся открытой. После продажи продавец
+          // закроет вкладку и вернётся к работе.
+          window.open(
+            `/scan/${encodeURIComponent(code)}`,
+            '_blank',
+            'noopener',
+          );
         }
         return;
       }
@@ -94,7 +102,7 @@ export function useBarcodeScanner(): { scannerActive: boolean } {
       document.removeEventListener('keydown', handleKey);
       if (activeTimerRef.current) clearTimeout(activeTimerRef.current);
     };
-  }, [router, pathname]);
+  }, [pathname]);
 
   return { scannerActive };
 }

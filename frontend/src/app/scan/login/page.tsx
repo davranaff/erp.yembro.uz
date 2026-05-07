@@ -150,11 +150,16 @@ export default function ScanLoginPage() {
         </button>
 
         <p style={{
-          fontSize: 11, color: '#9CA3AF', marginTop: 16, marginBottom: 0,
+          fontSize: 11, color: '#9CA3AF', marginTop: 16, marginBottom: 8,
           textAlign: 'center',
         }}>
           Токен хранится только на этом устройстве (localStorage).
         </p>
+        <div style={{ textAlign: 'center', fontSize: 12 }}>
+          <a href="/dashboard" style={{ color: '#374151', textDecoration: 'underline' }}>
+            ⌂ В систему
+          </a>
+        </div>
       </div>
     </div>
   );

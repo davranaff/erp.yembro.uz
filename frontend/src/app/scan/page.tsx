@@ -94,13 +94,18 @@ export default function ScanIndexPage() {
           </button>
         </div>
 
-        <a href="/scan/login" style={{
-          display: 'block', textAlign: 'center',
-          fontSize: 12, color: '#6B7280',
-          textDecoration: 'underline',
+        <div style={{
+          display: 'flex', gap: 12, justifyContent: 'center',
+          fontSize: 12, color: '#6B7280', flexWrap: 'wrap',
         }}>
-          Сменить токен
-        </a>
+          <a href="/scan/login" style={{ color: '#6B7280', textDecoration: 'underline' }}>
+            Сменить токен
+          </a>
+          <span style={{ color: '#D1D5DB' }}>|</span>
+          <a href="/dashboard" style={{ color: '#374151', textDecoration: 'underline' }}>
+            ⌂ В систему
+          </a>
+        </div>
       </div>
     </div>
   );
