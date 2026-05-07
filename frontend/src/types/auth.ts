@@ -1386,8 +1386,44 @@ export interface VetAccessoryPublic {
   is_active: boolean;
 }
 
+/**
+ * Public-данные партии фасованного корма (мешки).
+ * Возвращается из /api/vet/public/scan/<barcode>/ когда штрих-код принадлежит
+ * FeedBagLot. Структура полей выровнена с VetStockBatchPublic насколько
+ * возможно (`drug_name` заполняется как «recipe.code · recipe.name»,
+ * `current_quantity` = `bags_remaining`), чтобы scan-страница могла
+ * отображать всё через общий код. Уникальные для feed:
+ *   - `bags_remaining` / `bags_initial` / `bag_weight_kg` — учёт в шт мешков
+ *   - `is_medicated` / `withdrawal_period_*` — медикаментозные лекторы
+ *   - `status` имеет свой набор: active|depleted|recalled
+ */
+export type FeedBagLotStatusPublic = 'active' | 'depleted' | 'recalled';
+
+export interface FeedBagLotPublic {
+  source_kind: 'feed_bag_lot';
+  id: string;
+  barcode: string;
+  doc_number: string;
+  drug_name: string | null;
+  lot_number: string;
+  status: FeedBagLotStatusPublic;
+  current_quantity: string;
+  unit_code: string | null;
+  bags_initial: number;
+  bags_remaining: number;
+  bag_weight_kg: string;
+  is_medicated: boolean;
+  withdrawal_period_days: number;
+  withdrawal_period_ends: string | null;
+  packaged_at: string;
+  warehouse_code: string | null;
+}
+
 /** Discriminated union — что отдаёт public scan. */
-export type ScanResult = VetStockBatchPublic | VetAccessoryPublic;
+export type ScanResult =
+  | VetStockBatchPublic
+  | VetAccessoryPublic
+  | FeedBagLotPublic;
 
 export interface SellerDeviceToken {
   id: string;

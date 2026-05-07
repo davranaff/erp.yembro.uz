@@ -22,9 +22,10 @@ function fmtMoney(uzs: string | number | null | undefined): string {
   return n.toLocaleString('ru-RU', { maximumFractionDigits: 0 }) + ' сум';
 }
 
-function statusColor(s: VetStockBatchPublic['status']): string {
+function statusColor(s: string | undefined): string {
   switch (s) {
-    case 'available': return '#10B981';
+    case 'available':
+    case 'active':       return '#10B981';
     case 'expiring_soon': return '#F59E0B';
     case 'expired': return '#EF4444';
     case 'recalled': return '#EF4444';
@@ -34,14 +35,24 @@ function statusColor(s: VetStockBatchPublic['status']): string {
   }
 }
 
-const STATUS_LABEL: Record<VetStockBatchPublic['status'], string> = {
+// Объединяем статусы vet-партии (`available|quarantine|expiring_soon|
+// expired|depleted|recalled`) и feed-партии мешков (`active|depleted|
+// recalled`). Лукап безопасный — fallback на сам код, чтобы /scan не
+// крашился если бэкенд добавит новый статус.
+const STATUS_LABEL: Record<string, string> = {
   available: 'Доступно для продажи',
+  active: 'Доступно для продажи',
   quarantine: 'На карантине',
   expiring_soon: 'Скоро истекает',
   expired: 'Срок истёк',
   depleted: 'Закончился',
   recalled: 'Отозван',
 };
+
+function statusLabel(s: string | undefined): string {
+  if (!s) return '—';
+  return STATUS_LABEL[s] ?? s;
+}
 
 
 export default function ScanBarcodePage({
@@ -75,9 +86,12 @@ export default function ScanBarcodePage({
       .then((data) => {
         setItem(data);
         if (data) {
-          const defaultPrice = data.source_kind === 'accessory'
-            ? data.sale_price_uzs
-            : data.price_per_unit_uzs;
+          // Цены по дефолту: accessory → sale_price, vet drug → price_per_unit,
+          // feed bag — нет дефолтной (продавец вводит сам).
+          const defaultPrice =
+            data.source_kind === 'accessory' ? data.sale_price_uzs
+            : data.source_kind === 'drug_lot' ? data.price_per_unit_uzs
+            : '';
           setPriceOverride(defaultPrice ? String(defaultPrice) : '');
         }
         setLoading(false);
@@ -130,7 +144,9 @@ export default function ScanBarcodePage({
       if (updated) {
         const defaultPrice = updated.source_kind === 'accessory'
           ? updated.sale_price_uzs
-          : updated.price_per_unit_uzs;
+          : updated.source_kind === 'drug_lot'
+          ? updated.price_per_unit_uzs
+          : '';
         setPriceOverride(defaultPrice ? String(defaultPrice) : '');
       }
       setCustomerId('');
@@ -179,17 +195,29 @@ export default function ScanBarcodePage({
   }
 
   const isAccessory = item.source_kind === 'accessory';
+  const isFeedBag = item.source_kind === 'feed_bag_lot';
 
   const title = isAccessory
     ? (item.nomenclature_name ?? '—')
     : (item.drug_name ?? '—');
-  const subtitleSku = isAccessory ? item.nomenclature_sku : item.drug_sku;
-  const unitPrice = isAccessory ? item.sale_price_uzs : item.price_per_unit_uzs;
+  const subtitleSku = isAccessory
+    ? item.nomenclature_sku
+    : isFeedBag
+    ? item.doc_number
+    : item.drug_sku;
+  // У feed-партии нет дефолтной отпускной цены — продавец вписывает
+  // сам в input «Цена за ед.» (ниже preselect возьмёт пустую строку).
+  const unitPrice = isAccessory
+    ? item.sale_price_uzs
+    : isFeedBag
+    ? null
+    : item.price_per_unit_uzs;
 
   const canSell = (() => {
     if (parseFloat(item.current_quantity) <= 0) return false;
     if (!hasToken) return false;
     if (isAccessory) return item.is_active;
+    if (isFeedBag) return item.status === 'active';
     const sellableStatus = item.status === 'available' || item.status === 'expiring_soon';
     return sellableStatus && !item.is_expired;
   })();
@@ -218,7 +246,9 @@ export default function ScanBarcodePage({
         }}>
           {isAccessory
             ? (item.is_active ? 'Аксессуар · в продаже' : 'Аксессуар · отключён')
-            : STATUS_LABEL[item.status]}
+            : isFeedBag
+            ? `Корм · ${statusLabel(item.status)}`
+            : statusLabel(item.status)}
         </div>
 
         <h1 style={{ margin: 0, fontSize: 22, color: '#111827' }}>
@@ -226,7 +256,7 @@ export default function ScanBarcodePage({
         </h1>
         <div style={{ fontSize: 13, color: '#6B7280', marginTop: 4 }}>
           <strong className="mono">{subtitleSku ?? '—'}</strong>
-          {!isAccessory && item.drug_type_display && <> · {item.drug_type_display}</>}
+          {item.source_kind === 'drug_lot' && item.drug_type_display && <> · {item.drug_type_display}</>}
         </div>
 
         <div style={{
@@ -260,7 +290,7 @@ export default function ScanBarcodePage({
           </div>
         </div>
 
-        {!isAccessory && (
+        {item.source_kind === 'drug_lot' && (
           <div style={{ marginTop: 16, fontSize: 13 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0' }}>
               <span style={{ color: '#6B7280' }}>Lot №</span>
@@ -286,6 +316,41 @@ export default function ScanBarcodePage({
                 )}
               </span>
             </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0' }}>
+              <span style={{ color: '#6B7280' }}>Штрих-код</span>
+              <span className="mono" style={{ fontSize: 11 }}>{item.barcode}</span>
+            </div>
+          </div>
+        )}
+
+        {isFeedBag && (
+          <div style={{ marginTop: 16, fontSize: 13 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0' }}>
+              <span style={{ color: '#6B7280' }}>Партия</span>
+              <span className="mono">{item.lot_number}</span>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0' }}>
+              <span style={{ color: '#6B7280' }}>Вес мешка</span>
+              <span className="mono">
+                {parseFloat(item.bag_weight_kg).toLocaleString('ru-RU')} кг
+              </span>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0' }}>
+              <span style={{ color: '#6B7280' }}>Остаток</span>
+              <span className="mono">
+                {item.bags_remaining}/{item.bags_initial} шт
+              </span>
+            </div>
+            {item.is_medicated && (
+              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0' }}>
+                <span style={{ color: '#6B7280' }}>Каренция до</span>
+                <span style={{
+                  color: '#F59E0B', fontWeight: 600,
+                }}>
+                  {item.withdrawal_period_ends ?? `${item.withdrawal_period_days} дн`}
+                </span>
+              </div>
+            )}
             <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0' }}>
               <span style={{ color: '#6B7280' }}>Штрих-код</span>
               <span className="mono" style={{ fontSize: 11 }}>{item.barcode}</span>
@@ -420,7 +485,7 @@ export default function ScanBarcodePage({
                 </span>
               )}
             </div>
-            {!isAccessory && item.status === 'expiring_soon' && (
+            {item.source_kind === 'drug_lot' && item.status === 'expiring_soon' && (
               <div style={{
                 marginTop: 10, padding: '8px 10px',
                 background: '#FFFBEB', borderRadius: 6,
@@ -449,14 +514,17 @@ export default function ScanBarcodePage({
           </div>
         )}
 
-        {!canSell && hasToken && !isAccessory && item.status !== 'available' && (
+        {!canSell && hasToken && !isAccessory && (
+          (isFeedBag && item.status !== 'active') ||
+          (!isFeedBag && item.status !== 'available')
+        ) && (
           <div style={{
             marginTop: 20, padding: 14,
             background: '#FEF2F2', borderRadius: 8,
             border: '1px solid #EF4444',
             fontSize: 13, color: '#991B1B',
           }}>
-            Продажа невозможна: {STATUS_LABEL[item.status].toLowerCase()}.
+            Продажа невозможна: {statusLabel(item.status).toLowerCase()}.
           </div>
         )}
 
