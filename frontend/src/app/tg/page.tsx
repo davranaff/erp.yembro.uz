@@ -47,8 +47,15 @@ type MiniAppAuthResponse = MiniAppAuthLinked | MiniAppAuthUnlinked;
 
 interface TelegramWebAppLite {
   initData: string;
+  version?: string;
+  isFullscreen?: boolean;
   ready?: () => void;
   expand?: () => void;
+  /** Bot API 8.0+. На desktop / старых клиентах метода нет — оборачиваем в try/catch. */
+  requestFullscreen?: () => void;
+  /** Bot API 8.0+. true → iOS swipe-down не свернёт WebApp при скролле. */
+  disableVerticalSwipes?: () => void;
+  isVersionAtLeast?: (v: string) => boolean;
 }
 
 declare global {
@@ -80,6 +87,21 @@ export default function TgMiniAppPage() {
 
     tg?.ready?.();
     tg?.expand?.();
+
+    // Bot API 8.0+: переключаем в full-screen на телефоне. На desktop /
+    // старых клиентах метода может не быть (или он бросит "UNSUPPORTED")
+    // — игнорируем, expand() уже даст max-height в обычном режиме.
+    try {
+      if (tg?.isVersionAtLeast?.('8.0') && !tg.isFullscreen) {
+        tg.requestFullscreen?.();
+        // В full-screen iOS swipe-down закроет WebApp на любом скролле —
+        // отключаем вертикальный жест, чтобы юзер не сворачивал нас
+        // случайно при прокрутке таблиц.
+        tg.disableVerticalSwipes?.();
+      }
+    } catch {
+      // Telegram <8.0 / desktop — silent. UI остаётся в expand-режиме.
+    }
 
     (async () => {
       try {
@@ -119,13 +141,18 @@ export default function TgMiniAppPage() {
       />
       <div
         style={{
-          minHeight: '100vh',
+          // 100dvh + safe-area: в full-screen Mini App статус-бар iOS / home
+          // indicator не налезают на текст.
+          minHeight: '100dvh',
           display: 'grid',
           placeItems: 'center',
           background: 'var(--bg)',
           color: 'var(--fg-3)',
           fontSize: 13,
-          padding: 24,
+          paddingTop: 'max(24px, env(safe-area-inset-top))',
+          paddingBottom: 'max(24px, env(safe-area-inset-bottom))',
+          paddingLeft: 'max(24px, env(safe-area-inset-left))',
+          paddingRight: 'max(24px, env(safe-area-inset-right))',
           textAlign: 'center',
         }}
       >

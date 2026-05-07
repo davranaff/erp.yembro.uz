@@ -55,6 +55,10 @@ export const viewport: Viewport = {
   initialScale: 1,
   maximumScale: 5,
   themeColor: '#E8751A',
+  // viewport-fit=cover нужен чтобы iOS Safari / Telegram WebView пробрасывал
+  // env(safe-area-inset-*). Без него в full-screen Mini App статус-бар и
+  // home-indicator налезают на UI.
+  viewportFit: 'cover',
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
