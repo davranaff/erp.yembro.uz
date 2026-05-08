@@ -1,5 +1,7 @@
 'use client';
 
+import { Fragment } from 'react';
+
 import DetailDrawer from '@/components/DetailDrawer';
 import Badge from '@/components/ui/Badge';
 import {
@@ -69,9 +71,8 @@ export default function WarehouseBalanceDrawer({ warehouse, onClose, onRowClick 
               const tone = bal > 0 ? 'success' : bal < 0 ? 'danger' : 'neutral';
               const hasLots = (r.lots?.length ?? 0) > 0;
               return (
-                <>
+                <Fragment key={r.nomenclature_id}>
                   <tr
-                    key={r.nomenclature_id}
                     onClick={onRowClick ? () => onRowClick(r) : undefined}
                     style={{
                       borderBottom: hasLots ? 'none' : '1px solid var(--border)',
@@ -104,7 +105,7 @@ export default function WarehouseBalanceDrawer({ warehouse, onClose, onRowClick 
                     </td>
                   </tr>
                   {hasLots && (
-                    <tr key={`${r.nomenclature_id}-lots`} style={{
+                    <tr style={{
                       borderBottom: '1px solid var(--border)',
                       background: 'var(--bg-soft)',
                     }}>
@@ -147,7 +148,7 @@ export default function WarehouseBalanceDrawer({ warehouse, onClose, onRowClick 
                       </td>
                     </tr>
                   )}
-                </>
+                </Fragment>
               );
             })}
           </tbody>
