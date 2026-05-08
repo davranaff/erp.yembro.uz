@@ -1,13 +1,20 @@
 'use client';
 
+import { Fragment } from 'react';
+
 import DetailDrawer from '@/components/DetailDrawer';
 import Badge from '@/components/ui/Badge';
-import { useWarehouseBalance } from '@/hooks/useStockMovements';
+import {
+  useWarehouseBalance,
+  type WarehouseBalanceRow,
+} from '@/hooks/useStockMovements';
 import type { WarehouseRef } from '@/types/auth';
 
 interface Props {
   warehouse: WarehouseRef;
   onClose: () => void;
+  /** Клик по строке номенклатуры — открыть историю движений этого SKU. */
+  onRowClick?: (row: WarehouseBalanceRow) => void;
 }
 
 function fmt(n: string, digits = 2): string {
@@ -20,7 +27,7 @@ function fmt(n: string, digits = 2): string {
  * Drawer с остатками склада: для каждой номенклатуры показывает Σ приход,
  * Σ расход, текущий баланс. Сортировка: с балансом сверху, исчерпанные снизу.
  */
-export default function WarehouseBalanceDrawer({ warehouse, onClose }: Props) {
+export default function WarehouseBalanceDrawer({ warehouse, onClose, onRowClick }: Props) {
   const { data, isLoading, error } = useWarehouseBalance(warehouse.id);
 
   return (
@@ -64,8 +71,15 @@ export default function WarehouseBalanceDrawer({ warehouse, onClose }: Props) {
               const tone = bal > 0 ? 'success' : bal < 0 ? 'danger' : 'neutral';
               const hasLots = (r.lots?.length ?? 0) > 0;
               return (
-                <>
-                  <tr key={r.nomenclature_id} style={{ borderBottom: hasLots ? 'none' : '1px solid var(--border)' }}>
+                <Fragment key={r.nomenclature_id}>
+                  <tr
+                    onClick={onRowClick ? () => onRowClick(r) : undefined}
+                    style={{
+                      borderBottom: hasLots ? 'none' : '1px solid var(--border)',
+                      cursor: onRowClick ? 'pointer' : 'default',
+                    }}
+                    title={onRowClick ? 'Открыть историю движений' : undefined}
+                  >
                     <td style={{ padding: '6px 10px' }}>
                       <div className="mono" style={{ fontWeight: 500 }}>{r.sku}</div>
                       <div style={{ fontSize: 11, color: 'var(--fg-3)' }}>{r.name}</div>
@@ -91,7 +105,7 @@ export default function WarehouseBalanceDrawer({ warehouse, onClose }: Props) {
                     </td>
                   </tr>
                   {hasLots && (
-                    <tr key={`${r.nomenclature_id}-lots`} style={{
+                    <tr style={{
                       borderBottom: '1px solid var(--border)',
                       background: 'var(--bg-soft)',
                     }}>
@@ -134,7 +148,7 @@ export default function WarehouseBalanceDrawer({ warehouse, onClose }: Props) {
                       </td>
                     </tr>
                   )}
-                </>
+                </Fragment>
               );
             })}
           </tbody>

@@ -12,6 +12,7 @@ import Panel from '@/components/ui/Panel';
 import RowActions from '@/components/ui/RowActions';
 import Seg from '@/components/ui/Seg';
 import TablePagination from '@/components/ui/TablePagination';
+import { useModules } from '@/hooks/useModules';
 import { useHasLevel } from '@/hooks/usePermissions';
 import {
   useDeleteManualMovement,
@@ -82,7 +83,7 @@ function fmtMoneyShort(v: string): string {
 type Tab = 'movements' | 'warehouses';
 
 export default function StockPage() {
-  const [tab, setTab] = useState<Tab>('movements');
+  const [tab, setTab] = useState<Tab>('warehouses');
 
   // Movements tab state
   const [kind, setKind] = useState<string>('');
@@ -90,6 +91,8 @@ export default function StockPage() {
   const [search, setSearch] = useState('');
   const [draftSearch, setDraftSearch] = useState('');
   const [warehouseId, setWarehouseId] = useState('');
+  const [nomenclatureId, setNomenclatureId] = useState('');
+  const [nomenclatureLabel, setNomenclatureLabel] = useState('');
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(50);
   const [sel, setSel] = useState<StockMovement | null>(null);
@@ -120,15 +123,17 @@ export default function StockPage() {
       // Используем единый фильтр `warehouse` (Q OR на бэкенде по
       // warehouse_from + warehouse_to), чтобы не терять INCOMING-движения.
       warehouse: warehouseId || undefined,
+      nomenclature: nomenclatureId || undefined,
       search: search || undefined,
     }),
-    [kind, moduleCode, warehouseId, search],
+    [kind, moduleCode, warehouseId, nomenclatureId, search],
   );
 
   const { data: pageData, isLoading, error, refetch, isFetching } = useStockMovementsPaginated(filter, page, pageSize);
   const data = pageData?.results ?? [];
   const { data: stats } = useStockMovementsStats(filter);
   const { data: warehouses } = useWarehouses({ is_active: '' });
+  const { data: modules } = useModules();
   const deleteMovement = useDeleteManualMovement();
   const deleteWarehouse = useDeleteWarehouse();
 
@@ -231,8 +236,8 @@ export default function StockPage() {
       <div style={{ marginBottom: 12 }}>
         <Seg
           options={[
-            { value: 'movements',  label: 'Движения' },
             { value: 'warehouses', label: 'Склады' },
+            { value: 'movements',  label: 'Движения' },
           ]}
           value={tab}
           onChange={(v) => setTab(v as Tab)}
@@ -284,20 +289,26 @@ export default function StockPage() {
               value={kind}
               onChange={(v) => { setKind(v); setPage(1); }}
             />
-            <input
+            <select
               className="input"
               value={moduleCode}
               onChange={(e) => { setModuleCode(e.target.value); setPage(1); }}
-              placeholder="Модуль (feedlot/slaughter/...)"
               style={{ width: 200 }}
-            />
+            >
+              <option value="">Все модули</option>
+              {modules?.filter((m) => m.is_active).map((m) => (
+                <option key={m.id} value={m.code}>
+                  {m.name}
+                </option>
+              ))}
+            </select>
             <select
               className="input"
               value={warehouseId}
               onChange={(e) => { setWarehouseId(e.target.value); setPage(1); }}
               style={{ width: 240 }}
             >
-              <option value="">Все склады (источник)</option>
+              <option value="">Все склады</option>
               {warehouses?.map((w) => (
                 <option key={w.id} value={w.id}>
                   {w.code} · {w.name}
@@ -319,6 +330,45 @@ export default function StockPage() {
               </form>
             </div>
           </div>
+
+          {/* Filter chip — показываем когда зашли через клик из drawer'а
+              «Остатки склада». Юзер сразу видит на чём фильтр и может сбросить. */}
+          {(nomenclatureId || warehouseId) && (
+            <div style={{
+              display: 'flex', alignItems: 'center', flexWrap: 'wrap',
+              gap: 8, padding: 8, marginBottom: 12,
+              background: 'var(--bg-soft)', borderRadius: 6,
+              border: '1px dashed var(--brand-orange)',
+            }}>
+              <span style={{
+                fontSize: 11, fontWeight: 700, color: 'var(--fg-3)',
+                textTransform: 'uppercase', letterSpacing: '.04em',
+              }}>
+                Фильтр:
+              </span>
+              {nomenclatureLabel && (
+                <Badge tone="warn">📦 {nomenclatureLabel}</Badge>
+              )}
+              {warehouseId && warehouses && (
+                <Badge tone="info">
+                  🏬 {warehouses.find((w) => w.id === warehouseId)?.code ?? '—'}
+                </Badge>
+              )}
+              <button
+                type="button"
+                className="btn btn-ghost btn-sm"
+                onClick={() => {
+                  setNomenclatureId('');
+                  setNomenclatureLabel('');
+                  setWarehouseId('');
+                  setPage(1);
+                }}
+                style={{ marginLeft: 'auto', fontSize: 11 }}
+              >
+                Сбросить
+              </button>
+            </div>
+          )}
 
           <Panel flush>
             <DataTable<StockMovement>
@@ -582,6 +632,16 @@ export default function StockPage() {
         <WarehouseBalanceDrawer
           warehouse={warehouseBalance}
           onClose={() => setWarehouseBalance(null)}
+          onRowClick={(row) => {
+            // Клик по строке → открыть Движения с фильтром по этой
+            // номенклатуре + этому складу.
+            setNomenclatureId(row.nomenclature_id);
+            setNomenclatureLabel(`${row.sku} · ${row.name}`);
+            setWarehouseId(warehouseBalance.id);
+            setPage(1);
+            setTab('movements');
+            setWarehouseBalance(null);
+          }}
         />
       )}
     </>
