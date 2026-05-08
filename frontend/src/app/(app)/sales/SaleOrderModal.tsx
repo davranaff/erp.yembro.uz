@@ -877,49 +877,89 @@ export default function SaleOrderModal({ initial, preselect, onClose }: Props) {
                 )}
               </div>
 
-              <div className="field">
-                <label>
-                  Кол-во *
-                  {it.available_quantity && (
-                    <span style={{ fontSize: 10, color: 'var(--fg-3)', fontWeight: 400, marginLeft: 6 }}>
-                      доступно {parseFloat(it.available_quantity).toLocaleString('ru-RU')} {it.unit_code ?? ''}
-                    </span>
-                  )}
-                </label>
-                <input
-                  className="input mono"
-                  type="number"
-                  step="0.001"
-                  min="0"
-                  max={it.available_quantity || undefined}
-                  value={it.quantity}
-                  onChange={(e) => updateItem(it.key, { quantity: e.target.value })}
-                  style={
-                    it.available_quantity
-                      && parseFloat(it.quantity || '0') > parseFloat(it.available_quantity)
-                      ? { borderColor: 'var(--danger)' }
-                      : undefined
-                  }
-                />
-                {it.available_quantity
-                  && parseFloat(it.quantity || '0') > parseFloat(it.available_quantity)
-                  && (
-                    <div style={{ fontSize: 11, color: 'var(--danger)', marginTop: 4 }}>
-                      Превышен доступный остаток партии {it.batch_doc}.
+              {(() => {
+                // Для feed_bag_lot показываем кг-эквивалент: партия физически
+                // продаётся в мешках (целое число), но фермер думает в кг.
+                const isBag = itemSourceKind(it) === 'feed_bag_lot';
+                const bagLot = isBag
+                  ? (feedBagLots ?? []).find((b) => b.id === it.feed_bag_lot)
+                  : undefined;
+                const bagKg = bagLot ? parseFloat(bagLot.bag_weight_kg) : 0;
+                const qtyNum = parseFloat(it.quantity || '0');
+                const qtyKg = isBag && bagKg > 0 ? qtyNum * bagKg : 0;
+                const availNum = it.available_quantity
+                  ? parseFloat(it.available_quantity)
+                  : 0;
+                const availKg = isBag && bagKg > 0 ? availNum * bagKg : 0;
+                return (
+                  <>
+                    <div className="field">
+                      <label>
+                        Кол-во *
+                        {it.available_quantity && (
+                          <span style={{ fontSize: 10, color: 'var(--fg-3)', fontWeight: 400, marginLeft: 6 }}>
+                            доступно {availNum.toLocaleString('ru-RU')} {it.unit_code ?? ''}
+                            {isBag && availKg > 0 && (
+                              <> = {availKg.toLocaleString('ru-RU')} кг</>
+                            )}
+                          </span>
+                        )}
+                      </label>
+                      <input
+                        className="input mono"
+                        type="number"
+                        step={isBag ? '1' : '0.001'}
+                        min="0"
+                        max={it.available_quantity || undefined}
+                        value={it.quantity}
+                        onChange={(e) => updateItem(it.key, { quantity: e.target.value })}
+                        style={
+                          it.available_quantity
+                            && qtyNum > availNum
+                            ? { borderColor: 'var(--danger)' }
+                            : undefined
+                        }
+                      />
+                      {isBag && qtyNum > 0 && bagKg > 0 && (
+                        <div style={{ fontSize: 11, color: 'var(--fg-3)', marginTop: 4 }}>
+                          {qtyNum.toLocaleString('ru-RU')} мешок × {bagKg.toLocaleString('ru-RU')} кг ={' '}
+                          <b>{qtyKg.toLocaleString('ru-RU')} кг</b>
+                        </div>
+                      )}
+                      {it.available_quantity
+                        && qtyNum > availNum
+                        && (
+                          <div style={{ fontSize: 11, color: 'var(--danger)', marginTop: 4 }}>
+                            Превышен доступный остаток партии {it.batch_doc}.
+                          </div>
+                        )}
                     </div>
-                  )}
-              </div>
 
-              <div className="field">
-                <label>Цена за ед. ({currencyCode}) *</label>
-                <input
-                  className="input mono"
-                  type="number"
-                  step="0.01"
-                  value={it.unit_price_uzs}
-                  onChange={(e) => updateItem(it.key, { unit_price_uzs: e.target.value })}
-                />
-              </div>
+                    <div className="field">
+                      <label>
+                        Цена за ед. ({currencyCode}) *
+                        {isBag && bagKg > 0 && (
+                          <span style={{ fontSize: 10, color: 'var(--fg-3)', fontWeight: 400, marginLeft: 6 }}>
+                            за 1 мешок ({bagKg.toLocaleString('ru-RU')} кг)
+                          </span>
+                        )}
+                      </label>
+                      <input
+                        className="input mono"
+                        type="number"
+                        step="0.01"
+                        value={it.unit_price_uzs}
+                        onChange={(e) => updateItem(it.key, { unit_price_uzs: e.target.value })}
+                      />
+                      {isBag && bagKg > 0 && parseFloat(it.unit_price_uzs || '0') > 0 && (
+                        <div style={{ fontSize: 11, color: 'var(--fg-3)', marginTop: 4 }}>
+                          ≈ {(parseFloat(it.unit_price_uzs) / bagKg).toLocaleString('ru-RU', { maximumFractionDigits: 0 })} {currencyCode}/кг
+                        </div>
+                      )}
+                    </div>
+                  </>
+                );
+              })()}
 
               <div style={{ gridColumn: '1/3', display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 12, color: 'var(--fg-2)' }}>
                 <span>
