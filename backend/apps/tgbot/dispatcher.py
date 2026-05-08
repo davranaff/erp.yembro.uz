@@ -227,6 +227,16 @@ def dispatch_message(msg: dict) -> None:
         )
         return
 
+    # Wizard-перехват: если у пользователя есть активная wizard-сессия и
+    # текущий state ждёт текст-ввод — направляем сообщение туда. Команды
+    # с / всё ещё имеют приоритет: `/cancel` отменяет wizard, любая другая
+    # команда тоже прерывает (новый command-flow явно).
+    if not is_counterparty and not text.startswith("/"):
+        if _try_route_wizard_message(
+            HandlerCtx(chat_id=chat_id, link=link), text=text,
+        ):
+            return
+
     spec = COMMANDS.get(cmd_name)
     if spec is None:
         # Неизвестная команда → /help
@@ -268,11 +278,24 @@ def dispatch_callback(cbq: dict) -> None:
     answer_callback_query(callback_id)
 
     from . import handlers  # noqa: F401
+    from . import wizards  # noqa: F401  — регистрирует wizard-handlers
 
     link = get_admin_link(chat_id) or get_counterparty_link(chat_id)
     if link is None:
         send_message(chat_id, "❌ Sessiya tugadi. Akkauntni qaytadan bog'lang.")
         return
+
+    # Callback'и wizard'ов идут с префиксом `wiz:<wizard_code>:...`. Если
+    # есть активная session — direct route в её handler (по state).
+    if data.startswith("wiz:"):
+        if _try_route_wizard_callback(
+            HandlerCtx(
+                chat_id=chat_id, link=link, callback_data=data,
+                callback_id=callback_id, message_id=message_id,
+            ),
+            data=data,
+        ):
+            return
 
     resolved = _resolve_callback(data)
     if resolved is None:
@@ -300,6 +323,65 @@ def dispatch_callback(cbq: dict) -> None:
     except Exception:  # noqa: BLE001
         logger.exception("callback %s crashed", data)
         send_message(chat_id, "⚠️ Ошибка обработки. Повторите позже.")
+
+
+def _try_route_wizard_message(ctx: HandlerCtx, *, text: str) -> bool:
+    """Возвращает True если сообщение поглощено wizard-handler'ом."""
+    from .models import TgWizardSession
+    from .wizards import get_wizard
+
+    session = TgWizardSession.get_active(ctx.chat_id)
+    if session is None:
+        return False
+    wizard = get_wizard(session.wizard)
+    if wizard is None:
+        # Сессия ссылается на исчезнувший wizard — чистим, ничего не делаем.
+        session.delete()
+        return False
+    handler = wizard.on_message.get(session.state)
+    if handler is None:
+        return False
+    try:
+        handler(ctx, session=session, text=text)
+    except Exception:  # noqa: BLE001
+        logger.exception("wizard %s state=%s message handler crashed",
+                         session.wizard, session.state)
+        send_message(ctx.chat_id, "⚠️ Xatolik yuz berdi. /bekor — отменить.")
+    return True
+
+
+def _try_route_wizard_callback(ctx: HandlerCtx, *, data: str) -> bool:
+    """Возвращает True если callback поглощён wizard'ом."""
+    from .models import TgWizardSession
+    from .wizards import get_wizard
+
+    session = TgWizardSession.get_active(ctx.chat_id)
+    if session is None:
+        send_message(
+            ctx.chat_id,
+            "Sessiya muddati o'tdi. Buyrug'ni qayta ishga tushiring.",
+        )
+        return True
+    wizard = get_wizard(session.wizard)
+    if wizard is None:
+        session.delete()
+        return False
+    handler = wizard.on_callback.get(session.state)
+    if handler is None:
+        # Поведение «непривязанный callback» — игнорируем, но не пропускаем
+        # дальше (чтобы не дёрнуть какой-нибудь home:fin).
+        logger.warning(
+            "wizard %s state=%s has no callback handler for %r",
+            session.wizard, session.state, data,
+        )
+        return True
+    try:
+        handler(ctx, session=session, text=None)
+    except Exception:  # noqa: BLE001
+        logger.exception("wizard %s state=%s callback handler crashed",
+                         session.wizard, session.state)
+        send_message(ctx.chat_id, "⚠️ Xatolik yuz berdi. /bekor — отменить.")
+    return True
 
 
 def _resolve_callback(data: str) -> Optional[tuple[str, Handler]]:

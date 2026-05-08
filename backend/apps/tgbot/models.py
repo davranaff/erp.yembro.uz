@@ -106,3 +106,83 @@ class TgLinkToken(UUIDModel, TimestampedModel):
     @property
     def is_valid(self) -> bool:
         return not self.used and timezone.now() < self.expires_at
+
+
+def _wizard_expires() -> object:
+    return timezone.now() + timedelta(minutes=30)
+
+
+class TgWizardSession(UUIDModel, TimestampedModel):
+    """
+    Состояние многошагового диалога (wizard) для конкретного chat_id.
+
+    Юзер запускает команду (например `/qabul`), сервер создаёт сессию
+    с начальным state'ом. Каждый callback / текстовый ответ обновляет
+    state и накапливает payload (выбранный склад, поставщик, qty и т.п.).
+    На последнем шаге payload отдаётся в существующий ERP-сервис
+    (`confirm_purchase` / `WriteOff` / `execute_production_task`),
+    сессия удаляется.
+
+    Один chat_id → одна активная сессия. При запуске нового wizard'а
+    старая сессия (если есть) перезаписывается — это сознательно: если
+    юзер бросил wizard на середине и начал новый, старый просто умирает.
+
+    expires_at = 30 минут — для вечерней очистки. Сессии без активности
+    дольше TTL не возвращаются `get_active()` и считаются истёкшими.
+    """
+    chat_id = models.BigIntegerField(unique=True, db_index=True)
+    organization = models.ForeignKey(
+        "organizations.Organization",
+        on_delete=models.CASCADE,
+        related_name="+",
+    )
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True, blank=True,
+        on_delete=models.SET_NULL,
+        related_name="+",
+    )
+    wizard = models.CharField(max_length=64)
+    """Код wizard'а: `feed_purchase`, `feed_writeoff`, `feed_mix`."""
+    state = models.CharField(max_length=64)
+    """Текущий step. Формат `<scope>:<step>` — например `purchase:qty`."""
+    payload = models.JSONField(default=dict, blank=True)
+    """Накопленные данные (warehouse_id, supplier_id, items[], etc)."""
+    expires_at = models.DateTimeField(default=_wizard_expires)
+
+    class Meta:
+        verbose_name = "TG wizard сессия"
+        verbose_name_plural = "TG wizard сессии"
+
+    def __str__(self) -> str:
+        return f"WizardSession({self.chat_id} · {self.wizard}@{self.state})"
+
+    @property
+    def is_active(self) -> bool:
+        return timezone.now() < self.expires_at
+
+    def touch(self) -> None:
+        """Продлить сессию (новые 30 минут от now)."""
+        self.expires_at = _wizard_expires()
+        self.save(update_fields=["expires_at", "updated_at"])
+
+    def advance(self, *, state: str, payload_update: dict | None = None) -> None:
+        """Переход на следующий step + опциональный merge в payload."""
+        if payload_update:
+            current = dict(self.payload or {})
+            current.update(payload_update)
+            self.payload = current
+        self.state = state
+        self.expires_at = _wizard_expires()
+        self.save(update_fields=["state", "payload", "expires_at", "updated_at"])
+
+    @classmethod
+    def get_active(cls, chat_id: int) -> "TgWizardSession | None":
+        """Активная (не истёкшая) сессия или None. Истёкшие удаляет в фоне."""
+        s = cls.objects.filter(chat_id=chat_id).first()
+        if s is None:
+            return None
+        if not s.is_active:
+            s.delete()
+            return None
+        return s
