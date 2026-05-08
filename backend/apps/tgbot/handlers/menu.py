@@ -91,7 +91,7 @@ def _is_cp_link(link) -> bool:
     return bool(link and link.counterparty_id and not link.user_id)
 
 
-@command("/menu", help="Asosiy menyu", audience="any")
+@command("/menu", help="Asosiy menyu", audience="any", category="main")
 def handle_menu_cmd(ctx: HandlerCtx) -> None:
     if _is_cp_link(ctx.link):
         from .counterparty import render_counterparty_menu

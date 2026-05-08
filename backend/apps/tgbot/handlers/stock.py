@@ -218,24 +218,31 @@ def _render_warehouse_balance(ctx: HandlerCtx, *, wh_id: str, page: int) -> None
     with_balance = sum(1 for r in rows if r["balance"] > 0)
     lines = [
         f"📦 <b>{warehouse.code} · {warehouse.name}</b>",
-        f"<i>Modul: {mod} · Qoldiqli SKU: {with_balance} / Jami SKU: {total}</i>",
+        f"<i>Модуль: {mod} · с остатком: {with_balance}/{total}</i>",
         "",
     ]
     if not page_rows:
-        lines.append("Bu omborda harakatlar yo'q.")
+        lines.append("Движений на этом складе нет.")
     else:
+        # Моноширинная таблица в <pre> — Telegram рендерит фиксированным шрифтом
+        # → колонки выравниваются. Раньше 2 строки на SKU давали мешанину.
+        sku_w = max(8, max(len(r["sku"]) for r in page_rows))
+        sku_w = min(sku_w, 22)  # ограничение ширины SKU
+        rows_text = []
         for r in page_rows:
             bal = r["balance"]
             unit = r["unit"] or ""
-            sign = "✅" if bal > 0 else ("⚪" if bal == 0 else "🔴")
-            lines.append(
-                f"{sign} <code>{r['sku']}</code>"
-                f" — <b>{_fmt_qty(bal)} {unit}</b>"
+            mark = "+" if bal > 0 else ("·" if bal == 0 else "!")
+            sku_trunc = r["sku"][:sku_w]
+            rows_text.append(
+                f"{mark} {sku_trunc:<{sku_w}}  "
+                f"{_fmt_qty(bal):>10} {unit}"
             )
-            lines.append(
-                f"   <i>({r['name']}) · "
-                f"+{_fmt_qty(r['in_qty'])} − {_fmt_qty(r['out_qty'])}</i>"
-            )
+        lines.append("<pre>" + "\n".join(rows_text) + "</pre>")
+        # Имена SKU отдельным блоком — детали для тех кто хочет посмотреть.
+        lines.append("<i>Названия:</i>")
+        for r in page_rows:
+            lines.append(f"  • <code>{r['sku']}</code> — {r['name']}")
 
     markup = kb_pagination(
         f"wh:bal:{wh_id}", page, total,

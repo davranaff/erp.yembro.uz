@@ -9,7 +9,7 @@ from ..bot import send_message
 from ..dispatcher import HandlerCtx, command
 
 
-@command("/bekor", help="Отменить текущий wizard", audience="any")
+@command("/bekor", help="Отменить текущий wizard", audience="any", category="main")
 def handle_cancel_wizard(ctx: HandlerCtx) -> None:
     from ..models import TgWizardSession
 

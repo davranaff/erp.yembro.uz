@@ -1,60 +1,26 @@
 """
 /help — список команд, доступных текущему юзеру.
 
+Группы определяются по `CommandSpec.category` (см. apps.tgbot.categories).
+Сортировка групп — `sort_order`, внутри группы — по имени команды.
+
 Фильтр:
   - private=True не показываем (легаси: /report /balance ...)
   - команда требует module RBAC, у юзера нет — скрываем
   - audience=admin — только для admin-link, audience=counterparty — для
     cp-link, "any" — для обоих
 
-Группировка:
-  Команды группируются по категориям (Склад / Производство / Финансы /
-  Сводки / Прочее) — определяется по module-коду либо по эвристике имён.
-  Так длинный плоский список превращается в навигируемый блок.
+Чтобы добавить новую группу — одна запись в apps.tgbot.categories._CATEGORY_DEFS.
+Чтобы добавить команду — `@command(name, module=..., category="...")`.
 """
 from __future__ import annotations
 
 from ..bot import send_message
+from ..categories import CATEGORIES, sorted_categories
 from ..dispatcher import COMMANDS, HandlerCtx, command
 
 
-# Категория → emoji + порядок отображения
-_CATEGORY_ORDER: list[tuple[str, str]] = [
-    ("main",       "🏠 <b>Главное</b>"),
-    ("stock",      "📦 <b>Склад</b>"),
-    ("production", "🥣 <b>Производство</b>"),
-    ("finance",    "💰 <b>Финансы</b>"),
-    ("digest",     "📅 <b>Сводки</b>"),
-    ("org",        "🏢 <b>Организация</b>"),
-    ("client",     "👤 <b>Клиентский кабинет</b>"),
-    ("misc",       "🔧 <b>Прочее</b>"),
-]
-
-
-def _categorize(spec) -> str:
-    """Маппит CommandSpec → категория. Эвристика по module + имени."""
-    name = spec.name
-    audience = getattr(spec, "audience", "admin")
-    module = spec.module
-
-    if audience == "counterparty":
-        return "client"
-    if name in ("/help", "/menu", "/start", "/bekor"):
-        return "main"
-    if name in ("/digest", "/digest_on", "/digest_off"):
-        return "digest"
-    if name == "/org":
-        return "org"
-    if module == "purchases" or module == "stock" or name in ("/qabul", "/chiqim", "/qoldiq"):
-        return "stock"
-    if module == "feed" or name == "/aralash":
-        return "production"
-    if module == "reports" or name in ("/cash", "/pnl", "/sales", "/debt"):
-        return "finance"
-    return "misc"
-
-
-@command("/help", help="Список команд", audience="any")
+@command("/help", help="Список команд", audience="any", category="main")
 def handle_help(ctx: HandlerCtx) -> None:
     send_message(ctx.chat_id, _build_help_text(ctx.link))
 
@@ -82,7 +48,9 @@ def _build_help_text(link) -> str:
         if not is_counterparty and spec.module and not has_module_access(link, spec.module):
             continue
         seen_handlers.add(handler_key)
-        cat = _categorize(spec)
+        cat = getattr(spec, "category", "misc")
+        if cat not in CATEGORIES:
+            cat = "misc"
         line = f"{spec.name} — {spec.help_line}" if spec.help_line else spec.name
         grouped.setdefault(cat, []).append(line)
 
@@ -93,13 +61,15 @@ def _build_help_text(link) -> str:
     org = getattr(link, "active_organization", None) or getattr(link, "organization", None)
     if org and not is_counterparty:
         parts.append(f"<i>Организация: {org.name}</i>\n")
-    for cat, header in _CATEGORY_ORDER:
-        if cat not in grouped:
+
+    for cat_def in sorted_categories():
+        if cat_def.code not in grouped:
             continue
-        parts.append(header)
-        for line in grouped[cat]:
+        parts.append(f"<b>{cat_def.label}</b>")
+        for line in grouped[cat_def.code]:
             parts.append(f"  {line}")
-        parts.append("")  # пустая строка между группами
-    parts.append("💡 /menu — inline-навигация по разделам")
-    parts.append("💡 /bekor — отменить активный wizard")
+        parts.append("")  # blank line между группами
+
+    parts.append("💡 /menu — inline-навигация")
+    parts.append("💡 /bekor — отмена wizard'а")
     return "\n".join(parts)
