@@ -3,14 +3,21 @@ from __future__ import annotations
 import hashlib
 import hmac
 import json
+from datetime import timedelta
 from urllib.parse import parse_qsl
 
 from django.conf import settings
+from django.utils import timezone
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework_simplejwt.tokens import RefreshToken
+
+# TTL токена для контрагента: длинный, чтобы менеджер мог послать клиенту
+# в WhatsApp/SMS и тот не торопясь привязал бот в течение недели. Для user
+# (сотрудника) — короткий 30-минутный default из _token_expires().
+COUNTERPARTY_LINK_TOKEN_TTL = timedelta(days=7)
 
 from apps.common.viewsets import OrganizationContextMixin
 
@@ -77,11 +84,14 @@ class TgLinkTokenView(OrganizationContextMixin, APIView):
                     status=status.HTTP_400_BAD_REQUEST,
                 )
 
-        token = TgLinkToken.objects.create(
-            organization=org,
-            user=request.user if not counterparty else None,
-            counterparty=counterparty,
-        )
+        create_kwargs: dict = {
+            "organization": org,
+            "user": request.user if not counterparty else None,
+            "counterparty": counterparty,
+        }
+        if counterparty:
+            create_kwargs["expires_at"] = timezone.now() + COUNTERPARTY_LINK_TOKEN_TTL
+        token = TgLinkToken.objects.create(**create_kwargs)
         return Response(TgLinkTokenSerializer(token).data, status=status.HTTP_201_CREATED)
 
 
