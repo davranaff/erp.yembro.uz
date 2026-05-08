@@ -375,26 +375,30 @@ def fmt_head_brief_uz(org, module_code: str) -> str | None:
         f"<i>Bugun: {today}</i>",
         "",
     ]
+    # Таблица: операция · count · summa · to'landi · qarz.
+    rows = []
     if sales_count > 0:
         debt = sales_invoiced - sales_paid
-        lines.append(
-            f"📤 Sotuv: <b>{sales_count}</b> ta · "
-            f"{_fmt_money(sales_invoiced)} so'm"
-        )
-        lines.append(
-            f"   ↳ to'landi: {_fmt_money(sales_paid)} · "
-            f"qarz: <b>{_fmt_money(debt)}</b>"
-        )
+        rows.append((
+            "📤 Sotuv", sales_count, sales_invoiced, sales_paid, debt,
+        ))
     if purch_count > 0:
         debt = purch_invoiced - purch_paid
-        lines.append(
-            f"📥 Xarid: <b>{purch_count}</b> ta · "
-            f"{_fmt_money(purch_invoiced)} so'm"
-        )
-        lines.append(
-            f"   ↳ to'landi: {_fmt_money(purch_paid)} · "
-            f"qarz biz: <b>{_fmt_money(debt)}</b>"
-        )
+        rows.append((
+            "📥 Xarid", purch_count, purch_invoiced, purch_paid, debt,
+        ))
+    if rows:
+        table_rows = [
+            f"{'':<10}{'kol-vo':>7}{'summa':>14}{'toʼlandi':>14}{'qarz':>14}"
+        ]
+        for op, n, inv, pd, dbt in rows:
+            table_rows.append(
+                f"{op:<10}{n:>7}"
+                f"{_fmt_money(inv):>14}"
+                f"{_fmt_money(pd):>14}"
+                f"{_fmt_money(dbt):>14}"
+            )
+        lines.append("<pre>" + "\n".join(table_rows) + "</pre>")
 
     return "\n".join(lines)
 
@@ -424,15 +428,18 @@ def fmt_cashflow_alert_uz(negatives: list, total_uzs) -> str:
         "🚨 <b>Diqqat: kassada manfiy qoldiq!</b>",
         "",
     ]
-    for label, bal in negatives:
-        lines.append(
-            f"  🔴 {label}: <b>−{_fmt_money(abs(Decimal(str(bal))))}</b> so'm"
-        )
-    total = Decimal(str(total_uzs))
-    if total < 0:
-        lines.append("")
-        lines.append(f"<b>Jami:</b> <b>−{_fmt_money(abs(total))}</b> so'm")
-    lines.append("")
+    if negatives:
+        name_w = max(8, min(20, max(len(label) for label, _ in negatives)))
+        rows = []
+        for label, bal in negatives:
+            bal_d = Decimal(str(bal))
+            rows.append(f"! {label[:name_w]:<{name_w}}  -{_fmt_money(abs(bal_d)):>14} so'm")
+        total = Decimal(str(total_uzs))
+        if total < 0:
+            sep_w = name_w + 2 + 1 + 14 + 5
+            rows.append("─" * sep_w)
+            rows.append(f"  Jami{' ' * (name_w - 2)} -{_fmt_money(abs(total)):>14} so'm")
+        lines.append("<pre>" + "\n".join(rows) + "</pre>")
     lines.append(
         "⚠️ Tekshiring: dastlabki qoldiqlar to'g'ri sozlanganmi yoki "
         "haqiqatda overdraft bormi."
@@ -442,6 +449,8 @@ def fmt_cashflow_alert_uz(negatives: list, total_uzs) -> str:
 
 def fmt_stale_payment_alert_uz(stale_orders: list, threshold_days: int) -> str:
     """Alert sales-админу: продажи без касания > threshold_days."""
+    from decimal import Decimal
+
     lines = [
         f"📞 <b>Mijozlar bilan ishlash kerak</b>",
         f"<i>{threshold_days} kundan ortiq qarzdorlar bilan aloqa yo'q</i>",
@@ -449,17 +458,22 @@ def fmt_stale_payment_alert_uz(stale_orders: list, threshold_days: int) -> str:
         f"Jami: <b>{len(stale_orders)}</b> ta hujjat",
         "",
     ]
-    for o in stale_orders[:10]:
-        from decimal import Decimal
-        debt = Decimal(o.amount_uzs or 0) - Decimal(o.paid_amount_uzs or 0)
-        cust = o.customer.name if o.customer_id else "—"
-        lines.append(
-            f"• <b>{cust}</b>\n"
-            f"   <code>{o.doc_number}</code> · qarz "
-            f"<b>{_fmt_money(debt)}</b> so'm"
-        )
+    show = stale_orders[:10]
+    if show:
+        # Таблица: клиент · doc · qarz.
+        name_w = max(10, min(22, max(len(o.customer.name if o.customer_id else "—") for o in show)))
+        doc_w = max(8, min(14, max(len(o.doc_number) for o in show)))
+        rows = []
+        for o in show:
+            cust = (o.customer.name if o.customer_id else "—")[:name_w]
+            doc = o.doc_number[:doc_w]
+            debt = Decimal(o.amount_uzs or 0) - Decimal(o.paid_amount_uzs or 0)
+            rows.append(
+                f"{cust:<{name_w}}  {doc:<{doc_w}}  {_fmt_money(debt):>14}"
+            )
+        lines.append("<pre>" + "\n".join(rows) + "</pre>")
     if len(stale_orders) > 10:
-        lines.append(f"… va yana {len(stale_orders) - 10} ta")
+        lines.append(f"<i>… va yana {len(stale_orders) - 10} ta</i>")
     lines.append("")
     lines.append("💼 Mijozlar bilan bog'lanib, va'da olib qo'ying.")
     return "\n".join(lines)
