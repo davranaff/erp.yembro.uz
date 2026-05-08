@@ -119,28 +119,36 @@ def _collect_alert_lines(organization) -> list[str]:
 
 
 def format_digest(data: DigestData, organization_name: str = "") -> str:
-    """HTML-сообщение для send_message. Минималистичный формат."""
+    """HTML-сообщение для send_message. Моноширинная таблица."""
     org_line = f" · {organization_name}" if organization_name else ""
+
+    # Основная финансовая таблица.
+    pl_rows = [
+        f"Выручка    {_fmt_uzs(data.revenue):>14} сум",
+        f"           {_fmt_delta(data.revenue_delta):>14}  к пред. дню",
+        f"Расходы    {_fmt_uzs(data.expense):>14} сум",
+        "─" * 30,
+        f"Прибыль    {_fmt_delta(data.profit):>14} сум",
+    ]
+
+    # Производственная таблица.
+    op_rows = [
+        f"Касса/банк       {_fmt_uzs(data.cash_total):>14} сум",
+        f"Активных партий  {str(data.active_batches):>14}",
+    ]
 
     lines = [
         f"📅 <b>Сводка за {data.on_date.isoformat()}</b>{org_line}",
         "",
-        f"  Выручка:   <code>{_fmt_uzs(data.revenue)}</code> сум",
-        f"             <i>{_fmt_delta(data.revenue_delta)} к пред. дню</i>",
-        f"  Расходы:   <code>{_fmt_uzs(data.expense)}</code> сум",
-        "  ──────────────────",
-        f"  <b>Прибыль:</b>  <code>{_fmt_delta(data.profit)}</code> сум",
-        "",
-        f"  Касса/банк:       <code>{_fmt_uzs(data.cash_total)}</code> сум",
-        f"  Активных партий:  <b>{data.active_batches}</b>",
+        "<pre>" + "\n".join(pl_rows) + "</pre>",
+        "<pre>" + "\n".join(op_rows) + "</pre>",
     ]
+
     if data.alerts:
-        lines.append("")
         lines.append("<b>Активные алерты:</b>")
         for a in data.alerts:
-            # KPI-collector сам ставит 🚨, не дублируем.
             lines.append(f"  {a}")
+        lines.append("")
 
-    lines.append("")
     lines.append("<i>/menu — открыть полное меню</i>")
     return "\n".join(lines)

@@ -537,32 +537,35 @@ def _render_pnl(ctx: HandlerCtx, *, period: str, edit: bool = False) -> None:
         f"📈 <b>P&amp;L · {_PERIOD_LABELS[period]}</b>",
         f"<i>{df.isoformat()} — {dt.isoformat()}</i>",
         "",
-        f"  Доходы:    <code>{_fmt_uzs(base.total_revenue)}</code>",
-        f"  Расходы:   <code>{_fmt_uzs(base.total_expense)}</code>",
-        "  ──────────────────",
-        f"  <b>Прибыль:</b>  <code>{_fmt_signed(base.profit)}</code> сум",
     ]
+    # Основная P&L-таблица (accrual basis) — вертикально, для ясности.
+    pl_rows = [
+        f"Доходы    {_fmt_uzs(base.total_revenue):>14}",
+        f"Расходы   {_fmt_uzs(base.total_expense):>14}",
+        "─" * 26,
+        f"Прибыль   {_fmt_signed(base.profit):>14}",
+    ]
+    lines.append("<pre>" + "\n".join(pl_rows) + "</pre>")
 
-    # Cash-блок: «продано Х (оплачено Y, должны Z)»
+    # Cash-разрез — таблица 3 колонки (сумма / оплачено / долг).
     if sales_total > 0 or purchases_total > 0:
-        lines.append("")
         lines.append("<b>Деньги (cash basis):</b>")
+        cash_rows = [f"{'':<11}{'сумма':>14}{'оплачено':>14}{'долг':>14}"]
         if sales_total > 0:
-            lines.append(
-                f"  📤 Продано:    <code>{_fmt_uzs(sales_total)}</code>"
-            )
-            lines.append(
-                f"     ↳ оплачено: <code>{_fmt_uzs(sales_paid)}</code>"
-                f" · должны:  <code>{_fmt_uzs(sales_debt)}</code>"
+            cash_rows.append(
+                f"{'Продано':<11}"
+                f"{_fmt_uzs(sales_total):>14}"
+                f"{_fmt_uzs(sales_paid):>14}"
+                f"{_fmt_uzs(sales_debt):>14}"
             )
         if purchases_total > 0:
-            lines.append(
-                f"  📥 Закуплено:  <code>{_fmt_uzs(purchases_total)}</code>"
+            cash_rows.append(
+                f"{'Закуплено':<11}"
+                f"{_fmt_uzs(purchases_total):>14}"
+                f"{_fmt_uzs(purchases_paid):>14}"
+                f"{_fmt_uzs(purchases_debt):>14}"
             )
-            lines.append(
-                f"     ↳ оплачено: <code>{_fmt_uzs(purchases_paid)}</code>"
-                f" · должны мы: <code>{_fmt_uzs(purchases_debt)}</code>"
-            )
+        lines.append("<pre>" + "\n".join(cash_rows) + "</pre>")
 
     if by_mod.rows:
         lines.append("")
