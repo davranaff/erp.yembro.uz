@@ -1294,19 +1294,22 @@ body.navigating * {
     padding: 0 !important;
   }
   .modal-hdr {
-    /* Sticky header чтобы close-btn всегда видна при скролле длинной формы. */
+    /* Sticky header чтобы close-btn всегда видна при скролле длинной формы.
+       В full-screen Telegram Mini App pill-ы Telegram («Закрыть» слева,
+       меню справа) рисуются ПОВЕРХ WebView — env() про них не знает,
+       только var(--tg-safe-*) от TgFrameSync. Берём максимум из обоих. */
     position: sticky;
     top: 0;
     z-index: 1;
     background: var(--bg-raised);
-    padding-top: max(14px, env(safe-area-inset-top));
-    padding-left: max(18px, env(safe-area-inset-left));
-    padding-right: max(18px, env(safe-area-inset-right));
+    padding-top: max(14px, env(safe-area-inset-top), var(--tg-safe-top, 0px));
+    padding-left: max(18px, env(safe-area-inset-left), var(--tg-safe-left, 0px));
+    padding-right: max(18px, env(safe-area-inset-right), var(--tg-safe-right, 0px));
   }
   .modal-ftr {
-    padding-bottom: max(12px, env(safe-area-inset-bottom));
-    padding-left: max(18px, env(safe-area-inset-left));
-    padding-right: max(18px, env(safe-area-inset-right));
+    padding-bottom: max(12px, env(safe-area-inset-bottom), var(--tg-safe-bottom, 0px));
+    padding-left: max(18px, env(safe-area-inset-left), var(--tg-safe-left, 0px));
+    padding-right: max(18px, env(safe-area-inset-right), var(--tg-safe-right, 0px));
   }
 
   /* Drawer (slide-in detail) — fullscreen */
@@ -1319,14 +1322,15 @@ body.navigating * {
     position: sticky;
     top: 0;
     z-index: 1;
-    padding-top: max(14px, env(safe-area-inset-top));
-    padding-left: max(18px, env(safe-area-inset-left));
-    padding-right: max(18px, env(safe-area-inset-right));
+    background: var(--bg-card);
+    padding-top: max(14px, env(safe-area-inset-top), var(--tg-safe-top, 0px));
+    padding-left: max(18px, env(safe-area-inset-left), var(--tg-safe-left, 0px));
+    padding-right: max(18px, env(safe-area-inset-right), var(--tg-safe-right, 0px));
   }
   .drawer-body {
-    padding-bottom: max(18px, env(safe-area-inset-bottom));
-    padding-left: max(18px, env(safe-area-inset-left));
-    padding-right: max(18px, env(safe-area-inset-right));
+    padding-bottom: max(18px, env(safe-area-inset-bottom), var(--tg-safe-bottom, 0px));
+    padding-left: max(18px, env(safe-area-inset-left), var(--tg-safe-left, 0px));
+    padding-right: max(18px, env(safe-area-inset-right), var(--tg-safe-right, 0px));
   }
 
   /* Close-button: 44×44 touch-target по Apple HIG. На мобилке 28px
