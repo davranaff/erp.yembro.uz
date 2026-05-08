@@ -763,7 +763,7 @@ export default function FeedPage() {
                 render: (b) => new Date(b.packaged_at).toLocaleDateString('ru-RU') },
               { key: 'weight', label: 'Вес мешка', align: 'right', mono: true,
                 render: (b) => `${parseFloat(b.bag_weight_kg).toLocaleString('ru-RU')} кг` },
-              { key: 'progress', label: 'Продано / Расфасовано', mono: true,
+              { key: 'progress', label: 'Остаток / Расфасовано', mono: true,
                 cellStyle: { fontSize: 12 },
                 render: (b) => {
                   const total = b.bags_initial;
@@ -772,11 +772,18 @@ export default function FeedPage() {
                   const pct = total > 0 ? (sold / total) * 100 : 0;
                   const color = pct >= 100 ? 'var(--success)'
                     : pct > 0 ? 'var(--brand-orange)' : 'var(--fg-3)';
+                  const bagKg = parseFloat(b.bag_weight_kg) || 0;
+                  const remainKg = parseFloat(b.remaining_kg) || (remain * bagKg);
+                  const totalKg = total * bagKg;
                   return (
-                    <div style={{ minWidth: 150 }}>
+                    <div style={{ minWidth: 170 }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 600 }}>
-                        <span style={{ color }}>{sold} шт</span>
-                        <span style={{ color: 'var(--fg-3)' }}>из {total}</span>
+                        <span style={{ color: 'var(--fg-1)' }}>
+                          {fmtNum(String(remainKg), 0)} кг
+                        </span>
+                        <span style={{ color: 'var(--fg-3)' }}>
+                          из {fmtNum(String(totalKg), 0)} кг
+                        </span>
                       </div>
                       <div style={{
                         height: 4, background: 'var(--bg-soft)', borderRadius: 2,
@@ -788,13 +795,11 @@ export default function FeedPage() {
                         }} />
                       </div>
                       <div style={{ fontSize: 10, color: 'var(--fg-3)', marginTop: 2 }}>
-                        остаток <b>{remain} шт</b> · {pct.toFixed(1)}%
+                        <b>{remain}/{total} шт</b> · продано {sold} шт · {pct.toFixed(1)}%
                       </div>
                     </div>
                   );
                 } },
-              { key: 'kg', label: '≈ кг', align: 'right', mono: true, cellStyle: { fontSize: 12, color: 'var(--fg-3)' },
-                render: (b) => fmtNum(b.remaining_kg, 0) },
               ...(getFinancesVisible(pageBagLots) ? [{
                 key: 'unit_cost', label: 'Себест/мешок', align: 'right' as const, mono: true,
                 cellStyle: { fontSize: 12 },
@@ -1746,7 +1751,14 @@ export default function FeedPage() {
           title={`Мешки · ${selBagLot.doc_number}`}
           subtitle={
             `${selBagLot.recipe_code ?? '—'} · `
-            + `${selBagLot.bags_remaining}/${selBagLot.bags_initial} шт`
+            + `${fmtNum(selBagLot.remaining_kg, 0)}/`
+            + `${fmtNum(
+              String(
+                (selBagLot.bags_initial || 0)
+                * (parseFloat(selBagLot.bag_weight_kg) || 0)
+              ), 0,
+            )} кг`
+            + ` · ${selBagLot.bags_remaining}/${selBagLot.bags_initial} шт`
           }
           onClose={() => setSelBagLot(null)}
         >
@@ -1811,9 +1823,19 @@ export default function FeedPage() {
               { k: 'Рецепт', v: selBagLot.recipe_code ?? '—', mono: true },
               { k: 'Расфасовано', v: new Date(selBagLot.packaged_at).toLocaleString('ru'), mono: true },
               { k: 'Вес мешка', v: `${parseFloat(selBagLot.bag_weight_kg).toLocaleString('ru-RU')} кг`, mono: true },
-              { k: 'Выпуск', v: `${selBagLot.bags_initial} шт`, mono: true },
-              { k: 'Остаток', v: `${selBagLot.bags_remaining} шт`, mono: true },
-              { k: 'Остаток ≈ кг', v: `${fmtNum(selBagLot.remaining_kg, 1)} кг`, mono: true },
+              {
+                k: 'Остаток',
+                v: `${fmtNum(selBagLot.remaining_kg, 1)} кг (${selBagLot.bags_remaining} шт)`,
+                mono: true,
+              },
+              {
+                k: 'Выпуск',
+                v: (() => {
+                  const total = (selBagLot.bags_initial || 0) * (parseFloat(selBagLot.bag_weight_kg) || 0);
+                  return `${fmtNum(String(total), 1)} кг (${selBagLot.bags_initial} шт)`;
+                })(),
+                mono: true,
+              },
               ...(getFinancesVisible(selBagLot) ? [
                 { k: 'Себестоимость / мешок', v: fmtNum(selBagLot.unit_cost_uzs, 2) + ' сум', mono: true },
                 { k: 'Сумма партии', v: fmtNum(selBagLot.total_cost_uzs, 0) + ' сум', mono: true },
