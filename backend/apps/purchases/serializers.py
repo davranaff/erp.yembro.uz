@@ -12,18 +12,38 @@ from .models import (
 
 
 class PurchaseItemSerializer(serializers.ModelSerializer):
+    nomenclature_name = serializers.CharField(
+        source="nomenclature.name", read_only=True,
+    )
+    nomenclature_sku = serializers.CharField(
+        source="nomenclature.sku", read_only=True,
+    )
+    unit_code = serializers.CharField(
+        source="nomenclature.unit.code", read_only=True,
+    )
+
     class Meta:
         model = PurchaseItem
         fields = (
             "id",
             "nomenclature",
+            "nomenclature_name",
+            "nomenclature_sku",
+            "unit_code",
             "quantity",
             "received_qty",
             "unit_price",
             "line_total_foreign",
             "line_total_uzs",
         )
-        read_only_fields = ("id", "line_total_foreign", "line_total_uzs")
+        read_only_fields = (
+            "id",
+            "nomenclature_name",
+            "nomenclature_sku",
+            "unit_code",
+            "line_total_foreign",
+            "line_total_uzs",
+        )
 
 
 class PurchaseOrderSerializer(serializers.ModelSerializer):

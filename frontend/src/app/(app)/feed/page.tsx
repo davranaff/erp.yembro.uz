@@ -42,6 +42,8 @@ import type {
   FeedBagLot,
   FeedBagLotStatus,
   FeedBatch,
+  FeedBatchPassportStatus,
+  FeedBatchStatus,
   ProductionTask,
   ProductionTaskStatus,
   RawMaterialBatch,
@@ -102,6 +104,32 @@ const RAW_STATUS_TONE: Record<RawMaterialBatchStatus, 'warn' | 'success' | 'dang
   available: 'success',
   rejected: 'danger',
   depleted: 'neutral',
+};
+
+const FEED_BATCH_STATUS_LABEL: Record<FeedBatchStatus, string> = {
+  quality_check: 'Контроль качества',
+  approved: 'Одобрена',
+  rejected: 'Отклонена',
+  depleted: 'Исчерпана',
+};
+
+const FEED_BATCH_STATUS_TONE: Record<FeedBatchStatus, 'warn' | 'success' | 'danger' | 'neutral'> = {
+  quality_check: 'warn',
+  approved: 'success',
+  rejected: 'danger',
+  depleted: 'neutral',
+};
+
+const PASSPORT_STATUS_LABEL: Record<FeedBatchPassportStatus, string> = {
+  pending: 'Ожидает',
+  passed: 'Пройден',
+  failed: 'Не пройден',
+};
+
+const PASSPORT_STATUS_TONE: Record<FeedBatchPassportStatus, 'warn' | 'success' | 'danger'> = {
+  pending: 'warn',
+  passed: 'success',
+  failed: 'danger',
 };
 
 function fmtNum(v: string | null | undefined, digits = 2): string {
@@ -670,9 +698,21 @@ export default function FeedPage() {
               { key: 'med', label: 'Мед.',
                 render: (b) => b.is_medicated ? <Badge tone="warn">мед</Badge> : '—' },
               { key: 'status', label: 'Статус', cellStyle: { fontSize: 12 },
-                render: (b) => b.status },
+                render: (b) => (
+                  <Badge tone={FEED_BATCH_STATUS_TONE[b.status]} dot>
+                    {FEED_BATCH_STATUS_LABEL[b.status]}
+                  </Badge>
+                ) },
               { key: 'passport', label: 'Паспорт', cellStyle: { fontSize: 12 },
-                render: (b) => b.quality_passport_status },
+                render: (b) => {
+                  const p = b.quality_passport_status as FeedBatchPassportStatus | null;
+                  if (!p) return '—';
+                  return (
+                    <Badge tone={PASSPORT_STATUS_TONE[p]} dot>
+                      {PASSPORT_STATUS_LABEL[p]}
+                    </Badge>
+                  );
+                } },
             ]}
           />
           {feedBatchesPage.data && (
@@ -1611,7 +1651,7 @@ export default function FeedPage() {
                     />
                   </span>
                 ) as unknown as string,
-                v: selBatch.status,
+                v: FEED_BATCH_STATUS_LABEL[selBatch.status] ?? selBatch.status,
               },
               {
                 k: (
@@ -1627,7 +1667,9 @@ export default function FeedPage() {
                     />
                   </span>
                 ) as unknown as string,
-                v: selBatch.quality_passport_status,
+                v: selBatch.quality_passport_status
+                  ? (PASSPORT_STATUS_LABEL[selBatch.quality_passport_status as FeedBatchPassportStatus] ?? selBatch.quality_passport_status)
+                  : '—',
               },
             ]}
           />

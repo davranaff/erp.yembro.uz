@@ -17,6 +17,7 @@ import {
   useReversePurchase,
 } from '@/hooks/usePurchases';
 import type {
+  PurchaseItem,
   PurchaseOrder,
   PurchasePaymentStatus,
   PurchaseStatus,
@@ -59,6 +60,25 @@ function fmtUzs(v: string | null | undefined): string {
   const n = parseFloat(v);
   if (Number.isNaN(n)) return '—';
   return n.toLocaleString('ru-RU', { maximumFractionDigits: 0 }) + ' сум';
+}
+
+function fmtItemQty(it: PurchaseItem): string {
+  const q = parseFloat(it.quantity || '0');
+  if (Number.isNaN(q) || q === 0) return '';
+  const qStr = q.toLocaleString('ru-RU', { maximumFractionDigits: 3 });
+  return it.unit_code ? `${qStr} ${it.unit_code}` : qStr;
+}
+
+/** Краткая сводка позиций под doc_number: «Кукуруза 500 кг, Соя 200 кг + ещё 1». */
+function summarizeItems(items: PurchaseItem[] | undefined): string {
+  if (!items || items.length === 0) return 'Без позиций';
+  const head = items.slice(0, 2).map((it) => {
+    const name = it.nomenclature_name || it.nomenclature_sku || '—';
+    const qty = fmtItemQty(it);
+    return qty ? `${name} ${qty}` : name;
+  });
+  const more = items.length - head.length;
+  return more > 0 ? `${head.join(', ')} + ещё ${more}` : head.join(', ');
 }
 
 export default function PurchasesPage() {
@@ -197,7 +217,14 @@ export default function PurchasesPage() {
           columns={[
             {
               key: 'doc_number', label: 'Документ', mono: true,
-              render: (o) => o.doc_number || '—',
+              render: (o) => (
+                <div>
+                  <div>{o.doc_number || '—'}</div>
+                  <div style={{ fontSize: 11, color: 'var(--fg-3)', fontFamily: 'var(--font-sans)', marginTop: 2 }}>
+                    {summarizeItems(o.items)}
+                  </div>
+                </div>
+              ),
             },
             { key: 'date', label: 'Дата', render: (o) => o.date },
             {

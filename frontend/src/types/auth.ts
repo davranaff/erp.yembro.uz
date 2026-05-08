@@ -1759,6 +1759,9 @@ export type PurchasePaymentStatus = 'unpaid' | 'partial' | 'paid' | 'overpaid';
 export interface PurchaseItem {
   id: string;
   nomenclature: string;
+  nomenclature_name?: string | null;
+  nomenclature_sku?: string | null;
+  unit_code?: string | null;
   quantity: string;
   received_qty: string;
   unit_price: string;
