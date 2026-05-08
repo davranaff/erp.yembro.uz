@@ -219,9 +219,28 @@ def package_feed_batch(
                 )}
             )
 
-    # 3. Compute costs (наследуем per-kg, в пересчёте на мешок)
+    # 3. Compute costs (наследуем per-kg, в пересчёте на мешок).
+    # В bag_unit_cost включаем стоимость пустого мешка (если SKU определился) —
+    # без этого packaging-cost оседал только в OUTGOING SM пустых мешков, а
+    # партия мешков получала заниженный unit_cost_uzs (только корм). Что в
+    # свою очередь занижало себестоимость продаж downstream.
     source_unit_cost = Decimal(source.unit_cost_uzs)  # сум/кг
-    bag_unit_cost = _quantize_money(source_unit_cost * bag_weight)
+    feed_per_bag = _quantize_money(source_unit_cost * bag_weight)
+
+    pack_unit_cost = Decimal(0)
+    if pack_nom is not None:
+        # WAC по всем предыдущим INCOMING пустых мешков. Если приходов не
+        # было (бартер / неучтённое поступление) — 0, чтобы не падать. Это
+        # глобальный AVG, не per-warehouse и не FIFO-cohort — потенциальная
+        # точка для уточнения, но текущая бизнес-логика этого не требует.
+        from django.db.models import Avg, F as _F
+        avg_cost = StockMovement.objects.filter(
+            nomenclature=pack_nom,
+            kind=StockMovement.Kind.INCOMING,
+        ).aggregate(c=Avg(_F("amount_uzs") / _F("quantity")))["c"] or Decimal(0)
+        pack_unit_cost = _quantize_money(Decimal(avg_cost))
+
+    bag_unit_cost = _quantize_money(feed_per_bag + pack_unit_cost)
     total_cost = _quantize_money(bag_unit_cost * Decimal(bag_count))
 
     now = timezone.now()
@@ -341,19 +360,11 @@ def package_feed_batch(
         sm_in.save()
         stock_movements.append(sm_in)
 
-    # 6b. Списываем пустые мешки (если SKU определился)
+    # 6b. Списываем пустые мешки (если SKU определился). Стоимость уже
+    # учтена в bag_unit_cost через pack_unit_cost (см. шаг 3) — здесь
+    # только материальное движение OUTGOING со склада упаковки.
     if pack_nom is not None:
-        # Стоимость одного пустого мешка — weighted-avg по предыдущим
-        # INCOMING. Если приходов не было (мешки пришли через бартер /
-        # неучтённое поступление) — ставим 0 чтобы не падать.
-        from django.db.models import Avg, F as _F
-        avg_cost = StockMovement.objects.filter(
-            nomenclature=pack_nom,
-            kind=StockMovement.Kind.INCOMING,
-        ).aggregate(c=Avg(_F("amount_uzs") / _F("quantity")))["c"] or Decimal(0)
-        avg_cost = _quantize_money(Decimal(avg_cost))
-        bag_total_cost = _quantize_money(avg_cost * Decimal(bag_count))
-
+        bag_total_cost = _quantize_money(pack_unit_cost * Decimal(bag_count))
         sm_pack_number = next_doc_number(
             StockMovement, organization=org, prefix="СД", on_date=entry_date
         )
@@ -365,7 +376,7 @@ def package_feed_batch(
             date=now,
             nomenclature=pack_nom,
             quantity=Decimal(bag_count),
-            unit_price_uzs=avg_cost,
+            unit_price_uzs=pack_unit_cost,
             amount_uzs=bag_total_cost,
             warehouse_from=pack_wh,
             warehouse_to=None,

@@ -141,9 +141,51 @@ def execute_production_task(
         )
 
     org = task.organization
+    recipe = task.recipe_version.recipe
+
+    # Pre-flight: NomenclatureItem для готового корма ОБЯЗАН существовать
+    # (sku == recipe.code). Иначе INCOMING StockMovement не создастся, и
+    # на складе готового корма физически не появится остатков, при том
+    # что JE и FeedBatch уже сохранятся. Это рассинхрон, который раньше
+    # тихо проходил с комментарием в коде. Ловим до side-effects.
+    from apps.nomenclature.models import NomenclatureItem
+    feed_nom = NomenclatureItem.objects.filter(
+        organization=org, sku=recipe.code,
+    ).first()
+    if feed_nom is None:
+        raise FeedTaskExecuteError(
+            {"recipe_version": (
+                f"Не найдена номенклатура готового корма (SKU = «{recipe.code}»). "
+                "Создайте позицию в справочнике номенклатуры с этим SKU и "
+                "попробуйте провести замес снова."
+            )}
+        )
 
     # Нормализация actual
     actual_qty = actual_quantity_kg or task.actual_quantity_kg or task.planned_quantity_kg
+    if actual_qty == 0:
+        raise FeedTaskExecuteError(
+            {"actual_quantity_kg": "Фактический выпуск не может быть нулевым."}
+        )
+    if task.planned_quantity_kg in (None, 0):
+        raise FeedTaskExecuteError(
+            {"planned_quantity_kg": "Плановый выпуск задания не может быть нулевым."}
+        )
+
+    # Пропорционирование компонентов: если фактический выход отличается от
+    # планового, рецепт-доли сохраняются — реальный расход сырья и стоимость
+    # масштабируются на scale = actual / planned. Раньше код всегда списывал
+    # по planned, что даёт неверный unit_cost при переборе/недоборе.
+    qty_scale = (actual_qty / task.planned_quantity_kg).quantize(
+        Decimal("0.000001"), rounding=ROUND_HALF_UP,
+    )
+
+    def _component_actual_qty(comp: ProductionTaskComponent) -> Decimal:
+        # Сохраняем precision сырья (3 знака — стандартный размер decimal у
+        # quantity в проекте).
+        return (comp.planned_quantity * qty_scale).quantize(
+            Decimal("0.001"), rounding=ROUND_HALF_UP,
+        )
 
     # 3. Проверки источников и сборка данных
     total_cost = Decimal("0")
@@ -170,13 +212,14 @@ def execute_production_task(
                     )
                 }
             )
-        required = comp.planned_quantity
+        required = _component_actual_qty(comp)
         if batch.current_quantity < required:
             raise FeedTaskExecuteError(
                 {
                     "components": (
                         f"Партия сырья {batch.doc_number}: остаток "
-                        f"{batch.current_quantity} < требуется {required}."
+                        f"{batch.current_quantity} < требуется {required} "
+                        f"(пропорционально actual={actual_qty} кг)."
                     )
                 }
             )
@@ -184,10 +227,6 @@ def execute_production_task(
         total_cost += component_cost
 
     total_cost = _quantize_money(total_cost)
-    if actual_qty == 0:
-        raise FeedTaskExecuteError(
-            {"actual_quantity_kg": "Фактический выпуск не может быть нулевым."}
-        )
     unit_cost = (total_cost / actual_qty).quantize(
         Decimal("0.000001"), rounding=ROUND_HALF_UP
     )
@@ -214,15 +253,15 @@ def execute_production_task(
     # Используем local-TZ дату (settings.TIME_ZONE = Asia/Tashkent)
     entry_date = timezone.localdate(now)
 
-    # 5. Декремент сырья + OUTGOING movements
+    # 5. Декремент сырья + OUTGOING movements (по actual = planned * scale)
     stock_movements: list[StockMovement] = []
     for comp in components:
         batch = comp.source_batch
+        actual_qty_comp = _component_actual_qty(comp)
         RawMaterialBatch.objects.filter(pk=batch.pk).update(
-            current_quantity=F("current_quantity") - comp.planned_quantity
+            current_quantity=F("current_quantity") - actual_qty_comp
         )
-        # Обновим comp.actual_quantity и actual_price (MVP: actual == planned)
-        comp.actual_quantity = comp.planned_quantity
+        comp.actual_quantity = actual_qty_comp
         comp.actual_price_per_unit_uzs = batch.price_per_unit_uzs
         comp.save(
             update_fields=[
@@ -235,7 +274,7 @@ def execute_production_task(
         sm_number = next_doc_number(
             StockMovement, organization=org, prefix="СД", on_date=entry_date
         )
-        amount = _quantize_money(comp.planned_quantity * batch.price_per_unit_uzs)
+        amount = _quantize_money(actual_qty_comp * batch.price_per_unit_uzs)
         sm = StockMovement(
             organization=org,
             module=task.module,
@@ -243,7 +282,7 @@ def execute_production_task(
             kind=StockMovement.Kind.OUTGOING,
             date=now,
             nomenclature=comp.nomenclature,
-            quantity=comp.planned_quantity,
+            quantity=actual_qty_comp,
             unit_price_uzs=batch.price_per_unit_uzs,
             amount_uzs=amount,
             warehouse_from=batch.warehouse,
@@ -257,7 +296,6 @@ def execute_production_task(
         stock_movements.append(sm)
 
     # 6. FeedBatch (готовый комбикорм)
-    recipe = task.recipe_version.recipe
     fb_number = (
         f"К-{recipe.code}-" + next_doc_number(
             FeedBatch, organization=org, prefix="ФБ", on_date=entry_date, width=5
@@ -291,45 +329,30 @@ def execute_production_task(
     feed_batch.full_clean(exclude=None)
     feed_batch.save()
 
-    # 7. StockMovement INCOMING (готовый корм)
+    # 7. StockMovement INCOMING (готовый корм). feed_nom гарантирован
+    # pre-flight проверкой выше — иначе мы бы не дошли до side-effects.
     sm_in_number = next_doc_number(
         StockMovement, organization=org, prefix="СД", on_date=entry_date
     )
-    # Готовый корм — это nomenclature рецепта.
-    # У ProductionTask нет FK на nomenclature-продукт; возьмём из первого
-    # имеющегося на бункере или используем specialty: так как в фазе
-    # моделей ProductionTask не хранит output_nomenclature, MVP не
-    # создаёт incoming movement с корректной номенклатурой готового корма.
-    # Решение: добавим incoming movement на номенклатуру "готового корма"
-    # если она есть в nomenclature (Recipe.code). В текущей схеме
-    # nomenclature готового корма создаётся при CRUD. Для MVP вернёмся
-    # к использованию nomenclature первой позиции компонентов? — нет,
-    # это неверно. Оставим без incoming SM если nomenclature не найдена.
-    from apps.nomenclature.models import NomenclatureItem
-    feed_nom = NomenclatureItem.objects.filter(
-        organization=org, sku=recipe.code
-    ).first()
-    sm_in = None
-    if feed_nom:
-        sm_in = StockMovement(
-            organization=org,
-            module=task.module,
-            doc_number=sm_in_number,
-            kind=StockMovement.Kind.INCOMING,
-            date=now,
-            nomenclature=feed_nom,
-            quantity=actual_qty,
-            unit_price_uzs=unit_cost.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP),
-            amount_uzs=total_cost,
-            warehouse_to=output_warehouse,
-            warehouse_from=None,
-            source_content_type=ContentType.objects.get_for_model(FeedBatch),
-            source_object_id=feed_batch.id,
-            created_by=user,
-        )
-        sm_in.full_clean(exclude=None)
-        sm_in.save()
-        stock_movements.append(sm_in)
+    sm_in = StockMovement(
+        organization=org,
+        module=task.module,
+        doc_number=sm_in_number,
+        kind=StockMovement.Kind.INCOMING,
+        date=now,
+        nomenclature=feed_nom,
+        quantity=actual_qty,
+        unit_price_uzs=unit_cost.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP),
+        amount_uzs=total_cost,
+        warehouse_to=output_warehouse,
+        warehouse_from=None,
+        source_content_type=ContentType.objects.get_for_model(FeedBatch),
+        source_object_id=feed_batch.id,
+        created_by=user,
+    )
+    sm_in.full_clean(exclude=None)
+    sm_in.save()
+    stock_movements.append(sm_in)
 
     # 8. JournalEntry: Dr 10.05 / Cr 10.01
     debit_sub = _get_subaccount(org, READY_FEED_SUBACCOUNT)

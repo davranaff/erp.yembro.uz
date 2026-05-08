@@ -29,6 +29,7 @@ from decimal import Decimal, ROUND_HALF_UP
 from typing import Iterable, Optional
 
 from django.contrib.contenttypes.models import ContentType
+from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.db.models import F
 
@@ -113,6 +114,8 @@ def _collect_raw_lots(organization_id: str) -> Iterable[LotInfo]:
 
 
 def _collect_feed_lots(organization_id: str) -> Iterable[LotInfo]:
+    from apps.nomenclature.models import NomenclatureItem
+
     from .. import models as feed_models
     from ..models import FeedBatch
 
@@ -125,15 +128,45 @@ def _collect_feed_lots(organization_id: str) -> Iterable[LotInfo]:
         .select_related("recipe_version__recipe", "storage_warehouse", "module")
     )
     state_lot_type = feed_models.FeedLotShrinkageState.LotType.PRODUCTION_BATCH
+
+    # Кеш recipe.code → nomenclature_id, чтобы не делать N запросов по
+    # одному recipe (типичный случай — много партий одного рецепта).
+    nom_cache: dict[str, Optional[str]] = {}
+
+    def _resolve_nom_id(recipe_code: str) -> Optional[str]:
+        if recipe_code in nom_cache:
+            return nom_cache[recipe_code]
+        nom = NomenclatureItem.objects.filter(
+            organization_id=organization_id, sku=recipe_code,
+        ).only("id").first()
+        nom_cache[recipe_code] = str(nom.id) if nom else None
+        return nom_cache[recipe_code]
+
     for b in qs:
         wh_id = b.storage_warehouse_id
+        recipe_code = b.recipe_version.recipe.code
+        nomenclature_id = _resolve_nom_id(recipe_code)
+        if nomenclature_id is None:
+            # Конфигурационная ошибка: для recipe нет NomenclatureItem.
+            # Пропускаем партию ЦЕЛИКОМ — без декремента и без movement.
+            # Раньше партия проходила через apply_to_lot, current_quantity_kg
+            # уменьшался, но StockMovement не создавался → склад «терял» кг
+            # без journal-записи. После фикса #1 в execute_task новые
+            # партии не могут попасть в это состояние; warning остаётся
+            # для legacy/импортированных данных.
+            logger.warning(
+                "shrinkage: skip FeedBatch %s — no NomenclatureItem for sku=%s",
+                b.doc_number, recipe_code,
+            )
+            continue
+
         # Партия готового корма может храниться в bunker, без storage_warehouse —
         # тогда профиль для конкретного склада не подойдёт, останется только общий.
         yield LotInfo(
             lot_type=state_lot_type,
             lot_id=str(b.id),
             organization_id=str(b.organization_id),
-            nomenclature_id=None,
+            nomenclature_id=nomenclature_id,
             recipe_id=str(b.recipe_version.recipe_id),
             warehouse_id=str(wh_id) if wh_id else None,
             arrived_on=b.produced_at.date(),
@@ -514,14 +547,30 @@ def _build_lot_info(lot_type: str, lot_id: str) -> LotInfo:
             module_id=str(b.module_id),
         )
     elif lot_type == FeedLotShrinkageState.LotType.PRODUCTION_BATCH:
+        from apps.nomenclature.models import NomenclatureItem
+
         b = FeedBatch.objects.select_related(
             "recipe_version__recipe", "storage_warehouse", "module"
         ).get(pk=lot_id)
+        recipe_code = b.recipe_version.recipe.code
+        nom = NomenclatureItem.objects.filter(
+            organization_id=b.organization_id, sku=recipe_code,
+        ).only("id").first()
+        if nom is None:
+            # См. _collect_feed_lots — без nomenclature нельзя писать
+            # StockMovement(SHRINKAGE), а тихо декрементить кг — рассинхрон.
+            raise ValidationError({
+                "nomenclature": (
+                    f"Не найдена номенклатура готового корма (SKU = «{recipe_code}»). "
+                    "Создайте позицию в справочнике номенклатуры с этим SKU и "
+                    "повторите запуск усушки."
+                )
+            })
         return LotInfo(
             lot_type=lot_type,
             lot_id=str(b.id),
             organization_id=str(b.organization_id),
-            nomenclature_id=None,
+            nomenclature_id=str(nom.id),
             recipe_id=str(b.recipe_version.recipe_id),
             warehouse_id=str(b.storage_warehouse_id) if b.storage_warehouse_id else None,
             arrived_on=b.produced_at.date(),

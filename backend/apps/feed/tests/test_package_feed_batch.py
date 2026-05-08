@@ -384,3 +384,27 @@ def test_package_no_auto_when_weight_nonstandard(
         if sm.nomenclature_id == empty_bag_50.id
     ]
     assert len(bag_outs) == 0
+
+
+def test_package_includes_empty_bag_cost_in_unit_cost(
+    approved_feed_batch, stocked_bag_warehouse, empty_bag_50, user,
+):
+    """
+    Регрессия (audit gap #3): стоимость пустого мешка должна попадать в
+    FeedBagLot.unit_cost_uzs, не теряться в OUTGOING SM пустых мешков.
+    Без этого downstream-продажи получают заниженную себестоимость.
+
+    Stocked: 100 мешков по 1000 сум/штука → pack_unit_cost = 1000.
+    feed_per_bag = source.unit_cost (20700) × bag_weight (50) = 1_035_000.
+    bag_unit_cost = 1_035_000 + 1000 = 1_036_000.
+    """
+    res = package_feed_batch(
+        approved_feed_batch,
+        bag_count=10, bag_weight_kg=Decimal("50"),
+        storage_warehouse=stocked_bag_warehouse, user=user,
+    )
+    feed_per_bag = (Decimal("20700.000000") * Decimal("50")).quantize(Decimal("0.01"))
+    pack_unit_cost = Decimal("1000.00")
+    expected_unit = (feed_per_bag + pack_unit_cost).quantize(Decimal("0.01"))
+    assert res.bag_lot.unit_cost_uzs == expected_unit
+    assert res.bag_lot.total_cost_uzs == (expected_unit * 10).quantize(Decimal("0.01"))

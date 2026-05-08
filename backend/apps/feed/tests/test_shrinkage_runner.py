@@ -980,3 +980,65 @@ def test_depleted_batch_not_picked_up(
     results = apply_for_organization(org, today=date(2026, 5, 1))
     depleted = [r for r in results if r.lot_id == str(batch.id)]
     assert depleted == []
+
+
+@pytest.mark.django_db
+def test_feed_batch_without_nomenclature_skipped_in_orgwide(
+    org, m_feed, recipe, recipe_version, wh1,
+):
+    """
+    Регрессия (audit gap #5): если у FeedBatch нет связанной NomenclatureItem
+    (sku=recipe.code), партия должна быть пропущена ЦЕЛИКОМ — без декремента
+    current_quantity_kg и без StockMovement. Раньше collector yield-ил такой
+    lot, current_quantity уменьшался, а SHRINKAGE-движение пропускалось →
+    кг «терялись» без journal-записи.
+    """
+    from apps.nomenclature.models import NomenclatureItem
+
+    batch = _make_feed_batch(
+        org=org, m_feed=m_feed, recipe_version=recipe_version,
+        warehouse=wh1, doc="FEED-NONOM", qty="500",
+    )
+    # Удаляем nomenclature, созданный сигналом auto_create_nomenclature_for_recipe.
+    NomenclatureItem.objects.filter(organization=org, sku=recipe.code).delete()
+
+    FeedShrinkageProfile.objects.create(
+        organization=org,
+        target_type=FeedShrinkageProfile.TargetType.FEED_TYPE,
+        recipe=recipe,
+        period_days=7,
+        percent_per_period=Decimal("0.4"),
+    )
+
+    initial_qty = Decimal(batch.current_quantity_kg)
+    results = apply_for_organization(org, today=date(2026, 5, 1))
+    skipped = [r for r in results if r.lot_id == str(batch.id)]
+
+    # Партия пропущена: ни в результатах, ни декремента.
+    assert skipped == []
+    batch.refresh_from_db()
+    assert batch.current_quantity_kg == initial_qty
+
+
+@pytest.mark.django_db
+def test_feed_batch_without_nomenclature_raises_in_specific_apply(
+    org, m_feed, recipe, recipe_version, wh1,
+):
+    """
+    _build_lot_info (ручной apply через POST /shrinkage/apply) должен
+    жёстко падать при отсутствии NomenclatureItem — это конфигурационная
+    ошибка, оператор должен исправить справочник.
+    """
+    from django.core.exceptions import ValidationError
+    from apps.nomenclature.models import NomenclatureItem
+
+    batch = _make_feed_batch(
+        org=org, m_feed=m_feed, recipe_version=recipe_version,
+        warehouse=wh1, doc="FEED-NONOM-2", qty="500",
+    )
+    NomenclatureItem.objects.filter(organization=org, sku=recipe.code).delete()
+
+    with pytest.raises(ValidationError):
+        _build_lot_info(
+            FeedLotShrinkageState.LotType.PRODUCTION_BATCH, str(batch.id),
+        )
