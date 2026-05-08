@@ -97,8 +97,16 @@ def fake_send():
             digest as _dig,
             counterparty as _cp,
             modules_hub as _mod_hub,
+            wizard_cmds as _wc,
         )
-        for mod in (_disp, _menu, _fin, _prod, _rep, _org, _help, _leg, _link, _dig, _cp, _mod_hub):
+        from apps.tgbot.wizards import (
+            feed_purchase as _wp,
+            feed_writeoff as _wwo,
+        )
+        for mod in (
+            _disp, _menu, _fin, _prod, _rep, _org, _help, _leg, _link,
+            _dig, _cp, _mod_hub, _wc, _wp, _wwo,
+        ):
             if hasattr(mod, "send_message"):
                 mod.send_message = fake.send
             if hasattr(mod, "edit_message_text"):
