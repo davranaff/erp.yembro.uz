@@ -597,17 +597,23 @@ export default function FeedDashboardPage() {
                   <th style={{
                     textAlign: 'left', padding: '8px 10px',
                     borderBottom: '1px solid var(--border)',
-                    minWidth: 200, position: 'sticky', left: 0,
-                    background: 'var(--bg-soft)', zIndex: 2,
+                    minWidth: 200, width: 200,
+                    position: 'sticky', left: 0,
+                    // Полностью непрозрачный фон + box-shadow справа —
+                    // иначе при горизонтальном скролле scroll-колонки
+                    // просвечивают через sticky.
+                    background: '#FBF7EE', zIndex: 5,
+                    boxShadow: '2px 0 0 var(--border)',
                   }}>
                     Ингредиент
                   </th>
                   <th style={{
                     textAlign: 'right', padding: '8px 10px',
                     borderBottom: '1px solid var(--border)',
-                    borderLeft: '1px solid var(--border)',
-                    minWidth: 90, position: 'sticky', left: 200,
-                    background: 'var(--bg-soft)', zIndex: 2,
+                    minWidth: 90, width: 90,
+                    position: 'sticky', left: 200,
+                    background: '#FBF7EE', zIndex: 5,
+                    boxShadow: '2px 0 0 var(--border)',
                     fontSize: 11,
                   }}>
                     Остаток
@@ -662,8 +668,13 @@ export default function FeedDashboardPage() {
                     <tr key={ing.sku} style={{ borderBottom: '1px solid var(--border)' }}>
                       <td style={{
                         padding: '6px 10px', position: 'sticky', left: 0,
-                        background: 'var(--bg-card, #fff)',
-                        fontSize: 12, zIndex: 1,
+                        // Hard-coded fully opaque cream — иначе scroll-cells
+                        // справа просвечивают через sticky (var(--bg-card)
+                        // имеет alpha < 1 в некоторых рендерах).
+                        background: '#FFFDF7', zIndex: 4,
+                        boxShadow: '2px 0 0 var(--border)',
+                        fontSize: 12,
+                        minWidth: 200, width: 200,
                       }}>
                         <span style={{ fontWeight: 500, color: 'var(--fg-1)' }}>
                           {ing.name}
@@ -677,9 +688,10 @@ export default function FeedDashboardPage() {
                       <td className="mono" style={{
                         padding: '6px 10px', textAlign: 'right',
                         position: 'sticky', left: 200,
-                        background: 'var(--bg-card, #fff)',
-                        borderLeft: '1px solid var(--border)',
-                        fontSize: 12, zIndex: 1,
+                        background: '#FFFDF7', zIndex: 4,
+                        boxShadow: '2px 0 0 var(--border)',
+                        fontSize: 12,
+                        minWidth: 90, width: 90,
                         color: stock > 0 ? 'var(--fg-1)' : 'var(--fg-3)',
                         fontWeight: stock > 0 ? 600 : 400,
                       }}>
@@ -766,14 +778,17 @@ export default function FeedDashboardPage() {
                 <tr style={{ background: 'var(--bg-soft)', fontWeight: 700 }}>
                   <td style={{
                     padding: '8px 10px', position: 'sticky', left: 0,
-                    background: 'var(--bg-soft)', zIndex: 1,
+                    background: '#FBF7EE', zIndex: 4,
+                    boxShadow: '2px 0 0 var(--border)',
+                    minWidth: 200, width: 200,
                   }}>
                     Итого
                   </td>
                   <td style={{
                     padding: '8px 10px', position: 'sticky', left: 200,
-                    background: 'var(--bg-soft)', zIndex: 1,
-                    borderLeft: '1px solid var(--border)',
+                    background: '#FBF7EE', zIndex: 4,
+                    boxShadow: '2px 0 0 var(--border)',
+                    minWidth: 90, width: 90,
                   }} />
                   {displayVersions.map((v) => {
                     const t = columnTotals[v.id] ?? 0;
