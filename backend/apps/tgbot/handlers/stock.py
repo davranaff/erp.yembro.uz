@@ -224,25 +224,21 @@ def _render_warehouse_balance(ctx: HandlerCtx, *, wh_id: str, page: int) -> None
     if not page_rows:
         lines.append("Движений на этом складе нет.")
     else:
-        # Моноширинная таблица в <pre> — Telegram рендерит фиксированным шрифтом
-        # → колонки выравниваются. Раньше 2 строки на SKU давали мешанину.
-        sku_w = max(8, max(len(r["sku"]) for r in page_rows))
-        sku_w = min(sku_w, 22)  # ограничение ширины SKU
+        # Моноширинная таблица: «название · кол-во · ед.»
+        # Используем human-readable name вместо SKU-кода — оператору
+        # не нужны технические SKU, он думает в названиях.
+        name_w = max(10, min(28, max(len(r["name"] or r["sku"]) for r in page_rows)))
         rows_text = []
         for r in page_rows:
             bal = r["balance"]
             unit = r["unit"] or ""
             mark = "+" if bal > 0 else ("·" if bal == 0 else "!")
-            sku_trunc = r["sku"][:sku_w]
+            name = (r["name"] or r["sku"])[:name_w]
             rows_text.append(
-                f"{mark} {sku_trunc:<{sku_w}}  "
+                f"{mark} {name:<{name_w}}  "
                 f"{_fmt_qty(bal):>10} {unit}"
             )
         lines.append("<pre>" + "\n".join(rows_text) + "</pre>")
-        # Имена SKU отдельным блоком — детали для тех кто хочет посмотреть.
-        lines.append("<i>Названия:</i>")
-        for r in page_rows:
-            lines.append(f"  • <code>{r['sku']}</code> — {r['name']}")
 
     markup = kb_pagination(
         f"wh:bal:{wh_id}", page, total,
