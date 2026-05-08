@@ -19,3 +19,4 @@ from . import wizard_cmds  # noqa: F401  — /bekor (отмена wizard-сес�
 from .. import wizards  # noqa: F401  — регистрирует wizard-handlers
 from ..wizards import feed_purchase  # noqa: F401  — /qabul (приход)
 from ..wizards import feed_writeoff  # noqa: F401  — /chiqim (списание)
+from ..wizards import feed_mix  # noqa: F401  — /aralash (замес)
