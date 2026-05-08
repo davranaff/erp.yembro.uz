@@ -390,6 +390,78 @@ def test_execute_raw_in_quarantine_raises(
         )
 
 
+def test_execute_raises_when_no_nomenclature_for_recipe_code(
+    task, ready_warehouse, storage_bin, corn_batch, soy_batch,
+):
+    """
+    Регрессия (audit gap #1): если для recipe.code нет NomenclatureItem,
+    раньше execute_task проходил, JE/FeedBatch создавались, но INCOMING
+    StockMovement пропускался — на складе готового корма не появлялось
+    остатков. Теперь это ValidationError pre-flight, до side-effects.
+
+    NOTE: сигнал auto_create_nomenclature_for_recipe создаёт позицию
+    автоматически. Тест отключает его удалением созданной позиции.
+    """
+    NomenclatureItem.objects.filter(organization=task.organization, sku="Р-БР-СТ").delete()
+
+    initial_corn = corn_batch.current_quantity
+    initial_soy = soy_batch.current_quantity
+
+    with pytest.raises(ValidationError) as exc:
+        execute_production_task(
+            task, output_warehouse=ready_warehouse, storage_bin=storage_bin,
+        )
+    assert "Р-БР-СТ" in str(exc.value)
+
+    # Side-effects не должны произойти.
+    task.refresh_from_db()
+    corn_batch.refresh_from_db()
+    soy_batch.refresh_from_db()
+    assert task.status == ProductionTask.Status.PLANNED
+    assert corn_batch.current_quantity == initial_corn
+    assert soy_batch.current_quantity == initial_soy
+    assert not FeedBatch.objects.filter(produced_by_task=task).exists()
+
+
+def test_execute_proportional_components_when_actual_less_than_planned(
+    task, ready_warehouse, storage_bin, broiler_feed_nom,
+    corn_batch, soy_batch,
+):
+    """
+    Регрессия (audit gap #2): если actual_quantity_kg < planned, компоненты
+    должны масштабироваться пропорционально (рецепт-доли сохраняются),
+    total_cost — пропорционально, unit_cost остаётся тем же.
+
+    Раньше код всегда списывал planned, что давало неверный unit_cost при
+    переборе/недоборе.
+    """
+    # planned 1000 кг, actual 800 кг → scale 0.8.
+    # corn_planned 700 → corn_actual 560; soy_planned 300 → soy_actual 240.
+    result = execute_production_task(
+        task, output_warehouse=ready_warehouse, storage_bin=storage_bin,
+        actual_quantity_kg=Decimal("800"),
+    )
+
+    corn_batch.refresh_from_db()
+    soy_batch.refresh_from_db()
+
+    # Списано 0.8 от planned, не planned.
+    assert corn_batch.current_quantity == Decimal("5000") - Decimal("560")
+    assert soy_batch.current_quantity == Decimal("2000") - Decimal("240")
+
+    # total_cost = 560*18000 + 240*27000 = 10_080_000 + 6_480_000 = 16_560_000
+    expected_total = Decimal("560") * Decimal("18000") + Decimal("240") * Decimal("27000")
+    assert result.feed_batch.total_cost_uzs == expected_total
+    # unit_cost = total / 800 — рецепт-доли сохранены → совпадает с
+    # планом 1000 кг (700*18000 + 300*27000)/1000 = 20_700.
+    assert result.feed_batch.unit_cost_uzs == Decimal("20700.000000")
+
+    # actual_quantity на компонентах тоже должно быть пропорциональным.
+    components = list(task.components.order_by("sort_order"))
+    assert components[0].actual_quantity == Decimal("560.000")
+    assert components[1].actual_quantity == Decimal("240.000")
+
+
 def test_execute_is_atomic_on_je_failure(
     task, ready_warehouse, storage_bin, broiler_feed_nom,
     corn_batch, monkeypatch,
