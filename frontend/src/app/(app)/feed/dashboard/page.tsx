@@ -105,6 +105,21 @@ export default function FeedDashboardPage() {
     const n = parseFloat(whatIfTons);
     return Number.isFinite(n) && n > 0 ? n * 1000 : 0;
   }, [whatIfTons]);
+  // Multi-select по рецептам: пусто = все, иначе только выбранные.
+  const [selectedRecipeIds, setSelectedRecipeIds] = useState<Set<string>>(new Set());
+  const toggleRecipe = (id: string) => {
+    setSelectedRecipeIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+  const displayVersions = useMemo(() => (
+    selectedRecipeIds.size === 0
+      ? matrixVersions
+      : matrixVersions.filter((v) => selectedRecipeIds.has(v.id))
+  ), [matrixVersions, selectedRecipeIds]);
 
   // ── Stock map (sku → balance kg) для подсветки нехватки ───────────────
   const stockBySku = useMemo(() => {
@@ -521,9 +536,65 @@ export default function FeedDashboardPage() {
         )}
       </div>
 
+      {/* ── Recipe filter chips ─────────────────────────────────────────── */}
+      {matrixVersions.length > 0 && (
+        <div style={{
+          display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 6,
+          padding: 10,
+          background: 'var(--bg-soft)',
+          borderLeft: `1px solid ${whatIfKg > 0 ? 'var(--brand-orange)' : 'var(--border)'}`,
+          borderRight: `1px solid ${whatIfKg > 0 ? 'var(--brand-orange)' : 'var(--border)'}`,
+          borderTop: '1px dashed var(--border)',
+        }}>
+          <span style={{
+            fontSize: 11, fontWeight: 700, color: 'var(--fg-3)',
+            textTransform: 'uppercase', letterSpacing: '.04em', marginRight: 4,
+          }}>
+            Фильтр рецептов:
+          </span>
+          <button
+            type="button"
+            onClick={() => setSelectedRecipeIds(new Set())}
+            className="btn btn-sm"
+            style={{
+              fontSize: 11, padding: '3px 10px',
+              background: selectedRecipeIds.size === 0 ? 'var(--brand-orange)' : 'var(--bg-card)',
+              color: selectedRecipeIds.size === 0 ? '#fff' : 'var(--fg-2)',
+              border: '1px solid var(--border)', borderRadius: 999,
+            }}
+          >
+            Все ({matrixVersions.length})
+          </button>
+          {matrixVersions.map((v) => {
+            const selected = selectedRecipeIds.has(v.id);
+            return (
+              <button
+                key={v.id}
+                type="button"
+                onClick={() => toggleRecipe(v.id)}
+                className="btn btn-sm"
+                style={{
+                  fontSize: 11, padding: '3px 10px',
+                  background: selected ? 'var(--brand-orange)' : 'var(--bg-card)',
+                  color: selected ? '#fff' : 'var(--fg-2)',
+                  border: '1px solid var(--border)', borderRadius: 999,
+                }}
+                title={v.recipe_name}
+              >
+                {v.recipe_code} <span style={{ opacity: 0.7 }}>v{v.version}</span>
+              </button>
+            );
+          })}
+        </div>
+      )}
+
       {/* ── Recipe matrix ─────────────────────────────────────────────── */}
       <Panel
-        title={`Рецептурная матрица · ${matrixVersions.length} рецептов × ${matrixIngredients.length} ингредиентов`}
+        title={
+          selectedRecipeIds.size === 0
+            ? `Рецептурная матрица · ${matrixVersions.length} рецептов × ${matrixIngredients.length} ингредиентов`
+            : `Рецептурная матрица · ${displayVersions.length}/${matrixVersions.length} рецептов × ${matrixIngredients.length} ингредиентов`
+        }
         flush
         style={{ marginBottom: 14 }}
       >
@@ -566,7 +637,7 @@ export default function FeedDashboardPage() {
                   }}>
                     Остаток
                   </th>
-                  {matrixVersions.map((v) => {
+                  {displayVersions.map((v) => {
                     const sum = recipeSummary[v.id];
                     const totalOk = Math.abs((columnTotals[v.id] ?? 0) - 100) < 0.5;
                     return (
@@ -639,7 +710,7 @@ export default function FeedDashboardPage() {
                       }}>
                         {fmtNum(stock, 0)}
                       </td>
-                      {matrixVersions.map((v) => {
+                      {displayVersions.map((v) => {
                         const info = ing.shares[v.id];
                         const share = info?.share ?? null;
                         const isEditing = editingCell?.sku === ing.sku && editingCell?.vid === v.id;
@@ -729,7 +800,7 @@ export default function FeedDashboardPage() {
                     background: 'var(--bg-soft)', zIndex: 1,
                     borderLeft: '1px solid var(--border)',
                   }} />
-                  {matrixVersions.map((v) => {
+                  {displayVersions.map((v) => {
                     const t = columnTotals[v.id] ?? 0;
                     const ok = Math.abs(t - 100) < 0.5;
                     return (
