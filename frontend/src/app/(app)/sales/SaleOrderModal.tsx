@@ -69,6 +69,12 @@ interface ItemDraft {
   batch_doc?: string;
   /** Единица измерения для подсказки. */
   unit_code?: string;
+  /**
+   * UI-only: при продаже FeedBagLot юзер может вводить цену «за мешок»
+   * (default) или «за кг» — для convenience. На бэк всегда уходит цена
+   * за единицу учёта (мешок), kg-версия конвертируется через bag_weight_kg.
+   */
+  price_unit?: 'bag' | 'kg';
 }
 
 function makeItemDraft(overrides: Partial<ItemDraft> = {}): ItemDraft {
@@ -936,24 +942,72 @@ export default function SaleOrderModal({ initial, preselect, onClose }: Props) {
                     </div>
 
                     <div className="field">
-                      <label>
-                        Цена за ед. ({currencyCode}) *
+                      <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <span>Цена * ({currencyCode})</span>
                         {isBag && bagKg > 0 && (
-                          <span style={{ fontSize: 10, color: 'var(--fg-3)', fontWeight: 400, marginLeft: 6 }}>
-                            за 1 мешок ({bagKg.toLocaleString('ru-RU')} кг)
+                          <span style={{ display: 'inline-flex', gap: 4, marginLeft: 6 }}>
+                            <button
+                              type="button"
+                              onClick={() => updateItem(it.key, { price_unit: 'bag' })}
+                              className="btn btn-sm"
+                              style={{
+                                fontSize: 10, padding: '2px 8px',
+                                background: (it.price_unit ?? 'bag') === 'bag' ? 'var(--brand-orange)' : 'var(--bg-card)',
+                                color: (it.price_unit ?? 'bag') === 'bag' ? '#fff' : 'var(--fg-2)',
+                                border: '1px solid var(--border)', borderRadius: 4,
+                              }}
+                            >
+                              за мешок
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => updateItem(it.key, { price_unit: 'kg' })}
+                              className="btn btn-sm"
+                              style={{
+                                fontSize: 10, padding: '2px 8px',
+                                background: it.price_unit === 'kg' ? 'var(--brand-orange)' : 'var(--bg-card)',
+                                color: it.price_unit === 'kg' ? '#fff' : 'var(--fg-2)',
+                                border: '1px solid var(--border)', borderRadius: 4,
+                              }}
+                            >
+                              за кг
+                            </button>
                           </span>
                         )}
                       </label>
-                      <input
-                        className="input mono"
-                        type="number"
-                        step="0.01"
-                        value={it.unit_price_uzs}
-                        onChange={(e) => updateItem(it.key, { unit_price_uzs: e.target.value })}
-                      />
+                      {(() => {
+                        // Храним unit_price_uzs всегда как цену «за мешок» —
+                        // это то что нужно бэку (SaleItem.unit_price × quantity_шт).
+                        // Если юзер ввёл «за кг» — конвертим: bag_price = kg × bagKg.
+                        const priceUnit = (it.price_unit ?? 'bag') as 'bag' | 'kg';
+                        const stored = parseFloat(it.unit_price_uzs || '0');
+                        const displayed = !isBag || bagKg <= 0 || priceUnit === 'bag'
+                          ? it.unit_price_uzs
+                          : (stored > 0 ? String(stored / bagKg) : '');
+                        return (
+                          <input
+                            className="input mono"
+                            type="number"
+                            step="0.01"
+                            value={displayed}
+                            placeholder={isBag && priceUnit === 'kg' ? 'UZS за кг' : 'UZS за мешок'}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              if (!isBag || bagKg <= 0 || priceUnit === 'bag') {
+                                updateItem(it.key, { unit_price_uzs: val });
+                                return;
+                              }
+                              const kg = parseFloat(val || '0');
+                              const bagPrice = kg > 0 ? (kg * bagKg).toString() : val;
+                              updateItem(it.key, { unit_price_uzs: bagPrice });
+                            }}
+                          />
+                        );
+                      })()}
                       {isBag && bagKg > 0 && parseFloat(it.unit_price_uzs || '0') > 0 && (
                         <div style={{ fontSize: 11, color: 'var(--fg-3)', marginTop: 4 }}>
                           ≈ {(parseFloat(it.unit_price_uzs) / bagKg).toLocaleString('ru-RU', { maximumFractionDigits: 0 })} {currencyCode}/кг
+                          {' · '}{parseFloat(it.unit_price_uzs).toLocaleString('ru-RU', { maximumFractionDigits: 0 })} {currencyCode}/мешок
                         </div>
                       )}
                     </div>

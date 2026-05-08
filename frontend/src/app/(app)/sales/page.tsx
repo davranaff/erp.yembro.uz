@@ -53,6 +53,10 @@ function fmtUzs(v: string | null | undefined): string {
   return n.toLocaleString('ru-RU', { maximumFractionDigits: 0 }) + ' сум';
 }
 
+function todayISO(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+
 export default function SalesPage() {
   const [tab, setTab] = useState<'all' | SaleStatus>('all');
   const [page, setPage] = useState(1);
@@ -64,13 +68,20 @@ export default function SalesPage() {
   const [remindFor, setRemindFor] = useState<SaleOrder | null>(null);
   const [confirmingFor, setConfirmingFor] = useState<SaleOrder | null>(null);
 
+  // По умолчанию — текущий день. Юзер может расширить вручную или сбросить.
+  const [dateFrom, setDateFrom] = useState<string>(todayISO());
+  const [dateTo, setDateTo] = useState<string>(todayISO());
+
   const hasLevel = useHasLevel();
   const canEdit = hasLevel('sales', 'rw');
 
-  const filter = useMemo(
-    () => (tab === 'all' ? {} : { status: tab }),
-    [tab],
-  );
+  const filter = useMemo(() => {
+    const f: Record<string, string> = {};
+    if (tab !== 'all') f.status = tab;
+    if (dateFrom) f.date_after = dateFrom;
+    if (dateTo) f.date_before = dateTo;
+    return f;
+  }, [tab, dateFrom, dateTo]);
 
   const { data: pageData, isLoading } = salesCrud.useListPaginated(filter, page, pageSize);
   const orders = pageData?.results ?? [];
@@ -137,7 +148,7 @@ export default function SalesPage() {
         <KpiCard tone="red" iconName="users" label="Должны нам" sub="не оплачено" value={fmtUzs(String(totals.receivable))} />
       </div>
 
-      <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center', marginBottom: 12 }}>
         <Seg
           options={[
             { value: 'all', label: 'Все' },
@@ -148,6 +159,50 @@ export default function SalesPage() {
           value={tab}
           onChange={(v) => { setTab(v as typeof tab); setPage(1); }}
         />
+        <span style={{
+          fontSize: 11, fontWeight: 700, color: 'var(--fg-3)',
+          textTransform: 'uppercase', letterSpacing: '.04em', marginLeft: 8,
+        }}>
+          Период:
+        </span>
+        <input
+          type="date"
+          className="input mono"
+          value={dateFrom}
+          onChange={(e) => { setDateFrom(e.target.value); setPage(1); }}
+          style={{ width: 140 }}
+        />
+        <span style={{ fontSize: 12, color: 'var(--fg-3)' }}>—</span>
+        <input
+          type="date"
+          className="input mono"
+          value={dateTo}
+          onChange={(e) => { setDateTo(e.target.value); setPage(1); }}
+          style={{ width: 140 }}
+        />
+        <button
+          type="button"
+          className="btn btn-ghost btn-sm"
+          onClick={() => {
+            const t = todayISO();
+            setDateFrom(t);
+            setDateTo(t);
+            setPage(1);
+          }}
+          title="Только сегодня"
+        >
+          Сегодня
+        </button>
+        {(dateFrom || dateTo) && (
+          <button
+            type="button"
+            className="btn btn-ghost btn-sm"
+            onClick={() => { setDateFrom(''); setDateTo(''); setPage(1); }}
+            title="Все даты"
+          >
+            Сбросить
+          </button>
+        )}
       </div>
 
       <Panel flush>
