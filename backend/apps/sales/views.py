@@ -8,6 +8,7 @@ from apps.common.lifecycle import DeleteReasonMixin, ImmutableStatusMixin
 from apps.common.services.numbering import next_doc_number
 from apps.common.viewsets import OrgScopedModelViewSet
 
+from .filters import SaleOrderFilter
 from .models import SaleCommunication, SaleOrder
 from .serializers import SaleCommunicationSerializer, SaleOrderSerializer
 from .services.aging import compute_aging_report
@@ -38,7 +39,7 @@ class SaleOrderViewSet(ImmutableStatusMixin, DeleteReasonMixin, OrgScopedModelVi
     status_field = "status"
 
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
-    filterset_fields = ["status", "payment_status", "customer", "currency", "module"]
+    filterset_class = SaleOrderFilter
     search_fields = ["doc_number", "customer__name", "customer__code", "notes"]
     ordering_fields = ["date", "doc_number", "amount_uzs", "cost_uzs", "created_at"]
     ordering = ["-date"]
