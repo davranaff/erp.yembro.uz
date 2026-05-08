@@ -15,6 +15,8 @@
 """
 from __future__ import annotations
 
+import html
+
 from ..bot import send_message
 from ..categories import CATEGORIES, sorted_categories
 from ..dispatcher import COMMANDS, HandlerCtx, command
@@ -51,7 +53,11 @@ def _build_help_text(link) -> str:
         cat = getattr(spec, "category", "misc")
         if cat not in CATEGORIES:
             cat = "misc"
-        line = f"{spec.name} — {spec.help_line}" if spec.help_line else spec.name
+        # Escape help-text — там могут быть угловые скобки (`/batch <doc_number>`)
+        # которые Telegram пытается распарсить как HTML-тег и валит сообщение
+        # с 400 «Unsupported start tag».
+        help_safe = html.escape(spec.help_line) if spec.help_line else ""
+        line = f"{spec.name} — {help_safe}" if help_safe else spec.name
         grouped.setdefault(cat, []).append(line)
 
     if not grouped:
@@ -60,7 +66,8 @@ def _build_help_text(link) -> str:
     parts: list[str] = ["🤖 <b>Yembro ERP Bot</b>\n"]
     org = getattr(link, "active_organization", None) or getattr(link, "organization", None)
     if org and not is_counterparty:
-        parts.append(f"<i>Организация: {org.name}</i>\n")
+        # org.name может содержать "&" / "<" — escape перед HTML-печатью.
+        parts.append(f"<i>Организация: {html.escape(org.name)}</i>\n")
 
     for cat_def in sorted_categories():
         if cat_def.code not in grouped:
