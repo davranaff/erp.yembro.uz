@@ -20,6 +20,7 @@ import RawBatchModal from '../RawBatchModal';
 import RecipeModal from '../RecipeModal';
 import TaskModal from '../TaskModal';
 import VersionModal from '../VersionModal';
+import RecipeFilterDropdown from './RecipeFilterDropdown';
 import type { Recipe } from '@/types/auth';
 
 function todayISO(): string {
@@ -536,10 +537,10 @@ export default function FeedDashboardPage() {
         )}
       </div>
 
-      {/* ── Recipe filter chips ─────────────────────────────────────────── */}
+      {/* ── Recipe filter dropdown ──────────────────────────────────────── */}
       {matrixVersions.length > 0 && (
         <div style={{
-          display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 6,
+          display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 8,
           padding: 10,
           background: 'var(--bg-soft)',
           borderLeft: `1px solid ${whatIfKg > 0 ? 'var(--brand-orange)' : 'var(--border)'}`,
@@ -548,43 +549,17 @@ export default function FeedDashboardPage() {
         }}>
           <span style={{
             fontSize: 11, fontWeight: 700, color: 'var(--fg-3)',
-            textTransform: 'uppercase', letterSpacing: '.04em', marginRight: 4,
+            textTransform: 'uppercase', letterSpacing: '.04em',
           }}>
             Фильтр рецептов:
           </span>
-          <button
-            type="button"
-            onClick={() => setSelectedRecipeIds(new Set())}
-            className="btn btn-sm"
-            style={{
-              fontSize: 11, padding: '3px 10px',
-              background: selectedRecipeIds.size === 0 ? 'var(--brand-orange)' : 'var(--bg-card)',
-              color: selectedRecipeIds.size === 0 ? '#fff' : 'var(--fg-2)',
-              border: '1px solid var(--border)', borderRadius: 999,
-            }}
-          >
-            Все ({matrixVersions.length})
-          </button>
-          {matrixVersions.map((v) => {
-            const selected = selectedRecipeIds.has(v.id);
-            return (
-              <button
-                key={v.id}
-                type="button"
-                onClick={() => toggleRecipe(v.id)}
-                className="btn btn-sm"
-                style={{
-                  fontSize: 11, padding: '3px 10px',
-                  background: selected ? 'var(--brand-orange)' : 'var(--bg-card)',
-                  color: selected ? '#fff' : 'var(--fg-2)',
-                  border: '1px solid var(--border)', borderRadius: 999,
-                }}
-                title={v.recipe_name}
-              >
-                {v.recipe_code} <span style={{ opacity: 0.7 }}>v{v.version}</span>
-              </button>
-            );
-          })}
+          <RecipeFilterDropdown
+            versions={matrixVersions}
+            selectedIds={selectedRecipeIds}
+            onToggle={toggleRecipe}
+            onClear={() => setSelectedRecipeIds(new Set())}
+            onSelectAll={() => setSelectedRecipeIds(new Set(matrixVersions.map((v) => v.id)))}
+          />
         </div>
       )}
 
