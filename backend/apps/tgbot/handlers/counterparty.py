@@ -350,18 +350,29 @@ def _render_debt(ctx: HandlerCtx) -> None:
         f"Jami qarz: <b>{_fmt_money(total_debt)}</b> so'm",
         f"To'lanmagan buyurtmalar: <b>{len(unpaid)}</b>",
         "",
-        "<b>Buyurtmalar bo'yicha:</b>",
     ]
-    for o in unpaid[:10]:
+    # Моноширинная таблица: doc · summa · muddat
+    show = unpaid[:10]
+    doc_w = max(8, min(14, max(len(o.doc_number) for o in show)))
+    rows_text = []
+    for o in show:
         debt = Decimal(o.amount_uzs or 0) - Decimal(o.paid_amount_uzs or 0)
-        line = f"• <code>{o.doc_number}</code> · {_fmt_money(debt)} so'm"
         if o.due_date:
             delta = (o.due_date - _date.today()).days
             if delta < 0:
-                line += f" · 🚨 {abs(delta)} kun kechikdi"
+                muddat = f"-{abs(delta)}d"
             elif delta == 0:
-                line += " · ⚠️ bugun"
-        lines.append(line)
+                muddat = "bugun"
+            else:
+                muddat = f"+{delta}d"
+        else:
+            muddat = "—"
+        rows_text.append(
+            f"{o.doc_number[:doc_w]:<{doc_w}}  "
+            f"{_fmt_money(debt):>14}  {muddat:>6}"
+        )
+    lines.append("<pre>" + "\n".join(rows_text) + "</pre>")
+    lines.append("<i>doc · qarz · muddat (kun)</i>")
     if len(unpaid) > 10:
         lines.append(f"… va yana {len(unpaid) - 10} ta buyurtma")
     lines.append("")

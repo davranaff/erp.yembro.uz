@@ -83,18 +83,20 @@ def _render_feedlot_list(ctx: HandlerCtx, *, edit: bool = False) -> None:
         lines.append("Нет активных партий.")
         markup = kb_back("home")
     else:
+        # Моноширинная таблица: doc · корпус · день · поголовье.
+        doc_w = max(8, min(14, max(len(fb.doc_number) for fb in items)))
+        rows_text = []
         buttons: list[tuple[str, str]] = []
         for fb in items:
             day = (today - fb.placed_date).days if fb.placed_date else 0
-            house = fb.house_block.code if fb.house_block_id else "—"
-            lines.append(
-                f"• <code>{fb.doc_number}</code> · {house} · "
-                f"день {day} · <b>{fb.current_heads}</b> гол."
+            house = (fb.house_block.code if fb.house_block_id else "—")[:8]
+            doc = fb.doc_number[:doc_w]
+            rows_text.append(
+                f"{doc:<{doc_w}}  {house:<8}  d{day:<3} {fb.current_heads:>6} гол"
             )
-            # Drill-down кнопка → /batch <doc> (но /batch принимает Batch.doc_number,
-            # не FeedlotBatch.doc_number). Используем batch.doc_number из FK.
             if fb.batch_id:
                 buttons.append((f"📋 {fb.doc_number}", f"prod:batch:{fb.batch.doc_number}"))
+        lines.append("<pre>" + "\n".join(rows_text) + "</pre>")
         # max 8 кнопок (Telegram UX), оставшиеся юзер дёрнет через /batch
         markup = kb(buttons[:8] + [("← Назад", "home")], cols=2)
 

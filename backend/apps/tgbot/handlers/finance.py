@@ -543,10 +543,15 @@ def _render_pnl(ctx: HandlerCtx, *, period: str, edit: bool = False) -> None:
     if by_mod.rows:
         lines.append("")
         lines.append("<b>По модулям:</b>")
-        for r in by_mod.rows[:8]:
-            lines.append(
-                f"  {r.module_name}:  <code>{_fmt_signed(r.profit)}</code>"
+        rows_show = by_mod.rows[:8]
+        name_w = max(8, min(20, max(len(r.module_name) for r in rows_show)))
+        rows_text = []
+        for r in rows_show:
+            mod_name = r.module_name[:name_w]
+            rows_text.append(
+                f"{mod_name:<{name_w}}  {_fmt_signed(r.profit):>14}"
             )
+        lines.append("<pre>" + "\n".join(rows_text) + "</pre>")
 
     markup = {
         "inline_keyboard":
