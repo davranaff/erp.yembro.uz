@@ -12,7 +12,7 @@ from ..dispatcher import HandlerCtx, command, on_callback
 from ..keyboards import kb
 
 
-@command("/org", help="Переключить активную организацию")
+@command("/org", help="Переключить активную организацию", category="org")
 def handle_org_cmd(ctx: HandlerCtx) -> None:
     from apps.organizations.models import Organization
 

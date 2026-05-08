@@ -218,24 +218,27 @@ def _render_warehouse_balance(ctx: HandlerCtx, *, wh_id: str, page: int) -> None
     with_balance = sum(1 for r in rows if r["balance"] > 0)
     lines = [
         f"📦 <b>{warehouse.code} · {warehouse.name}</b>",
-        f"<i>Modul: {mod} · Qoldiqli SKU: {with_balance} / Jami SKU: {total}</i>",
+        f"<i>Модуль: {mod} · с остатком: {with_balance}/{total}</i>",
         "",
     ]
     if not page_rows:
-        lines.append("Bu omborda harakatlar yo'q.")
+        lines.append("Движений на этом складе нет.")
     else:
+        # Моноширинная таблица: «название · кол-во · ед.»
+        # Используем human-readable name вместо SKU-кода — оператору
+        # не нужны технические SKU, он думает в названиях.
+        name_w = max(10, min(28, max(len(r["name"] or r["sku"]) for r in page_rows)))
+        rows_text = []
         for r in page_rows:
             bal = r["balance"]
             unit = r["unit"] or ""
-            sign = "✅" if bal > 0 else ("⚪" if bal == 0 else "🔴")
-            lines.append(
-                f"{sign} <code>{r['sku']}</code>"
-                f" — <b>{_fmt_qty(bal)} {unit}</b>"
+            mark = "+" if bal > 0 else ("·" if bal == 0 else "!")
+            name = (r["name"] or r["sku"])[:name_w]
+            rows_text.append(
+                f"{mark} {name:<{name_w}}  "
+                f"{_fmt_qty(bal):>10} {unit}"
             )
-            lines.append(
-                f"   <i>({r['name']}) · "
-                f"+{_fmt_qty(r['in_qty'])} − {_fmt_qty(r['out_qty'])}</i>"
-            )
+        lines.append("<pre>" + "\n".join(rows_text) + "</pre>")
 
     markup = kb_pagination(
         f"wh:bal:{wh_id}", page, total,

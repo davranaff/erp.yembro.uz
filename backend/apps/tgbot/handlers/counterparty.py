@@ -152,36 +152,46 @@ def _render_orders(ctx: HandlerCtx) -> None:
         return
 
     lines.append(f"Oxirgi {len(orders)} ta buyurtma:")
-    lines.append(f"  Jami summa:  <b>{_fmt_money(sum_total)}</b> so'm")
-    lines.append(f"  To'langan:   <b>{_fmt_money(sum_paid)}</b> so'm")
-    lines.append(f"  Qarz:        <b>{_fmt_money(sum_debt)}</b> so'm")
+    lines.append("<pre>"
+                 f"Jami:        {_fmt_money(sum_total):>14} so'm\n"
+                 f"To'langan:   {_fmt_money(sum_paid):>14} so'm\n"
+                 f"Qarz:        {_fmt_money(sum_debt):>14} so'm"
+                 "</pre>")
     lines.append("")
 
-    buttons = []
+    # Моноширинная таблица: статус, doc, date, summa.
+    doc_w = max(8, min(14, max(len(o.doc_number) for o in orders)))
+    rows_text = []
+    qarzdor: list[tuple[str, Decimal, str]] = []  # для секции «Qarzdorlik» снизу
     for o in orders:
         total = Decimal(o.amount_uzs or 0)
-        paid = Decimal(o.paid_amount_uzs or 0)
-        debt = total - paid
-        status_icon = "✅" if debt <= 0 else "⏳"
-        line = (
-            f"{status_icon} <code>{o.doc_number}</code> · {o.date}\n"
-            f"   Summa: <b>{_fmt_money(total)}</b> so'm"
+        debt = total - Decimal(o.paid_amount_uzs or 0)
+        status = "+" if debt <= 0 else "!"
+        rows_text.append(
+            f"{status} {o.doc_number[:doc_w]:<{doc_w}}  "
+            f"{o.date.strftime('%d.%m'):>5}  "
+            f"{_fmt_money(total):>11}"
         )
         if debt > 0:
-            line += f"\n   Qarz: <b>{_fmt_money(debt)}</b> so'm"
             if o.due_date:
                 delta = (o.due_date - _date.today()).days
                 if delta < 0:
-                    line += f" · 🚨 {abs(delta)} kun kechikdi"
+                    muddat = f"{abs(delta)} kun kechikdi"
                 elif delta == 0:
-                    line += " · ⚠️ bugun muddat"
+                    muddat = "bugun muddat"
                 else:
-                    line += f" · {delta} kun qoldi"
-        else:
-            line += " · ✅ to'liq to'langan"
-        lines.append(line)
-        # Кнопка drill-down на детали заказа
-        buttons.append((f"📄 {o.doc_number}", f"cp:order:{o.id}"))
+                    muddat = f"{delta} kun qoldi"
+            else:
+                muddat = "muddat ko'rsatilmagan"
+            qarzdor.append((o.doc_number, debt, muddat))
+    lines.append("<pre>" + "\n".join(rows_text) + "</pre>")
+    lines.append("<i>+ to'liq to'langan · ! qarzdor · колонки: doc · sana · summa</i>")
+    if qarzdor:
+        lines.append("")
+        lines.append("<b>Qarzdorlik:</b>")
+        for doc, debt, muddat in qarzdor:
+            lines.append(f"  • <code>{doc}</code> — {_fmt_money(debt)} so'm ({muddat})")
+    buttons = [(f"📄 {o.doc_number}", f"cp:order:{o.id}") for o in orders]
 
     # Делим клавиатуру: сначала кнопки заказов, потом «← Назад»
     markup = kb(buttons[:8] + [("← Orqaga", "cp:menu")], cols=2)
@@ -350,18 +360,29 @@ def _render_debt(ctx: HandlerCtx) -> None:
         f"Jami qarz: <b>{_fmt_money(total_debt)}</b> so'm",
         f"To'lanmagan buyurtmalar: <b>{len(unpaid)}</b>",
         "",
-        "<b>Buyurtmalar bo'yicha:</b>",
     ]
-    for o in unpaid[:10]:
+    # Моноширинная таблица: doc · summa · muddat
+    show = unpaid[:10]
+    doc_w = max(8, min(14, max(len(o.doc_number) for o in show)))
+    rows_text = []
+    for o in show:
         debt = Decimal(o.amount_uzs or 0) - Decimal(o.paid_amount_uzs or 0)
-        line = f"• <code>{o.doc_number}</code> · {_fmt_money(debt)} so'm"
         if o.due_date:
             delta = (o.due_date - _date.today()).days
             if delta < 0:
-                line += f" · 🚨 {abs(delta)} kun kechikdi"
+                muddat = f"-{abs(delta)}d"
             elif delta == 0:
-                line += " · ⚠️ bugun"
-        lines.append(line)
+                muddat = "bugun"
+            else:
+                muddat = f"+{delta}d"
+        else:
+            muddat = "—"
+        rows_text.append(
+            f"{o.doc_number[:doc_w]:<{doc_w}}  "
+            f"{_fmt_money(debt):>14}  {muddat:>6}"
+        )
+    lines.append("<pre>" + "\n".join(rows_text) + "</pre>")
+    lines.append("<i>doc · qarz · muddat (kun)</i>")
     if len(unpaid) > 10:
         lines.append(f"… va yana {len(unpaid) - 10} ta buyurtma")
     lines.append("")
@@ -570,8 +591,13 @@ def _render_catalog(ctx: HandlerCtx, *, page: int) -> None:
     else:
         lines.append(f"Jami {total} ta turi mavjud.")
         lines.append("")
-        for i, (icon, name, qty) in enumerate(page_items, offset + 1):
-            lines.append(f"{icon} <b>{name}</b> — {qty}")
+        # Моноширинная таблица: иконка · название · кол-во.
+        name_w = max(10, min(26, max(len(name) for _, name, _ in page_items)))
+        rows_text = []
+        for icon, name, qty in page_items:
+            name_t = name[:name_w]
+            rows_text.append(f"{icon} {name_t:<{name_w}}  {qty:>14}")
+        lines.append("<pre>" + "\n".join(rows_text) + "</pre>")
         lines.append("")
         lines.append(
             "<i>💬 Narxlar va buyurtmalar uchun menejer bilan bog'laning.</i>"

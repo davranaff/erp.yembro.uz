@@ -1,45 +1,82 @@
 """
-/help — авто-генерируется из реестра COMMANDS.
+/help — список команд, доступных текущему юзеру.
 
-Скрытые команды (`private=True`, например legacy `/report /balance ...`) не
-попадают в /help — пользователю предлагаем `/menu` для inline-навигации.
+Группы определяются по `CommandSpec.category` (см. apps.tgbot.categories).
+Сортировка групп — `sort_order`, внутри группы — по имени команды.
+
+Фильтр:
+  - private=True не показываем (легаси: /report /balance ...)
+  - команда требует module RBAC, у юзера нет — скрываем
+  - audience=admin — только для admin-link, audience=counterparty — для
+    cp-link, "any" — для обоих
+
+Чтобы добавить новую группу — одна запись в apps.tgbot.categories._CATEGORY_DEFS.
+Чтобы добавить команду — `@command(name, module=..., category="...")`.
 """
 from __future__ import annotations
 
+import html
+
 from ..bot import send_message
+from ..categories import CATEGORIES, sorted_categories
 from ..dispatcher import COMMANDS, HandlerCtx, command
 
 
-@command("/help", help="Список команд")
+@command("/help", help="Список команд", audience="any", category="main")
 def handle_help(ctx: HandlerCtx) -> None:
     send_message(ctx.chat_id, _build_help_text(ctx.link))
 
 
 def _build_help_text(link) -> str:
-    """Собирает help-текст по командам, доступным юзеру (private скрыты,
-    модули, к которым нет RBAC — тоже скрыты)."""
     from ..dispatcher import has_module_access
 
+    is_counterparty = getattr(link, "user_id", None) is None
     seen_handlers: set[int] = set()
-    lines: list[str] = []
-    # Сортировка: по имени команды, для стабильности.
+    grouped: dict[str, list[str]] = {}
+
     for spec in sorted(COMMANDS.values(), key=lambda s: s.name):
         if spec.private:
             continue
-        # Дедуп — одна функция могла быть зарегистрирована под несколькими
-        # именами (alias). Берём первое имя в алфавитном порядке.
         handler_key = id(spec.handler)
         if handler_key in seen_handlers:
             continue
-        if spec.module and not has_module_access(link, spec.module):
+        # Audience-gate
+        audience = getattr(spec, "audience", "admin")
+        if audience == "admin" and is_counterparty:
+            continue
+        if audience == "counterparty" and not is_counterparty:
+            continue
+        # RBAC-gate (для admin-link)
+        if not is_counterparty and spec.module and not has_module_access(link, spec.module):
             continue
         seen_handlers.add(handler_key)
-        lines.append(f"{spec.name} — {spec.help_line}" if spec.help_line else spec.name)
+        cat = getattr(spec, "category", "misc")
+        if cat not in CATEGORIES:
+            cat = "misc"
+        # Escape help-text — там могут быть угловые скобки (`/batch <doc_number>`)
+        # которые Telegram пытается распарсить как HTML-тег и валит сообщение
+        # с 400 «Unsupported start tag».
+        help_safe = html.escape(spec.help_line) if spec.help_line else ""
+        line = f"{spec.name} — {help_safe}" if help_safe else spec.name
+        grouped.setdefault(cat, []).append(line)
 
-    body = "\n".join(lines) if lines else "(нет доступных команд)"
-    return (
-        "🤖 <b>Yembro ERP Bot</b>\n\n"
-        "Доступные команды:\n"
-        f"{body}\n\n"
-        "💡 Откройте /menu для удобной навигации."
-    )
+    if not grouped:
+        return "🤖 <b>Yembro ERP Bot</b>\n\n(нет доступных команд)"
+
+    parts: list[str] = ["🤖 <b>Yembro ERP Bot</b>\n"]
+    org = getattr(link, "active_organization", None) or getattr(link, "organization", None)
+    if org and not is_counterparty:
+        # org.name может содержать "&" / "<" — escape перед HTML-печатью.
+        parts.append(f"<i>Организация: {html.escape(org.name)}</i>\n")
+
+    for cat_def in sorted_categories():
+        if cat_def.code not in grouped:
+            continue
+        parts.append(f"<b>{cat_def.label}</b>")
+        for line in grouped[cat_def.code]:
+            parts.append(f"  {line}")
+        parts.append("")  # blank line между группами
+
+    parts.append("💡 /menu — inline-навигация")
+    parts.append("💡 /bekor — отмена wizard'а")
+    return "\n".join(parts)

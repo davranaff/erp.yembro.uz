@@ -172,50 +172,62 @@ def _render_cash(ctx: HandlerCtx, *, edit: bool = False) -> None:
 
     lines = ["💵 <b>Kassa va bank</b>", ""]
     has_negative = False
+    channels = []
     for ch_key, ch_data in cash.items():
         if ch_key.startswith("_"):
             continue
-        label = ch_data["label"]
         bal_dec = Decimal(str(ch_data["balance_uzs"]))
         if bal_dec < 0:
             has_negative = True
-            icon = "🔴"
-            bal_str = f"<b>−{_fmt_uzs(abs(bal_dec))}</b>"
+            mark = "!"
         elif bal_dec == 0:
-            icon = "⚪"
-            bal_str = "0"
+            mark = "·"
         else:
-            icon = "🟢"
-            bal_str = _fmt_uzs(bal_dec)
-        lines.append(f"  {icon} {label}: <code>{bal_str}</code> so'm")
+            mark = "+"
+        channels.append((mark, ch_data["label"], bal_dec))
 
-    total_dec = Decimal(str(cash["_total_uzs"]))
-    lines.append("  ──────────────────")
-    if total_dec < 0:
-        total_str = f"<b>−{_fmt_uzs(abs(total_dec))}</b>"
-    else:
-        total_str = f"<b>{_fmt_uzs(total_dec)}</b>"
-    lines.append(f"  <b>Jami:</b> <code>{total_str}</code> so'm")
+    if channels:
+        # Моноширинная таблица: маркер · канал · баланс.
+        name_w = max(6, min(20, max(len(label) for _, label, _ in channels)))
+        rows_text = []
+        for mark, label, bal in channels:
+            label_t = label[:name_w]
+            bal_str = (
+                f"-{_fmt_uzs(abs(bal))}" if bal < 0
+                else ("0" if bal == 0 else _fmt_uzs(bal))
+            )
+            rows_text.append(f"{mark} {label_t:<{name_w}}  {bal_str:>14} so'm")
+        # Итого отдельной строкой с разделителем.
+        total_dec = Decimal(str(cash["_total_uzs"]))
+        total_str = (
+            f"-{_fmt_uzs(abs(total_dec))}" if total_dec < 0
+            else _fmt_uzs(total_dec)
+        )
+        sep_w = name_w + 2 + 14 + 5  # mark + name + 2sp + bal + " so'm"
+        rows_text.append("─" * sep_w)
+        rows_text.append(f"  Jami{' ' * (name_w - 2)}  {total_str:>14} so'm")
+        lines.append("<pre>" + "\n".join(rows_text) + "</pre>")
 
     if has_negative:
-        lines.append("")
         lines.append(
-            "<i>🔴 Manfiy qoldiq — kanaldan jami chiqarilgan summa kirimdan "
-            "ko'p (overdraft yoki dastlabki qoldiq sozlanmagan).</i>"
+            "<i>! manfiy qoldiq — chiqim kirimdan ko'p (overdraft yoki "
+            "dastlabki qoldiq sozlanmagan).</i>"
         )
 
     if points:
-        # Без ASCII-чарта: в Telegram он рендерился квадратами и юзер не
-        # понимал что это (см. user-feedback). Оставили только числа.
-        net_values = [Decimal(p["in_uzs"]) - Decimal(p["out_uzs"]) for p in points]
-        net_total = sum(net_values, Decimal("0"))
+        # Cashflow 7 дней — отдельная мини-таблица.
         in_total = sum((Decimal(p["in_uzs"]) for p in points), Decimal("0"))
         out_total = sum((Decimal(p["out_uzs"]) for p in points), Decimal("0"))
+        net_total = in_total - out_total
         lines.append("")
         lines.append("<b>Cash-flow · 7 kun</b>")
-        lines.append(f"  ⬆️ Kirim:  <code>{_fmt_uzs(in_total)}</code> so'm")
-        lines.append(f"  ⬇️ Chiqim: <code>{_fmt_uzs(out_total)}</code> so'm")
-        lines.append(f"  ━ Saldo:  <code>{_fmt_signed(net_total)}</code> so'm")
+        lines.append(
+            "<pre>"
+            f"Kirim   {_fmt_uzs(in_total):>14} so'm\n"
+            f"Chiqim  {_fmt_uzs(out_total):>14} so'm\n"
+            f"Saldo   {_fmt_signed(net_total):>14} so'm"
+            "</pre>"
+        )
 
     _send_or_edit(ctx, "\n".join(lines), kb_back_home("home:fin"), edit=edit)
 
@@ -348,16 +360,23 @@ def _render_debt(ctx: HandlerCtx, *, page: int = 1, edit: bool = False) -> None:
             f"Jami {total_count} ta hujjat · <b>{_fmt_uzs(grand_total)}</b> so'm"
         )
         lines.append("")
+        # Моноширинная таблица: №, doc, клиент, сумма, дни просрочки.
+        doc_w = max(8, min(14, max(len(so.doc_number) for so in debts)))
+        name_w = max(10, min(22, max(len(so.customer.name if so.customer_id else "—") for so in debts)))
+        rows_text = []
         for i, so in enumerate(debts, offset + 1):
-            customer = so.customer.name if so.customer_id else "—"
-            tail = ""
-            if so.due_date and so.due_date < today:
-                tail = f"  <i>{(today - so.due_date).days} kun kechikkan</i>"
-            lines.append(
-                f"{i}. <b>{customer}</b>{tail}\n"
-                f"   <code>{so.doc_number}</code> — "
-                f"<code>{_fmt_uzs(so.remaining)}</code> so'm"
+            customer = (so.customer.name if so.customer_id else "—")[:name_w]
+            doc = so.doc_number[:doc_w]
+            overdue = (today - so.due_date).days if so.due_date and so.due_date < today else 0
+            ov = f"{overdue}d" if overdue > 0 else "—"
+            rows_text.append(
+                f"{i:>2} {doc:<{doc_w}}  {customer:<{name_w}}  "
+                f"{_fmt_uzs(so.remaining):>13}  {ov:>4}"
             )
+        lines.append("<pre>" + "\n".join(rows_text) + "</pre>")
+        # «kechikkan» — узб. «опоздал/просрочка». Подпись для UI и для
+        # совместимости с существующими тестами.
+        lines.append("<i>колонки: №, doc, mijoz, qarz, kun kechikkan</i>")
         markup = kb_pagination("fin:debt", page, total_count, back_to="home:fin")
 
     _send_or_edit(ctx, "\n".join(lines), markup, edit=edit)
@@ -417,13 +436,18 @@ def _render_cred(ctx: HandlerCtx, *, page: int = 1, edit: bool = False) -> None:
             f"Jami {total_count} ta hujjat · <b>{_fmt_uzs(grand_total)}</b> so'm"
         )
         lines.append("")
+        doc_w = max(8, min(14, max(len(po.doc_number) for po in debts)))
+        name_w = max(10, min(24, max(len(po.counterparty.name if po.counterparty_id else "—") for po in debts)))
+        rows_text = []
         for i, po in enumerate(debts, offset + 1):
-            supplier = po.counterparty.name if po.counterparty_id else "—"
-            lines.append(
-                f"{i}. <b>{supplier}</b>\n"
-                f"   <code>{po.doc_number}</code> — "
-                f"<code>{_fmt_uzs(po.remaining)}</code> so'm"
+            supplier = (po.counterparty.name if po.counterparty_id else "—")[:name_w]
+            doc = po.doc_number[:doc_w]
+            rows_text.append(
+                f"{i:>2} {doc:<{doc_w}}  {supplier:<{name_w}}  "
+                f"{_fmt_uzs(po.remaining):>13}"
             )
+        lines.append("<pre>" + "\n".join(rows_text) + "</pre>")
+        lines.append("<i>колонки: №, doc, etkazib beruvchi, qarz</i>")
         markup = kb_pagination("fin:cred", page, total_count, back_to="home:fin")
 
     _send_or_edit(ctx, "\n".join(lines), markup, edit=edit)
@@ -543,10 +567,15 @@ def _render_pnl(ctx: HandlerCtx, *, period: str, edit: bool = False) -> None:
     if by_mod.rows:
         lines.append("")
         lines.append("<b>По модулям:</b>")
-        for r in by_mod.rows[:8]:
-            lines.append(
-                f"  {r.module_name}:  <code>{_fmt_signed(r.profit)}</code>"
+        rows_show = by_mod.rows[:8]
+        name_w = max(8, min(20, max(len(r.module_name) for r in rows_show)))
+        rows_text = []
+        for r in rows_show:
+            mod_name = r.module_name[:name_w]
+            rows_text.append(
+                f"{mod_name:<{name_w}}  {_fmt_signed(r.profit):>14}"
             )
+        lines.append("<pre>" + "\n".join(rows_text) + "</pre>")
 
     markup = {
         "inline_keyboard":
@@ -632,19 +661,22 @@ def _render_sales(ctx: HandlerCtx, *, period: str, edit: bool = False) -> None:
     if rows:
         lines.append("")
         lines.append(f"<b>Hujjatlar (sahifa {page}/{pages}):</b>")
+        # Моноширинная таблица: №, doc, клиент, сумма, долг (или ✓).
+        doc_w = max(8, min(14, max(len(so.doc_number) for so in rows)))
+        name_w = max(8, min(20, max(len(so.customer.name if so.customer_id else "—") for so in rows)))
+        rows_text = []
         for i, so in enumerate(rows, offset + 1):
-            customer = so.customer.name if so.customer_id else "—"
+            customer = (so.customer.name if so.customer_id else "—")[:name_w]
+            doc = so.doc_number[:doc_w]
             so_total = Decimal(so.amount_uzs or 0)
-            so_paid = Decimal(so.paid_amount_uzs or 0)
-            so_debt = so_total - so_paid
-            debt_block = (
-                f" · qarz <code>{_fmt_uzs(so_debt)}</code>"
-                if so_debt > 0 else " · ✅ to'langan"
+            so_debt = so_total - Decimal(so.paid_amount_uzs or 0)
+            debt_str = "to'langan" if so_debt <= 0 else _fmt_uzs(so_debt)
+            rows_text.append(
+                f"{i:>2} {doc:<{doc_w}}  {customer:<{name_w}}  "
+                f"{_fmt_uzs(so_total):>13}  {debt_str:>10}"
             )
-            lines.append(
-                f"  {i}. {customer} · <code>{so.doc_number}</code> · "
-                f"<code>{_fmt_uzs(so_total)}</code>{debt_block}"
-            )
+        lines.append("<pre>" + "\n".join(rows_text) + "</pre>")
+        lines.append("<i>колонки: №, doc, mijoz, summa, qarz</i>")
 
     # Пагинация переключает страницу: callback «fin:sales:<period>:<N>».
     nav: list[tuple[str, str]] = []

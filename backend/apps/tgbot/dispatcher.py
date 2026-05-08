@@ -70,6 +70,7 @@ class CommandSpec:
     module: str | None = None    # RBAC gate; None = публично (для /start, /help)
     private: bool = False        # если True — не показывать в setMyCommands
     audience: str = "admin"      # "admin" | "counterparty" | "any"
+    category: str = "misc"       # см. apps.tgbot.categories — для группировки в /help
 
 
 COMMANDS: dict[str, CommandSpec] = {}
@@ -91,6 +92,7 @@ def command(
     module: str | None = None,
     private: bool = False,
     audience: str = "admin",
+    category: str | None = None,
 ) -> Callable[[Handler], Handler]:
     """Декоратор регистрации текстовой команды.
 
@@ -98,11 +100,20 @@ def command(
       - "admin"        (default): доступно только для user-link (RBAC по module).
       - "counterparty": доступно только для counterparty-link (клиент-кабинет).
       - "any"          : доступно обоим типам (например /menu, /help).
+
+    ``category``:
+      Явная категория для группировки в /help. Если не задана, резолвится
+      автоматом из module (см. apps.tgbot.categories.MODULE_TO_CATEGORY).
     """
     def deco(fn: Handler) -> Handler:
+        from .categories import resolve_category
+        resolved_category = resolve_category(
+            explicit=category, module=module, audience=audience,
+        )
         COMMANDS[name] = CommandSpec(
             name=name, handler=fn, help_line=help,
             module=module, private=private, audience=audience,
+            category=resolved_category,
         )
         return fn
     return deco

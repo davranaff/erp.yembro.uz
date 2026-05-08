@@ -107,8 +107,7 @@ def on_warehouse_picked(
         send_message(ctx.chat_id, "⚠️ Склад не найден.")
         return
 
-    noms = _list_feed_nomenclatures(session.organization)
-    if not noms:
+    if _count_feed_nomenclatures(session.organization) == 0:
         _cancel(ctx, session)
         send_message(ctx.chat_id, "❌ В feed-модуле нет номенклатур.")
         return
@@ -117,14 +116,7 @@ def on_warehouse_picked(
         state=S.NOM,
         payload_update={"warehouse_id": warehouse_id, "warehouse_code": wh.code},
     )
-
-    buttons = [(f"🌾 {n.sku} · {n.name[:28]}", f"wiz:writeoff:nom:{n.id}") for n in noms]
-    buttons.append(("❌ Bekor", "wiz:writeoff:cancel"))
-    edit_message_text(
-        ctx.chat_id, ctx.message_id,
-        f"<b>📤 Списание · шаг 2/4</b>\nСклад: <code>{wh.code}</code>\n\nВыберите товар:",
-        reply_markup=kb(buttons, cols=1),
-    )
+    _render_noms(ctx, session, query="", page=0, edit=True)
 
 
 def on_nom_picked(
@@ -135,6 +127,19 @@ def on_nom_picked(
         return _cancel(ctx, session)
 
     parts = data.split(":")
+    # Пагинация / сброс поиска
+    if len(parts) >= 5 and parts[2] == "nom" and parts[3] == "page":
+        try:
+            page = int(parts[4])
+        except ValueError:
+            page = 0
+        query = (session.payload or {}).get("nom_query", "")
+        _render_noms(ctx, session, query=query, page=page, edit=True)
+        return
+    if len(parts) >= 4 and parts[2] == "nom" and parts[3] == "clear":
+        session.advance(state=S.NOM, payload_update={"nom_query": ""})
+        _render_noms(ctx, session, query="", page=0, edit=True)
+        return
     if len(parts) != 4 or parts[2] != "nom":
         return
     nom_id = parts[3]
@@ -310,15 +315,64 @@ def _parse_decimal(s: str | None) -> Decimal | None:
         return None
 
 
-def _list_feed_nomenclatures(org):
+PAGE_SIZE = 8
+
+
+def _feed_noms_qs(org, query: str = ""):
     from apps.nomenclature.models import NomenclatureItem
-    return list(
-        NomenclatureItem.objects.filter(
-            organization=org,
-            category__module__code="feed",
-            is_active=True,
-        ).select_related("unit").order_by("-created_at")[:8]
+    qs = NomenclatureItem.objects.filter(
+        organization=org, category__module__code="feed", is_active=True,
+    ).select_related("unit")
+    q = (query or "").strip()
+    if q:
+        from django.db.models import Q
+        qs = qs.filter(Q(sku__icontains=q) | Q(name__icontains=q))
+    return qs.order_by("-created_at")
+
+
+def _count_feed_nomenclatures(org) -> int:
+    return _feed_noms_qs(org).count()
+
+
+def _render_noms(ctx, session, *, query: str, page: int, edit: bool) -> None:
+    qs = _feed_noms_qs(session.organization, query)
+    total = qs.count()
+    pages = max(1, (total + PAGE_SIZE - 1) // PAGE_SIZE)
+    page = max(0, min(page, pages - 1))
+    items = list(qs[page * PAGE_SIZE:(page + 1) * PAGE_SIZE])
+    buttons = [
+        (f"🌾 {n.sku} · {n.name[:28]}", f"wiz:writeoff:nom:{n.id}")
+        for n in items
+    ]
+    nav = []
+    if page > 0:
+        nav.append(("← Назад", f"wiz:writeoff:nom:page:{page - 1}"))
+    if page < pages - 1:
+        nav.append(("Вперёд →", f"wiz:writeoff:nom:page:{page + 1}"))
+    if nav:
+        buttons.extend(nav)
+    if query:
+        buttons.append(("🔄 Сбросить поиск", "wiz:writeoff:nom:clear"))
+    buttons.append(("❌ Bekor", "wiz:writeoff:cancel"))
+    session.advance(state=S.NOM, payload_update={"nom_query": query})
+    msg = (
+        f"<b>📤 Списание · шаг 2/4</b>\n"
+        f"Склад: <code>{session.payload.get('warehouse_code')}</code>\n\n"
+        + (f"🔎 Поиск: <code>{query}</code> · найдено {total}\n" if query else "")
+        + f"Страница {page + 1}/{pages} (всего {total})\n\n"
+        + "Выберите товар или введите SKU/название для поиска:"
     )
+    if edit and ctx.message_id:
+        edit_message_text(ctx.chat_id, ctx.message_id, msg, reply_markup=kb(buttons, cols=1))
+    else:
+        send_message(ctx.chat_id, msg, reply_markup=kb(buttons, cols=1))
+
+
+def on_nom_text(
+    ctx: HandlerCtx, *, session: TgWizardSession, text: str | None,
+) -> None:
+    query = (text or "").strip()
+    _render_noms(ctx, session, query=query, page=0, edit=False)
 
 
 def _stock_balance_and_wac(
@@ -402,6 +456,7 @@ register_wizard(WizardSpec(
         S.CONFIRM: on_confirm,
     },
     on_message={
+        S.NOM: on_nom_text,
         S.QTY: on_qty_text,
         S.REASON: on_reason_text,
     },

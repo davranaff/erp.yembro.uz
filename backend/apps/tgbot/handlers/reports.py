@@ -50,14 +50,20 @@ def render_reports_section(ctx: HandlerCtx) -> None:
     if not result.rows:
         lines.append("Нет данных за период.")
     else:
-        for r in result.rows[:8]:
-            lines.append(
-                f"<b>{r.module_name}</b>\n"
-                f"  доход   <code>{_fmt_uzs(r.revenue)}</code>\n"
-                f"  расход  <code>{_fmt_uzs(r.expense)}</code>\n"
-                f"  прибыль <code>{_fmt_signed(r.profit)}</code>"
+        rows_show = result.rows[:8]
+        name_w = max(8, min(18, max(len(r.module_name) for r in rows_show)))
+        rows_text = [
+            f"{'модуль':<{name_w}}  {'доход':>14}  {'расход':>14}  {'прибыль':>14}"
+        ]
+        for r in rows_show:
+            mod_name = r.module_name[:name_w]
+            rows_text.append(
+                f"{mod_name:<{name_w}}  "
+                f"{_fmt_uzs(r.revenue):>14}  "
+                f"{_fmt_uzs(r.expense):>14}  "
+                f"{_fmt_signed(r.profit):>14}"
             )
-        lines.append("")
+        lines.append("<pre>" + "\n".join(rows_text) + "</pre>")
         lines.append(
             f"<b>Итого прибыль:</b> <code>{_fmt_signed(result.total_profit)}</code> сум"
         )
