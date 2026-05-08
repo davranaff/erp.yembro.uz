@@ -20,3 +20,6 @@ from .. import wizards  # noqa: F401  — регистрирует wizard-handle
 from ..wizards import feed_purchase  # noqa: F401  — /qabul (приход)
 from ..wizards import feed_writeoff  # noqa: F401  — /chiqim (списание)
 from ..wizards import feed_mix  # noqa: F401  — /aralash (замес)
+from ..wizards import feed_sale  # noqa: F401  — /sotuv (продажа мешков)
+from ..wizards import payment_in  # noqa: F401  — /tolov (поступление)
+from ..wizards import payment_opex  # noqa: F401  — /xarajat (расход)

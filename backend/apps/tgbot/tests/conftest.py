@@ -102,11 +102,14 @@ def fake_send():
         from apps.tgbot.wizards import (
             feed_mix as _wmx,
             feed_purchase as _wp,
+            feed_sale as _wsl,
             feed_writeoff as _wwo,
+            payment_in as _wpi,
+            payment_opex as _wpo,
         )
         for mod in (
             _disp, _menu, _fin, _prod, _rep, _org, _help, _leg, _link,
-            _dig, _cp, _mod_hub, _wc, _wp, _wwo, _wmx,
+            _dig, _cp, _mod_hub, _wc, _wp, _wwo, _wmx, _wsl, _wpi, _wpo,
         ):
             if hasattr(mod, "send_message"):
                 mod.send_message = fake.send
