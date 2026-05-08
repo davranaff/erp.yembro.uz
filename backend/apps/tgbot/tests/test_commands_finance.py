@@ -137,9 +137,9 @@ def test_debt_pagination_navigates_pages(tg_link, fake_send, org):
     text1 = fake_send.edits[-1][2]
     markup1 = fake_send.edits[-1][3]
     assert "Jami 12 ta hujjat" in text1
-    # Должно быть 10 строк (1.-10.)
-    for i in range(1, 11):
-        assert f"\n{i}. " in text1
+    # 10 doc_number'ов на первой странице (формат — моноширинная таблица).
+    for i in range(10):
+        assert f"ПР-PG-{i:02d}" in text1
     # Должна быть кнопка «Keyingi →» с callback fin:debt:2
     callbacks = {b["callback_data"] for row in markup1["inline_keyboard"] for b in row}
     assert "fin:debt:2" in callbacks
@@ -154,9 +154,9 @@ def test_debt_pagination_navigates_pages(tg_link, fake_send, org):
     })
     text2 = fake_send.edits[-1][2]
     markup2 = fake_send.edits[-1][3]
-    # На второй стр элементы 11 и 12
-    assert "\n11. " in text2
-    assert "\n12. " in text2
+    # На второй стр элементы 10 и 11 (по убыванию суммы это последние 2)
+    assert "ПР-PG-10" in text2
+    assert "ПР-PG-11" in text2
     # Должна быть «← Oldingi» (вернуться на 1)
     callbacks2 = {b["callback_data"] for row in markup2["inline_keyboard"] for b in row}
     assert "fin:debt:1" in callbacks2
