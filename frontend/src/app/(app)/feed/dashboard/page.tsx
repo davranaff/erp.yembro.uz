@@ -309,7 +309,7 @@ export default function FeedDashboardPage() {
 
       {/* Date navigation */}
       <div style={{
-        display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14,
+        display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 8, marginBottom: 14,
         padding: 10, background: 'var(--bg-soft)', borderRadius: 6,
       }}>
         <button
@@ -472,7 +472,7 @@ export default function FeedDashboardPage() {
 
       {/* ── What-if banner above matrix ─────────────────────────────────── */}
       <div style={{
-        display: 'flex', alignItems: 'center', gap: 10,
+        display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 10,
         padding: 10, marginBottom: 0,
         background: whatIfKg > 0 ? 'rgba(232,117,26,0.08)' : 'var(--bg-soft)',
         // Используем longhand-свойства целиком: React ругается если
@@ -754,7 +754,7 @@ export default function FeedDashboardPage() {
       </Panel>
 
       {/* ── Day flow: Приход / Расход (2 колонки) ─────────────────────── */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(420px, 1fr))', gap: 14, marginBottom: 14 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(420px, 100%), 1fr))', gap: 14, marginBottom: 14 }}>
         <Panel
           title={`Приход · ${data?.incoming.length ?? 0}`}
           flush
@@ -845,7 +845,7 @@ export default function FeedDashboardPage() {
       </div>
 
       {/* ── Production / Stock (2 колонки) ─────────────────────────────── */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(420px, 1fr))', gap: 14 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(420px, 100%), 1fr))', gap: 14 }}>
         <Panel title={`Произведено · ${data?.production.length ?? 0} партий`} flush>
           {isLoading ? (
             <div style={{ padding: 16, color: 'var(--fg-3)' }}>Загрузка…</div>

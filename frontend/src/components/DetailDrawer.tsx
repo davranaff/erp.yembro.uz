@@ -1,6 +1,7 @@
 'use client';
 
 import Icon from '@/components/ui/Icon';
+import { useModalLifecycle } from '@/hooks/useModalLifecycle';
 
 interface Tab {
   key: string;
@@ -20,13 +21,19 @@ interface DetailDrawerProps {
 }
 
 export default function DetailDrawer({ title, subtitle, onClose, tabs, activeTab, onTab, actions, children }: DetailDrawerProps) {
+  useModalLifecycle(onClose);
   return (
     <div className="drawer-backdrop" onClick={onClose}>
       <div className="drawer" onClick={e => e.stopPropagation()}>
         <div className="drawer-hdr">
           <div style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 10 }}>
-            <button className="close-btn" onClick={onClose} title="Закрыть (Esc)">
-              <Icon name="close" size={16} />
+            <button
+              className="close-btn"
+              onClick={onClose}
+              aria-label="Закрыть"
+              title="Закрыть (Esc)"
+            >
+              <Icon name="close" size={18} />
             </button>
             <div style={{ minWidth: 0, flex: 1 }}>
               <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--fg-1)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
