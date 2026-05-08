@@ -20,6 +20,7 @@ import RawBatchModal from '../RawBatchModal';
 import RecipeModal from '../RecipeModal';
 import TaskModal from '../TaskModal';
 import VersionModal from '../VersionModal';
+import RecipeFilterDropdown from './RecipeFilterDropdown';
 import type { Recipe } from '@/types/auth';
 
 function todayISO(): string {
@@ -105,6 +106,21 @@ export default function FeedDashboardPage() {
     const n = parseFloat(whatIfTons);
     return Number.isFinite(n) && n > 0 ? n * 1000 : 0;
   }, [whatIfTons]);
+  // Multi-select по рецептам: пусто = все, иначе только выбранные.
+  const [selectedRecipeIds, setSelectedRecipeIds] = useState<Set<string>>(new Set());
+  const toggleRecipe = (id: string) => {
+    setSelectedRecipeIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+  const displayVersions = useMemo(() => (
+    selectedRecipeIds.size === 0
+      ? matrixVersions
+      : matrixVersions.filter((v) => selectedRecipeIds.has(v.id))
+  ), [matrixVersions, selectedRecipeIds]);
 
   // ── Stock map (sku → balance kg) для подсветки нехватки ───────────────
   const stockBySku = useMemo(() => {
@@ -309,7 +325,7 @@ export default function FeedDashboardPage() {
 
       {/* Date navigation */}
       <div style={{
-        display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14,
+        display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 8, marginBottom: 14,
         padding: 10, background: 'var(--bg-soft)', borderRadius: 6,
       }}>
         <button
@@ -472,7 +488,7 @@ export default function FeedDashboardPage() {
 
       {/* ── What-if banner above matrix ─────────────────────────────────── */}
       <div style={{
-        display: 'flex', alignItems: 'center', gap: 10,
+        display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 10,
         padding: 10, marginBottom: 0,
         background: whatIfKg > 0 ? 'rgba(232,117,26,0.08)' : 'var(--bg-soft)',
         // Используем longhand-свойства целиком: React ругается если
@@ -521,9 +537,39 @@ export default function FeedDashboardPage() {
         )}
       </div>
 
+      {/* ── Recipe filter dropdown ──────────────────────────────────────── */}
+      {matrixVersions.length > 0 && (
+        <div style={{
+          display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 8,
+          padding: 10,
+          background: 'var(--bg-soft)',
+          borderLeft: `1px solid ${whatIfKg > 0 ? 'var(--brand-orange)' : 'var(--border)'}`,
+          borderRight: `1px solid ${whatIfKg > 0 ? 'var(--brand-orange)' : 'var(--border)'}`,
+          borderTop: '1px dashed var(--border)',
+        }}>
+          <span style={{
+            fontSize: 11, fontWeight: 700, color: 'var(--fg-3)',
+            textTransform: 'uppercase', letterSpacing: '.04em',
+          }}>
+            Фильтр рецептов:
+          </span>
+          <RecipeFilterDropdown
+            versions={matrixVersions}
+            selectedIds={selectedRecipeIds}
+            onToggle={toggleRecipe}
+            onClear={() => setSelectedRecipeIds(new Set())}
+            onSelectAll={() => setSelectedRecipeIds(new Set(matrixVersions.map((v) => v.id)))}
+          />
+        </div>
+      )}
+
       {/* ── Recipe matrix ─────────────────────────────────────────────── */}
       <Panel
-        title={`Рецептурная матрица · ${matrixVersions.length} рецептов × ${matrixIngredients.length} ингредиентов`}
+        title={
+          selectedRecipeIds.size === 0
+            ? `Рецептурная матрица · ${matrixVersions.length} рецептов × ${matrixIngredients.length} ингредиентов`
+            : `Рецептурная матрица · ${displayVersions.length}/${matrixVersions.length} рецептов × ${matrixIngredients.length} ингредиентов`
+        }
         flush
         style={{ marginBottom: 14 }}
       >
@@ -551,22 +597,28 @@ export default function FeedDashboardPage() {
                   <th style={{
                     textAlign: 'left', padding: '8px 10px',
                     borderBottom: '1px solid var(--border)',
-                    minWidth: 200, position: 'sticky', left: 0,
-                    background: 'var(--bg-soft)', zIndex: 2,
+                    minWidth: 200, width: 200,
+                    position: 'sticky', left: 0,
+                    // Полностью непрозрачный фон + box-shadow справа —
+                    // иначе при горизонтальном скролле scroll-колонки
+                    // просвечивают через sticky.
+                    background: '#FBF7EE', zIndex: 5,
+                    boxShadow: '2px 0 0 var(--border)',
                   }}>
                     Ингредиент
                   </th>
                   <th style={{
                     textAlign: 'right', padding: '8px 10px',
                     borderBottom: '1px solid var(--border)',
-                    borderLeft: '1px solid var(--border)',
-                    minWidth: 90, position: 'sticky', left: 200,
-                    background: 'var(--bg-soft)', zIndex: 2,
+                    minWidth: 90, width: 90,
+                    position: 'sticky', left: 200,
+                    background: '#FBF7EE', zIndex: 5,
+                    boxShadow: '2px 0 0 var(--border)',
                     fontSize: 11,
                   }}>
                     Остаток
                   </th>
-                  {matrixVersions.map((v) => {
+                  {displayVersions.map((v) => {
                     const sum = recipeSummary[v.id];
                     const totalOk = Math.abs((columnTotals[v.id] ?? 0) - 100) < 0.5;
                     return (
@@ -616,8 +668,13 @@ export default function FeedDashboardPage() {
                     <tr key={ing.sku} style={{ borderBottom: '1px solid var(--border)' }}>
                       <td style={{
                         padding: '6px 10px', position: 'sticky', left: 0,
-                        background: 'var(--bg-card, #fff)',
-                        fontSize: 12, zIndex: 1,
+                        // Hard-coded fully opaque cream — иначе scroll-cells
+                        // справа просвечивают через sticky (var(--bg-card)
+                        // имеет alpha < 1 в некоторых рендерах).
+                        background: '#FFFDF7', zIndex: 4,
+                        boxShadow: '2px 0 0 var(--border)',
+                        fontSize: 12,
+                        minWidth: 200, width: 200,
                       }}>
                         <span style={{ fontWeight: 500, color: 'var(--fg-1)' }}>
                           {ing.name}
@@ -631,15 +688,16 @@ export default function FeedDashboardPage() {
                       <td className="mono" style={{
                         padding: '6px 10px', textAlign: 'right',
                         position: 'sticky', left: 200,
-                        background: 'var(--bg-card, #fff)',
-                        borderLeft: '1px solid var(--border)',
-                        fontSize: 12, zIndex: 1,
+                        background: '#FFFDF7', zIndex: 4,
+                        boxShadow: '2px 0 0 var(--border)',
+                        fontSize: 12,
+                        minWidth: 90, width: 90,
                         color: stock > 0 ? 'var(--fg-1)' : 'var(--fg-3)',
                         fontWeight: stock > 0 ? 600 : 400,
                       }}>
                         {fmtNum(stock, 0)}
                       </td>
-                      {matrixVersions.map((v) => {
+                      {displayVersions.map((v) => {
                         const info = ing.shares[v.id];
                         const share = info?.share ?? null;
                         const isEditing = editingCell?.sku === ing.sku && editingCell?.vid === v.id;
@@ -720,16 +778,19 @@ export default function FeedDashboardPage() {
                 <tr style={{ background: 'var(--bg-soft)', fontWeight: 700 }}>
                   <td style={{
                     padding: '8px 10px', position: 'sticky', left: 0,
-                    background: 'var(--bg-soft)', zIndex: 1,
+                    background: '#FBF7EE', zIndex: 4,
+                    boxShadow: '2px 0 0 var(--border)',
+                    minWidth: 200, width: 200,
                   }}>
                     Итого
                   </td>
                   <td style={{
                     padding: '8px 10px', position: 'sticky', left: 200,
-                    background: 'var(--bg-soft)', zIndex: 1,
-                    borderLeft: '1px solid var(--border)',
+                    background: '#FBF7EE', zIndex: 4,
+                    boxShadow: '2px 0 0 var(--border)',
+                    minWidth: 90, width: 90,
                   }} />
-                  {matrixVersions.map((v) => {
+                  {displayVersions.map((v) => {
                     const t = columnTotals[v.id] ?? 0;
                     const ok = Math.abs(t - 100) < 0.5;
                     return (
@@ -754,7 +815,7 @@ export default function FeedDashboardPage() {
       </Panel>
 
       {/* ── Day flow: Приход / Расход (2 колонки) ─────────────────────── */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(420px, 1fr))', gap: 14, marginBottom: 14 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(420px, 100%), 1fr))', gap: 14, marginBottom: 14 }}>
         <Panel
           title={`Приход · ${data?.incoming.length ?? 0}`}
           flush
@@ -845,7 +906,7 @@ export default function FeedDashboardPage() {
       </div>
 
       {/* ── Production / Stock (2 колонки) ─────────────────────────────── */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(420px, 1fr))', gap: 14 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(420px, 100%), 1fr))', gap: 14 }}>
         <Panel title={`Произведено · ${data?.production.length ?? 0} партий`} flush>
           {isLoading ? (
             <div style={{ padding: 16, color: 'var(--fg-3)' }}>Загрузка…</div>

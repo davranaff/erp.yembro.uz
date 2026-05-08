@@ -1,5 +1,7 @@
 'use client';
 
+import { useModalLifecycle } from '@/hooks/useModalLifecycle';
+
 import Icon from './Icon';
 
 interface ModalProps {
@@ -10,13 +12,19 @@ interface ModalProps {
 }
 
 export default function Modal({ title, onClose, footer, children }: ModalProps) {
+  useModalLifecycle(onClose);
   return (
     <div className="modal-backdrop" onClick={onClose}>
       <div className="modal" onClick={e => e.stopPropagation()}>
         <div className="modal-hdr">
           <h3>{title}</h3>
-          <button className="close-btn" onClick={onClose}>
-            <Icon name="close" size={16} />
+          <button
+            className="close-btn"
+            onClick={onClose}
+            aria-label="Закрыть"
+            title="Закрыть (Esc)"
+          >
+            <Icon name="close" size={18} />
           </button>
         </div>
         <div className="modal-body">{children}</div>
