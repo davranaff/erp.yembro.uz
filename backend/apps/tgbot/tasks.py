@@ -227,11 +227,19 @@ def debt_reminder_daily_task() -> dict:
 
     Старая логика спамила всем должникам каждый день, что приучало
     клиентов игнорировать. Новая логика — точечная по `due_date`:
-      - T-3: первое предупреждение «через 3 дня срок»
+      - T-7: ранний сигнал «через неделю срок» (B2B agro нужно
+        5–7 дней чтобы спланировать ликвидность)
+      - T-3: «через 3 дня срок»
       - T-1: «завтра срок»
       - T-0: «сегодня срок»
-      - T+N: каждые 7 дней просрочки (T+1, T+8, T+15, …)
+      - T+1, T+3: первая неделя просрочки самая «податливая» —
+        loss aversion ещё свежий, два касания close together
+      - T+N: дальше каждые 7 дней (T+8, T+15, T+22, …)
       - без due_date: раз в неделю по понедельникам (мягкое напоминание)
+
+    Доп. фильтр: если по заказу есть SaleCommunication с
+    outcome=ASKED_DEFER и next_action_date в будущем — pause до этой
+    даты (договорились ждать, дёргать = разрушать доверие).
 
     Стартовые долги (миграция) теперь живут как синтетические SaleOrder
     с kind=opening_balance — попадают в эту же выборку и напоминания
@@ -269,20 +277,33 @@ def _should_remind_today(order, today) -> bool:
 
     См. docstring `debt_reminder_daily_task` для расписания.
     """
+    from apps.sales.models import SaleCommunication
+
+    # Pause если клиент попросил отсрочку, менеджер согласился
+    # (зафиксировал ASKED_DEFER с next_action_date) — договорились
+    # подождать, дёргать = разрушать доверие.
+    has_active_defer = order.communications.filter(
+        outcome=SaleCommunication.Outcome.ASKED_DEFER,
+        next_action_date__gt=today,
+    ).exists()
+    if has_active_defer:
+        return False
+
     if order.due_date is None:
         # Без срока — только по понедельникам (weekday 0), не каждый день
         return today.weekday() == 0
 
     delta_days = (today - order.due_date).days
     if delta_days < 0:
-        # Ещё до срока: T-3 и T-1
+        # Ещё до срока: T-7, T-3, T-1
         days_until = -delta_days
-        return days_until in (3, 1)
+        return days_until in (7, 3, 1)
     if delta_days == 0:
         # День X
         return True
-    # После срока: T+1, потом каждые 7 дней (T+8, T+15, ...)
-    return delta_days == 1 or delta_days % 7 == 1
+    # После срока: T+1, T+3 (первая неделя — самая «податливая»),
+    # дальше каждые 7 дней (T+8, T+15, T+22, …).
+    return delta_days in (1, 3) or delta_days % 7 == 1
 
 
 @shared_task(name="apps.tgbot.daily_collection_alerts_task")
