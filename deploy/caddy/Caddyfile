@@ -1,16 +1,6 @@
 # ════════════════════════════════════════════════════════════════════════════
 #  Yembro edge proxy
 # ════════════════════════════════════════════════════════════════════════════
-#  Домены берутся из переменных окружения (.envs/.env.edge):
-#    PRIMARY_DOMAIN          erp.yembro.uz             — ERP frontend
-#    API_PRIMARY_DOMAIN      api.erp.yembro.uz         — Django backend
-#    STAGING_DOMAIN          staging.erp.yembro.uz
-#    API_STAGING_DOMAIN      staging.api.erp.yembro.uz
-#    REGISTRY_DOMAIN         registry.erp.yembro.uz    — docker registry
-#    CATALOG_DOMAIN          yembro.uz                 — публичный каталог (Next.js)
-#    CATALOG_STAGING_DOMAIN  staging.yembro.uz
-# ════════════════════════════════════════════════════════════════════════════
-
 {
 	email {$CADDY_ACME_EMAIL}
 	servers {
@@ -18,25 +8,16 @@
 	}
 }
 
-# ── Snippets ────────────────────────────────────────────────────────────────
-
-# Security headers, единый набор для всех сайтов.
-(security_headers) {
+# ── ERP (PRIMARY_DOMAIN) ────────────────────────────────────────────────────
+{$PRIMARY_DOMAIN} {
+	encode zstd gzip
 	header {
 		Strict-Transport-Security "max-age=31536000; includeSubDomains"
 		X-Content-Type-Options "nosniff"
 		Referrer-Policy "strict-origin-when-cross-origin"
-		Permissions-Policy "interest-cohort=()"
 		X-Frame-Options "SAMEORIGIN"
 		-Server
 	}
-}
-
-# ── ERP (PRIMARY_DOMAIN) ────────────────────────────────────────────────────
-
-{$PRIMARY_DOMAIN} {
-	import security_headers
-	encode zstd gzip
 
 	handle_path /static/* {
 		root * /srv/static/prod
@@ -54,10 +35,13 @@
 }
 
 # ── ERP API ─────────────────────────────────────────────────────────────────
-
 {$API_PRIMARY_DOMAIN} {
-	import security_headers
 	encode zstd gzip
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		-Server
+	}
 
 	handle_path /static/* {
 		root * /srv/static/prod
@@ -68,10 +52,9 @@
 }
 
 # ── ERP staging ─────────────────────────────────────────────────────────────
-
 {$STAGING_DOMAIN} {
-	import security_headers
 	encode zstd gzip
+	header X-Robots-Tag "noindex, nofollow"
 
 	handle_path /static/* {
 		root * /srv/static/staging
@@ -89,8 +72,8 @@
 }
 
 {$API_STAGING_DOMAIN} {
-	import security_headers
 	encode zstd gzip
+	header X-Robots-Tag "noindex, nofollow"
 
 	handle_path /static/* {
 		root * /srv/static/staging
@@ -101,54 +84,45 @@
 }
 
 # ── Docker registry ─────────────────────────────────────────────────────────
-
 {$REGISTRY_DOMAIN} {
-	import security_headers
 	encode zstd gzip
-	reverse_proxy docker-registry:5000 {
-		header_up Host {host}
-		header_up X-Forwarded-Proto {scheme}
-		header_up X-Forwarded-For {remote_host}
-		header_up X-Forwarded-Host {host}
-	}
+	reverse_proxy docker-registry:5000
 }
 
 # ── Публичный каталог yembro.uz (Next.js, catalog/) ─────────────────────────
-# Apex-домен. www. редиректится на apex для SEO-canonical.
-
 {$CATALOG_DOMAIN} {
-	import security_headers
 	encode zstd gzip
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		Permissions-Policy "interest-cohort=()"
+		X-Frame-Options "SAMEORIGIN"
+		-Server
+	}
 
 	# Длинный кеш для статики Next.js.
 	header /_next/static/* Cache-Control "public, max-age=31536000, immutable"
-	# Образы и шрифты из public/ — отдаём с долгим кешем тоже.
 	header /logo.png Cache-Control "public, max-age=2592000"
 	header /mark.png Cache-Control "public, max-age=2592000"
-	header /og-default.jpg Cache-Control "public, max-age=86400"
-	# robots.txt и sitemap.xml — короткий кеш чтобы поисковики видели правки.
+	# robots/sitemap — короткий кеш чтобы поисковики видели правки.
 	header /robots.txt Cache-Control "public, max-age=3600"
 	header /sitemap.xml Cache-Control "public, max-age=3600"
 
 	reverse_proxy prod-catalog:3001
 }
 
+# www → apex (301), сохраняя путь и query.
 www.{$CATALOG_DOMAIN} {
-	import security_headers
-	# www → apex (301), сохраняя путь и query.
 	redir https://{$CATALOG_DOMAIN}{uri} permanent
 }
 
 # ── Каталог staging ─────────────────────────────────────────────────────────
-
 {$CATALOG_STAGING_DOMAIN} {
-	import security_headers
 	encode zstd gzip
-
-	header /_next/static/* Cache-Control "public, max-age=31536000, immutable"
-
 	# Закрываем staging от индексации, чтобы не каннибализировал прод.
 	header X-Robots-Tag "noindex, nofollow"
+	header /_next/static/* Cache-Control "public, max-age=31536000, immutable"
 
 	reverse_proxy staging-catalog:3001
 }
