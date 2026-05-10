@@ -16,6 +16,7 @@ from . import counterparty  # noqa: F401  — /buyurtmalar /qarz /holat для c
 from . import modules_hub  # noqa: F401  — mod:* + rep:* (per-module hub + analytics)
 from . import stock  # noqa: F401  — /qoldiq + wh:bal/wh:list + fin:stock
 from . import wizard_cmds  # noqa: F401  — /bekor (отмена wizard-сессии)
+from . import payroll  # noqa: F401  — /zp /myzp
 from .. import wizards  # noqa: F401  — регистрирует wizard-handlers
 from ..wizards import feed_purchase  # noqa: F401  — /qabul (приход)
 from ..wizards import feed_writeoff  # noqa: F401  — /chiqim (списание)

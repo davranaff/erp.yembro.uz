@@ -42,6 +42,13 @@ class OrganizationMembershipSerializer(serializers.ModelSerializer):
     user_email = serializers.SerializerMethodField()
     user_full_name = serializers.SerializerMethodField()
     organization_code = serializers.SerializerMethodField()
+    # HR-расширения. Заполняются только если context['include_compensation'] / ['include_balance']
+    # и у юзера есть hr:r. Иначе всегда None.
+    compensation_type = serializers.SerializerMethodField()
+    current_rate_uzs = serializers.SerializerMethodField()       # native amount (исторически)
+    current_rate_currency = serializers.SerializerMethodField()
+    current_rate_uzs_equiv = serializers.SerializerMethodField() # native → UZS на сегодня
+    balance_uzs = serializers.SerializerMethodField()
 
     class Meta:
         model = OrganizationMembership
@@ -57,6 +64,11 @@ class OrganizationMembershipSerializer(serializers.ModelSerializer):
             "user_email",
             "user_full_name",
             "organization_code",
+            "compensation_type",
+            "current_rate_uzs",
+            "current_rate_currency",
+            "current_rate_uzs_equiv",
+            "balance_uzs",
             "created_at",
             "updated_at",
         )
@@ -66,6 +78,11 @@ class OrganizationMembershipSerializer(serializers.ModelSerializer):
             "user_email",
             "user_full_name",
             "organization_code",
+            "compensation_type",
+            "current_rate_uzs",
+            "current_rate_currency",
+            "current_rate_uzs_equiv",
+            "balance_uzs",
             "created_at",
             "updated_at",
         )
@@ -78,6 +95,62 @@ class OrganizationMembershipSerializer(serializers.ModelSerializer):
 
     def get_organization_code(self, obj):
         return obj.organization.code if obj.organization_id else None
+
+    def _hr_visible(self) -> bool:
+        ctx = self.context or {}
+        return bool(ctx.get("hr_visible"))
+
+    def get_compensation_type(self, obj):
+        if not self._hr_visible() or not (self.context or {}).get("include_compensation"):
+            return None
+        plan = getattr(obj, "compensation_plan", None)
+        return plan.compensation_type if plan else None
+
+    def get_current_rate_uzs(self, obj):
+        if not self._hr_visible() or not (self.context or {}).get("include_compensation"):
+            return None
+        from datetime import date
+        from apps.payroll.services.rates import rate_at
+
+        rate = rate_at(obj, date.today())
+        return str(rate.amount) if rate else None
+
+    def get_current_rate_currency(self, obj):
+        if not self._hr_visible() or not (self.context or {}).get("include_compensation"):
+            return None
+        from datetime import date
+        from apps.payroll.services.rates import rate_at
+
+        rate = rate_at(obj, date.today())
+        return rate.currency.code if rate and rate.currency_id else None
+
+    def get_current_rate_uzs_equiv(self, obj):
+        """UZS-эквивалент native-ставки по курсу CBU на сегодня."""
+        if not self._hr_visible() or not (self.context or {}).get("include_compensation"):
+            return None
+        from datetime import date
+        from django.core.exceptions import ValidationError
+        from apps.payroll.services.fx import convert_to_uzs
+        from apps.payroll.services.rates import rate_at
+
+        rate = rate_at(obj, date.today())
+        if not rate:
+            return None
+        currency_code = rate.currency.code if rate.currency_id else "UZS"
+        try:
+            fx = convert_to_uzs(rate.amount, currency_code, date.today())
+            return str(fx.amount_uzs)
+        except ValidationError:
+            return None
+
+    def get_balance_uzs(self, obj):
+        if not self._hr_visible() or not (self.context or {}).get("include_balance"):
+            return None
+        from datetime import date
+        from apps.payroll.services.balance import compute_balance
+
+        bal = compute_balance(obj, date.today())
+        return str(bal.balance_uzs)
 
 
 class OrganizationMembershipCreateSerializer(serializers.Serializer):

@@ -129,6 +129,10 @@ urlpatterns = [
         "api/sales/",
         include("apps.sales.urls", namespace="sales"),
     ),
+    path(
+        "api/payroll/",
+        include("apps.payroll.urls", namespace="payroll"),
+    ),
     path("api/tg/", include("apps.tgbot.urls")),
     path("api/landing/", include("apps.landing.urls", namespace="landing")),
     # Media-файлы (загруженные приложения к закупам и т.п.). Caddy уже

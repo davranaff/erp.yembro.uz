@@ -1,30 +1,21 @@
 'use client';
 
-import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { useParams, useRouter } from 'next/navigation';
 import { useState } from 'react';
 
 import Badge from '@/components/ui/Badge';
 import DataTable from '@/components/ui/DataTable';
 import Icon from '@/components/ui/Icon';
-import KpiCard from '@/components/ui/KpiCard';
 import Panel from '@/components/ui/Panel';
-import { useCounterpartyDebtSummary } from '@/hooks/useCounterparties';
+import Seg from '@/components/ui/Seg';
+import { useCounterpartyFullSummary } from '@/hooks/useCounterparties';
 import { useDeleteCommunicationWithDebtRefresh } from '@/hooks/useSales';
 import type { SaleCommunication } from '@/types/auth';
 
 import CommunicationFormModal from '../../sales/CommunicationFormModal';
 
-function fmt(uzs: string | null | undefined): string {
-  if (uzs == null || uzs === '') return '—';
-  const n = parseFloat(uzs);
-  if (Number.isNaN(n) || n === 0) return '—';
-  return n.toLocaleString('ru-RU', { maximumFractionDigits: 0 });
-}
-
-function fmtFull(uzs: string | null | undefined): string {
-  return fmt(uzs) + (fmt(uzs) === '—' ? '' : ' сум');
-}
+type TabKey = 'info' | 'docs' | 'payments';
 
 const PAY_LABEL: Record<string, string> = {
   unpaid: 'Не оплачен',
@@ -40,71 +31,70 @@ const PAY_TONE: Record<string, 'neutral' | 'success' | 'warn' | 'info'> = {
   overpaid: 'info',
 };
 
-/**
- * Карточка контрагента (debt card).
- *
- * Полный обзор по клиенту: реквизиты, кредитная политика, дебиторка с aging,
- * открытые счета, история всех касаний. Цель — открыл одну страницу,
- * понял что делать.
- */
+const ORDER_KIND_LABEL: Record<string, string> = {
+  sale: 'Продажа',
+  purchase: 'Закуп',
+};
+
+const ORDER_STATUS_LABEL: Record<string, string> = {
+  draft: 'Черновик',
+  confirmed: 'Проведён',
+  cancelled: 'Отменён',
+};
+
+const PAYMENT_KIND_LABEL: Record<string, string> = {
+  counterparty: 'Контрагенту',
+  opex: 'Прочий расход',
+  income: 'Прочий доход',
+  salary: 'Зарплата',
+  internal: 'Внутр. перевод',
+  opening_balance_prepayment: 'Старт. предоплата',
+};
+
+function fmt(uzs: string | number | null | undefined): string {
+  if (uzs == null || uzs === '') return '—';
+  const n = typeof uzs === 'number' ? uzs : parseFloat(uzs);
+  if (Number.isNaN(n) || n === 0) return '—';
+  return n.toLocaleString('ru-RU', { maximumFractionDigits: 0 });
+}
+
 export default function CounterpartyDetailPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
   const id = params?.id;
 
-  const { data, isLoading, error } = useCounterpartyDebtSummary(id);
-  const [tab, setTab] = useState<'orders' | 'comms'>('orders');
+  const { data, isLoading, error } = useCounterpartyFullSummary(id);
+  const [tab, setTab] = useState<TabKey>('info');
   const [adding, setAdding] = useState(false);
   const [editing, setEditing] = useState<SaleCommunication | null>(null);
   const deleteComm = useDeleteCommunicationWithDebtRefresh();
 
-  if (isLoading) {
-    return (
-      <div className="page-hdr">
-        <div><h1>Загружаем…</h1></div>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div style={{
-        padding: 16, margin: 16, background: '#fef2f2',
-        color: 'var(--danger)', borderRadius: 6,
-      }}>
-        Не удалось загрузить карточку: {error.message}
-      </div>
-    );
-  }
-
+  if (isLoading) return <div className="page-hdr"><div><h1>Загружаем…</h1></div></div>;
+  if (error) return (
+    <div style={{ padding: 16, margin: 16, background: '#fef2f2', color: 'var(--danger)', borderRadius: 6 }}>
+      Не удалось загрузить: {error.message}
+    </div>
+  );
   if (!data) return null;
 
   const cp = data.counterparty;
   const aging = data.aging;
   const credit = data.credit;
   const isBuyer = cp.kind === 'buyer';
-  const utilization = data.credit_utilization_pct;
-
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
+  const debt = parseFloat(credit.current_debt_uzs || '0');
 
   return (
     <>
       <div className="page-hdr">
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-            <button
-              className="btn btn-ghost btn-sm"
-              onClick={() => router.push('/counterparties')}
-            >
+            <button className="btn btn-ghost btn-sm" onClick={() => router.push('/counterparties')}>
               <Icon name="chevron-left" size={12} /> К списку
             </button>
           </div>
           <h1>
             {cp.name}{' '}
-            <span className="mono" style={{ fontSize: 16, color: 'var(--fg-3)' }}>
-              · {cp.code}
-            </span>
+            <span className="mono" style={{ fontSize: 16, color: 'var(--fg-3)' }}>· {cp.code}</span>
           </h1>
           <div className="sub" style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
             <Badge tone={isBuyer ? 'info' : 'neutral'}>
@@ -113,334 +103,89 @@ export default function CounterpartyDetailPage() {
             {!cp.is_active && <Badge tone="danger">Заблокирован</Badge>}
             {cp.inn && <span className="mono">ИНН {cp.inn}</span>}
             {cp.phone && <span>· {cp.phone}</span>}
-            {cp.email && <span>· {cp.email}</span>}
           </div>
         </div>
       </div>
 
-      {/* ── KPI ─────────────────────────────────────────────── */}
-      {isBuyer && (
-        <>
-          <div className="kpi-row">
-            <KpiCard
-              tone={aging?.has_overdue ? 'red' : aging?.total ? 'orange' : 'green'}
-              iconName="bag"
-              label="Текущий долг"
-              sub={aging ? `${aging.orders_count} счетов` : 'нет долгов'}
-              value={fmtFull(credit.current_debt_uzs)}
-            />
-            <KpiCard
-              tone={cp.credit_limit_uzs ? 'blue' : 'orange'}
-              iconName="chart"
-              label="Кредитный лимит"
-              sub={cp.credit_limit_uzs ? 'из политики' : 'не задан'}
-              value={cp.credit_limit_uzs ? fmtFull(cp.credit_limit_uzs) : '—'}
-            />
-            <KpiCard
-              tone={
-                utilization == null ? 'blue' :
-                utilization >= 100 ? 'red' :
-                utilization >= 80 ? 'orange' : 'green'
-              }
-              iconName="chart"
-              label="Утилизация лимита"
-              sub={utilization != null ? '% занятого лимита' : '—'}
-              value={utilization != null ? `${utilization}%` : '—'}
-            />
-            <KpiCard
-              tone={
-                aging && aging.oldest_overdue_days > 90 ? 'red' :
-                aging && aging.oldest_overdue_days > 30 ? 'orange' :
-                aging && aging.oldest_overdue_days > 0 ? 'orange' : 'green'
-              }
-              iconName="bag"
-              label="Макс. просрочка"
-              sub={cp.max_overdue_days != null ? `лимит ${cp.max_overdue_days} дн` : 'без лимита'}
-              value={aging ? `${aging.oldest_overdue_days} дн` : '—'}
-            />
-          </div>
-
-          {/* ── Кредитный гейт — состояние ─────────────────── */}
-          {!credit.ok && (
-            <div style={{
-              marginTop: 12, padding: 12, borderRadius: 6,
-              background: '#fef2f2', border: '1px solid var(--danger)',
-              fontSize: 12, color: 'var(--danger)',
-            }}>
-              <div style={{ fontWeight: 600, marginBottom: 6 }}>
-                ⚠ Новые продажи этому клиенту автоматически блокируются:
-              </div>
-              <ul style={{ margin: 0, paddingLeft: 18 }}>
-                {credit.reasons.map((r, i) => <li key={i}>{r}</li>)}
-              </ul>
-            </div>
-          )}
-
-          {/* ── Aging-разбивка ──────────────────────────────── */}
-          {aging && (
-            <Panel
-              title="Старение долга"
-              style={{ marginTop: 14 }}
-            >
-              <div style={{ padding: 12 }}>
-                <div style={{
-                  display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)',
-                  gap: 8, fontSize: 12,
-                }}>
-                  <AgingBucket label="Текущие" value={aging.current} tone="info" desc="не просрочено" />
-                  <AgingBucket label="0-30 дн" value={aging.b_0_30} tone="warn" desc="до месяца" />
-                  <AgingBucket label="31-60 дн" value={aging.b_31_60} tone="warn" desc="1-2 мес" />
-                  <AgingBucket label="61-90 дн" value={aging.b_61_90} tone="danger" desc="2-3 мес" />
-                  <AgingBucket label="90+ дн" value={aging.b_90_plus} tone="danger" desc="критично" />
-                </div>
-              </div>
-            </Panel>
-          )}
-
-          {/* ── Стартовые предоплаты (free credit) ──────────── */}
-          {data.prepayments && data.prepayments.length > 0 && (
-            <Panel
-              title={`Свободный кредит: ${fmtFull(data.prepayments_total_free_uzs)}`}
-              style={{ marginTop: 14 }}
-            >
-              <div style={{ padding: 12 }}>
-                <div style={{
-                  fontSize: 12, color: 'var(--fg-3)', marginBottom: 10,
-                }}>
-                  Стартовые предоплаты, перенесённые при миграции. Кассир может
-                  применить часть к новой продаже/закупу через кнопку
-                  «Применить предоплату» в карточке документа.
-                </div>
-                <table style={{ width: '100%', fontSize: 13, borderCollapse: 'collapse' }}>
-                  <thead>
-                    <tr style={{ color: 'var(--fg-3)', fontSize: 11, textAlign: 'left' }}>
-                      <th style={{ padding: '6px 12px' }}>Документ</th>
-                      <th style={{ padding: '6px 12px' }}>Дата</th>
-                      <th style={{ padding: '6px 12px' }}>Направление</th>
-                      <th style={{ padding: '6px 12px', textAlign: 'right' }}>Сумма</th>
-                      <th style={{ padding: '6px 12px', textAlign: 'right' }}>Использовано</th>
-                      <th style={{ padding: '6px 12px', textAlign: 'right' }}>Свободно</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {data.prepayments.map((p) => (
-                      <tr key={p.id} style={{ borderTop: '1px solid var(--border)' }}>
-                        <td className="mono" style={{ padding: '8px 12px', fontWeight: 500 }}>
-                          {p.doc_number}
-                        </td>
-                        <td className="mono" style={{ padding: '8px 12px', fontSize: 12 }}>
-                          {p.date}
-                        </td>
-                        <td style={{ padding: '8px 12px', fontSize: 12 }}>
-                          {p.direction === 'in' ? '⬇️ от клиента' : '⬆️ поставщику'}
-                        </td>
-                        <td className="mono" style={{ padding: '8px 12px', textAlign: 'right' }}>
-                          {fmt(p.amount_uzs)}
-                        </td>
-                        <td className="mono" style={{
-                          padding: '8px 12px', textAlign: 'right',
-                          color: 'var(--fg-3)',
-                        }}>
-                          {fmt(p.used_uzs)}
-                        </td>
-                        <td className="mono" style={{
-                          padding: '8px 12px', textAlign: 'right',
-                          color: 'var(--success)', fontWeight: 600,
-                        }}>
-                          {fmt(p.free_uzs)}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </Panel>
-          )}
-        </>
-      )}
-
-      {/* ── Tabs: открытые счета / касания ────────────────── */}
+      {/* Один большой блок: Долг */}
       <div style={{
-        display: 'flex', gap: 4, marginTop: 14, marginBottom: 8,
-        borderBottom: '1px solid var(--border)',
+        marginTop: 4,
+        padding: '20px 24px',
+        borderRadius: 8,
+        background: debt > 0
+          ? 'linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)'
+          : debt < 0
+            ? 'linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%)'
+            : 'linear-gradient(135deg, #e5e7eb 0%, #d1d5db 100%)',
+        border: '1px solid',
+        borderColor: debt > 0 ? '#f59e0b' : debt < 0 ? '#10b981' : '#9ca3af',
       }}>
-        <TabBtn active={tab === 'orders'} onClick={() => setTab('orders')}>
-          Открытые счета ({data.open_orders_count})
-        </TabBtn>
-        <TabBtn active={tab === 'comms'} onClick={() => setTab('comms')}>
-          История касаний ({data.communications_count})
-        </TabBtn>
+        <div style={{ fontSize: 12, color: 'var(--fg-2)', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+          {isBuyer
+            ? (debt > 0 ? 'Клиент должен нам' : debt < 0 ? 'Мы должны клиенту (предоплата)' : 'Расчётов нет')
+            : (debt > 0 ? 'Мы должны поставщику' : debt < 0 ? 'Поставщик должен нам (предоплата)' : 'Расчётов нет')}
+        </div>
+        <div style={{
+          fontSize: 36, fontWeight: 700, fontFamily: 'var(--mono, monospace)',
+          color: debt > 0 ? '#92400e' : debt < 0 ? '#065f46' : '#374151',
+          marginTop: 4,
+        }}>
+          {fmt(Math.abs(debt))} <span style={{ fontSize: 18, fontWeight: 500 }}>сум</span>
+        </div>
+        {aging && aging.has_overdue && (
+          <div style={{ fontSize: 13, color: '#dc2626', marginTop: 8, fontWeight: 500 }}>
+            ⚠ Просрочка: {aging.oldest_overdue_days} дн · {aging.orders_count} счетов
+          </div>
+        )}
       </div>
 
-      {tab === 'orders' && (
-        <Panel title="Непогашенные продажи">
-          <DataTable
-            rows={data.open_orders}
-            rowKey={(o) => o.id}
-            emptyMessage="Открытых счетов нет."
-            columns={[
-              {
-                key: 'doc',
-                label: 'Документ',
-                render: (o) => (
-                  <Link
-                    href={`/sales?doc=${o.doc_number}`}
-                    className="mono"
-                    style={{ color: 'var(--brand-orange)', textDecoration: 'none', fontWeight: 500 }}
-                  >
-                    {o.doc_number}
-                  </Link>
-                ),
-              },
-              { key: 'date', label: 'Дата', mono: true,
-                render: (o) => o.date },
-              {
-                key: 'due',
-                label: 'Срок оплаты',
-                render: (o) => {
-                  if (!o.due_date) return <span style={{ color: 'var(--fg-3)' }}>не задан</span>;
-                  const due = new Date(o.due_date);
-                  const days = Math.round((due.getTime() - today.getTime()) / 86400000);
-                  return (
-                    <span style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }}>
-                      <span className="mono">{o.due_date}</span>
-                      {days < 0 && <Badge tone="danger">просрочено {Math.abs(days)} дн</Badge>}
-                      {days === 0 && <Badge tone="warn">сегодня</Badge>}
-                      {days > 0 && days <= 7 && <Badge tone="warn">через {days} дн</Badge>}
-                    </span>
-                  );
-                },
-              },
-              { key: 'amount', label: 'Сумма', align: 'right', mono: true,
-                render: (o) => fmt(o.amount_uzs) },
-              { key: 'paid', label: 'Оплачено', align: 'right', mono: true,
-                render: (o) => fmt(o.paid_amount_uzs) },
-              { key: 'outstanding', label: 'Долг', align: 'right', mono: true,
-                cellStyle: { fontWeight: 600, color: 'var(--brand-orange)' },
-                render: (o) => fmt(o.outstanding_uzs) },
-              { key: 'pay', label: 'Статус',
-                render: (o) => (
-                  <Badge tone={PAY_TONE[o.payment_status] ?? 'neutral'}>
-                    {PAY_LABEL[o.payment_status] ?? o.payment_status}
-                  </Badge>
-                ) },
-            ]}
-          />
-        </Panel>
+      {!credit.ok && isBuyer && (
+        <div style={{
+          marginTop: 12, padding: 10, borderRadius: 6,
+          background: '#fef2f2', border: '1px solid var(--danger)',
+          fontSize: 12, color: 'var(--danger)',
+        }}>
+          ⚠ Новые продажи блокируются: {credit.reasons.join('; ')}
+        </div>
       )}
 
-      {tab === 'comms' && (
-        <Panel
-          title="История общения"
-          tools={
-            data.open_orders.length > 0 ? (
-              <button
-                className="btn btn-primary btn-sm"
-                onClick={() => setAdding(true)}
-              >
-                <Icon name="plus" size={12} /> Новое касание
-              </button>
-            ) : (
-              <span style={{ fontSize: 11, color: 'var(--fg-3)' }}>
-                Нет открытых счетов — некуда привязать
-              </span>
-            )
-          }
-        >
-          {data.communications.length === 0 ? (
-            <div style={{
-              padding: 24, textAlign: 'center',
-              fontSize: 12, color: 'var(--fg-3)',
-            }}>
-              Касаний по этому клиенту ещё не было.
-              {data.open_orders.length > 0 && ' Нажмите «Новое касание» чтобы зафиксировать первый звонок.'}
-            </div>
-          ) : (
-            <div style={{ padding: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {data.communications.map((c) => (
-                <div
-                  key={c.id}
-                  style={{
-                    padding: 10, borderRadius: 6,
-                    border: '1px solid var(--border)',
-                    background: 'var(--bg-card)',
-                  }}
-                >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4, flexWrap: 'wrap' }}>
-                    <span className="mono" style={{ fontSize: 11, color: 'var(--fg-3)' }}>
-                      {new Date(c.contacted_at).toLocaleString('ru-RU', {
-                        day: '2-digit', month: '2-digit', year: '2-digit',
-                        hour: '2-digit', minute: '2-digit',
-                      })}
-                    </span>
-                    <Badge tone="info">{c.method_display}</Badge>
-                    <Badge tone={
-                      c.outcome === 'promised' ? 'success' :
-                      c.outcome === 'asked_defer' ? 'warn' :
-                      c.outcome === 'refused' || c.outcome === 'wrong_number' ? 'danger' :
-                      'neutral'
-                    }>{c.outcome_display}</Badge>
-                    <span className="mono" style={{ fontSize: 11, color: 'var(--fg-3)' }}>
-                      по счёту {c.order_doc}
-                    </span>
-                    <div style={{ flex: 1 }} />
-                    <button
-                      className="btn btn-ghost btn-sm"
-                      style={{ padding: '2px 8px' }}
-                      title="Редактировать"
-                      onClick={() => setEditing({
-                        ...c,
-                        order: c.order_id,
-                      } as unknown as SaleCommunication)}
-                    >
-                      ✎
-                    </button>
-                    <button
-                      className="btn btn-ghost btn-sm"
-                      style={{ padding: '2px 8px', color: 'var(--danger)' }}
-                      title="Удалить"
-                      disabled={deleteComm.isPending}
-                      onClick={() => {
-                        if (confirm('Удалить это касание? Действие нельзя отменить.')) {
-                          deleteComm.mutate({ id: c.id, customerId: id });
-                        }
-                      }}
-                    >
-                      ✕
-                    </button>
-                  </div>
-                  <div style={{ fontSize: 13, marginBottom: 4 }}>
-                    «{c.customer_response}»
-                  </div>
-                  {c.internal_note && (
-                    <div style={{
-                      fontSize: 11, color: 'var(--fg-2)', marginBottom: 6,
-                      padding: '4px 8px', background: 'var(--bg-soft)',
-                      borderRadius: 4, fontStyle: 'italic',
-                    }}>
-                      📝 {c.internal_note}
-                    </div>
-                  )}
-                  <div style={{ display: 'flex', gap: 12, fontSize: 11, color: 'var(--fg-3)', flexWrap: 'wrap' }}>
-                    {c.contacted_by_name && <span>{c.contacted_by_name}</span>}
-                    {c.promised_pay_date && (
-                      <span style={{ color: 'var(--brand-orange)' }}>
-                        ✓ обещал к {c.promised_pay_date}
-                      </span>
-                    )}
-                    {c.expected_pay_date && (
-                      <span style={{ color: 'var(--brand-orange)' }}>
-                        🎯 жду к {c.expected_pay_date}
-                      </span>
-                    )}
-                    {c.next_action_date && <span>↺ перезвонить {c.next_action_date}</span>}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </Panel>
+      <div style={{ marginTop: 14, marginBottom: 12 }}>
+        <Seg
+          options={[
+            { value: 'info', label: 'Инфо' },
+            { value: 'docs', label: `Документы (${data.all_orders_count})` },
+            { value: 'payments', label: `Платежи (${data.all_payments_count})` },
+          ]}
+          value={tab}
+          onChange={(v) => setTab(v as TabKey)}
+        />
+      </div>
+
+      {tab === 'info' && (
+        <InfoTab
+          cp={cp}
+          aging={aging}
+          isBuyer={isBuyer}
+          openOrders={data.open_orders}
+          openOrdersCount={data.open_orders_count}
+          communications={data.communications}
+          communicationsCount={data.communications_count}
+          monthly={data.monthly_turnover}
+          prepayments={data.prepayments}
+          prepaymentsTotalFreeUzs={data.prepayments_total_free_uzs}
+          customerId={id ?? null}
+          onAddComm={() => setAdding(true)}
+          onEditComm={(c) => setEditing(c)}
+          onDeleteComm={(commId) => {
+            if (confirm('Удалить касание?')) {
+              deleteComm.mutate({ id: commId, customerId: id });
+            }
+          }}
+          deletingComm={deleteComm.isPending}
+        />
       )}
+      {tab === 'docs' && <DocsTab rows={data.all_orders} />}
+      {tab === 'payments' && <PaymentsTab rows={data.all_payments} />}
 
       {adding && id && (
         <CommunicationFormModal
@@ -448,14 +193,11 @@ export default function CounterpartyDetailPage() {
           customerId={id}
           customerName={cp.name}
           customerOpenOrders={data.open_orders.map((o) => ({
-            id: o.id,
-            doc_number: o.doc_number,
-            outstanding_uzs: o.outstanding_uzs,
+            id: o.id, doc_number: o.doc_number, outstanding_uzs: o.outstanding_uzs,
           }))}
           onClose={() => setAdding(false)}
         />
       )}
-
       {editing && (
         <CommunicationFormModal
           mode="edit"
@@ -468,48 +210,330 @@ export default function CounterpartyDetailPage() {
   );
 }
 
-function AgingBucket({
-  label, value, tone, desc,
+// ─── Инфо: реквизиты + открытые счета + касания + обороты ────────────────
+
+function InfoTab({
+  cp, aging, isBuyer, openOrders, openOrdersCount, communications, communicationsCount,
+  monthly, prepayments, prepaymentsTotalFreeUzs,
+  onAddComm, onEditComm, onDeleteComm, deletingComm,
 }: {
-  label: string;
-  value: string;
-  tone: 'info' | 'warn' | 'danger';
-  desc: string;
+  cp: import('@/hooks/useCounterparties').CounterpartyDebtSummary['counterparty'];
+  aging: import('@/hooks/useCounterparties').CounterpartyDebtSummary['aging'];
+  isBuyer: boolean;
+  openOrders: import('@/hooks/useCounterparties').CounterpartyDebtSummary['open_orders'];
+  openOrdersCount: number;
+  communications: import('@/hooks/useCounterparties').CounterpartyDebtSummary['communications'];
+  communicationsCount: number;
+  monthly: import('@/hooks/useCounterparties').CounterpartyFullSummary['monthly_turnover'];
+  prepayments: import('@/hooks/useCounterparties').CounterpartyDebtSummary['prepayments'];
+  prepaymentsTotalFreeUzs: string;
+  customerId: string | null;
+  onAddComm: () => void;
+  onEditComm: (c: SaleCommunication) => void;
+  onDeleteComm: (id: string) => void;
+  deletingComm: boolean;
 }) {
-  const isEmpty = parseFloat(value) === 0;
-  const color =
-    isEmpty ? 'var(--fg-3)' :
-    tone === 'danger' ? 'var(--danger)' :
-    tone === 'warn' ? 'var(--brand-orange)' : 'var(--fg-1)';
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const totalSales = monthly.reduce((s, r) => s + parseFloat(r.sales_uzs || '0'), 0);
+  const totalPurchases = monthly.reduce((s, r) => s + parseFloat(r.purchases_uzs || '0'), 0);
+
   return (
-    <div style={{
-      padding: 8, borderRadius: 4, border: '1px solid var(--border)',
-      background: isEmpty ? 'var(--bg-soft)' : 'var(--bg-card)',
-    }}>
-      <div style={{ fontSize: 10, color: 'var(--fg-3)', textTransform: 'uppercase' }}>{label}</div>
-      <div className="mono" style={{ fontSize: 14, fontWeight: 600, color }}>
-        {fmt(value)}
-      </div>
-      <div style={{ fontSize: 10, color: 'var(--fg-3)' }}>{desc}</div>
-    </div>
+    <>
+      {/* Реквизиты */}
+      <Panel title="Реквизиты">
+        <div style={{ padding: 12, display: 'grid', gridTemplateColumns: '160px 1fr', rowGap: 10, columnGap: 16 }}>
+          <div className="sub">Код</div>
+          <div className="mono">{cp.code}</div>
+          <div className="sub">Тип</div>
+          <div>{cp.kind === 'buyer' ? 'Покупатель' : cp.kind === 'supplier' ? 'Поставщик' : 'Прочее'}</div>
+          {cp.specialization && (<><div className="sub">Специализация</div><div>{cp.specialization}</div></>)}
+          {cp.inn && (<><div className="sub">ИНН</div><div className="mono">{cp.inn}</div></>)}
+          {cp.phone && (<><div className="sub">Телефон</div><div className="mono">{cp.phone}</div></>)}
+          {cp.email && (<><div className="sub">Email</div><div className="mono">{cp.email}</div></>)}
+          {cp.address && (<><div className="sub">Адрес</div><div>{cp.address}</div></>)}
+          {isBuyer && cp.credit_limit_uzs && (
+            <>
+              <div className="sub">Кредитный лимит</div>
+              <div className="mono">{fmt(cp.credit_limit_uzs)} сум</div>
+            </>
+          )}
+          {cp.notes && (
+            <>
+              <div className="sub">Примечание</div>
+              <div style={{ whiteSpace: 'pre-wrap' }}>{cp.notes}</div>
+            </>
+          )}
+        </div>
+      </Panel>
+
+      {/* Открытые счета — только если есть */}
+      {openOrdersCount > 0 && (
+        <>
+          <div style={{ height: 12 }} />
+          <Panel title={`Открытые счета (${openOrdersCount})`}>
+            <DataTable
+              rows={openOrders}
+              rowKey={(o) => o.id}
+              columns={[
+                { key: 'doc', label: 'Документ', mono: true,
+                  render: (o) => (
+                    <Link href={`/sales/${o.id}`} style={{ color: 'var(--brand-orange)', textDecoration: 'none' }}>
+                      {o.doc_number}
+                    </Link>
+                  ) },
+                { key: 'date', label: 'Дата', mono: true, render: (o) => o.date },
+                { key: 'due', label: 'Срок',
+                  render: (o) => {
+                    if (!o.due_date) return <span style={{ color: 'var(--fg-3)' }}>—</span>;
+                    const due = new Date(o.due_date);
+                    const days = Math.round((due.getTime() - today.getTime()) / 86400000);
+                    return (
+                      <span>
+                        <span className="mono">{o.due_date}</span>
+                        {days < 0 && <Badge tone="danger" style={{ marginLeft: 6 }}>просрочено {Math.abs(days)} дн</Badge>}
+                      </span>
+                    );
+                  } },
+                { key: 'out', label: 'Долг', align: 'right', mono: true,
+                  cellStyle: { fontWeight: 600, color: 'var(--brand-orange)' },
+                  render: (o) => fmt(o.outstanding_uzs) },
+                { key: 'pay', label: '',
+                  render: (o) => (
+                    <Badge tone={PAY_TONE[o.payment_status] ?? 'neutral'}>
+                      {PAY_LABEL[o.payment_status] ?? o.payment_status}
+                    </Badge>
+                  ) },
+              ]}
+            />
+          </Panel>
+        </>
+      )}
+
+      {/* Свободный кредит */}
+      {prepayments && prepayments.length > 0 && (
+        <>
+          <div style={{ height: 12 }} />
+          <Panel title={`Свободный кредит (предоплата): ${fmt(prepaymentsTotalFreeUzs)} сум`}>
+            <DataTable
+              rows={prepayments}
+              rowKey={(p) => p.id}
+              columns={[
+                { key: 'doc', label: 'Документ', mono: true, render: (p) => p.doc_number },
+                { key: 'date', label: 'Дата', mono: true, render: (p) => p.date },
+                { key: 'amt', label: 'Сумма', mono: true, align: 'right', render: (p) => fmt(p.amount_uzs) },
+                { key: 'free', label: 'Свободно', mono: true, align: 'right',
+                  cellStyle: { fontWeight: 600, color: 'var(--success)' },
+                  render: (p) => fmt(p.free_uzs) },
+              ]}
+            />
+          </Panel>
+        </>
+      )}
+
+      {/* Обороты */}
+      {(totalSales > 0 || totalPurchases > 0) && (
+        <>
+          <div style={{ height: 12 }} />
+          <Panel title="Обороты за 12 месяцев">
+            <div style={{ padding: 16, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+              {isBuyer ? (
+                <>
+                  <div>
+                    <div className="sub">Куплено всего</div>
+                    <div className="mono" style={{ fontSize: 22, fontWeight: 600 }}>
+                      {fmt(totalSales)} <span style={{ fontSize: 13, fontWeight: 400 }}>сум</span>
+                    </div>
+                  </div>
+                  <div>
+                    <div className="sub">Заплатил</div>
+                    <div className="mono" style={{ fontSize: 22, fontWeight: 600 }}>
+                      {fmt(monthly.reduce((s, r) => s + parseFloat(r.payments_in_uzs || '0'), 0))}
+                      <span style={{ fontSize: 13, fontWeight: 400 }}> сум</span>
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div>
+                    <div className="sub">Куплено у поставщика</div>
+                    <div className="mono" style={{ fontSize: 22, fontWeight: 600 }}>
+                      {fmt(totalPurchases)} <span style={{ fontSize: 13, fontWeight: 400 }}>сум</span>
+                    </div>
+                  </div>
+                  <div>
+                    <div className="sub">Выплачено</div>
+                    <div className="mono" style={{ fontSize: 22, fontWeight: 600 }}>
+                      {fmt(monthly.reduce((s, r) => s + parseFloat(r.payments_out_uzs || '0'), 0))}
+                      <span style={{ fontSize: 13, fontWeight: 400 }}> сум</span>
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
+          </Panel>
+        </>
+      )}
+
+      {/* Касания */}
+      {(communicationsCount > 0 || openOrders.length > 0) && (
+        <>
+          <div style={{ height: 12 }} />
+          <Panel
+            title={`Касания (${communicationsCount})`}
+            tools={
+              openOrders.length > 0 ? (
+                <button className="btn btn-primary btn-sm" onClick={onAddComm}>
+                  <Icon name="plus" size={12} /> Новое касание
+                </button>
+              ) : null
+            }
+          >
+            {communicationsCount === 0 ? (
+              <div style={{ padding: 24, textAlign: 'center', fontSize: 12, color: 'var(--fg-3)' }}>
+                Касаний не было.
+              </div>
+            ) : (
+              <div style={{ padding: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {communications.slice(0, 10).map((c) => (
+                  <div key={c.id} style={{
+                    padding: 10, borderRadius: 6,
+                    border: '1px solid var(--border)', background: 'var(--bg-card)',
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4, flexWrap: 'wrap' }}>
+                      <span className="mono" style={{ fontSize: 11, color: 'var(--fg-3)' }}>
+                        {new Date(c.contacted_at).toLocaleString('ru-RU', {
+                          day: '2-digit', month: '2-digit', year: '2-digit',
+                          hour: '2-digit', minute: '2-digit',
+                        })}
+                      </span>
+                      <Badge tone="info">{c.method_display}</Badge>
+                      <Badge tone={
+                        c.outcome === 'promised' ? 'success' :
+                        c.outcome === 'asked_defer' ? 'warn' :
+                        c.outcome === 'refused' || c.outcome === 'wrong_number' ? 'danger' : 'neutral'
+                      }>{c.outcome_display}</Badge>
+                      <span className="mono" style={{ fontSize: 11, color: 'var(--fg-3)' }}>
+                        по счёту {c.order_doc}
+                      </span>
+                      <div style={{ flex: 1 }} />
+                      <button
+                        className="btn btn-ghost btn-sm" style={{ padding: '2px 8px' }}
+                        title="Редактировать"
+                        onClick={() => onEditComm({ ...c, order: c.order_id } as unknown as SaleCommunication)}
+                      >✎</button>
+                      <button
+                        className="btn btn-ghost btn-sm" style={{ padding: '2px 8px', color: 'var(--danger)' }}
+                        title="Удалить" disabled={deletingComm}
+                        onClick={() => onDeleteComm(c.id)}
+                      >✕</button>
+                    </div>
+                    <div style={{ fontSize: 13, marginBottom: 4 }}>«{c.customer_response}»</div>
+                    {c.internal_note && (
+                      <div style={{
+                        fontSize: 11, color: 'var(--fg-2)', marginBottom: 6,
+                        padding: '4px 8px', background: 'var(--bg-soft)',
+                        borderRadius: 4, fontStyle: 'italic',
+                      }}>📝 {c.internal_note}</div>
+                    )}
+                    <div style={{ display: 'flex', gap: 12, fontSize: 11, color: 'var(--fg-3)', flexWrap: 'wrap' }}>
+                      {c.contacted_by_name && <span>{c.contacted_by_name}</span>}
+                      {c.promised_pay_date && <span style={{ color: 'var(--brand-orange)' }}>✓ обещал к {c.promised_pay_date}</span>}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </Panel>
+        </>
+      )}
+    </>
   );
 }
 
-function TabBtn({
-  active, onClick, children,
-}: { active: boolean; onClick: () => void; children: React.ReactNode }) {
+// ─── Документы ────────────────────────────────────────────────────────────
+
+function DocsTab({
+  rows,
+}: { rows: import('@/hooks/useCounterparties').CounterpartyFullSummary['all_orders'] }) {
   return (
-    <button
-      onClick={onClick}
-      style={{
-        padding: '8px 14px', fontSize: 13,
-        background: 'transparent', border: 'none',
-        borderBottom: active ? '2px solid var(--brand-orange)' : '2px solid transparent',
-        color: active ? 'var(--brand-orange)' : 'var(--fg-2)',
-        cursor: 'pointer', fontWeight: active ? 600 : 400,
-      }}
-    >
-      {children}
-    </button>
+    <Panel flush>
+      <DataTable
+        rows={rows}
+        rowKey={(o) => o.id}
+        emptyMessage="Документов нет."
+        columns={[
+          { key: 'kind', label: 'Тип',
+            render: (o) => (
+              <Badge tone={o.kind === 'sale' ? 'info' : 'neutral'}>
+                {ORDER_KIND_LABEL[o.kind] ?? o.kind}
+              </Badge>
+            ) },
+          { key: 'doc', label: 'Документ', mono: true,
+            render: (o) => (
+              <Link
+                href={o.kind === 'sale' ? `/sales/${o.id}` : `/purchases/${o.id}`}
+                style={{ color: 'var(--brand-orange)', textDecoration: 'none', fontWeight: 500 }}
+              >
+                {o.doc_number}
+              </Link>
+            ) },
+          { key: 'date', label: 'Дата', mono: true, render: (o) => o.date },
+          { key: 'status', label: 'Статус',
+            render: (o) => (
+              <Badge tone={o.status === 'confirmed' ? 'success' : o.status === 'cancelled' ? 'danger' : 'neutral'}>
+                {ORDER_STATUS_LABEL[o.status] ?? o.status}
+              </Badge>
+            ) },
+          { key: 'amount', label: 'Сумма', mono: true, align: 'right',
+            render: (o) => fmt(o.amount_uzs) },
+          { key: 'paid', label: 'Оплачено', mono: true, align: 'right',
+            cellStyle: { color: 'var(--fg-3)' },
+            render: (o) => fmt(o.paid_amount_uzs) },
+          { key: 'out', label: 'Долг', mono: true, align: 'right',
+            cellStyle: { fontWeight: 600 },
+            render: (o) => {
+              const v = parseFloat(o.outstanding_uzs);
+              if (!Number.isFinite(v) || v === 0) return <span style={{ color: 'var(--fg-3)' }}>—</span>;
+              return <span style={{ color: 'var(--brand-orange)' }}>{fmt(v)}</span>;
+            } },
+        ]}
+      />
+    </Panel>
+  );
+}
+
+// ─── Платежи ──────────────────────────────────────────────────────────────
+
+function PaymentsTab({
+  rows,
+}: { rows: import('@/hooks/useCounterparties').CounterpartyFullSummary['all_payments'] }) {
+  return (
+    <Panel flush>
+      <DataTable
+        rows={rows}
+        rowKey={(p) => p.id}
+        emptyMessage="Платежей нет."
+        columns={[
+          { key: 'doc', label: 'Документ', mono: true, render: (p) => p.doc_number },
+          { key: 'date', label: 'Дата', mono: true, render: (p) => p.date },
+          { key: 'dir', label: 'Направление',
+            render: (p) => p.direction === 'in'
+              ? <Badge tone="success">⬇ Поступление</Badge>
+              : <Badge tone="warn">⬆ Расход</Badge> },
+          { key: 'kind', label: 'Тип',
+            render: (p) => <span style={{ fontSize: 12, color: 'var(--fg-2)' }}>{PAYMENT_KIND_LABEL[p.kind] ?? p.kind}</span> },
+          { key: 'amount', label: 'Сумма', mono: true, align: 'right',
+            cellStyle: { fontWeight: 600 },
+            render: (p) => fmt(p.amount_uzs) },
+          { key: 'status', label: 'Статус',
+            render: (p) => (
+              <Badge tone={p.status === 'posted' ? 'success' : p.status === 'cancelled' ? 'neutral' : 'warn'}>
+                {p.status === 'posted' ? 'Проведён' : p.status === 'cancelled' ? 'Отменён' : p.status}
+              </Badge>
+            ) },
+        ]}
+      />
+    </Panel>
   );
 }

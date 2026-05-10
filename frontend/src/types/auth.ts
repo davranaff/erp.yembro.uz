@@ -360,6 +360,13 @@ export interface MembershipRow {
   user_email: string;
   user_full_name: string;
   organization_code: string;
+  // HR-расширения (заполняются при ?include_compensation=1 / ?include_balance=1
+  // и наличии hr:r). Иначе null.
+  compensation_type: 'monthly_salary' | 'per_shift' | 'per_hour' | null;
+  current_rate_uzs: string | null;       // native amount (в валюте ставки)
+  current_rate_currency: string | null;  // код валюты ставки
+  current_rate_uzs_equiv: string | null; // UZS-эквивалент по курсу на сегодня
+  balance_uzs: string | null;
   created_at: string;
   updated_at: string;
 }

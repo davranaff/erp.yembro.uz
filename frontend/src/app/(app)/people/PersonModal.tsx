@@ -4,8 +4,12 @@ import { useState } from 'react';
 
 import Modal from '@/components/ui/Modal';
 import { ApiError } from '@/lib/api';
+import { useCurrenciesSorted } from '@/hooks/useCurrencyRates';
 import { useCreatePerson, useUpdatePerson } from '@/hooks/usePeople';
+import { useCreateRate, useSaveCompensationPlan } from '@/hooks/usePayroll';
+import { useHasLevel } from '@/hooks/usePermissions';
 import type { MembershipRow } from '@/types/auth';
+import type { CompensationType } from '@/types/payroll';
 
 interface Props {
   initial?: MembershipRow | null;
@@ -23,7 +27,14 @@ const WORK_STATUS_OPTIONS: { value: string; label: string }[] = [
 export default function PersonModal({ initial, onClose, onSaved }: Props) {
   const create = useCreatePerson();
   const update = useUpdatePerson();
-  const saving = create.isPending || update.isPending;
+  const savePlan = useSaveCompensationPlan();
+  const createRate = useCreateRate();
+  const { data: currencies = [] } = useCurrenciesSorted();
+  const hasLevel = useHasLevel();
+  const canSetCompensation = hasLevel('hr', 'rw');
+
+  const saving =
+    create.isPending || update.isPending || savePlan.isPending || createRate.isPending;
   const error = (initial ? update.error : create.error) ?? null;
   const isEdit = !!initial;
 
@@ -34,6 +45,14 @@ export default function PersonModal({ initial, onClose, onSaved }: Props) {
   const [positionTitle, setPositionTitle] = useState(initial?.position_title ?? '');
   const [workPhone, setWorkPhone] = useState(initial?.work_phone ?? '');
   const [workStatus, setWorkStatus] = useState(initial?.work_status ?? 'active');
+
+  // Compensation поля — показываются только при создании и при наличии hr:rw.
+  const [compType, setCompType] = useState<CompensationType>('monthly_salary');
+  const [initialRate, setInitialRate] = useState('');
+  const [rateFrom, setRateFrom] = useState(() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`;
+  });
 
   const fieldErrors =
     error instanceof ApiError && error.status === 400
@@ -62,6 +81,32 @@ export default function PersonModal({ initial, onClose, onSaved }: Props) {
           work_phone: workPhone,
           work_status: workStatus,
         });
+        // Если у юзера hr:rw — сразу настроим план и (опц.) первую ставку.
+        if (canSetCompensation) {
+          const uzs = currencies.find((c) => c.code === 'UZS') ?? currencies[0];
+          if (uzs) {
+            try {
+              await savePlan.mutateAsync({
+                employee: res.id,
+                compensation_type: compType,
+                currency: uzs.id,
+              });
+              const amount = initialRate.replace(/\s/g, '');
+              if (amount && Number(amount) > 0) {
+                await createRate.mutateAsync({
+                  employee: res.id,
+                  amount,
+                  currency: uzs.id,
+                  effective_from: rateFrom,
+                  reason: 'hire',
+                });
+              }
+            } catch {
+              // Если payroll-операции упали — членство уже создано,
+              // юзер донастроит на детальной странице. Не блокируем закрытие.
+            }
+          }
+        }
         onSaved?.(res);
       }
       onClose();
@@ -200,6 +245,54 @@ export default function PersonModal({ initial, onClose, onSaved }: Props) {
           </select>
         </div>
       </div>
+
+      {!isEdit && canSetCompensation && (
+        <div
+          style={{
+            marginTop: 12,
+            padding: 12,
+            background: 'var(--bg-soft)',
+            borderRadius: 6,
+            display: 'grid',
+            gap: 10,
+          }}
+        >
+          <div style={{ fontWeight: 600, fontSize: 13 }}>Зарплата (опционально)</div>
+          <div className="field">
+            <label>Тип оплаты</label>
+            <select
+              className="input"
+              value={compType}
+              onChange={(e) => setCompType(e.target.value as CompensationType)}
+            >
+              <option value="monthly_salary">Оклад в месяц</option>
+              <option value="per_shift">Ставка за смену</option>
+              <option value="per_hour">Ставка за час</option>
+            </select>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+            <div className="field">
+              <label>Стартовая ставка (UZS)</label>
+              <input
+                className="input"
+                inputMode="decimal"
+                value={initialRate}
+                onChange={(e) => setInitialRate(e.target.value)}
+                placeholder="оставьте пустым — задать позже"
+              />
+            </div>
+            <div className="field">
+              <label>С даты</label>
+              <input
+                className="input"
+                type="date"
+                value={rateFrom}
+                onChange={(e) => setRateFrom(e.target.value)}
+              />
+            </div>
+          </div>
+        </div>
+      )}
 
       {error && error.status !== 400 && (
         <div style={{ fontSize: 12, color: 'var(--danger)', marginTop: 12 }}>

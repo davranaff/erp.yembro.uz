@@ -6,13 +6,15 @@ import KpiCard from '@/components/ui/KpiCard';
 import { useAuth } from '@/contexts/AuthContext';
 
 import OrganizationsTab from './OrganizationsTab';
+import PayrollSelfTab from './PayrollSelfTab';
 import ProfileTab from './ProfileTab';
 import SecurityTab from './SecurityTab';
 
-type Tab = 'profile' | 'security' | 'orgs';
+type Tab = 'profile' | 'security' | 'orgs' | 'payroll';
 
 const TABS: { key: Tab; label: string }[] = [
   { key: 'profile', label: 'Профиль' },
+  { key: 'payroll', label: 'Зарплата' },
   { key: 'security', label: 'Безопасность' },
   { key: 'orgs', label: 'Организации' },
 ];
@@ -145,6 +147,7 @@ export default function ProfilePage() {
       </div>
 
       {tab === 'profile' && <ProfileTab />}
+      {tab === 'payroll' && <PayrollSelfTab />}
       {tab === 'security' && <SecurityTab />}
       {tab === 'orgs' && <OrganizationsTab />}
     </>

@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useMemo, useState } from 'react';
 
 import Badge from '@/components/ui/Badge';
@@ -9,7 +10,7 @@ import Panel from '@/components/ui/Panel';
 import RowActions from '@/components/ui/RowActions';
 import Seg from '@/components/ui/Seg';
 import TablePagination from '@/components/ui/TablePagination';
-import { useDeactivatePerson, usePeoplePaginated } from '@/hooks/usePeople';
+import { useTerminatePerson, usePeoplePaginated } from '@/hooks/usePeople';
 import { useHasLevel } from '@/hooks/usePermissions';
 import type { MembershipRow } from '@/types/auth';
 
@@ -28,6 +29,22 @@ const STATUS_TONE: Record<string, 'success' | 'warn' | 'neutral' | 'info'> = {
   sick_leave: 'warn',
   terminated: 'neutral',
 };
+
+const COMP_TYPE_LABEL: Record<string, string> = {
+  monthly_salary: 'Оклад',
+  per_shift: 'Смена',
+  per_hour: 'Час',
+};
+
+function fmtUzs(value: string | null) {
+  if (value === null || value === undefined || value === '') return '—';
+  const n = Number(value);
+  if (!Number.isFinite(n)) return '—';
+  return new Intl.NumberFormat('ru-RU', {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  }).format(n);
+}
 
 function initials(name: string) {
   return name
@@ -50,19 +67,22 @@ export default function PeoplePage() {
 
   const hasLevel = useHasLevel();
   const canEdit = hasLevel('admin', 'rw');
+  const hrVisible = hasLevel('hr', 'r');
 
   const filter = useMemo(
     () => ({
       is_active: isActive || undefined,
       work_status: workStatus || undefined,
       search: search || undefined,
+      include_compensation: hrVisible || undefined,
+      include_balance: hrVisible || undefined,
     }),
-    [isActive, workStatus, search],
+    [isActive, workStatus, search, hrVisible],
   );
 
   const { data: pageData, isLoading, error, refetch, isFetching } = usePeoplePaginated(filter, page, pageSize);
   const data = pageData?.results ?? [];
-  const deactivate = useDeactivatePerson();
+  const terminate = useTerminatePerson();
 
   const submitSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -75,11 +95,19 @@ export default function PeoplePage() {
     setModalOpen(true);
   };
 
-  const handleDeactivate = (m: MembershipRow) => {
-    if (!confirm(`Уволить «${m.user_full_name}»?\n\nАккаунт сохранится, но membership деактивируется.`)) return;
-    deactivate.mutate(m.id, {
-      onError: (err) => alert(`Не удалось: ${err.message}`),
-    });
+  const handleDeactivate = async (m: MembershipRow) => {
+    if (!confirm(`Уволить «${m.user_full_name}»?\n\nАккаунт сохранится, ставка и график будут закрыты сегодня.`)) return;
+    try {
+      const res = await terminate.mutateAsync({ id: m.id });
+      const balance = Number(res.balance_at_termination);
+      if (balance > 0) {
+        alert(`Уволен. Долг сотруднику: ${balance.toLocaleString('ru-RU')} сум.`);
+      } else if (balance < 0) {
+        alert(`Уволен. Переплата: ${Math.abs(balance).toLocaleString('ru-RU')} сум.`);
+      }
+    } catch (err) {
+      alert(`Не удалось: ${(err as Error).message}`);
+    }
   };
 
   return (
@@ -171,11 +199,13 @@ export default function PeoplePage() {
               </button>
             </>
           }
-          onRowClick={(p) => handleEdit(p)}
           columns={[
             { key: 'emp', label: 'Сотрудник',
               render: (p) => (
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <Link
+                  href={`/people/${p.id}`}
+                  style={{ display: 'flex', alignItems: 'center', gap: 10, textDecoration: 'none', color: 'inherit' }}
+                >
                   <div
                     style={{
                       width: 28,
@@ -193,7 +223,7 @@ export default function PeoplePage() {
                     {initials(p.user_full_name ?? '')}
                   </div>
                   <span style={{ fontWeight: 500 }}>{p.user_full_name ?? '—'}</span>
-                </div>
+                </Link>
               ) },
             { key: 'pos', label: 'Должность', cellStyle: { fontSize: 12 },
               render: (p) => p.position_title || '—' },
@@ -203,6 +233,40 @@ export default function PeoplePage() {
             { key: 'phone', label: 'Телефон', mono: true,
               cellStyle: { fontSize: 12, color: 'var(--fg-2)' },
               render: (p) => p.work_phone || '—' },
+            ...(hrVisible ? [
+              { key: 'comp', label: 'Тип оплаты',
+                render: (p: MembershipRow) => p.compensation_type
+                  ? <Badge tone="info">{COMP_TYPE_LABEL[p.compensation_type] ?? p.compensation_type}</Badge>
+                  : <span style={{ color: 'var(--fg-3)', fontSize: 12 }}>—</span> },
+              { key: 'rate', label: 'Ставка', mono: true, align: 'right' as const,
+                cellStyle: { fontSize: 12 },
+                render: (p: MembershipRow) => {
+                  if (!p.current_rate_uzs) return '—';
+                  const native = `${fmtUzs(p.current_rate_uzs)} ${p.current_rate_currency ?? ''}`.trim();
+                  const isFx = p.current_rate_currency && p.current_rate_currency !== 'UZS';
+                  if (isFx && p.current_rate_uzs_equiv) {
+                    return (
+                      <span title={`≈ ${fmtUzs(p.current_rate_uzs_equiv)} сум`}>
+                        {native}
+                        <div style={{ fontSize: 10, color: 'var(--fg-3)' }}>
+                          ≈ {fmtUzs(p.current_rate_uzs_equiv)} сум
+                        </div>
+                      </span>
+                    );
+                  }
+                  return native;
+                } },
+              { key: 'balance', label: 'Баланс', mono: true, align: 'right' as const,
+                cellStyle: { fontSize: 12 },
+                render: (p: MembershipRow) => {
+                  const v = p.balance_uzs;
+                  if (v === null || v === undefined || v === '') return '—';
+                  const n = Number(v);
+                  if (!Number.isFinite(n)) return '—';
+                  const tone = n > 0 ? 'var(--accent-success)' : n < 0 ? 'var(--accent-warn)' : 'var(--fg-2)';
+                  return <span style={{ color: tone }}>{fmtUzs(v)}</span>;
+                } },
+            ] : []),
             { key: 'status', label: 'Статус',
               render: (p) => (
                 <Badge tone={STATUS_TONE[p.work_status] ?? 'neutral'} dot>
@@ -217,12 +281,13 @@ export default function PeoplePage() {
               render: (p) => canEdit ? (
                 <RowActions
                   actions={[
+                    { label: 'Открыть', onClick: () => { window.location.href = `/people/${p.id}`; } },
                     { label: 'Редактировать', onClick: () => handleEdit(p) },
                     {
                       label: 'Уволить',
                       danger: true,
                       hidden: !p.is_active,
-                      disabled: deactivate.isPending,
+                      disabled: terminate.isPending,
                       onClick: () => handleDeactivate(p),
                     },
                   ]}

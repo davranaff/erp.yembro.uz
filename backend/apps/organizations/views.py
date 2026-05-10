@@ -1,8 +1,14 @@
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import viewsets
-from rest_framework.exceptions import PermissionDenied, ValidationError
+from rest_framework.decorators import action
+from rest_framework.exceptions import (
+    NotFound,
+    PermissionDenied,
+    ValidationError,
+)
 from rest_framework.filters import OrderingFilter, SearchFilter
 from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
 
 from apps.audit.models import AuditLog
 from apps.audit.services.writer import audit_log
@@ -162,6 +168,121 @@ class OrganizationMembershipViewSet(OrgScopedModelViewSet):
         if self.action == "create":
             return OrganizationMembershipCreateSerializer
         return OrganizationMembershipSerializer
+
+    def get_serializer_context(self):
+        ctx = super().get_serializer_context()
+        membership = getattr(self.request, "membership", None)
+        hr_level = (
+            _effective_level(membership, "hr") if membership is not None else None
+        )
+        ctx["hr_visible"] = bool(
+            membership is not None
+            and (is_org_admin(membership) or level_satisfies(hr_level, "r"))
+        )
+        # query-флаги читаются только для list/retrieve (write-операции игнорируют)
+        params = getattr(self.request, "query_params", None) or {}
+        ctx["include_compensation"] = params.get("include_compensation") in ("1", "true")
+        ctx["include_balance"] = params.get("include_balance") in ("1", "true")
+        return ctx
+
+    @action(detail=True, methods=["post"])
+    def terminate(self, request, pk=None):
+        """
+        POST /api/memberships/{id}/terminate/ — атомарное увольнение.
+
+        Body (опц.): {"date": "YYYY-MM-DD"} — дата увольнения (default = сегодня).
+
+        Эффект:
+            1. is_active=False, work_status=terminated.
+            2. Закрываем все open SalaryRate (effective_to=date).
+            3. Закрываем все open WorkSchedule (effective_to=date).
+            4. Audit_log.
+
+        ПРИМЕЧАНИЕ: позитивный/негативный баланс ЗП НЕ обнуляется автоматически.
+        HR должен либо доплатить, либо удержать через PayrollAdjustment.
+        """
+        from datetime import date as _date, datetime as _datetime
+        from django.db import transaction as _tx
+
+        self._require_org_admin()
+        membership = self.get_object()
+
+        date_str = request.data.get("date") if hasattr(request, "data") else None
+        try:
+            term_date = (
+                _datetime.strptime(date_str, "%Y-%m-%d").date()
+                if date_str else _date.today()
+            )
+        except ValueError:
+            raise ValidationError({"date": "Формат YYYY-MM-DD."})
+
+        from apps.payroll.models import SalaryRate as _SR, WorkSchedule as _WS
+
+        with _tx.atomic():
+            membership.is_active = False
+            membership.work_status = "terminated"
+            membership.save(update_fields=["is_active", "work_status", "updated_at"])
+            _SR.objects.filter(
+                employee=membership, effective_to__isnull=True
+            ).update(effective_to=term_date)
+            _WS.objects.filter(
+                employee=membership, effective_to__isnull=True
+            ).update(effective_to=term_date)
+            audit_log(
+                organization=membership.organization,
+                actor=request.user,
+                action=AuditLog.Action.UPDATE,
+                entity=membership,
+                action_verb=f"terminated {membership.user.email} on {term_date}"[:64],
+            )
+
+        # Возвращаем баланс на момент увольнения для UI
+        from apps.payroll.services.balance import compute_balance
+        bal = compute_balance(membership, term_date)
+        return Response({
+            "membership_id": str(membership.id),
+            "terminated_on": term_date,
+            "balance_at_termination": str(bal.balance_uzs),
+            "balance_breakdown": {
+                "accrued_total": str(bal.accrued_total),
+                "paid_total": str(bal.paid_total),
+            },
+        })
+
+    @action(detail=True, methods=["get"])
+    def balance(self, request, pk=None):
+        """GET /api/memberships/{id}/balance/?as_of=YYYY-MM-DD"""
+        membership = getattr(request, "membership", None)
+        if membership is None:
+            raise PermissionDenied({"detail": "Нет доступа."})
+        if not (
+            is_org_admin(membership)
+            or level_satisfies(_effective_level(membership, "hr"), "r")
+        ):
+            raise PermissionDenied({"detail": "Требуется hr:r."})
+        employee = self.get_object()
+        from datetime import date, datetime
+
+        from apps.payroll.services.balance import compute_balance
+
+        as_of_str = request.query_params.get("as_of")
+        if as_of_str:
+            try:
+                as_of = datetime.strptime(as_of_str, "%Y-%m-%d").date()
+            except ValueError:
+                raise ValidationError({"as_of": "Формат YYYY-MM-DD."})
+        else:
+            as_of = date.today()
+        bal = compute_balance(employee, as_of)
+        return Response({
+            "employee_id": bal.employee_id,
+            "as_of": bal.as_of,
+            "accrued_total": str(bal.accrued_total),
+            "paid_total": str(bal.paid_total),
+            "adjustments_plus": str(bal.adjustments_plus),
+            "adjustments_minus": str(bal.adjustments_minus),
+            "balance_uzs": str(bal.balance_uzs),
+        })
 
     def update(self, request, *args, **kwargs):
         self._require_org_admin()

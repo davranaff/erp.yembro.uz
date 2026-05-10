@@ -403,6 +403,133 @@ class SaleOrderViewSet(ImmutableStatusMixin, DeleteReasonMixin, OrgScopedModelVi
         )
         return Response({"events": events, "count": len(events)})
 
+    @action(detail=True, methods=["get"])
+    def summary(self, request, pk=None):
+        """GET /api/sales/orders/{id}/summary/ — всё для детальной страницы."""
+        from decimal import Decimal as _D
+
+        from django.contrib.contenttypes.models import ContentType
+
+        from apps.common.services.document_timeline import (
+            build_document_timeline,
+            get_payment_events_for_order,
+        )
+        from apps.payments.models import PaymentAllocation
+
+        order = self.get_object()
+
+        # Items
+        items = []
+        for it in order.items.select_related("nomenclature", "batch", "feed_batch").all():
+            items.append({
+                "id": str(it.id),
+                "nomenclature_id": str(it.nomenclature_id) if it.nomenclature_id else None,
+                "nomenclature_name": (
+                    it.nomenclature.name if it.nomenclature_id else None
+                ),
+                "quantity": str(it.quantity),
+                "unit_price_uzs": str(it.unit_price_uzs),
+                "line_total_uzs": str(it.line_total_uzs or 0),
+                "cost_per_unit_uzs": str(it.cost_per_unit_uzs)
+                if it.cost_per_unit_uzs is not None else None,
+                "line_cost_uzs": str(it.line_cost_uzs or 0),
+                "batch_doc": getattr(it.batch, "doc_number", None) if it.batch_id else None,
+            })
+
+        # Allocated payments to this order
+        ct = ContentType.objects.get_for_model(SaleOrder)
+        alloc_qs = (
+            PaymentAllocation.objects.filter(
+                target_content_type=ct, target_object_id=order.id,
+            )
+            .select_related("payment", "payment__currency")
+            .order_by("-payment__date")
+        )
+        payments = []
+        for a in alloc_qs:
+            p = a.payment
+            payments.append({
+                "id": str(p.id),
+                "allocation_id": str(a.id),
+                "doc_number": p.doc_number,
+                "date": p.date.isoformat(),
+                "direction": p.direction,
+                "channel": p.channel,
+                "kind": p.kind,
+                "status": p.status,
+                "amount_uzs": str(a.amount_uzs),
+                "payment_amount_uzs": str(p.amount_uzs),
+                "currency_code": p.currency.code if p.currency_id else None,
+                "notes": a.notes or p.notes or "",
+            })
+
+        # Communications
+        comms_qs = (
+            order.communications.all()
+            .select_related("contacted_by")
+            .order_by("-contacted_at")
+        )
+        comms = [
+            {
+                "id": str(c.id),
+                "contacted_at": c.contacted_at.isoformat(),
+                "method": c.method,
+                "outcome": c.outcome,
+                "customer_response": c.customer_response,
+                "internal_note": c.internal_note,
+                "promised_pay_date": c.promised_pay_date.isoformat()
+                if c.promised_pay_date else None,
+                "next_action_date": c.next_action_date.isoformat()
+                if c.next_action_date else None,
+                "contacted_by_name": (
+                    getattr(c.contacted_by, "full_name", None)
+                    or getattr(c.contacted_by, "email", None)
+                    if c.contacted_by_id else None
+                ),
+            }
+            for c in comms_qs
+        ]
+
+        # Timeline
+        events = build_document_timeline(
+            order, extra_events=get_payment_events_for_order(order),
+        )
+
+        amount = _D(order.amount_uzs or 0)
+        paid = _D(order.paid_amount_uzs or 0)
+        cost = _D(order.cost_uzs or 0)
+
+        return Response({
+            "order": {
+                "id": str(order.id),
+                "doc_number": order.doc_number,
+                "date": order.date.isoformat(),
+                "due_date": order.due_date.isoformat() if order.due_date else None,
+                "status": order.status,
+                "payment_status": order.payment_status,
+                "amount_uzs": str(amount),
+                "cost_uzs": str(cost),
+                "margin_uzs": str(amount - cost),
+                "paid_amount_uzs": str(paid),
+                "outstanding_uzs": str(amount - paid),
+                "currency_code": order.currency.code if order.currency_id else None,
+                "amount_foreign": str(order.amount_foreign)
+                if order.amount_foreign is not None else None,
+                "exchange_rate": str(order.exchange_rate)
+                if order.exchange_rate is not None else None,
+                "notes": order.notes or "",
+                "customer_id": str(order.customer_id) if order.customer_id else None,
+                "customer_name": order.customer.name if order.customer_id else None,
+                "customer_code": order.customer.code if order.customer_id else None,
+                "warehouse_name": order.warehouse.name if order.warehouse_id else None,
+                "module_code": order.module.code if order.module_id else None,
+            },
+            "items": items,
+            "payments": payments,
+            "communications": comms,
+            "timeline": events,
+        })
+
 
 class SaleCommunicationViewSet(OrgScopedModelViewSet):
     """

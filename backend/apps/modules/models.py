@@ -17,6 +17,7 @@ class Module(UUIDModel, TimestampedModel):
         REPORTS = "reports", "Отчёты"
         PURCHASES = "purchases", "Закупки"
         SALES = "sales", "Продажи"
+        HR = "hr", "Кадры и ЗП"
         ADMIN = "admin", "Администрирование"
 
     code = models.CharField(max_length=32, unique=True)

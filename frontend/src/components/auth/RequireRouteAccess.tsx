@@ -33,6 +33,7 @@ const PREFIX_RULES: { prefix: string; module: string; min?: ModuleLevel }[] = [
   { prefix: '/finance', module: 'ledger' },          // /finance/cashbox, /finance/rates
   { prefix: '/feed/',   module: 'feed' },            // /feed/<id>/print
   { prefix: '/matochnik/', module: 'matochnik' },    // /matochnik/<id>/print/...
+  { prefix: '/payroll', module: 'hr' },              // /payroll/templates etc.
 ];
 
 /**

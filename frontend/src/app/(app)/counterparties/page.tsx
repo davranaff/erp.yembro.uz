@@ -3,7 +3,6 @@
 import { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 
-import DetailDrawer, { KV } from '@/components/DetailDrawer';
 import Badge from '@/components/ui/Badge';
 import DataTable from '@/components/ui/DataTable';
 import Icon from '@/components/ui/Icon';
@@ -17,39 +16,9 @@ import {
   useDeleteCounterparty,
 } from '@/hooks/useCounterparties';
 import { useHasLevel } from '@/hooks/usePermissions';
-import { useTgCounterpartyLink } from '@/hooks/useTgBot';
 import type { Counterparty, CounterpartyKind } from '@/types/auth';
 
 import CounterpartyModal from './CounterpartyModal';
-
-function TgStatusButton({ counterparty, onOpenModal }: { counterparty: Counterparty; onOpenModal: () => void }) {
-  const { data: link } = useTgCounterpartyLink(counterparty.id);
-  const connected = Boolean(link);
-  return (
-    <button
-      onClick={onOpenModal}
-      title={connected ? `Telegram подключён${link?.tg_username ? `: @${link.tg_username}` : ''}` : 'Привязать Telegram'}
-      className="btn btn-secondary btn-sm"
-      style={{
-        display: 'flex', alignItems: 'center', gap: 6,
-        color: connected ? '#229ED9' : undefined,
-      }}
-    >
-      {/* Telegram plane icon */}
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
-        <path
-          d="M22 2L11 13"
-          stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
-        />
-        <path
-          d="M22 2L15 22L11 13L2 9L22 2Z"
-          stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
-        />
-      </svg>
-      {connected ? 'TG подключён' : 'Привязать TG'}
-    </button>
-  );
-}
 
 const KIND_LABEL: Record<CounterpartyKind, string> = {
   supplier: 'Поставщик',
@@ -78,7 +47,6 @@ export default function CounterpartiesPage() {
   const [draftSearch, setDraftSearch] = useState('');
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(50);
-  const [sel, setSel] = useState<Counterparty | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<Counterparty | null>(null);
   const [tgModal, setTgModal] = useState<Counterparty | null>(null);
@@ -114,9 +82,6 @@ export default function CounterpartiesPage() {
   const handleDelete = (c: Counterparty) => {
     if (!confirm(`Удалить «${c.name}»?`)) return;
     del.mutate(c.id, {
-      onSuccess: () => {
-        if (sel?.id === c.id) setSel(null);
-      },
       onError: (err) => alert(`Не удалось удалить: ${err.message}`),
     });
   };
@@ -211,8 +176,7 @@ export default function CounterpartiesPage() {
               </button>
             </>
           }
-          onRowClick={(r) => setSel(r)}
-          rowProps={(r) => ({ active: sel?.id === r.id })}
+          onRowClick={(r) => router.push(`/counterparties/${r.id}`)}
           columns={[
             { key: 'code', label: 'Код',
               render: (r) => <span className="badge id">{r.code}</span> },
@@ -243,6 +207,10 @@ export default function CounterpartiesPage() {
                       label: 'Открыть карточку',
                       onClick: () => router.push(`/counterparties/${r.id}`),
                     },
+                    {
+                      label: 'Привязать Telegram',
+                      onClick: () => setTgModal(r),
+                    },
                     ...(canEdit ? [
                       { label: 'Редактировать', onClick: () => handleEdit(r) },
                       {
@@ -270,64 +238,6 @@ export default function CounterpartiesPage() {
         )}
       </Panel>
 
-      {sel && (
-        <DetailDrawer
-          title={sel.name}
-          subtitle={`${sel.code} · ${KIND_LABEL[sel.kind]} · ИНН ${sel.inn || '—'}`}
-          onClose={() => setSel(null)}
-          actions={
-            canEdit ? (
-              <div style={{ display: 'flex', gap: 8 }}>
-                <TgStatusButton counterparty={sel} onOpenModal={() => setTgModal(sel)} />
-                <button className="btn btn-secondary btn-sm" onClick={() => handleEdit(sel)}>
-                  Редактировать
-                </button>
-              </div>
-            ) : null
-          }
-        >
-          <KV
-            items={[
-              { k: 'Код', v: sel.code, mono: true },
-              { k: 'Тип', v: <Badge tone={kindTone(sel.kind)}>{KIND_LABEL[sel.kind]}</Badge> },
-              { k: 'ИНН', v: sel.inn || '—', mono: true },
-              { k: 'Телефон', v: sel.phone || '—' },
-              { k: 'Email', v: sel.email || '—' },
-              { k: 'Специализация', v: sel.specialization || '—' },
-              { k: 'Сальдо, UZS', v: fmtBalance(sel.balance_uzs).text, mono: true },
-              ...(parseFloat(sel.opening_debt_uzs || '0') !== 0 ? [{
-                k: 'Стартовый долг (миграция)',
-                v: (
-                  <span className="mono" style={{
-                    color: parseFloat(sel.opening_debt_uzs) > 0 ? 'var(--danger)' : 'var(--success)',
-                    fontWeight: 600,
-                  }}>
-                    {parseFloat(sel.opening_debt_uzs).toLocaleString('ru-RU', { maximumFractionDigits: 0 })} сум
-                    {sel.opening_balance_date && (
-                      <span style={{
-                        color: 'var(--fg-3)', fontWeight: 400, fontSize: 11, marginLeft: 6,
-                      }}>
-                        (на {sel.opening_balance_date})
-                      </span>
-                    )}
-                  </span>
-                ),
-              }] : []),
-              {
-                k: 'Статус',
-                v: sel.is_active ? (
-                  <Badge tone="success" dot>Активен</Badge>
-                ) : (
-                  <Badge tone="neutral" dot>Заблокирован</Badge>
-                ),
-              },
-              ...(sel.address ? [{ k: 'Адрес', v: sel.address }] : []),
-              ...(sel.notes ? [{ k: 'Примечание', v: sel.notes }] : []),
-            ]}
-          />
-        </DetailDrawer>
-      )}
-
       {tgModal && (
         <TgConnectModal
           mode="counterparty"
@@ -343,9 +253,6 @@ export default function CounterpartiesPage() {
           onClose={() => {
             setModalOpen(false);
             setEditing(null);
-          }}
-          onSaved={(c) => {
-            if (sel?.id === c.id) setSel(c);
           }}
         />
       )}

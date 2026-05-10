@@ -1,5 +1,6 @@
 'use client';
 
+import { useRouter } from 'next/navigation';
 import { useMemo, useState } from 'react';
 
 import Badge from '@/components/ui/Badge';
@@ -58,6 +59,7 @@ function todayISO(): string {
 }
 
 export default function SalesPage() {
+  const router = useRouter();
   const [tab, setTab] = useState<'all' | SaleStatus>('all');
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(50);
@@ -210,6 +212,7 @@ export default function SalesPage() {
           isLoading={isLoading}
           rows={orders}
           rowKey={(o) => o.id}
+          onRowClick={(o) => router.push(`/sales/${o.id}`)}
           emptyMessage="Продаж нет. Нажмите «Новая продажа» чтобы отгрузить клиенту."
           columns={[
             { key: 'doc_number', label: 'Документ', mono: true,

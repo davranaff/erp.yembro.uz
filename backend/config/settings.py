@@ -57,6 +57,7 @@ INSTALLED_APPS = [
     "apps.holding",
     "apps.dashboard",
     "apps.sales",
+    "apps.payroll",
     "apps.seeding",
     "apps.tgbot",
     "apps.landing",
