@@ -135,6 +135,7 @@ urlpatterns = [
     ),
     path("api/tg/", include("apps.tgbot.urls")),
     path("api/landing/", include("apps.landing.urls", namespace="landing")),
+    path("api/catalog/", include("apps.catalog.urls", namespace="catalog")),
     # Media-файлы (загруженные приложения к закупам и т.п.). Caddy уже
     # проксирует /media/* на backend, поэтому Django должен сам их отдавать.
     # Для production-инструмента внутри одной орг это ок; для public-роутов

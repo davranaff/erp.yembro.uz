@@ -1,0 +1,97 @@
+{
+  "brand": {
+    "name": "Yembro",
+    "tagline": "Feed born on the farm — not in a marketing brief."
+  },
+  "nav": {
+    "home": "Home",
+    "catalog": "Catalog",
+    "brand": "Brands",
+    "about": "About",
+    "contacts": "Contacts",
+    "erp": "Rent the ERP"
+  },
+  "home": {
+    "heroTitle": "Feeds that grow the flock evenly",
+    "heroSubtitle": "Yembro complete-feed programs for broiler, layer and parent stock — calibrated to Cobb, Ross, Hy-Line and Lohmann. Lab QC on every batch. Delivered across Uzbekistan.",
+    "ctaCatalog": "Open the catalog",
+    "ctaContact": "Request a program",
+    "directionsTitle": "Programs by direction",
+    "featuredTitle": "What customers reorder",
+    "erpBlockTitle": "Yembro ERP — the system our own farm runs on",
+    "erpBlockText": "We wrote it because Excel ran out of headroom, and off-the-shelf ERPs didn't speak incubation, FCR or central-bank FX rates. Today we rent that same ERP to other operations — the ones tired of spreadsheets with five «versions of truth».",
+    "erpBlockCta": "Learn more about ERP"
+  },
+  "catalog": {
+    "title": "Feed catalog",
+    "filters": "Filters",
+    "filterDirection": "Direction",
+    "filterBrand": "Line",
+    "filterProtein": "Protein",
+    "filterAge": "Age (days)",
+    "search": "Find feed by name or code…",
+    "sort": "Sort",
+    "sortDefault": "Recommended",
+    "sortProteinDesc": "High protein first",
+    "sortProteinAsc": "Low protein first",
+    "sortNewest": "Newest first",
+    "reset": "Clear filters",
+    "empty": "Nothing matched the current filters. Try clearing them — or get in touch and we'll match by hand.",
+    "showAll": "All"
+  },
+  "product": {
+    "applicationTitle": "How to feed",
+    "specTitle": "Nutrition",
+    "ageRange": "Age",
+    "package": "Pack size",
+    "relatedTitle": "What follows in the program",
+    "ctaContact": "Request price & program"
+  },
+  "directions": {
+    "broiler": "Broiler",
+    "layer": "Layer",
+    "parent": "Parent stock",
+    "universal": "Universal"
+  },
+  "spec": {
+    "protein_pct": "Protein",
+    "fat_pct": "Fat",
+    "fiber_pct": "Fiber",
+    "lysine_pct": "Lysine",
+    "methionine_pct": "Methionine",
+    "me_kcal_per_kg": "ME (kcal/kg)",
+    "moisture_pct": "Moisture",
+    "calcium_pct": "Calcium",
+    "phosphorus_pct": "Phosphorus"
+  },
+  "erp": {
+    "title": "Yembro ERP — the operating system of a poultry farm",
+    "subtitle": "The cloud platform we run our own operation on. Available for rent — no licenses, no integrators, no «annual support tax». Live in one day.",
+    "featuresTitle": "What Yembro ERP covers",
+    "ctaPrimary": "Open the system",
+    "ctaSecondary": "Get in touch"
+  },
+  "contacts": {
+    "title": "Talk to us — no call scripts, no forms maze",
+    "subtitle": "Call, message us on Telegram, or leave a request. A manager replies the same business day — with a nutritionist alongside if you need a program calculated.",
+    "formTitle": "Send a message",
+    "name": "What should we call you",
+    "contact": "Phone or email",
+    "company": "Company (optional)",
+    "message": "What's on the table — bird type, headcount, age",
+    "submit": "Send",
+    "submitting": "Sending…",
+    "success": "Thanks. We'll call back today during working hours.",
+    "error": "Couldn't send the request. Please try again — or message us on Telegram @yembro."
+  },
+  "footer": {
+    "rights": "© {year} Yembro. Feed born on the farm.",
+    "lang": "Language"
+  },
+  "common": {
+    "loading": "Loading…",
+    "readMore": "Read more",
+    "back": "Back",
+    "viewAll": "See all"
+  }
+}

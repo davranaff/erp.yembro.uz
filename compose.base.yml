@@ -135,6 +135,30 @@ services:
       retries: 10
       start_period: 15s
 
+  catalog:
+    image: ${CATALOG_IMAGE}
+    env_file:
+      - ./.env
+    environment:
+      NEXT_PUBLIC_API_URL: ${CATALOG_NEXT_PUBLIC_API_URL:-https://api.yembro.uz/api/catalog/v1}
+      CATALOG_API_URL_INTERNAL: ${CATALOG_API_URL_INTERNAL:-http://api:30000/api/catalog/v1}
+      NEXT_PUBLIC_SITE_URL: ${CATALOG_NEXT_PUBLIC_SITE_URL:-https://yembro.uz}
+      NEXT_PUBLIC_ERP_URL: ${CATALOG_NEXT_PUBLIC_ERP_URL:-https://erp.yembro.uz}
+      NEXT_PUBLIC_YM_ID: ${CATALOG_YM_ID:-}
+      NEXT_PUBLIC_GA_ID: ${CATALOG_GA_ID:-}
+      REVALIDATE_SECRET: ${CATALOG_REVALIDATE_SECRET:-}
+    restart: unless-stopped
+    networks:
+      - public
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - "wget -qO- http://127.0.0.1:3001/ >/dev/null 2>&1 || exit 1"
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 15s
+
   postgres:
     image: postgres:16-alpine
     environment:

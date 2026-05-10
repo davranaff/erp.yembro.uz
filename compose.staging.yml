@@ -11,6 +11,12 @@ services:
         aliases:
           - staging-frontend
 
+  catalog:
+    networks:
+      public:
+        aliases:
+          - staging-catalog
+
 volumes:
   postgres_data:
     external: true

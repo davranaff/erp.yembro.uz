@@ -1,0 +1,97 @@
+{
+  "brand": {
+    "name": "Yembro",
+    "tagline": "Marketing boʻlimida emas, fermada tugʻilgan yem."
+  },
+  "nav": {
+    "home": "Bosh sahifa",
+    "catalog": "Katalog",
+    "brand": "Brendlar",
+    "about": "Biz haqimizda",
+    "contacts": "Aloqa",
+    "erp": "ERP ijaraga"
+  },
+  "home": {
+    "heroTitle": "Pod tekis oʻsadigan yemlar",
+    "heroSubtitle": "Broyler, tuxum tovuqlari va ota-ona podasi uchun Yembro toʻliq ratsionli dasturlari. Cobb, Ross, Hy-Line va Lohmann uchun hisoblangan. Har bir partiyada laboratoriya QC. Butun Oʻzbekiston boʻylab yetkazib berish.",
+    "ctaCatalog": "Katalogni ochish",
+    "ctaContact": "Dastur soʻrash",
+    "directionsTitle": "Yoʻnalishlar boʻyicha dasturlar",
+    "featuredTitle": "Eng koʻp buyurtma qilinganlari",
+    "erpBlockTitle": "Yembro ERP — bizning fermamiz ishlayotgan tizim",
+    "erpBlockText": "Buni biz Excel chiday olmay qolgani va qutidagi ERPlar inkubatsiyaning ham, FCRning ham, MB valyuta kursining ham nimaligini tushunmagani uchun yozdik. Bugun shu ERPni biz ijaraga beramiz — beshta «haqiqat versiyasi» bilan Excel jadvallaridan charchagan boshqa fabrikalarga.",
+    "erpBlockCta": "ERP haqida batafsil"
+  },
+  "catalog": {
+    "title": "Yem katalogi",
+    "filters": "Filtrlar",
+    "filterDirection": "Yoʻnalish",
+    "filterBrand": "Liniya",
+    "filterProtein": "Protein",
+    "filterAge": "Yoshi (kun)",
+    "search": "Yemni nomi yoki kodi boʻyicha topish…",
+    "sort": "Saralash",
+    "sortDefault": "Tavsiya etilganlar",
+    "sortProteinDesc": "Yuqori proteinlilar avval",
+    "sortProteinAsc": "Past proteinlilar avval",
+    "sortNewest": "Yangilari avval",
+    "reset": "Filtrlarni tozalash",
+    "empty": "Tanlangan shartlar boʻyicha hech narsa topilmadi. Filtrlarni tozalashga urinib koʻring yoki biz bilan bogʻlaning — qoʻlda tanlab beramiz.",
+    "showAll": "Barchasi"
+  },
+  "product": {
+    "applicationTitle": "Qanday boqiladi",
+    "specTitle": "Oziqlanish qiymati",
+    "ageRange": "Yoshi",
+    "package": "Qadoqlash",
+    "relatedTitle": "Dasturda keyingi bosqich",
+    "ctaContact": "Narx va dastur soʻrash"
+  },
+  "directions": {
+    "broiler": "Broyler",
+    "layer": "Tuxum tovuqlari",
+    "parent": "Ota-ona podasi",
+    "universal": "Universal"
+  },
+  "spec": {
+    "protein_pct": "Protein",
+    "fat_pct": "Yogʻ",
+    "fiber_pct": "Tola",
+    "lysine_pct": "Lizin",
+    "methionine_pct": "Metionin",
+    "me_kcal_per_kg": "Almashinuv energiyasi (kkal/kg)",
+    "moisture_pct": "Namlik",
+    "calcium_pct": "Kalsiy",
+    "phosphorus_pct": "Fosfor"
+  },
+  "erp": {
+    "title": "Yembro ERP — parrandachilik fabrikasining operatsion tizimi",
+    "subtitle": "Biz oʻz fermamizni boshqaradigan bulutli dastur. Ijaraga mavjud — litsenziyasiz, joriy etuvchilarsiz, «yillik kuzatuv»siz. Bir kunda ishga tushiriladi.",
+    "featuresTitle": "Yembro ERP nimani yopadi",
+    "ctaPrimary": "Tizimga kirish",
+    "ctaSecondary": "Biz bilan bogʻlanish"
+  },
+  "contacts": {
+    "title": "Suhbatlashamiz — skriptlar va anketalarsiz",
+    "subtitle": "Qoʻngʻiroq qiling, Telegramda yozing yoki ariza qoldiring. Menejer bugunoq javob beradi — agar dastur hisoblash kerak boʻlsa, zootexnikni ham olib keladi.",
+    "formTitle": "Ariza qoldirish",
+    "name": "Sizga qanday murojaat qilamiz",
+    "contact": "Telefon yoki email",
+    "company": "Kompaniya (ixtiyoriy)",
+    "message": "Nima haqida gaplashamiz — qaysi parranda, nechta bosh, qaysi yosh",
+    "submit": "Yuborish",
+    "submitting": "Yuborilmoqda…",
+    "success": "Rahmat. Bugun ish vaqtida qoʻngʻiroq qilamiz.",
+    "error": "Arizani yuborib boʻlmadi. Qayta urinib koʻring — yoki Telegram @yembro orqali yozing."
+  },
+  "footer": {
+    "rights": "© {year} Yembro. Fermada tugʻilgan yemlar.",
+    "lang": "Til"
+  },
+  "common": {
+    "loading": "Yuklanmoqda…",
+    "readMore": "Batafsil",
+    "back": "Orqaga",
+    "viewAll": "Barchasini koʻrish"
+  }
+}
