@@ -161,7 +161,7 @@ def _fmt_balance_line(name: str, accrued: Decimal, paid: Decimal, balance: Decim
 @command(
     "/zp",
     help="Балансы ЗП всех сотрудников (фильтр по ФИО)",
-    module="hr", category="reports",
+    module="hr", category="hr",
 )
 def handle_zp_cmd(ctx: HandlerCtx) -> None:
     """Список балансов всех активных сотрудников. /zp иван — фильтр по подстроке."""
@@ -253,7 +253,7 @@ def handle_myzp_cmd(ctx: HandlerCtx) -> None:
 @command(
     "/people",
     help="Список сотрудников: ФИО, должность, баланс (фильтр по ФИО)",
-    module="hr", category="reports",
+    module="hr", category="hr",
 )
 def handle_people_cmd(ctx: HandlerCtx) -> None:
     """`/people` или `/people иван` — компактный список."""
@@ -305,7 +305,7 @@ def handle_people_cmd(ctx: HandlerCtx) -> None:
 @command(
     "/person",
     help="Карточка сотрудника: ставка, баланс, явка месяца",
-    module="hr", category="reports",
+    module="hr", category="hr",
 )
 def handle_person_cmd(ctx: HandlerCtx) -> None:
     """`/person ФИО` — детальная карточка одного."""
@@ -368,7 +368,7 @@ def handle_person_cmd(ctx: HandlerCtx) -> None:
 @command(
     "/today",
     help="Кто сегодня на работе / в отпуске / прогуливает",
-    module="hr", category="reports",
+    module="hr", category="hr",
 )
 def handle_today_cmd(ctx: HandlerCtx) -> None:
     from apps.organizations.models import OrganizationMembership
@@ -435,7 +435,7 @@ def handle_today_cmd(ctx: HandlerCtx) -> None:
 @command(
     "/markday",
     help="Отметить день: /markday ФИО ДАТА КОД (work/absence/sick/vacation/...)",
-    module="hr", category="ops",
+    module="hr", category="hr",
 )
 def handle_markday_cmd(ctx: HandlerCtx) -> None:
     """
@@ -553,7 +553,7 @@ def _adjustment_cmd(ctx: HandlerCtx, kind: str, label_icon: str) -> None:
 @command(
     "/bonus",
     help="Премия сотруднику: /bonus ФИО СУММА [причина]",
-    module="hr", category="ops",
+    module="hr", category="hr",
 )
 def handle_bonus_cmd(ctx: HandlerCtx) -> None:
     _adjustment_cmd(ctx, "bonus", "🎁")
@@ -562,7 +562,7 @@ def handle_bonus_cmd(ctx: HandlerCtx) -> None:
 @command(
     "/deduct",
     help="Удержание из ЗП: /deduct ФИО СУММА [причина]",
-    module="hr", category="ops",
+    module="hr", category="hr",
 )
 def handle_deduct_cmd(ctx: HandlerCtx) -> None:
     _adjustment_cmd(ctx, "deduction", "✂️")
@@ -662,7 +662,7 @@ def _build_check_card(m, total: int, remaining: int) -> tuple[str, dict]:
 @command(
     "/check",
     help="Daily check: пройтись по неотмеченным и нажимать кнопки",
-    module="hr", category="ops",
+    module="hr", category="hr",
 )
 def handle_check_cmd(ctx: HandlerCtx) -> None:
     """Запуск daily-check. Шлёт первую неотмеченную карточку."""
@@ -837,7 +837,7 @@ def _quick_mark(ctx: HandlerCtx, kind: str, label: str, icon: str) -> None:
 @command(
     "/work",
     help="Отметить сотрудника как «работал» сегодня: /work ФИО",
-    module="hr", category="ops",
+    module="hr", category="hr",
 )
 def handle_work_cmd(ctx: HandlerCtx) -> None:
     _quick_mark(ctx, "work", "работал", "✅")
@@ -846,7 +846,7 @@ def handle_work_cmd(ctx: HandlerCtx) -> None:
 @command(
     "/absent",
     help="Отметить прогул сегодня: /absent ФИО",
-    module="hr", category="ops",
+    module="hr", category="hr",
 )
 def handle_absent_cmd(ctx: HandlerCtx) -> None:
     _quick_mark(ctx, "absence", "прогул", "❌")
@@ -855,7 +855,7 @@ def handle_absent_cmd(ctx: HandlerCtx) -> None:
 @command(
     "/sick",
     help="Отметить больничный сегодня: /sick ФИО",
-    module="hr", category="ops",
+    module="hr", category="hr",
 )
 def handle_sick_cmd(ctx: HandlerCtx) -> None:
     _quick_mark(ctx, "sick_leave", "больничный", "🏥")
@@ -864,7 +864,7 @@ def handle_sick_cmd(ctx: HandlerCtx) -> None:
 @command(
     "/vacay",
     help="Отметить отпуск сегодня: /vacay ФИО",
-    module="hr", category="ops",
+    module="hr", category="hr",
 )
 def handle_vacay_cmd(ctx: HandlerCtx) -> None:
     _quick_mark(ctx, "vacation", "отпуск", "🏖")

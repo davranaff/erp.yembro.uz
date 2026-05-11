@@ -35,6 +35,7 @@ _CATEGORY_DEFS: list[CategoryDef] = [
     CategoryDef("payments",   "💵 Касса / банк",   40),
     CategoryDef("finance",    "📊 Финансы",         50),
     CategoryDef("reports",    "📅 Сводки",          60),
+    CategoryDef("hr",         "👥 Кадры / ЗП",     65),
     CategoryDef("org",        "🏢 Организация",    70),
     CategoryDef("admin",      "🔧 Админ",           80),
     CategoryDef("client",     "👤 Клиент",          90),
@@ -60,6 +61,7 @@ MODULE_TO_CATEGORY: dict[str, str] = {
     "payments": "payments",
     "ledger":   "finance",
     "reports":  "reports",
+    "hr":       "hr",
 
     "core":  "misc",
     "admin": "admin",

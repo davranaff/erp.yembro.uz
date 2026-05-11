@@ -17,7 +17,7 @@ from ..bot import send_message
 from ..dispatcher import HandlerCtx, command
 
 
-@command("/digest", help="Сводка за сегодня (live)", category="reports")
+@command("/digest", help="Сводка за сегодня (live)", module="reports", category="reports")
 def handle_digest_preview(ctx: HandlerCtx) -> None:
     from ..services.digest import build_digest, format_digest
 
@@ -29,7 +29,7 @@ def handle_digest_preview(ctx: HandlerCtx) -> None:
     send_message(ctx.chat_id, format_digest(data, organization_name=org.name))
 
 
-@command("/digest_on", help="Включить ежедневную сводку (08:00)", category="reports")
+@command("/digest_on", help="Включить ежедневную сводку (08:00)", module="reports", category="reports")
 def handle_digest_on(ctx: HandlerCtx) -> None:
     if not ctx.link.digest_enabled:
         ctx.link.digest_enabled = True
@@ -41,7 +41,7 @@ def handle_digest_on(ctx: HandlerCtx) -> None:
     )
 
 
-@command("/digest_off", help="Отключить ежедневную сводку", category="reports")
+@command("/digest_off", help="Отключить ежедневную сводку", module="reports", category="reports")
 def handle_digest_off(ctx: HandlerCtx) -> None:
     if ctx.link.digest_enabled:
         ctx.link.digest_enabled = False
