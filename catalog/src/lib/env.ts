@@ -17,7 +17,7 @@ export const SITE_URL =
 export const API_URL = (
   process.env.CATALOG_API_URL_INTERNAL ||
   process.env.NEXT_PUBLIC_API_URL ||
-  "https://api.yembro.uz/api/catalog/v1"
+  "https://api.erp.yembro.uz/api/catalog/v1"
 ).replace(/\/+$/, "");
 
 export const ERP_URL =

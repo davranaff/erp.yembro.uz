@@ -2,8 +2,6 @@ import type { Metadata } from "next";
 import { getTranslations, setRequestLocale } from "next-intl/server";
 
 import { ContactForm } from "@/components/forms/ContactForm";
-import { Section } from "@/components/layout/Container";
-import { FAQPageJsonLd } from "@/components/seo/JsonLd";
 import { GlobeIcon, MailIcon, PhoneIcon } from "@/components/ui/Icon";
 import { isLocale, type Locale } from "@/i18n/config";
 import { fetchPage } from "@/lib/api";
@@ -29,17 +27,6 @@ export async function generateMetadata({
   });
 }
 
-function parseFaqBody(body: string): { question: string; answer: string }[] {
-  // Простой парсер «В: ... О: ...» / «S: ... J: ...» / «Q: ... A: ...»
-  const pattern = /(?:В|S|Q):\s*([\s\S]+?)\n\s*(?:О|J|A):\s*([\s\S]+?)(?=\n\s*(?:В|S|Q):|$)/g;
-  const out: { question: string; answer: string }[] = [];
-  let m;
-  while ((m = pattern.exec(body)) !== null) {
-    out.push({ question: m[1].trim(), answer: m[2].trim() });
-  }
-  return out;
-}
-
 export default async function ContactsPage({
   params,
 }: {
@@ -50,17 +37,10 @@ export default async function ContactsPage({
   setRequestLocale(lang);
   const locale = lang as Locale;
   const t = await getTranslations({ locale, namespace: "contacts" });
-  const [contactPage, faqPage] = await Promise.all([
-    fetchPage("contacts", locale),
-    fetchPage("faq", locale),
-  ]);
-
-  const faqs = faqPage?.body ? parseFaqBody(faqPage.body) : [];
+  const contactPage = await fetchPage("contacts", locale);
 
   return (
     <>
-      {faqs.length > 0 && <FAQPageJsonLd faqs={faqs} />}
-
       {/* Hero with form */}
       <section className="bg-grad-soft" style={{ position: "relative", overflow: "hidden" }}>
         <div className="blob" style={{ width: 420, height: 420, top: -120, right: -100, background: "var(--brand-orange)", opacity: 0.25 }} aria-hidden />
@@ -135,53 +115,6 @@ export default async function ContactsPage({
         </div>
       </section>
 
-      {/* FAQ */}
-      {faqs.length > 0 && (
-        <Section>
-          <div className="eyebrow anim-fade-in-up" style={{ marginBottom: 12 }}>FAQ</div>
-          <h2 className="h2 anim-fade-in-up delay-100" style={{ marginBottom: 40 }}>
-            {locale === "ru" ? "Частые вопросы" : locale === "uz" ? "Tez-tez beriladigan savollar" : "Frequently asked questions"}
-          </h2>
-          <div style={{ maxWidth: 820, display: "grid", gap: 12 }}>
-            {faqs.map((f, i) => (
-              <details key={i} className="card anim-fade-in-up" style={{
-                padding: "20px 24px",
-                animationDelay: `${i * 60}ms`,
-              }}>
-                <summary style={{
-                  cursor: "pointer",
-                  fontWeight: 700,
-                  fontSize: "var(--text-lg)",
-                  listStyle: "none",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                  gap: 12,
-                }}>
-                  {f.question}
-                  <span style={{
-                    width: 28, height: 28, flexShrink: 0,
-                    borderRadius: "50%",
-                    background: "var(--brand-orange-soft)",
-                    color: "var(--brand-orange)",
-                    display: "grid", placeItems: "center",
-                    fontSize: 18, fontWeight: 700,
-                  }}>+</span>
-                </summary>
-                <div style={{
-                  marginTop: 16,
-                  fontSize: "var(--text-base)",
-                  color: "var(--fg-2)",
-                  lineHeight: 1.6,
-                  whiteSpace: "pre-wrap",
-                }}>
-                  {f.answer}
-                </div>
-              </details>
-            ))}
-          </div>
-        </Section>
-      )}
 
       <style>{`
         @media (max-width: 900px) {
