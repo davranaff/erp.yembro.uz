@@ -25,6 +25,12 @@ if [[ -z "${BACKEND_IMAGE:-}" || -z "${FRONTEND_IMAGE:-}" ]]; then
   exit 1
 fi
 
+# CATALOG_IMAGE опционально пока, но если он передан — поднимаем и каталог.
+DEPLOY_CATALOG=0
+if [[ -n "${CATALOG_IMAGE:-}" ]]; then
+  DEPLOY_CATALOG=1
+fi
+
 cd "${TARGET_DIR}"
 
 if [[ ! -f .env ]]; then
@@ -56,6 +62,21 @@ BACKEND_IMAGE=${BACKEND_IMAGE}
 FRONTEND_IMAGE=${FRONTEND_IMAGE}
 EOF
 
+if [[ "${DEPLOY_CATALOG}" == "1" ]]; then
+  cat >> .release.env <<EOF
+CATALOG_IMAGE=${CATALOG_IMAGE}
+CATALOG_NEXT_PUBLIC_API_URL=${CATALOG_NEXT_PUBLIC_API_URL:-}
+CATALOG_API_URL_INTERNAL=${CATALOG_API_URL_INTERNAL:-}
+CATALOG_NEXT_PUBLIC_SITE_URL=${CATALOG_NEXT_PUBLIC_SITE_URL:-}
+CATALOG_NEXT_PUBLIC_ERP_URL=${CATALOG_NEXT_PUBLIC_ERP_URL:-}
+CATALOG_REVALIDATE_SECRET=${CATALOG_REVALIDATE_SECRET:-}
+CATALOG_FRONTEND_URL=${CATALOG_FRONTEND_URL:-http://${ENVIRONMENT//production/prod}-catalog:3001}
+CATALOG_NOTIFY_CHAT_IDS=${CATALOG_NOTIFY_CHAT_IDS:-}
+CATALOG_YM_ID=${CATALOG_YM_ID:-}
+CATALOG_GA_ID=${CATALOG_GA_ID:-}
+EOF
+fi
+
 docker network create "${PROD_PUBLIC_NETWORK_NAME:-yembro_prod_public}" >/dev/null 2>&1 || true
 docker network create "${STAGING_PUBLIC_NETWORK_NAME:-yembro_staging_public}" >/dev/null 2>&1 || true
 docker network create "${INTERNAL_NETWORK_NAME}" >/dev/null 2>&1 || true
@@ -71,11 +92,19 @@ compose_args=(
 )
 
 docker compose "${compose_args[@]}" up -d postgres redis
-docker compose "${compose_args[@]}" pull api worker scheduler frontend
+
+pull_services=(api worker scheduler frontend)
+up_services=(api worker scheduler frontend)
+if [[ "${DEPLOY_CATALOG}" == "1" ]]; then
+  pull_services+=(catalog)
+  up_services+=(catalog)
+fi
+
+docker compose "${compose_args[@]}" pull "${pull_services[@]}"
 if [[ "${RUN_MIGRATIONS}" == "1" ]]; then
   docker compose "${compose_args[@]}" run --rm migrate
 fi
-docker compose "${compose_args[@]}" up -d api worker scheduler frontend
+docker compose "${compose_args[@]}" up -d "${up_services[@]}"
 
 if [[ "${RUN_MIGRATIONS}" == "1" ]]; then
   # Optional Django post-migrate hook. Define a custom management command
@@ -131,12 +160,19 @@ service_is_ready() {
 }
 
 for attempt in $(seq 1 30); do
-  if service_is_ready postgres \
-    && service_is_ready redis \
-    && service_is_ready api \
-    && service_is_ready worker \
-    && service_is_ready scheduler \
-    && service_is_ready frontend; then
+  ready=1
+  for svc in postgres redis api worker scheduler frontend; do
+    if ! service_is_ready "${svc}"; then
+      ready=0
+      break
+    fi
+  done
+  if [[ "${ready}" == "1" && "${DEPLOY_CATALOG}" == "1" ]]; then
+    if ! service_is_ready catalog; then
+      ready=0
+    fi
+  fi
+  if [[ "${ready}" == "1" ]]; then
     echo "Deployment is healthy for ${ENVIRONMENT}"
     exit 0
   fi
