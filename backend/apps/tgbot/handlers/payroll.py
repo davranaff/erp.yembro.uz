@@ -20,8 +20,9 @@ import logging
 from datetime import date, timedelta
 from decimal import Decimal, InvalidOperation
 
-from ..bot import send_message
-from ..dispatcher import HandlerCtx, command
+from ..bot import answer_callback_query, edit_message_text, send_message
+from ..dispatcher import HandlerCtx, command, on_callback
+from ..keyboards import kb
 
 
 logger = logging.getLogger(__name__)
@@ -565,3 +566,305 @@ def handle_bonus_cmd(ctx: HandlerCtx) -> None:
 )
 def handle_deduct_cmd(ctx: HandlerCtx) -> None:
     _adjustment_cmd(ctx, "deduction", "✂️")
+
+
+# ════════════════════════════════════════════════════════════════════════════
+#   Daily check — массовая отметка сотрудников за сегодня кнопками
+# ════════════════════════════════════════════════════════════════════════════
+#
+# UX: одна карточка — один сотрудник. Кадровик нажимает «работал/прогул/
+# больничный/отпуск/пропустить», бот пишет в БД и шлёт следующего.
+# В конце — сводка.
+#
+# Telegram-callback'и ограничены 64 байтами, поэтому в data передаём
+# первые 8 hex-символов uuid сотрудника. Конфликтов в маленькой ферме (до
+# 50 человек) практически нет; на коллизии подстрахуемся проверкой в org.
+
+_CHECK_KIND_BTNS = [
+    ("✅ Работал",     "work"),
+    ("💪 Сверхурочно", "overtime"),
+    ("🏥 Больничный",  "sick_leave"),
+    ("🏖 Отпуск",      "vacation"),
+    ("❌ Прогул",      "absence"),
+    ("🛏 Выходной",    "day_off"),
+]
+
+
+def _resolve_emp_short(org, short_id: str):
+    """Найти Membership по первым 8 chars uuid в текущей org."""
+    from apps.organizations.models import OrganizationMembership
+
+    short_id = short_id.lower()
+    # uuid_id::text не работает в filter; вытягиваем кандидатов и фильтруем в py.
+    for m in OrganizationMembership.objects.filter(
+        organization=org, is_active=True,
+    ).select_related("user")[:500]:
+        if str(m.id).replace("-", "").startswith(short_id):
+            return m
+    return None
+
+
+def _next_unchecked(org, after_short: str | None = None):
+    """Найти следующего активного сотрудника без записи WorkShift на сегодня.
+
+    after_short — короткий id, после которого продолжаем (по сортировке ФИО).
+    Если None — берём первого.
+    """
+    from apps.organizations.models import OrganizationMembership
+    from apps.payroll.models import WorkShift
+
+    today = date.today()
+    marked_ids = set(
+        WorkShift.objects.filter(
+            organization=org, shift_date=today, shift_index=0,
+        ).values_list("employee_id", flat=True)
+    )
+
+    qs = (
+        OrganizationMembership.objects.filter(organization=org, is_active=True)
+        .exclude(id__in=marked_ids)
+        .select_related("user")
+        .order_by("user__full_name")
+    )
+
+    after_seen = after_short is None
+    for m in qs:
+        if not after_seen:
+            if str(m.id).replace("-", "").startswith(after_short.lower()):
+                after_seen = True
+            continue
+        return m
+    return None
+
+
+def _build_check_card(m, total: int, remaining: int) -> tuple[str, dict]:
+    """Возвращает (text, reply_markup) для карточки одного сотрудника."""
+    name = html.escape(m.user.full_name or "—") if m.user_id else "—"
+    pos = html.escape(m.position_title or "")
+    today_str = date.today().strftime("%d.%m.%Y")
+    short_id = str(m.id).replace("-", "")[:8]
+
+    text = (
+        f"📋 <b>Daily check · {today_str}</b>\n"
+        f"<i>Осталось: {remaining} из {total}</i>\n"
+        f"\n"
+        f"👤 <b>{name}</b>"
+        + (f"\n   {pos}" if pos else "")
+        + "\n\n"
+        f"<i>Что отметить за сегодня?</i>"
+    )
+    buttons = [(label, f"hrc:m:{short_id}:{kind}") for label, kind in _CHECK_KIND_BTNS]
+    buttons.append(("▶️ Пропустить", f"hrc:s:{short_id}"))
+    buttons.append(("🏁 Завершить", "hrc:done"))
+    return text, kb(buttons, cols=2)
+
+
+@command(
+    "/check",
+    help="Daily check: пройтись по неотмеченным и нажимать кнопки",
+    module="hr", category="ops",
+)
+def handle_check_cmd(ctx: HandlerCtx) -> None:
+    """Запуск daily-check. Шлёт первую неотмеченную карточку."""
+    if not _require_hr_rw(ctx):
+        return
+
+    from apps.organizations.models import OrganizationMembership
+    from apps.payroll.models import WorkShift
+
+    org = ctx.org()
+    today = date.today()
+    total = OrganizationMembership.objects.filter(
+        organization=org, is_active=True,
+    ).count()
+    marked = WorkShift.objects.filter(
+        organization=org, shift_date=today, shift_index=0,
+    ).count()
+    remaining = max(0, total - marked)
+
+    if remaining == 0:
+        send_message(
+            ctx.chat_id,
+            f"📋 <b>Daily check · {today.strftime('%d.%m.%Y')}</b>\n\n"
+            f"Все {total} сотрудников уже отмечены за сегодня. ✅\n\n"
+            f"<i>Чтобы переотметить — <code>/markday ФИО сегодня ...</code></i>",
+        )
+        return
+
+    first = _next_unchecked(org)
+    if first is None:
+        send_message(ctx.chat_id, "Все уже отмечены на сегодня.")
+        return
+
+    text, markup = _build_check_card(first, total, remaining)
+    send_message(ctx.chat_id, text, reply_markup=markup)
+
+
+@on_callback("hrc:")
+def handle_check_callback(ctx: HandlerCtx) -> None:
+    """
+    Callback'и daily-check:
+        hrc:m:<short>:<kind>  — отметить и перейти к следующему
+        hrc:s:<short>         — пропустить (не пишем WorkShift, идём дальше)
+        hrc:done              — закрыть (показать сводку)
+    """
+    if not _require_hr_rw(ctx):
+        if ctx.callback_id:
+            answer_callback_query(ctx.callback_id, "Нет прав", show_alert=True)
+        return
+
+    if not ctx.args:
+        return
+    action = ctx.args[0]
+
+    from apps.organizations.models import OrganizationMembership
+    from apps.payroll.models import WorkShift
+
+    org = ctx.org()
+    today = date.today()
+
+    if action == "done":
+        if ctx.callback_id:
+            answer_callback_query(ctx.callback_id, "Готово")
+        total = OrganizationMembership.objects.filter(
+            organization=org, is_active=True,
+        ).count()
+        marked = WorkShift.objects.filter(
+            organization=org, shift_date=today, shift_index=0,
+        ).count()
+        edit_message_text(
+            ctx.chat_id, ctx.message_id,
+            f"📋 <b>Daily check · {today.strftime('%d.%m.%Y')}</b>\n\n"
+            f"Отмечено: <b>{marked}</b> из <b>{total}</b>\n"
+            f"Не отмечено: <b>{max(0, total - marked)}</b>",
+        )
+        return
+
+    if action == "m" and len(ctx.args) >= 3:
+        short_id, kind = ctx.args[1], ctx.args[2]
+        m = _resolve_emp_short(org, short_id)
+        if m is None:
+            if ctx.callback_id:
+                answer_callback_query(ctx.callback_id, "Сотрудник не найден", show_alert=True)
+            return
+        WorkShift.objects.update_or_create(
+            employee=m, shift_date=today, shift_index=0,
+            defaults={"organization": org, "kind": kind, "source": "manual"},
+        )
+        kind_label = dict(WorkShift.Kind.choices).get(kind, kind)
+        if ctx.callback_id:
+            answer_callback_query(ctx.callback_id, f"✓ {kind_label}")
+        _advance_check(ctx, after_short=short_id, last_name=m.user.full_name or "—", last_kind=kind_label)
+        return
+
+    if action == "s" and len(ctx.args) >= 2:
+        short_id = ctx.args[1]
+        if ctx.callback_id:
+            answer_callback_query(ctx.callback_id, "Пропущено")
+        _advance_check(ctx, after_short=short_id, last_name=None, last_kind="пропущен")
+        return
+
+
+def _advance_check(ctx: HandlerCtx, after_short: str, last_name: str | None, last_kind: str) -> None:
+    """После отметки/пропуска — показать следующую карточку или финал."""
+    from apps.organizations.models import OrganizationMembership
+    from apps.payroll.models import WorkShift
+
+    org = ctx.org()
+    today = date.today()
+    total = OrganizationMembership.objects.filter(
+        organization=org, is_active=True,
+    ).count()
+
+    nxt = _next_unchecked(org, after_short=after_short)
+    if nxt is None:
+        marked = WorkShift.objects.filter(
+            organization=org, shift_date=today, shift_index=0,
+        ).count()
+        edit_message_text(
+            ctx.chat_id, ctx.message_id,
+            f"📋 <b>Daily check завершён · {today.strftime('%d.%m.%Y')}</b>\n\n"
+            f"Отмечено: <b>{marked}</b> из <b>{total}</b>",
+        )
+        return
+
+    marked = WorkShift.objects.filter(
+        organization=org, shift_date=today, shift_index=0,
+    ).count()
+    remaining = max(0, total - marked)
+    text, markup = _build_check_card(nxt, total, remaining)
+    if last_name:
+        text = f"<i>✓ {html.escape(last_name)} — {last_kind}</i>\n\n" + text
+    edit_message_text(ctx.chat_id, ctx.message_id, text, reply_markup=markup)
+
+
+# ──────────────────────────────────────────────────────────────────────────
+#   Quick-shortcuts: одной командой отметить сотрудника на сегодня
+# ──────────────────────────────────────────────────────────────────────────
+
+
+def _quick_mark(ctx: HandlerCtx, kind: str, label: str, icon: str) -> None:
+    """Общая логика для /work, /absent, /sick, /vacay."""
+    if not _require_hr_rw(ctx):
+        return
+    if not ctx.args:
+        send_message(
+            ctx.chat_id,
+            f"Использование: <code>/{kind.replace('_', '')} ФИО</code>\n"
+            f"Например: <code>/{kind.replace('_', '')} Иванов</code>",
+        )
+        return
+
+    m = _find_employee(ctx, " ".join(ctx.args))
+    if m is None:
+        return
+
+    from apps.payroll.models import WorkShift
+
+    today = date.today()
+    _, created = WorkShift.objects.update_or_create(
+        employee=m, shift_date=today, shift_index=0,
+        defaults={"organization": ctx.org(), "kind": kind, "source": "manual"},
+    )
+    action = "✨" if created else "♻️"
+    name = html.escape(m.user.full_name or "—") if m.user_id else "—"
+    send_message(
+        ctx.chat_id,
+        f"{action} {icon} <b>{name}</b> — {label} на {today.strftime('%d.%m.%Y')}",
+    )
+
+
+@command(
+    "/work",
+    help="Отметить сотрудника как «работал» сегодня: /work ФИО",
+    module="hr", category="ops",
+)
+def handle_work_cmd(ctx: HandlerCtx) -> None:
+    _quick_mark(ctx, "work", "работал", "✅")
+
+
+@command(
+    "/absent",
+    help="Отметить прогул сегодня: /absent ФИО",
+    module="hr", category="ops",
+)
+def handle_absent_cmd(ctx: HandlerCtx) -> None:
+    _quick_mark(ctx, "absence", "прогул", "❌")
+
+
+@command(
+    "/sick",
+    help="Отметить больничный сегодня: /sick ФИО",
+    module="hr", category="ops",
+)
+def handle_sick_cmd(ctx: HandlerCtx) -> None:
+    _quick_mark(ctx, "sick_leave", "больничный", "🏥")
+
+
+@command(
+    "/vacay",
+    help="Отметить отпуск сегодня: /vacay ФИО",
+    module="hr", category="ops",
+)
+def handle_vacay_cmd(ctx: HandlerCtx) -> None:
+    _quick_mark(ctx, "vacation", "отпуск", "🏖")
