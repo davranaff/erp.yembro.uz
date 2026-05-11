@@ -17,9 +17,12 @@ export function ContactForm() {
 
   async function onSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    // Сохраняем ссылку на форму ДО await — иначе после async-операции
+    // React зануляет e.currentTarget и .reset() падает с TypeError.
+    const form = e.currentTarget;
+    const fd = new FormData(form);
     setStatus("submitting");
     setErrorMsg("");
-    const fd = new FormData(e.currentTarget);
     try {
       const res = await fetch(`${API_URL}/contact/`, {
         method: "POST",
@@ -37,7 +40,7 @@ export function ContactForm() {
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       setStatus("success");
-      e.currentTarget.reset();
+      try { form.reset(); } catch { /* форма могла размонтироваться */ }
       if (typeof window !== "undefined" && (window as unknown as { gtag?: (...args: unknown[]) => void }).gtag) {
         (window as unknown as { gtag: (...args: unknown[]) => void }).gtag("event", "generate_lead");
       }
