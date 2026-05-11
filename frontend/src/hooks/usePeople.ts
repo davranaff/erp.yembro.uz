@@ -12,13 +12,21 @@ export interface PeopleFilter {
   is_active?: string;
   work_status?: string;
   search?: string;
+  include_compensation?: boolean;
+  include_balance?: boolean;
+}
+
+function appendFilter(params: URLSearchParams, filter: PeopleFilter) {
+  if (filter.is_active) params.set('is_active', filter.is_active);
+  if (filter.work_status) params.set('work_status', filter.work_status);
+  if (filter.search) params.set('search', filter.search);
+  if (filter.include_compensation) params.set('include_compensation', '1');
+  if (filter.include_balance) params.set('include_balance', '1');
 }
 
 export function usePeople(filter: PeopleFilter = {}) {
   const params = new URLSearchParams();
-  if (filter.is_active) params.set('is_active', filter.is_active);
-  if (filter.work_status) params.set('work_status', filter.work_status);
-  if (filter.search) params.set('search', filter.search);
+  appendFilter(params, filter);
   params.set('ordering', 'user__full_name');
   params.set('page_size', '2000');
   const qs = params.toString();
@@ -41,9 +49,7 @@ export function usePeoplePaginated(
   pageSize = 50,
 ) {
   const params = new URLSearchParams();
-  if (filter.is_active) params.set('is_active', filter.is_active);
-  if (filter.work_status) params.set('work_status', filter.work_status);
-  if (filter.search) params.set('search', filter.search);
+  appendFilter(params, filter);
   params.set('ordering', 'user__full_name');
   params.set('page', String(page));
   params.set('page_size', String(pageSize));
@@ -53,6 +59,18 @@ export function usePeoplePaginated(
     queryFn: () => apiFetch<Paginated<MembershipRow>>(`/api/memberships/?${qs}`),
     staleTime: 30_000,
     placeholderData: (prev) => prev,
+  });
+}
+
+export function usePerson(id: string | null | undefined) {
+  return useQuery<MembershipRow, ApiError>({
+    queryKey: [...KEY, 'one', id],
+    enabled: Boolean(id),
+    queryFn: () =>
+      apiFetch<MembershipRow>(
+        `/api/memberships/${id}/?include_compensation=1&include_balance=1`,
+      ),
+    staleTime: 30_000,
   });
 }
 
@@ -105,5 +123,27 @@ export function useDeactivatePerson() {
         body: { is_active: false, work_status: 'terminated' },
       }),
     onSuccess: () => qc.invalidateQueries({ queryKey: KEY }),
+  });
+}
+
+export interface TerminateResult {
+  membership_id: string;
+  terminated_on: string;
+  balance_at_termination: string;
+  balance_breakdown: { accrued_total: string; paid_total: string };
+}
+
+export function useTerminatePerson() {
+  const qc = useQueryClient();
+  return useMutation<TerminateResult, ApiError, { id: string; date?: string }>({
+    mutationFn: ({ id, date }) =>
+      apiFetch<TerminateResult>(`/api/memberships/${id}/terminate/`, {
+        method: 'POST',
+        body: date ? { date } : {},
+      }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: KEY });
+      qc.invalidateQueries({ queryKey: ['payroll'] });
+    },
   });
 }

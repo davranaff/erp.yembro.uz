@@ -46,6 +46,11 @@ export default function Sidebar() {
   };
 
   const allowed = (item: NavItem) => {
+    // requireAnyModule: пункт виден если есть r+ на хоть один из перечисленных.
+    if (item.requireAnyModule && item.requireAnyModule.length > 0) {
+      const any = item.requireAnyModule.some((m) => hasAccess(m, 'r'));
+      if (!any) return false;
+    }
     if (!item.module) return true;
     // hasAccess = модуль включён для орги (org-level toggle) И есть RBAC-уровень.
     // Если владелец отключил модуль через /settings — пункт пропадает из nav.

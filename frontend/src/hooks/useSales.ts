@@ -66,6 +66,85 @@ export function useCreditCheck(orderId: string | null | undefined) {
   });
 }
 
+// ── Детальная страница: /api/sales/orders/{id}/summary/ ────────────────
+
+export interface SaleOrderSummary {
+  order: {
+    id: string;
+    doc_number: string;
+    date: string;
+    due_date: string | null;
+    status: string;
+    payment_status: string;
+    amount_uzs: string;
+    cost_uzs: string;
+    margin_uzs: string;
+    paid_amount_uzs: string;
+    outstanding_uzs: string;
+    currency_code: string | null;
+    amount_foreign: string | null;
+    exchange_rate: string | null;
+    notes: string;
+    customer_id: string | null;
+    customer_name: string | null;
+    customer_code: string | null;
+    warehouse_name: string | null;
+    module_code: string | null;
+  };
+  items: Array<{
+    id: string;
+    nomenclature_id: string | null;
+    nomenclature_name: string | null;
+    quantity: string;
+    unit_price_uzs: string;
+    line_total_uzs: string;
+    cost_per_unit_uzs: string | null;
+    line_cost_uzs: string;
+    batch_doc: string | null;
+  }>;
+  payments: Array<{
+    id: string;
+    allocation_id: string;
+    doc_number: string;
+    date: string;
+    direction: string;
+    channel: string;
+    kind: string;
+    status: string;
+    amount_uzs: string;
+    payment_amount_uzs: string;
+    currency_code: string | null;
+    notes: string;
+  }>;
+  communications: Array<{
+    id: string;
+    contacted_at: string;
+    method: string;
+    outcome: string;
+    customer_response: string;
+    internal_note: string;
+    promised_pay_date: string | null;
+    next_action_date: string | null;
+    contacted_by_name: string | null;
+  }>;
+  timeline: Array<{
+    at: string;
+    kind: string;
+    title: string;
+    description?: string;
+    actor?: string | null;
+  }>;
+}
+
+export function useSaleOrderSummary(id: string | null | undefined) {
+  return useQuery<SaleOrderSummary, ApiError>({
+    queryKey: ['sales', 'summary', id ?? ''],
+    enabled: Boolean(id),
+    queryFn: () => apiFetch<SaleOrderSummary>(`/api/sales/orders/${id}/summary/`),
+    staleTime: 15_000,
+  });
+}
+
 export const useReverseSale = salesCrud.makeAction<{ reason?: string }, SaleOrder>(
   (id) => `/api/sales/orders/${id}/reverse/`,
 );

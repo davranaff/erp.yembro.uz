@@ -48,6 +48,8 @@ export default function Icon({ name, size = 16, className, style }: IconProps) {
       return <svg viewBox="0 0 24 24" style={s} className={className} {...p}><path d="M6 9l6 6 6-6"/></svg>;
     case 'chevron-right':
       return <svg viewBox="0 0 24 24" style={s} className={className} {...p}><path d="M9 6l6 6-6 6"/></svg>;
+    case 'chevron-left':
+      return <svg viewBox="0 0 24 24" style={s} className={className} {...p}><path d="M15 6l-6 6 6 6"/></svg>;
     case 'help':
       return <svg viewBox="0 0 24 24" style={s} className={className} {...p}><circle cx="12" cy="12" r="9"/><path d="M9.5 9a2.5 2.5 0 015 0c0 2-2.5 2-2.5 4M12 17h.01"/></svg>;
     case 'close':

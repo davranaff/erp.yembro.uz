@@ -122,4 +122,18 @@ class PaymentSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError(
                 {"status": "Проведённый платёж нельзя редактировать."}
             )
+        # Зарплатные платежи создаются только через сервис payroll.create_payout —
+        # closed-loop гарантирует, что у Payment.kind=salary всегда есть PayrollPayout.
+        kind = attrs.get("kind") if "kind" in attrs else (
+            self.instance.kind if self.instance else None
+        )
+        if kind == Payment.Kind.SALARY:
+            ctx = self.context or {}
+            if not ctx.get("from_payroll_service"):
+                raise serializers.ValidationError(
+                    {"kind": (
+                        "Зарплатные платежи создаются через "
+                        "/api/payroll/payouts/, а не напрямую."
+                    )}
+                )
         return attrs

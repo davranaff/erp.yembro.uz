@@ -11,6 +11,12 @@ services:
         aliases:
           - prod-frontend
 
+  catalog:
+    networks:
+      public:
+        aliases:
+          - prod-catalog
+
 volumes:
   postgres_data:
     external: true

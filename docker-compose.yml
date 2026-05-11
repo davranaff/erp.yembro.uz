@@ -114,5 +114,26 @@ services:
       - /app/.next
     restart: unless-stopped
 
+  catalog:
+    build:
+      context: ./catalog
+      dockerfile: Dockerfile
+    env_file:
+      - ./.env
+    environment:
+      NEXT_PUBLIC_API_URL: ${CATALOG_NEXT_PUBLIC_API_URL:-http://localhost:30000/api/catalog/v1}
+      # Серверный fetch (RSC) ходит к api по docker-сети, не к localhost.
+      CATALOG_API_URL_INTERNAL: ${CATALOG_API_URL_INTERNAL:-http://api:30000/api/catalog/v1}
+      NEXT_PUBLIC_SITE_URL: ${CATALOG_NEXT_PUBLIC_SITE_URL:-http://localhost:30081}
+      NEXT_PUBLIC_ERP_URL: ${CATALOG_NEXT_PUBLIC_ERP_URL:-http://localhost:30080}
+      NEXT_PUBLIC_YM_ID: ${CATALOG_YM_ID:-}
+      NEXT_PUBLIC_GA_ID: ${CATALOG_GA_ID:-}
+      REVALIDATE_SECRET: ${CATALOG_REVALIDATE_SECRET:-dev-secret}
+    depends_on:
+      - api
+    ports:
+      - "${CATALOG_PUBLISHED_PORT:-30081}:3001"
+    restart: unless-stopped
+
 volumes:
   postgres_data:

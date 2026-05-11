@@ -76,7 +76,10 @@ services:
     init: true
     restart: unless-stopped
     networks:
+      # internal — для доступа к postgres/redis.
+      # public — чтобы revalidate_next_task мог резолвить prod-catalog (Next.js).
       - internal
+      - public
     volumes:
       - uploads_data:${APP_STORAGE_LOCAL_ROOT:-/data/uploads}
     healthcheck:
@@ -134,6 +137,33 @@ services:
       timeout: 5s
       retries: 10
       start_period: 15s
+
+  catalog:
+    image: ${CATALOG_IMAGE}
+    env_file:
+      - ./.env
+    environment:
+      NEXT_PUBLIC_API_URL: ${CATALOG_NEXT_PUBLIC_API_URL:-https://api.erp.yembro.uz/api/catalog/v1}
+      CATALOG_API_URL_INTERNAL: ${CATALOG_API_URL_INTERNAL:-http://api:30000/api/catalog/v1}
+      NEXT_PUBLIC_SITE_URL: ${CATALOG_NEXT_PUBLIC_SITE_URL:-https://yembro.uz}
+      NEXT_PUBLIC_ERP_URL: ${CATALOG_NEXT_PUBLIC_ERP_URL:-https://erp.yembro.uz}
+      NEXT_PUBLIC_YM_ID: ${CATALOG_YM_ID:-}
+      NEXT_PUBLIC_GA_ID: ${CATALOG_GA_ID:-}
+      REVALIDATE_SECRET: ${CATALOG_REVALIDATE_SECRET:-}
+    restart: unless-stopped
+    networks:
+      - public
+    healthcheck:
+      # / возвращает 307 redirect на /ru (next-intl middleware). wget без -L
+      # на 307 возвращает exit 8 → unhealthy. Проверяем через `wget --spider`
+      # с -L (follow redirects) — тогда ок.
+      test:
+        - CMD-SHELL
+        - "wget -qL --spider http://127.0.0.1:3001/ru || exit 1"
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
 
   postgres:
     image: postgres:16-alpine

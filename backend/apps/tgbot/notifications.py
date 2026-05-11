@@ -221,7 +221,7 @@ def fmt_debt_reminder_uz(sale_order, counterparty) -> str:
     - 30+ дней: жёстко, последнее предупреждение
     Это снижает game-the-system эффект «бот дёргает но ничего не меняется».
     """
-    from datetime import date as _date
+    from datetime import date as _date, timedelta
     from decimal import Decimal
 
     remaining = Decimal(sale_order.amount_uzs or 0) - Decimal(sale_order.paid_amount_uzs or 0)
@@ -229,6 +229,14 @@ def fmt_debt_reminder_uz(sale_order, counterparty) -> str:
     delta = None
     if sale_order.due_date:
         delta = (sale_order.due_date - _date.today()).days
+
+    # Дата автоблока: due_date + max_overdue_days (или дефолт 30 дн).
+    # Используется для конкретных угроз вместо размытого «mumkin».
+    block_after_days = counterparty.max_overdue_days or 30
+    block_date = (
+        sale_order.due_date + timedelta(days=block_after_days)
+        if sale_order.due_date else None
+    )
 
     # Подбор тональности по delta
     if delta is None:
@@ -258,16 +266,31 @@ def fmt_debt_reminder_uz(sale_order, counterparty) -> str:
             "❓ Qiyinchilik bo'lsa — menejer bilan bog'laning."
         )
     elif delta >= -30:
+        days_until_block = (
+            (block_date - _date.today()).days if block_date else 0
+        )
         header = f"🔴 <b>Jiddiy kechikish: {abs(delta)} kun</b>"
         deadline_block = f"📅 Muddati edi: {sale_order.due_date}\n"
+        if block_date and days_until_block > 0:
+            threat = (
+                f"⚠️ <b>Diqqat:</b> <b>{block_date}</b> sanasidan boshlab "
+                f"yangi xaridlar avtomatik bloklanadi "
+                f"(yana {days_until_block} kun)."
+            )
+        else:
+            threat = (
+                "⚠️ <b>Diqqat:</b> Yangi xaridlar bugundan bloklanishi mumkin."
+            )
         tone_block = (
-            "⚠️ <b>Diqqat:</b> Qarzdorlik davom etsa, yangi xaridlar "
-            "vaqtincha to'xtatilishi mumkin.\n"
+            f"{threat}\n"
             "💳 Iltimos, bugun-ertaga to'lang yoki menejer bilan "
             "kelishuv tuzing."
         )
     else:
-        header = f"🚨🚨 <b>Oxirgi ogohlantirish: {abs(delta)} kun kechikish</b>"
+        header = (
+            f"🚨🚨 <b>Tezkor to'lov talab etiladi: "
+            f"{abs(delta)} kun kechikish</b>"
+        )
         deadline_block = f"📅 Muddati edi: {sale_order.due_date}\n"
         tone_block = (
             "⛔ Qarzdorlik 30 kundan oshdi. Yangi xaridlar bloklangan.\n"
@@ -287,15 +310,20 @@ def fmt_debt_reminder_uz(sale_order, counterparty) -> str:
 
 
 def fmt_promise_broken_uz(sale_order, communication) -> str:
-    """Mijozga: «kecha to'lashga va'da bergan edingiz, hali to'lov yo'q»."""
+    """Mijozga: «kecha to'lashga va'da bergan edingiz, hali to'lov yo'q».
+
+    Сумму подставляем явно — это активирует precise-commitment эффект:
+    клиент видит «обещал X сум», а не абстрактное «обещал заплатить».
+    """
     from decimal import Decimal
 
     remaining = Decimal(sale_order.amount_uzs or 0) - Decimal(sale_order.paid_amount_uzs or 0)
     return (
         f"📢 <b>Va'dangiz haqida</b>\n\n"
         f"<i>{sale_order.customer.name}</i>\n\n"
-        f"Siz <b>{communication.promised_pay_date}</b> kuni to'lashga "
-        f"va'da bergan edingiz, biroq to'lov hali kelmadi.\n\n"
+        f"Siz <b>{communication.promised_pay_date}</b> kuni "
+        f"<b>{_fmt_money(remaining)} so'm</b> to'lashga va'da bergan "
+        f"edingiz, biroq to'lov hali kelmadi.\n\n"
         f"📄 Buyurtma: <code>{sale_order.doc_number}</code>\n"
         f"💰 Qarz: <b>{_fmt_money(remaining)} so'm</b>\n\n"
         f"💳 Iltimos, qarzni to'lang yoki yangi muddat haqida menejerga "

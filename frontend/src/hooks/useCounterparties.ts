@@ -147,6 +147,46 @@ export interface CounterpartyDebtSummary {
   prepayments_total_free_uzs: string;
 }
 
+// ── Расширенная сводка для детальной страницы (full_summary) ────────────
+
+export interface CounterpartyFullSummary extends CounterpartyDebtSummary {
+  all_orders: Array<{
+    id: string;
+    kind: 'sale' | 'purchase';
+    doc_number: string;
+    date: string;
+    due_date: string | null;
+    status: string;
+    payment_status: string | null;
+    amount_uzs: string;
+    paid_amount_uzs: string;
+    outstanding_uzs: string;
+  }>;
+  all_orders_count: number;
+  all_payments: Array<{
+    id: string;
+    doc_number: string;
+    date: string;
+    direction: 'in' | 'out';
+    channel: string;
+    kind: string;
+    status: string;
+    amount_uzs: string;
+    currency_code: string | null;
+    amount_foreign: string | null;
+    exchange_rate: string | null;
+    notes: string;
+  }>;
+  all_payments_count: number;
+  monthly_turnover: Array<{
+    month: string; // "YYYY-MM"
+    sales_uzs: string;
+    purchases_uzs: string;
+    payments_in_uzs: string;
+    payments_out_uzs: string;
+  }>;
+}
+
 export function useCounterparty(id: string | null | undefined) {
   return useQuery<Counterparty, ApiError>({
     queryKey: ['counterparties', 'detail', id ?? ''],
@@ -163,6 +203,18 @@ export function useCounterpartyDebtSummary(id: string | null | undefined) {
     queryFn: () =>
       apiFetch<CounterpartyDebtSummary>(
         `/api/counterparties/${id}/debt_summary/`,
+      ),
+    staleTime: 15_000,
+  });
+}
+
+export function useCounterpartyFullSummary(id: string | null | undefined) {
+  return useQuery<CounterpartyFullSummary, ApiError>({
+    queryKey: ['counterparties', 'full-summary', id ?? ''],
+    enabled: Boolean(id),
+    queryFn: () =>
+      apiFetch<CounterpartyFullSummary>(
+        `/api/counterparties/${id}/full_summary/`,
       ),
     staleTime: 15_000,
   });

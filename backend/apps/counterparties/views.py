@@ -156,6 +156,141 @@ def _build_debt_summary(counterparty, organization) -> dict:
     }
 
 
+def _build_extended_summary(counterparty, organization) -> dict:
+    """
+    Расширение для full_summary: вся история документов и платежей,
+    + помесячная агрегация оборотов за последние 12 месяцев.
+    """
+    from datetime import date, timedelta
+
+    from django.db.models import Sum
+
+    from apps.payments.models import Payment
+    from apps.purchases.models import PurchaseOrder
+    from apps.sales.models import SaleOrder
+
+    # ── all_orders: SaleOrder + PurchaseOrder любого статуса ─────────────
+    sale_qs = (
+        SaleOrder.objects.filter(
+            organization=organization, customer=counterparty,
+        ).order_by("-date")
+    )
+    purchase_qs = (
+        PurchaseOrder.objects.filter(
+            organization=organization, counterparty=counterparty,
+        ).order_by("-date")
+    )
+
+    all_orders = []
+    for o in sale_qs:
+        amt = Decimal(o.amount_uzs or 0)
+        paid = Decimal(o.paid_amount_uzs or 0)
+        all_orders.append({
+            "id": str(o.id),
+            "kind": "sale",
+            "doc_number": o.doc_number,
+            "date": o.date.isoformat(),
+            "due_date": o.due_date.isoformat() if o.due_date else None,
+            "status": o.status,
+            "payment_status": o.payment_status,
+            "amount_uzs": str(amt),
+            "paid_amount_uzs": str(paid),
+            "outstanding_uzs": str(amt - paid),
+        })
+    for o in purchase_qs:
+        amt = Decimal(o.amount_uzs or 0)
+        paid = Decimal(o.paid_amount_uzs or 0)
+        all_orders.append({
+            "id": str(o.id),
+            "kind": "purchase",
+            "doc_number": o.doc_number,
+            "date": o.date.isoformat(),
+            "due_date": o.due_date.isoformat() if getattr(o, "due_date", None) else None,
+            "status": o.status,
+            "payment_status": getattr(o, "payment_status", None),
+            "amount_uzs": str(amt),
+            "paid_amount_uzs": str(paid),
+            "outstanding_uzs": str(amt - paid),
+        })
+    all_orders.sort(key=lambda r: r["date"], reverse=True)
+
+    # ── all_payments: вся история Payment этого контрагента ──────────────
+    payments_qs = (
+        Payment.objects.filter(
+            organization=organization, counterparty=counterparty,
+        )
+        .select_related("currency")
+        .order_by("-date")
+    )
+    all_payments = []
+    for p in payments_qs:
+        all_payments.append({
+            "id": str(p.id),
+            "doc_number": p.doc_number,
+            "date": p.date.isoformat(),
+            "direction": p.direction,
+            "channel": p.channel,
+            "kind": p.kind,
+            "status": p.status,
+            "amount_uzs": str(p.amount_uzs),
+            "currency_code": p.currency.code if p.currency_id else None,
+            "amount_foreign": str(p.amount_foreign) if p.amount_foreign is not None else None,
+            "exchange_rate": str(p.exchange_rate) if p.exchange_rate is not None else None,
+            "notes": p.notes or "",
+        })
+
+    # ── monthly_turnover: помесячная агрегация за 12 мес ──────────────────
+    today = date.today()
+    months: list[dict] = []
+    for i in range(11, -1, -1):
+        # Собираем 12 точек, последняя — текущий месяц.
+        year = today.year
+        month = today.month - i
+        while month <= 0:
+            month += 12
+            year -= 1
+        month_start = date(year, month, 1)
+        if month == 12:
+            next_start = date(year + 1, 1, 1)
+        else:
+            next_start = date(year, month + 1, 1)
+        month_end = next_start - timedelta(days=1)
+
+        sales_total = sale_qs.filter(
+            date__gte=month_start, date__lte=month_end,
+            status=SaleOrder.Status.CONFIRMED,
+        ).aggregate(s=Sum("amount_uzs"))["s"] or Decimal("0")
+        purchases_total = purchase_qs.filter(
+            date__gte=month_start, date__lte=month_end,
+        ).aggregate(s=Sum("amount_uzs"))["s"] or Decimal("0")
+        payments_in = payments_qs.filter(
+            date__gte=month_start, date__lte=month_end,
+            direction=Payment.Direction.IN,
+            status=Payment.Status.POSTED,
+        ).aggregate(s=Sum("amount_uzs"))["s"] or Decimal("0")
+        payments_out = payments_qs.filter(
+            date__gte=month_start, date__lte=month_end,
+            direction=Payment.Direction.OUT,
+            status=Payment.Status.POSTED,
+        ).aggregate(s=Sum("amount_uzs"))["s"] or Decimal("0")
+
+        months.append({
+            "month": month_start.isoformat()[:7],  # "2026-04"
+            "sales_uzs": str(sales_total),
+            "purchases_uzs": str(purchases_total),
+            "payments_in_uzs": str(payments_in),
+            "payments_out_uzs": str(payments_out),
+        })
+
+    return {
+        "all_orders": all_orders,
+        "all_orders_count": len(all_orders),
+        "all_payments": all_payments,
+        "all_payments_count": len(all_payments),
+        "monthly_turnover": months,
+    }
+
+
 class CounterpartyViewSet(OrgScopedModelViewSet):
     """
     CRUD контрагентов для текущей организации.
@@ -340,3 +475,19 @@ class CounterpartyViewSet(OrgScopedModelViewSet):
         """
         cp = self.get_object()
         return Response(_build_debt_summary(cp, request.organization))
+
+    @action(detail=True, methods=["get"], url_path="full_summary")
+    def full_summary(self, request, pk=None):
+        """GET /api/counterparties/{id}/full_summary/
+
+        Полная сводка для детальной страницы:
+          - всё что в debt_summary
+          - all_orders: вся история документов (SaleOrder + PurchaseOrder, любой статус)
+          - all_payments: вся история платежей (Payment, любой direction/kind)
+          - monthly_turnover: помесячная агрегация выручки/закупок за 12 мес
+        """
+        cp = self.get_object()
+        org = request.organization
+        base = _build_debt_summary(cp, org)
+        base.update(_build_extended_summary(cp, org))
+        return Response(base)

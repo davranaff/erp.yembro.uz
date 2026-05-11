@@ -1,5 +1,6 @@
 'use client';
 
+import { useRouter } from 'next/navigation';
 import { useMemo, useState } from 'react';
 
 import Badge from '@/components/ui/Badge';
@@ -82,6 +83,7 @@ function summarizeItems(items: PurchaseItem[] | undefined): string {
 }
 
 export default function PurchasesPage() {
+  const router = useRouter();
   const [tab, setTab] = useState<'all' | PurchaseStatus>('all');
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(50);
@@ -213,6 +215,7 @@ export default function PurchasesPage() {
           isLoading={isLoading}
           rows={orders}
           rowKey={(o) => o.id}
+          onRowClick={(o) => router.push(`/purchases/${o.id}`)}
           emptyMessage="Закупов нет. Нажмите «Новая закупка» чтобы оприходовать приход."
           columns={[
             {

@@ -1,9 +1,23 @@
+# ════════════════════════════════════════════════════════════════════════════
+#  Yembro edge proxy
+# ════════════════════════════════════════════════════════════════════════════
 {
 	email {$CADDY_ACME_EMAIL}
+	servers {
+		trusted_proxies static private_ranges
+	}
 }
 
+# ── ERP (PRIMARY_DOMAIN) ────────────────────────────────────────────────────
 {$PRIMARY_DOMAIN} {
 	encode zstd gzip
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		X-Frame-Options "SAMEORIGIN"
+		-Server
+	}
 
 	handle_path /static/* {
 		root * /srv/static/prod
@@ -20,8 +34,14 @@
 	}
 }
 
+# ── ERP API ─────────────────────────────────────────────────────────────────
 {$API_PRIMARY_DOMAIN} {
 	encode zstd gzip
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		-Server
+	}
 
 	handle_path /static/* {
 		root * /srv/static/prod
@@ -31,8 +51,10 @@
 	reverse_proxy prod-api:30000
 }
 
+# ── ERP staging ─────────────────────────────────────────────────────────────
 {$STAGING_DOMAIN} {
 	encode zstd gzip
+	header X-Robots-Tag "noindex, nofollow"
 
 	handle_path /static/* {
 		root * /srv/static/staging
@@ -51,6 +73,7 @@
 
 {$API_STAGING_DOMAIN} {
 	encode zstd gzip
+	header X-Robots-Tag "noindex, nofollow"
 
 	handle_path /static/* {
 		root * /srv/static/staging
@@ -60,12 +83,46 @@
 	reverse_proxy staging-api:30000
 }
 
+# ── Docker registry ─────────────────────────────────────────────────────────
 {$REGISTRY_DOMAIN} {
 	encode zstd gzip
-	reverse_proxy docker-registry:5000 {
-		header_up Host {host}
-		header_up X-Forwarded-Proto {scheme}
-		header_up X-Forwarded-For {remote_host}
-		header_up X-Forwarded-Host {host}
+	reverse_proxy docker-registry:5000
+}
+
+# ── Публичный каталог yembro.uz (Next.js, catalog/) ─────────────────────────
+{$CATALOG_DOMAIN} {
+	encode zstd gzip
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		Permissions-Policy "interest-cohort=()"
+		X-Frame-Options "SAMEORIGIN"
+		-Server
 	}
+
+	# Длинный кеш для статики Next.js.
+	header /_next/static/* Cache-Control "public, max-age=31536000, immutable"
+	header /logo.png Cache-Control "public, max-age=2592000"
+	header /mark.png Cache-Control "public, max-age=2592000"
+	# robots/sitemap — короткий кеш чтобы поисковики видели правки.
+	header /robots.txt Cache-Control "public, max-age=3600"
+	header /sitemap.xml Cache-Control "public, max-age=3600"
+
+	reverse_proxy prod-catalog:3001
+}
+
+# www → apex (301), сохраняя путь и query.
+www.{$CATALOG_DOMAIN} {
+	redir https://{$CATALOG_DOMAIN}{uri} permanent
+}
+
+# ── Каталог staging ─────────────────────────────────────────────────────────
+{$CATALOG_STAGING_DOMAIN} {
+	encode zstd gzip
+	# Закрываем staging от индексации, чтобы не каннибализировал прод.
+	header X-Robots-Tag "noindex, nofollow"
+	header /_next/static/* Cache-Control "public, max-age=31536000, immutable"
+
+	reverse_proxy staging-catalog:3001
 }

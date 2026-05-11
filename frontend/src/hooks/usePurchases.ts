@@ -98,3 +98,72 @@ export function useDeletePurchaseAttachment() {
     },
   });
 }
+
+// ── Детальная страница: /api/purchases/orders/{id}/summary/ ────────────
+
+export interface PurchaseOrderSummary {
+  order: {
+    id: string;
+    doc_number: string;
+    date: string;
+    due_date: string | null;
+    status: string;
+    payment_status: string | null;
+    amount_uzs: string;
+    paid_amount_uzs: string;
+    outstanding_uzs: string;
+    currency_code: string | null;
+    amount_foreign: string | null;
+    exchange_rate: string | null;
+    notes: string;
+    counterparty_id: string | null;
+    counterparty_name: string | null;
+    counterparty_code: string | null;
+    warehouse_name: string | null;
+    module_code: string | null;
+  };
+  items: Array<{
+    id: string;
+    nomenclature_id: string | null;
+    nomenclature_name: string | null;
+    quantity: string;
+    unit_price_uzs: string | null;
+    line_total_uzs: string;
+  }>;
+  payments: Array<{
+    id: string;
+    allocation_id: string;
+    doc_number: string;
+    date: string;
+    direction: string;
+    channel: string;
+    kind: string;
+    status: string;
+    amount_uzs: string;
+    payment_amount_uzs: string;
+    currency_code: string | null;
+    notes: string;
+  }>;
+  attachments: Array<{
+    id: string;
+    file: string | null;
+    name: string;
+    uploaded_at: string | null;
+  }>;
+  timeline: Array<{
+    at: string;
+    kind: string;
+    title: string;
+    description?: string;
+    actor?: string | null;
+  }>;
+}
+
+export function usePurchaseOrderSummary(id: string | null | undefined) {
+  return useQuery<PurchaseOrderSummary, ApiError>({
+    queryKey: ['purchases', 'summary', id ?? ''],
+    enabled: Boolean(id),
+    queryFn: () => apiFetch<PurchaseOrderSummary>(`/api/purchases/orders/${id}/summary/`),
+    staleTime: 15_000,
+  });
+}

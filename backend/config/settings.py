@@ -21,6 +21,9 @@ if BEHIND_TLS_PROXY:
     CSRF_COOKIE_SECURE = True
 
 INSTALLED_APPS = [
+    # modeltranslation должен идти ДО django.contrib.admin, иначе админка
+    # не подхватит i18n-поля.
+    "modeltranslation",
     "django.contrib.admin",
     "django.contrib.auth",
     "django.contrib.contenttypes",
@@ -33,6 +36,8 @@ INSTALLED_APPS = [
     "corsheaders",
     "django_celery_beat",
     "django_celery_results",
+    "mptt",
+    "imagekit",
     "apps.common",
     "apps.users",
     "apps.organizations",
@@ -57,9 +62,11 @@ INSTALLED_APPS = [
     "apps.holding",
     "apps.dashboard",
     "apps.sales",
+    "apps.payroll",
     "apps.seeding",
     "apps.tgbot",
     "apps.landing",
+    "apps.catalog",
 ]
 
 AUTH_USER_MODEL = "users.User"
@@ -120,6 +127,16 @@ TIME_ZONE = "Asia/Tashkent"
 USE_I18N = True
 USE_TZ = True
 
+# ── i18n каталога (django-modeltranslation) ───────────────────────────────
+LANGUAGES = [
+    ("ru", "Русский"),
+    ("uz", "Oʻzbekcha"),
+    ("en", "English"),
+]
+MODELTRANSLATION_DEFAULT_LANGUAGE = "ru"
+MODELTRANSLATION_LANGUAGES = ("ru", "uz", "en")
+MODELTRANSLATION_FALLBACK_LANGUAGES = {"default": ("ru",)}
+
 STATIC_URL = "static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
 MEDIA_URL = "media/"
@@ -172,6 +189,7 @@ REST_FRAMEWORK = {
     # UserRateThrottle, и задать ему rate в этом dict'е.
     "DEFAULT_THROTTLE_RATES": {
         "landing-demo": "5/min",
+        "catalog-contact": "5/hour",
     },
 }
 
@@ -214,6 +232,14 @@ TELEGRAM_WEBHOOK_SECRET = env("TELEGRAM_WEBHOOK_SECRET", default="")
 # ── Landing / Demo leads ──────────────────────────────────────────────────────
 # Telegram chat_id через запятую — куда слать уведомления о новых заявках с лендинга
 DEMO_NOTIFY_CHAT_IDS = env.str("DEMO_NOTIFY_CHAT_IDS", default="")
+
+# ── Catalog (yembro.uz публичный сайт) ──────────────────────────────────────
+# Куда стучаться для ISR-revalidation Next.js (catalog/) при изменениях контента.
+CATALOG_FRONTEND_URL = env.str("CATALOG_FRONTEND_URL", default="https://yembro.uz")
+CATALOG_REVALIDATE_SECRET = env.str("CATALOG_REVALIDATE_SECRET", default="")
+# Telegram chat_id через запятую для уведомлений о заявках с каталога.
+# Если пусто — fallback на DEMO_NOTIFY_CHAT_IDS.
+CATALOG_NOTIFY_CHAT_IDS = env.str("CATALOG_NOTIFY_CHAT_IDS", default="")
 
 # ── Feed shrinkage ──────────────────────────────────────────────────────────
 # Если True — при первой партии новой номенклатуры (или нового рецепта корма)
