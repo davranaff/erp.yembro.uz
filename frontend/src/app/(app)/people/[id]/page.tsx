@@ -189,33 +189,35 @@ export default function PersonDetailPage() {
         </div>
       </div>
 
-      {/* ── Один большой блок: Сколько осталось выплатить ── */}
-      <div style={{
-        marginTop: 4,
-        padding: '20px 24px',
-        borderRadius: 8,
-        background: oweAmount > 0
-          ? 'linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)'
-          : oweAmount < 0
-            ? 'linear-gradient(135deg, #fed7aa 0%, #fdba74 100%)'
-            : 'linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%)',
-        border: '1px solid',
-        borderColor: oweAmount > 0 ? '#f59e0b' : oweAmount < 0 ? '#ea580c' : '#10b981',
-      }}>
-        <div style={{ fontSize: 12, color: 'var(--fg-2)', textTransform: 'uppercase', letterSpacing: 0.5 }}>
-          {oweAmount > 0 ? 'Должны выплатить' : oweAmount < 0 ? 'Переплачено сотруднику' : 'Расчёт чистый'}
-        </div>
+      {/* ── Блок «Сколько осталось выплатить» ── показываем только если
+          баланс ненулевой. При oweAmount == 0 ничего не рисуем, чтобы не
+          забивать страницу банальным «Расчёт чистый». ── */}
+      {oweAmount !== 0 && (
         <div style={{
-          fontSize: 36, fontWeight: 700, fontFamily: 'var(--mono, monospace)',
-          color: oweAmount > 0 ? '#92400e' : oweAmount < 0 ? '#9a3412' : '#065f46',
           marginTop: 4,
+          padding: '20px 24px',
+          borderRadius: 8,
+          background: oweAmount > 0
+            ? 'linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)'
+            : 'linear-gradient(135deg, #fed7aa 0%, #fdba74 100%)',
+          border: '1px solid',
+          borderColor: oweAmount > 0 ? '#f59e0b' : '#ea580c',
         }}>
-          {fmt(Math.abs(oweAmount))} <span style={{ fontSize: 18, fontWeight: 500 }}>сум</span>
+          <div style={{ fontSize: 12, color: 'var(--fg-2)', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+            {oweAmount > 0 ? 'Должны выплатить' : 'Переплачено сотруднику'}
+          </div>
+          <div style={{
+            fontSize: 36, fontWeight: 700, fontFamily: 'var(--mono, monospace)',
+            color: oweAmount > 0 ? '#92400e' : '#9a3412',
+            marginTop: 4,
+          }}>
+            {fmt(Math.abs(oweAmount))} <span style={{ fontSize: 18, fontWeight: 500 }}>сум</span>
+          </div>
+          <div style={{ fontSize: 13, color: 'var(--fg-2)', marginTop: 8 }}>
+            Заработал к сегодня: <b>{fmt(accruedVal)}</b> сум · Уже выплачено: <b>{fmt(paidVal)}</b> сум
+          </div>
         </div>
-        <div style={{ fontSize: 13, color: 'var(--fg-2)', marginTop: 8 }}>
-          Заработал к сегодня: <b>{fmt(accruedVal)}</b> сум · Уже выплачено: <b>{fmt(paidVal)}</b> сум
-        </div>
-      </div>
+      )}
 
       <WorkStatsRow employeeId={person.id} />
 
