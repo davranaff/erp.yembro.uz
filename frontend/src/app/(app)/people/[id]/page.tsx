@@ -36,6 +36,7 @@ import { useHasLevel } from '@/hooks/usePermissions';
 import type { WorkShiftKind } from '@/types/payroll';
 
 import PayoutModal from './PayoutModal';
+import WorkStatsRow from './WorkStatsRow';
 
 type TabKey = 'info' | 'timesheet' | 'salary';
 
@@ -215,6 +216,8 @@ export default function PersonDetailPage() {
           Заработал к сегодня: <b>{fmt(accruedVal)}</b> сум · Уже выплачено: <b>{fmt(paidVal)}</b> сум
         </div>
       </div>
+
+      <WorkStatsRow employeeId={person.id} />
 
       <div style={{ marginTop: 14, marginBottom: 12 }}>
         <Seg
