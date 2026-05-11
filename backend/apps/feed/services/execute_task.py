@@ -295,11 +295,18 @@ def execute_production_task(
         sm.save()
         stock_movements.append(sm)
 
-    # 6. FeedBatch (готовый комбикорм)
-    fb_number = (
-        f"К-{recipe.code}-" + next_doc_number(
-            FeedBatch, organization=org, prefix="ФБ", on_date=entry_date, width=5
-        ).split("-")[-1]
+    # 6. FeedBatch (готовый комбикорм).
+    # Раньше код брал last-сегмент от nextdoc(prefix="ФБ") и склеивал с
+    # «К-{recipe.code}-», но регексп-скан искал «ФБ-…», а сохранялось
+    # «К-…» — поэтому max=0 на каждом замесе и второй вызов падал на
+    # unique(organization, doc_number). Правильно — использовать
+    # «К-{recipe.code}» как префикс самой серии.
+    fb_number = next_doc_number(
+        FeedBatch,
+        organization=org,
+        prefix=f"К-{recipe.code}",
+        on_date=entry_date,
+        width=5,
     )
     withdrawal_period_ends = None
     if task.is_medicated and task.withdrawal_period_days:
