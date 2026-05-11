@@ -1,6 +1,9 @@
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.decorators import action
-from rest_framework.exceptions import ValidationError as DRFValidationError
+from rest_framework.exceptions import (
+    PermissionDenied,
+    ValidationError as DRFValidationError,
+)
 from rest_framework.filters import OrderingFilter, SearchFilter
 from rest_framework.response import Response
 
@@ -178,15 +181,23 @@ class SlaughterShiftViewSet(ImmutableStatusMixin, OrgScopedModelViewSet):
 
         Body: {
             "yields": [
-                {"nomenclature": "uuid", "quantity": "412.5", "share_percent": "25.0", "notes": ""},
+                {"nomenclature": "uuid", "quantity": "412.5",
+                 "share_percent": "25.0", "grade": "grade_1", "notes": ""},
                 ...
             ],
             "replace_existing": true|false  # default false: добавляет к существующим
         }
 
-        Если `replace_existing=true` — все существующие SlaughterYield с unit=kg
-        для этой смены удаляются перед созданием новых (только для shifts в ACTIVE/CLOSED).
-        Атомарно: все выходы создаются в одной транзакции.
+        Поведение по `(shift, nomenclature, grade)`:
+          - если строка есть — quantity/share/notes обновляются, unit
+            оставляется прежним если не kg-совместим (kg-строки нормализуем
+            в kg-unit организации);
+          - если строки нет — создаётся новая.
+
+        Если `replace_existing=true` — все kg-выходы смены удаляются перед
+        вставкой. Атомарно: все выходы создаются в одной транзакции.
+
+        Лимит-чек: Σ kg-выходов после операции не должна превышать живой вес.
         """
         from decimal import Decimal
 
@@ -223,8 +234,12 @@ class SlaughterShiftViewSet(ImmutableStatusMixin, OrgScopedModelViewSet):
                 {"unit": "В организации нет единицы измерения 'kg'/'кг'."}
             )
 
+        valid_grades = {g.value for g in SlaughterYield.Grade}
+        default_grade = SlaughterYield.Grade.GRADE_1.value
+
         # Валидация перед записью
         prepared = []
+        seen_keys: set[tuple] = set()
         for i, row in enumerate(rows):
             nom_id = row.get("nomenclature")
             qty_raw = row.get("quantity")
@@ -260,59 +275,80 @@ class SlaughterShiftViewSet(ImmutableStatusMixin, OrgScopedModelViewSet):
                     )
             else:
                 share = None
+            grade = (row.get("grade") or default_grade).strip()
+            if grade not in valid_grades:
+                raise DRFValidationError(
+                    {f"yields[{i}].grade": f"Неверный grade: {grade}. Допустимо: {sorted(valid_grades)}."}
+                )
+            key = (nom.id, grade)
+            if key in seen_keys:
+                raise DRFValidationError(
+                    {f"yields[{i}]": f"Дубликат (nomenclature, grade) в запросе: {key}."}
+                )
+            seen_keys.add(key)
             prepared.append({
                 "nomenclature": nom,
+                "grade": grade,
                 "quantity": qty,
                 "share_percent": share,
                 "notes": row.get("notes", "") or "",
             })
 
-        # Сумма выходов не должна превышать живой вес
         live_kg = shift.live_weight_kg_total or Decimal("0")
-        new_total = sum((p["quantity"] for p in prepared), Decimal("0"))
 
         with transaction.atomic():
-            existing_qs = (
+            # Лочим смену, чтобы не было гонки с другим bulk_yields/удалением.
+            SlaughterShift.objects.select_for_update().filter(pk=shift.pk).only("pk").first()
+
+            existing_qs = list(
                 SlaughterYield.objects.filter(shift=shift)
                 .select_related("unit")
             )
-            if replace_existing:
-                # Удаляем только kg-выходы
-                kg_existing = [
-                    y for y in existing_qs
-                    if y.unit and y.unit.code.lower() in KG_CODES
-                ]
-                for y in kg_existing:
-                    y.delete()
-                existing_kg = Decimal("0")
-            else:
-                existing_kg = sum(
-                    (
-                        y.quantity
-                        for y in existing_qs
-                        if y.unit and y.unit.code.lower() in KG_CODES
-                    ),
-                    Decimal("0"),
-                )
 
-            if live_kg > 0 and existing_kg + new_total > live_kg:
+            def _is_kg(y) -> bool:
+                return bool(y.unit and y.unit.code.lower() in KG_CODES)
+
+            if replace_existing:
+                for y in [yy for yy in existing_qs if _is_kg(yy)]:
+                    y.delete()
+                existing_qs = [yy for yy in existing_qs if not _is_kg(yy)]
+
+            # Индекс существующих по (nomenclature_id, grade) — модель имеет
+            # unique_together по этому ключу, поэтому он точно идентифицирует строку.
+            by_key = {(yy.nomenclature_id, yy.grade): yy for yy in existing_qs}
+
+            # Считаем итоговую сумму kg ПОСЛЕ операции (учитывая, какие строки
+            # будут перезаписаны, а какие — добавлены).
+            kept_kg = sum(
+                (yy.quantity for yy in existing_qs if _is_kg(yy)
+                 and (yy.nomenclature_id, yy.grade) not in {
+                     (p["nomenclature"].id, p["grade"]) for p in prepared
+                 }),
+                Decimal("0"),
+            )
+            new_total = sum((p["quantity"] for p in prepared), Decimal("0"))
+            projected_total = kept_kg + new_total
+
+            if live_kg > 0 and projected_total > live_kg:
+                available = max(live_kg - kept_kg, Decimal("0"))
                 raise DRFValidationError({
                     "yields": (
-                        f"Сумма выходов {existing_kg + new_total} кг превысит "
-                        f"живой вес {live_kg} кг. Доступно для добавления: "
-                        f"{max(live_kg - existing_kg, Decimal('0'))} кг."
+                        f"Сумма kg-выходов после операции {projected_total} кг "
+                        f"превысит живой вес {live_kg} кг. "
+                        f"Доступно для kg-строк: {available} кг."
                     )
                 })
 
             created = []
             for p in prepared:
-                # Уникальность (shift, nomenclature) — если запись есть, обновляем quantity
-                existing = SlaughterYield.objects.filter(
-                    shift=shift, nomenclature=p["nomenclature"]
-                ).first()
+                key = (p["nomenclature"].id, p["grade"])
+                existing = by_key.get(key)
                 if existing:
                     existing.quantity = p["quantity"]
-                    existing.unit = kg_unit
+                    # unit меняем только если прежняя строка была в kg
+                    # (а в bulk_yields мы работаем с kg-выходами).
+                    if _is_kg(existing):
+                        existing.unit = kg_unit
                     existing.share_percent = p["share_percent"]
                     existing.notes = p["notes"]
                     existing.save()
@@ -321,6 +357,7 @@ class SlaughterShiftViewSet(ImmutableStatusMixin, OrgScopedModelViewSet):
                     y = SlaughterYield.objects.create(
                         shift=shift,
                         nomenclature=p["nomenclature"],
+                        grade=p["grade"],
                         unit=kg_unit,
                         quantity=p["quantity"],
                         share_percent=p["share_percent"],
@@ -333,7 +370,8 @@ class SlaughterShiftViewSet(ImmutableStatusMixin, OrgScopedModelViewSet):
         data = self.get_serializer(shift).data
         data["_result"] = {
             "yields_created": len(created),
-            "total_kg": str(new_total),
+            "total_kg": str(projected_total),
+            "added_kg": str(new_total),
         }
         return Response(data)
 
@@ -409,7 +447,41 @@ class _ChildOfShiftMixin:
     Mixin для дочерних моделей SlaughterShift — переопределяет _save_kwargs_for_create,
     чтобы не передавать `shift__organization=...` в `Model.objects.create()`
     (организация наследуется через FK на shift).
+
+    Также блокирует CRUD-операции над дочерними записями если родительская
+    смена находится в финальном статусе (posted/cancelled) — нельзя
+    добавлять/изменять/удалять yields/quality/lab после проведения смены.
+    Для отмены проведённой смены используется action `reverse`.
     """
+
+    _frozen_shift_statuses = (
+        SlaughterShift.Status.POSTED,
+        SlaughterShift.Status.CANCELLED,
+    )
+
+    def _assert_shift_mutable(self, shift: "SlaughterShift | None") -> None:
+        if shift is None:
+            return
+        if shift.status in self._frozen_shift_statuses:
+            raise PermissionDenied(
+                f"Нельзя изменять записи смены в статусе «{shift.get_status_display()}». "
+                f"Используйте reverse для отмены смены."
+            )
+
+    def perform_create(self, serializer):
+        shift = serializer.validated_data.get("shift")
+        self._assert_shift_mutable(shift)
+        super().perform_create(serializer)
+
+    def perform_update(self, serializer):
+        instance = serializer.instance
+        shift = getattr(instance, "shift", None) or serializer.validated_data.get("shift")
+        self._assert_shift_mutable(shift)
+        super().perform_update(serializer)
+
+    def perform_destroy(self, instance):
+        self._assert_shift_mutable(getattr(instance, "shift", None))
+        super().perform_destroy(instance)
 
     def _save_kwargs_for_create(self, serializer) -> dict:
         kwargs: dict = {}
