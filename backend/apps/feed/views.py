@@ -63,6 +63,49 @@ class RecipeViewSet(OrgScopedModelViewSet):
     search_fields = ["code", "name"]
     ordering = ["code"]
 
+    def destroy(self, request, *args, **kwargs):
+        """
+        DELETE рецепта.
+
+        Default Django: на Recipe ссылаются `RecipeVersion`, `FeedShrinkageProfile`,
+        `FeedConsumptionPlan` с `on_delete=PROTECT`, а на сами версии — ещё
+        `ProductionTask`/`FeedBatch`/`FeedBagLot` PROTECT. Поэтому `Recipe.delete()`
+        кидал `ProtectedError`, который у DRF превращается в нелочённый 500.
+
+        Стратегия:
+          1. В атомарной транзакции — каскадно убираем безопасные связки
+             (профили усушки, планы потребления) и сами версии (RecipeComponent
+             у версий — CASCADE).
+          2. Если на версиях висят задания/партии/мешки — `RecipeVersion.delete()`
+             поднимет `ProtectedError`. Транзакция откатится; вместо 500 вернём
+             409 с понятным сообщением — оператор может скрыть рецепт через
+             `PATCH is_active=False`.
+        """
+        from django.db import transaction
+        from django.db.models.deletion import ProtectedError
+
+        instance = self.get_object()
+        try:
+            with transaction.atomic():
+                instance.feed_shrinkage_profiles.all().delete()
+                instance.consumption_plans.all().delete()
+                # CASCADE: RecipeComponent.recipe_version
+                instance.versions.all().delete()
+                instance.delete()
+        except ProtectedError:
+            from rest_framework import status as http_status
+            return Response(
+                {
+                    "detail": (
+                        "Невозможно удалить рецепт: на него ссылаются задания "
+                        "на замес, партии готового корма или мешки. Чтобы скрыть "
+                        "рецепт из активных, снимите флаг «Активен» (is_active)."
+                    ),
+                },
+                status=http_status.HTTP_409_CONFLICT,
+            )
+        return Response(status=204)
+
 
 class _ChildOfRecipeMixin:
     """
