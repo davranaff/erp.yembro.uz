@@ -18,6 +18,13 @@ export interface NavItem {
   module?: string;
   min?: ModuleLevel;
   /**
+   * Cross-module гейт: пункт виден если у пользователя есть `r+` хотя бы на
+   * один модуль из списка. Используется для «сборных» страниц (Сводка,
+   * Касса и банк, Токены продавцов) — чтобы их не видел тот, у кого вообще
+   * нет смежных модулей (например HR_MANAGER с одним hr-модулем).
+   */
+  requireAnyModule?: string[];
+  /**
    * Альтернативные термины для поиска (palette). Например для «Касса и банк» —
    * ['платёж', 'оплата', 'банк'].
    */
@@ -32,7 +39,12 @@ export type NavEntry = NavItem | NavGroup;
 
 export const NAV: NavEntry[] = [
   // ── Главное (без группы) ────────────────────────────────────────────
+  // Сводка показывает KPI по производству, финансам, продажам. Скрыта от
+  // ролей, у которых только узкий модуль (например HR_MANAGER с hr=admin
+  // и без остальных модулей).
   { key: 'dash',         label: 'Сводка',             icon: 'grid',  href: '/dashboard',
+    requireAnyModule: ['core', 'ledger', 'reports', 'sales', 'purchases', 'stock',
+      'feed', 'feedlot', 'matochnik', 'incubation', 'slaughter', 'vet', 'admin'],
     aliases: ['dashboard', 'главная', 'kpi'] },
 
   // ── Справочники ─────────────────────────────────────────────────────
@@ -83,8 +95,10 @@ export const NAV: NavEntry[] = [
     aliases: ['усушка', 'shrinkage', 'потери', 'испарение'] },
   { key: 'vet', label: 'Вет. аптека', icon: 'pharma', href: '/vet', module: 'vet',
     aliases: ['ветеринар', 'препараты', 'лекарства'] },
-  // Токены — без module-гейта, видимость через canEdit на странице.
+  // Токены — это API-доступ к vet-сканеру для продавцов. Показываем только
+  // тем, у кого есть отношение к vet или sales.
   { key: 'seller-tokens', label: 'Токены продавцов', icon: 'users', href: '/vet/seller-tokens',
+    requireAnyModule: ['vet', 'sales', 'admin'],
     aliases: ['токен', 'api', 'продавец', 'scan'] },
 
   // ── Операции (движения денег и товаров) ─────────────────────────────
@@ -98,7 +112,9 @@ export const NAV: NavEntry[] = [
   { key: 'tasks',     label: 'Задачи по долгам', icon: 'bag',   href: '/tasks',           module: 'sales',
     aliases: ['обзвон', 'напоминание', 'collection', 'follow-up'] },
   // Касса и банк: cross-module, фильтрация платежей по модулям внутри viewset.
+  // Скрываем для тех, у кого только узкий модуль (например HR).
   { key: 'cashbox',   label: 'Касса и банк',     icon: 'book',  href: '/finance/cashbox',
+    requireAnyModule: ['ledger', 'purchases', 'sales', 'vet', 'feed', 'admin'],
     aliases: ['платёж', 'оплата', 'банк', 'касса'] },
 
   // ── Аналитика (всё отчётно-аналитическое) ───────────────────────────
