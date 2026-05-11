@@ -84,9 +84,9 @@ export default async function ContactsPage({
             {/* CONTACTS info */}
             <div className="anim-fade-in-up delay-200">
               {[
-                { Icon: PhoneIcon, label: locale === "ru" ? "Телефон" : locale === "uz" ? "Telefon" : "Phone", value: "+998 (90) 000-00-00", href: "tel:+998900000000" },
-                { Icon: MailIcon, label: "Email", value: "hello@yembro.uz", href: "mailto:hello@yembro.uz" },
-                { Icon: GlobeIcon, label: "Telegram", value: "@yembro", href: "https://t.me/yembro" },
+                { Icon: PhoneIcon, label: locale === "ru" ? "Телефон" : locale === "uz" ? "Telefon" : "Phone", value: "+998 (94) 542 77 77", href: "tel:+998945427777" },
+                { Icon: MailIcon, label: "Email", value: "info@yembro.uz", href: "mailto:info@yembro.uz" },
+                { Icon: GlobeIcon, label: "Telegram", value: "@ulugbek_jalolov", href: "https://t.me/ulugbek_jalolov" },
               ].map(({ Icon, label, value, href }) => (
                 <a key={label} href={href} className="card card-hover" style={{
                   display: "flex",

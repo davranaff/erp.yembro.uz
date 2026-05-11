@@ -35,14 +35,14 @@ export function OrganizationJsonLd({ locale }: { locale: string }) {
     },
     sameAs: [
       ERP_URL,
-      "https://t.me/yembro",
+      "https://t.me/ulugbek_jalolov",
     ],
     contactPoint: [
       {
         "@type": "ContactPoint",
         contactType: "sales",
-        telephone: "+998-90-000-00-00",
-        email: "hello@yembro.uz",
+        telephone: "+998-94-542-77-77",
+        email: "info@yembro.uz",
         availableLanguage: ["ru", "uz", "en"],
         areaServed: "UZ",
       },

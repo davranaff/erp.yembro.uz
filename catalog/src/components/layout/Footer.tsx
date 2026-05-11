@@ -74,11 +74,11 @@ export async function Footer() {
             <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "grid", gap: 10, fontSize: "var(--text-sm)", color: "rgba(255,253,247,0.85)" }}>
               <li style={{ display: "flex", gap: 8, alignItems: "center" }}>
                 <PhoneIcon width={14} height={14} style={{ color: "var(--brand-yellow)", flex: "0 0 14px" }} />
-                <a href="tel:+998900000000">+998 (90) 000-00-00</a>
+                <a href="tel:+998945427777">+998 (94) 542 77 77</a>
               </li>
               <li style={{ display: "flex", gap: 8, alignItems: "center" }}>
                 <MailIcon width={14} height={14} style={{ color: "var(--brand-yellow)", flex: "0 0 14px" }} />
-                <a href="mailto:hello@yembro.uz">hello@yembro.uz</a>
+                <a href="mailto:info@yembro.uz">info@yembro.uz</a>
               </li>
               <li style={{ display: "flex", gap: 8, alignItems: "center" }}>
                 <GlobeIcon width={14} height={14} style={{ color: "var(--brand-yellow)", flex: "0 0 14px" }} />
