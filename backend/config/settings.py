@@ -140,7 +140,11 @@ MODELTRANSLATION_FALLBACK_LANGUAGES = {"default": ("ru",)}
 STATIC_URL = "static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
 MEDIA_URL = "media/"
-MEDIA_ROOT = BASE_DIR / "media"
+# Override через env, потому что в проде /app/media — НЕ volume, и любой
+# rebuild контейнера терял загруженные файлы. На проде ставим
+# DJANGO_MEDIA_ROOT=/data/uploads — тот же volume что для покупок,
+# переживает rebuild/redeploy.
+MEDIA_ROOT = env.str("DJANGO_MEDIA_ROOT", default=str(BASE_DIR / "media"))
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
