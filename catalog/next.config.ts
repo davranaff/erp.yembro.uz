@@ -14,21 +14,16 @@ const config: NextConfig = {
   images: {
     formats: ["image/avif", "image/webp"],
     remotePatterns: [
-      {
-        protocol: "https",
-        hostname: "media.yembro.uz",
-        pathname: "/**",
-      },
-      {
-        protocol: "https",
-        hostname: "api.yembro.uz",
-        pathname: "/media/**",
-      },
-      {
-        protocol: "http",
-        hostname: "localhost",
-        pathname: "/media/**",
-      },
+      // CDN-домен на случай если когда-нибудь введём
+      { protocol: "https", hostname: "media.yembro.uz", pathname: "/**" },
+      // Прод-API: тут реально живут MediaFiles
+      { protocol: "https", hostname: "api.erp.yembro.uz", pathname: "/media/**" },
+      // Староe имя на случай если оно ещё где-то осталось
+      { protocol: "https", hostname: "api.yembro.uz", pathname: "/media/**" },
+      // Staging
+      { protocol: "https", hostname: "staging.api.erp.yembro.uz", pathname: "/media/**" },
+      // Локалка через docker-compose host port
+      { protocol: "http", hostname: "localhost", pathname: "/media/**" },
     ],
   },
   async headers() {
