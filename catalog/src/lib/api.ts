@@ -42,9 +42,29 @@ async function apiGet<T extends z.ZodTypeAny>(
     }
   }
   try {
+    // При server-side fetch мы ходим к API через docker-internal hostname
+    // (например http://prod-api:30000), а сериализаторы Django по умолчанию
+    // строят абсолютные URL картинок через `request.build_absolute_uri()` —
+    // в итоге картинки получают URL `http://prod-api:30000/media/...`,
+    // недоступный извне.
+    //
+    // X-Forwarded-Host/Proto уважается Django при USE_X_FORWARDED_HOST=True,
+    // и сериализатор отдаёт правильный публичный URL media-файлов.
+    const headers: Record<string, string> = {};
+    if (lang) headers["Accept-Language"] = lang;
+    // Внутренний хост ловим по env-переменной (server-side only).
+    if (process.env.CATALOG_API_URL_INTERNAL) {
+      try {
+        const publicHost = new URL(
+          process.env.NEXT_PUBLIC_API_URL ?? "https://api.erp.yembro.uz",
+        ).host;
+        headers["X-Forwarded-Host"] = publicHost;
+        headers["X-Forwarded-Proto"] = "https";
+      } catch { /* malformed env — пропускаем */ }
+    }
     const res = await fetch(url.toString(), {
       next: { revalidate, tags },
-      headers: lang ? { "Accept-Language": lang } : undefined,
+      headers: Object.keys(headers).length > 0 ? headers : undefined,
     });
     if (!res.ok) {
       // Любой 4xx/5xx — возвращаем null. Страница либо отрендерит "пустое",
