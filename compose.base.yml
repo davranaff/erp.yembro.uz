@@ -76,7 +76,10 @@ services:
     init: true
     restart: unless-stopped
     networks:
+      # internal — для доступа к postgres/redis.
+      # public — чтобы revalidate_next_task мог резолвить prod-catalog (Next.js).
       - internal
+      - public
     volumes:
       - uploads_data:${APP_STORAGE_LOCAL_ROOT:-/data/uploads}
     healthcheck:
