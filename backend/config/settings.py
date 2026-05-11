@@ -237,6 +237,12 @@ DEMO_NOTIFY_CHAT_IDS = env.str("DEMO_NOTIFY_CHAT_IDS", default="")
 # Куда стучаться для ISR-revalidation Next.js (catalog/) при изменениях контента.
 CATALOG_FRONTEND_URL = env.str("CATALOG_FRONTEND_URL", default="https://yembro.uz")
 CATALOG_REVALIDATE_SECRET = env.str("CATALOG_REVALIDATE_SECRET", default="")
+# Базовый URL для absolute media-ссылок в публичном API каталога.
+# Берётся вместо request.build_absolute_uri() — иначе при server-side fetch
+# из Next.js (Host: prod-api:30000) URL получался бы внутренним и битым.
+CATALOG_PUBLIC_MEDIA_BASE = env.str(
+    "CATALOG_PUBLIC_MEDIA_BASE", default="https://api.erp.yembro.uz",
+)
 # Telegram chat_id через запятую для уведомлений о заявках с каталога.
 # Если пусто — fallback на DEMO_NOTIFY_CHAT_IDS.
 CATALOG_NOTIFY_CHAT_IDS = env.str("CATALOG_NOTIFY_CHAT_IDS", default="")

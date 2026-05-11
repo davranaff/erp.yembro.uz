@@ -75,14 +75,38 @@ class CategoryNodeSerializer(_LocalizedMixin, serializers.ModelSerializer):
     def get_meta_description(self, obj): return localized(obj, "meta_description", self.lang)
 
 
+def _absolute_media_url(image_field) -> str | None:
+    """Безопасное построение абсолютного URL для медиа-файла.
+
+    Не зависит от request.Host (который в docker-internal среде может быть
+    'prod-api:30000'). Использует CATALOG_PUBLIC_MEDIA_BASE из settings —
+    обычно это 'https://api.erp.yembro.uz'.
+    """
+    from django.conf import settings
+    if not image_field:
+        return None
+    try:
+        url = image_field.url  # /media/catalog/products/...
+    except Exception:
+        return None
+    base = getattr(settings, "CATALOG_PUBLIC_MEDIA_BASE", "") or ""
+    if base:
+        return base.rstrip("/") + url
+    return url
+
+
 class ProductImageSerializer(_LocalizedMixin, serializers.ModelSerializer):
     alt = serializers.SerializerMethodField()
+    image = serializers.SerializerMethodField()
 
     class Meta:
         model = ProductImage
         fields = ("id", "image", "alt", "sort_order", "is_primary")
 
     def get_alt(self, obj): return localized(obj, "alt", self.lang)
+
+    def get_image(self, obj):
+        return _absolute_media_url(obj.image)
 
 
 class ProductSpecSerializer(serializers.ModelSerializer):
@@ -133,11 +157,7 @@ class ProductCardSerializer(_LocalizedMixin, serializers.ModelSerializer):
             (i for i in obj.images.all() if i.is_primary),
             next(iter(obj.images.all()), None),
         )
-        if not img:
-            return None
-        request = self.context.get("request")
-        url = img.image.url if img.image else None
-        return request.build_absolute_uri(url) if request and url else url
+        return _absolute_media_url(img.image) if img else None
 
 
 class ProductDetailSerializer(_LocalizedMixin, serializers.ModelSerializer):
