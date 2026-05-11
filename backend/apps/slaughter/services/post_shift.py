@@ -86,6 +86,82 @@ def _quantize_money(v: Decimal) -> Decimal:
     return v.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
 
 
+def _allocate_costs(yields, total_cost: Decimal) -> list[Decimal]:
+    """
+    Распределить total_cost между yields так, чтобы Σ == total_cost.
+
+    Правила:
+      - yields с заданным share_percent получают долю от total_cost
+        пропорционально share_percent.
+      - yields без share_percent делят между собой остаток поровну.
+      - если share задан у всех — нормализация по их сумме.
+      - погрешность округления (±копейки) добавляется к последнему элементу.
+    """
+    n = len(yields)
+    if n == 0:
+        return []
+
+    with_share_idx = [i for i, y in enumerate(yields) if y.share_percent is not None]
+    no_share_idx = [i for i, y in enumerate(yields) if y.share_percent is None]
+
+    allocations: list[Decimal] = [Decimal("0") for _ in range(n)]
+
+    if not with_share_idx:
+        # никто не задан — равномерно
+        per = total_cost / n
+        for i in range(n):
+            allocations[i] = _quantize_money(per)
+    elif not no_share_idx:
+        # у всех задан — нормализуем по сумме (на случай, если != 100)
+        total_share = sum(
+            (yields[i].share_percent for i in with_share_idx),
+            Decimal("0"),
+        )
+        if total_share <= 0:
+            per = total_cost / n
+            for i in range(n):
+                allocations[i] = _quantize_money(per)
+        else:
+            for i in with_share_idx:
+                allocations[i] = _quantize_money(
+                    total_cost * yields[i].share_percent / total_share
+                )
+    else:
+        # смешанный: share как процент 0..100 от total_cost,
+        # остальное — равномерно среди без share.
+        assigned_share = sum(
+            (yields[i].share_percent for i in with_share_idx),
+            Decimal("0"),
+        )
+        if assigned_share > Decimal("100"):
+            # заданные доли уже превышают 100% — нормализуем их по сумме
+            # (yields без share получат 0).
+            for i in with_share_idx:
+                allocations[i] = _quantize_money(
+                    total_cost * yields[i].share_percent / assigned_share
+                )
+        else:
+            for i in with_share_idx:
+                allocations[i] = _quantize_money(
+                    total_cost * yields[i].share_percent / Decimal("100")
+                )
+            remaining = total_cost - sum(
+                (allocations[i] for i in with_share_idx), Decimal("0")
+            )
+            if remaining < 0:
+                remaining = Decimal("0")
+            per = remaining / len(no_share_idx)
+            for i in no_share_idx:
+                allocations[i] = _quantize_money(per)
+
+    # Корректировка округления — кладём дельту в последний allocation.
+    diff = total_cost - sum(allocations, Decimal("0"))
+    if diff != 0:
+        allocations[-1] = _quantize_money(allocations[-1] + diff)
+
+    return allocations
+
+
 @transaction.atomic
 def post_slaughter_shift(
     shift: SlaughterShift,
@@ -104,12 +180,17 @@ def post_slaughter_shift(
                           (получатель feedlot batch).
         output_warehouse: куда оприходуется готовая продукция (43-склад).
     """
-    # 1. Lock
-    shift = SlaughterShift.objects.select_for_update().get(pk=shift.pk)
-    shift = SlaughterShift.objects.select_related(
-        "organization", "module", "line_block", "source_batch",
-        "source_batch__current_module", "source_batch__current_block",
-    ).get(pk=shift.pk)
+    # 1. Lock shift (вместе с select_related — один запрос, lock сохраняется
+    # до конца tx). `of=("self",)` лочит только саму таблицу slaughter_shift,
+    # потому что PostgreSQL не позволяет FOR UPDATE на nullable joins.
+    shift = (
+        SlaughterShift.objects.select_for_update(of=("self",))
+        .select_related(
+            "organization", "module", "line_block", "source_batch",
+            "source_batch__current_module", "source_batch__current_block",
+        )
+        .get(pk=shift.pk)
+    )
 
     # 2. Status guard
     if shift.status not in (
@@ -119,6 +200,15 @@ def post_slaughter_shift(
         raise SlaughterPostError(
             {"status": f"Нельзя провести смену в статусе {shift.get_status_display()}."}
         )
+
+    # 2b. Lock source_batch — защита от параллельного reverse transfer'а
+    # из feedlot между проверкой current_module и записью.
+    source_batch = (
+        Batch.objects.select_for_update(of=("self",))
+        .select_related("current_module", "current_block")
+        .get(pk=shift.source_batch_id)
+    )
+    shift.source_batch = source_batch
 
     # 3. Full clean (включая withdrawal-guard!)
     shift.full_clean(exclude=None)
@@ -131,7 +221,6 @@ def post_slaughter_shift(
         )
 
     org = shift.organization
-    source_batch = shift.source_batch
     total_cost = source_batch.accumulated_cost_uzs
 
     # 4b. Гард: source_batch.current_module == slaughter
@@ -268,20 +357,17 @@ def post_slaughter_shift(
     journal_entries.append(je_writeoff)
 
     # 8. Оприходование выхода (yields)
-    # Пропорция cost по share_percent. Если share не задан — равномерно.
-    total_share = sum(
-        (y.share_percent for y in yields if y.share_percent is not None),
-        Decimal("0"),
-    )
+    # Распределение cost:
+    #   - если share_percent задан хотя бы у одного — он применяется как доля
+    #     от total_cost (трактуется как процент 0..100); остаток распределяется
+    #     равномерно среди yields БЕЗ share_percent.
+    #   - если задано у всех, но сумма != 100 — нормализуем по сумме.
+    #   - если не задано ни у кого — поровну.
+    #   - погрешность округления копится в последнем allocated, чтобы
+    #     Σ allocated == total_cost.
+    allocated_costs: list[Decimal] = _allocate_costs(yields, total_cost)
 
-    for yield_row in yields:
-        if yield_row.share_percent is not None and total_share > 0:
-            allocated_cost = _quantize_money(
-                total_cost * yield_row.share_percent / total_share
-            )
-        else:
-            allocated_cost = _quantize_money(total_cost / len(yields))
-
+    for yield_row, allocated_cost in zip(yields, allocated_costs):
         # Output batch
         out_batch = yield_row.output_batch
         if out_batch is None:

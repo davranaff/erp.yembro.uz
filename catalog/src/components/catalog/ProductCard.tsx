@@ -32,6 +32,8 @@ export function ProductCard({
           aspectRatio: "4 / 3",
           background: "var(--brand-grad-soft)",
           overflow: "hidden",
+          // Padding вокруг — чтобы картинка не была впритык к краям.
+          padding: 18,
         }}
       >
         {product.primary_image ? (
@@ -40,7 +42,14 @@ export function ProductCard({
             alt={product.name}
             fill
             sizes="(max-width: 768px) 100vw, (max-width: 1280px) 33vw, 320px"
-            style={{ objectFit: "cover", transition: "transform 400ms var(--ease)" }}
+            style={{
+              // contain — картинка вписывается целиком, без обрезки.
+              objectFit: "contain",
+              // padding на родителе обрезается у `fill`, поэтому имитируем
+              // его через inset/scale.
+              padding: 18,
+              transition: "transform 400ms var(--ease)",
+            }}
           />
         ) : (
           <div

@@ -87,20 +87,21 @@ export default function PostShiftModal({ shift, onClose }: Props) {
           </div>
         )}
       </div>
-      {fieldErrors.quality_check && (
-        <div style={{ fontSize: 12, color: 'var(--danger)', marginTop: 8 }}>
-          {Array.isArray(fieldErrors.quality_check)
-            ? fieldErrors.quality_check.join(' · ')
-            : String(fieldErrors.quality_check)}
-        </div>
-      )}
-      {fieldErrors.yields && (
-        <div style={{ fontSize: 12, color: 'var(--danger)', marginTop: 8 }}>
-          {Array.isArray(fieldErrors.yields)
-            ? fieldErrors.yields.join(' · ')
-            : String(fieldErrors.yields)}
-        </div>
-      )}
+      {(() => {
+        // Показываем все полевые ошибки кроме уже отрисованных под селектами
+        const rendered = new Set(['source_warehouse', 'output_warehouse']);
+        const rest = Object.entries(fieldErrors).filter(([k]) => !rendered.has(k));
+        if (rest.length === 0) return null;
+        return rest.map(([key, value]) => (
+          <div
+            key={key}
+            style={{ fontSize: 12, color: 'var(--danger)', marginTop: 8 }}
+          >
+            <strong>{key === '__all__' ? '' : `${key}: `}</strong>
+            {Array.isArray(value) ? value.join(' · ') : String(value)}
+          </div>
+        ));
+      })()}
       {error && error.status !== 400 && (
         <div style={{ fontSize: 12, color: 'var(--danger)' }}>Ошибка: {error.message}</div>
       )}

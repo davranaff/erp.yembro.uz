@@ -108,7 +108,7 @@ export default async function ProductPage({
             <div className="anim-fade-in-up" style={{
               position: "relative",
               aspectRatio: "1 / 1",
-              background: "var(--bg-card)",
+              background: "linear-gradient(135deg, var(--bg-card) 0%, var(--brand-red-soft) 100%)",
               border: "1px solid var(--border)",
               borderRadius: "var(--radius-2xl)",
               overflow: "hidden",
@@ -121,7 +121,11 @@ export default async function ProductPage({
                   fill
                   sizes="(max-width: 1024px) 100vw, 600px"
                   priority
-                  style={{ objectFit: "cover" }}
+                  style={{
+                    // contain — мешок целиком виден, не обрезается
+                    objectFit: "contain",
+                    padding: 48,
+                  }}
                 />
               ) : (
                 <div style={{
