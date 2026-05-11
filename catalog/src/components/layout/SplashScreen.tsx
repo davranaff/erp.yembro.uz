@@ -17,8 +17,8 @@ import { useEffect, useState } from "react";
  */
 type Stage = "showing" | "exiting" | "gone";
 
-const SHOW_MS = 3000;
-const EXIT_MS = 600;
+const SHOW_MS = 500;
+const EXIT_MS = 300;
 
 export function SplashScreen() {
   const [stage, setStage] = useState<Stage>("showing");
