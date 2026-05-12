@@ -23,6 +23,13 @@ export interface OpexPreselect {
    * соответствующий модулю. Если задан — будет автоматически отмечен.
    */
   suggestedContraCode?: string;
+  /**
+   * Жёстко привязать форму к конкретной кассе (UUID GLSubaccount). Когда
+   * передан — поле «Касса/счёт» становится readonly, и операция гарантированно
+   * пойдёт по этой кассе. Используется при открытии модалки из карточки
+   * /finance/cashbox/[id] — там нет смысла давать менять кассу.
+   */
+  cashSubaccountId?: string;
 }
 
 interface Props {
@@ -75,10 +82,20 @@ export default function OpexModal({ preselect, onClose }: Props) {
   );
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
   const [amount, setAmount] = useState('');
-  const [cashSubId, setCashSubId] = useState('');
+  const [cashSubId, setCashSubId] = useState(preselect?.cashSubaccountId ?? '');
+  // Если кассу прислали через preselect — поле кассы readonly, чтобы юзер
+  // открывший форму со страницы конкретной кассы случайно не зачислил/списал
+  // с другой.
+  const cashLocked = Boolean(preselect?.cashSubaccountId);
   const [contraSubId, setContraSubId] = useState('');
   const [articleId, setArticleId] = useState('');
   const [moduleId, setModuleId] = useState('');
+  // Касса у нас уже привязана к модулю (s.module). По умолчанию подставляем
+  // модуль из выбранной кассы, чтобы оператор не выбирал одно и то же дважды.
+  // Если юзер вручную поменял модуль — больше не перезаписываем при смене
+  // кассы (он явно знает, что делает: например, тратит из feed-кассы, но
+  // расход относит на vet).
+  const [moduleManuallySet, setModuleManuallySet] = useState(false);
   const [counterpartyId, setCounterpartyId] = useState('');
   const [notes, setNotes] = useState('');
   // Раскрыть «бухгалтерскую» секцию (выбор субсчёта вручную). Обычный
@@ -126,6 +143,7 @@ export default function OpexModal({ preselect, onClose }: Props) {
 
   // Авто-выбор если ровно одна доступная касса.
   useEffect(() => {
+    if (cashLocked) return; // preselect.cashSubaccountId — не переопределяем
     if (!cashSubId && cashOptions.length === 1) {
       setCashSubId(cashOptions[0].id);
     }
@@ -134,7 +152,7 @@ export default function OpexModal({ preselect, onClose }: Props) {
     if (cashSubId && !cashOptions.some((s) => s.id === cashSubId)) {
       setCashSubId('');
     }
-  }, [cashOptions, cashSubId]);
+  }, [cashOptions, cashSubId, cashLocked]);
 
   // Preselect модуль по коду
   useEffect(() => {
@@ -143,6 +161,17 @@ export default function OpexModal({ preselect, onClose }: Props) {
       if (m) setModuleId(m.id);
     }
   }, [preselect, modules, moduleId]);
+
+  // Авто-подстановка модуля из выбранной кассы. Не трогаем, если юзер
+  // уже вручную выбрал модуль (см. moduleManuallySet).
+  useEffect(() => {
+    if (moduleManuallySet) return;
+    if (!cashSubId || !subaccounts) return;
+    const cashbox = subaccounts.find((s) => s.id === cashSubId);
+    if (cashbox?.module) {
+      setModuleId(cashbox.module);
+    }
+  }, [cashSubId, subaccounts, moduleManuallySet]);
 
   // (старая логика «method → 50.01/51.01» удалена — теперь юзер
   // выбирает кассу явно из своего отфильтрованного списка)
@@ -417,7 +446,41 @@ export default function OpexModal({ preselect, onClose }: Props) {
       {/* ───── Касса/счёт ───── */}
       <div className="field">
         <label>Касса / счёт *</label>
-        {cashOptions.length === 0 ? (
+        {cashLocked ? (
+          // Жёстко зафиксирована (открыто со страницы конкретной кассы).
+          // Показываем только бейдж — без возможности смены, иначе юзер
+          // случайно перенесёт операцию на чужую кассу.
+          (() => {
+            const s = subaccounts?.find((x) => x.id === cashSubId);
+            if (!s) {
+              return (
+                <div style={{
+                  padding: 8, fontSize: 12,
+                  background: 'var(--bg-soft)', borderRadius: 6,
+                }}>
+                  Загрузка кассы…
+                </div>
+              );
+            }
+            const isCash = s.code.startsWith('50.');
+            return (
+              <div style={{
+                padding: '8px 10px', fontSize: 13,
+                background: 'var(--bg-soft)',
+                border: '1px solid var(--border)', borderRadius: 6,
+                display: 'flex', alignItems: 'center', gap: 8,
+              }}>
+                <span>{isCash ? '💵' : '🏦'}</span>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontWeight: 500 }}>{s.name}</div>
+                  <div className="mono" style={{ fontSize: 11, color: 'var(--fg-3)' }}>
+                    {s.code}{s.module_code ? ` · ${s.module_code}` : ''}
+                  </div>
+                </div>
+              </div>
+            );
+          })()
+        ) : cashOptions.length === 0 ? (
           <div style={{
             padding: 8, fontSize: 12, color: 'var(--danger)',
             background: 'var(--danger-soft, #FEF2F2)',
@@ -445,9 +508,11 @@ export default function OpexModal({ preselect, onClose }: Props) {
           </select>
         )}
         <span className="hint">
-          {direction === 'out'
-            ? 'Откуда списываются деньги. Видите только свои кассы (по модулям где у вас rw).'
-            : 'Куда зачисляются деньги. Видите только свои кассы.'}
+          {cashLocked
+            ? 'Операция жёстко привязана к этой кассе.'
+            : direction === 'out'
+              ? 'Откуда списываются деньги. Видите только свои кассы (по модулям где у вас rw).'
+              : 'Куда зачисляются деньги. Видите только свои кассы.'}
         </span>
       </div>
 
@@ -456,13 +521,23 @@ export default function OpexModal({ preselect, onClose }: Props) {
 
       <div className="field">
         <label>Модуль</label>
-        <select className="input" value={moduleId} onChange={(e) => setModuleId(e.target.value)}>
+        <select
+          className="input"
+          value={moduleId}
+          onChange={(e) => {
+            setModuleId(e.target.value);
+            setModuleManuallySet(true);
+          }}
+        >
           <option value="">— не привязан —</option>
           {modules?.map((m) => (
             <option key={m.id} value={m.id}>{m.name}</option>
           ))}
         </select>
-        <span className="hint">К какому производству относится. Можно пропустить</span>
+        <span className="hint">
+          Подставляется из кассы автоматически. Меняйте только если расход/приход
+          реально относится к другому производству.
+        </span>
       </div>
 
       <div className="field">

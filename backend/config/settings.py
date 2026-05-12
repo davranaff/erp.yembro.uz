@@ -67,6 +67,7 @@ INSTALLED_APPS = [
     "apps.tgbot",
     "apps.landing",
     "apps.catalog",
+    "apps.otp",
 ]
 
 AUTH_USER_MODEL = "users.User"
@@ -194,6 +195,12 @@ REST_FRAMEWORK = {
     "DEFAULT_THROTTLE_RATES": {
         "landing-demo": "5/min",
         "catalog-contact": "5/hour",
+        # OTP: даём по 10 запросов кода с IP в минуту (внутри сервиса
+        # ещё есть per-phone resend-cooldown через OTP_RESEND_INTERVAL_SECONDS).
+        # Verify пускаем щедрее — пользователь может опечататься несколько раз,
+        # счётчик попыток на конкретный код всё равно ограничивает подбор.
+        "otp-request": "10/min",
+        "otp-verify": "20/min",
     },
 }
 
@@ -275,6 +282,45 @@ INCUBATION_HATCH_RATE_ALERT_PCT = env.float(
 INCUBATION_MIN_FERTILE_FOR_ALERT = env.int(
     "INCUBATION_MIN_FERTILE_FOR_ALERT", default=100,
 )
+
+# ── OTP / SMS (Eskiz) ───────────────────────────────────────────────────────
+# Креды личного кабинета Eskiz (notify.eskiz.uz). При пустых значениях боевая
+# отправка SMS невозможна — endpoint вернёт 503. Для локальной разработки
+# включите OTP_DEV_PRINT=true: код будет писаться в лог.
+ESKIZ_BASE_URL = env.str("ESKIZ_BASE_URL", default="https://notify.eskiz.uz")
+ESKIZ_EMAIL = env.str("ESKIZ_EMAIL", default="")
+ESKIZ_PASSWORD = env.str("ESKIZ_PASSWORD", default="")
+# Sender ID / alpha-name. По умолчанию тестовый "4546" — он работает только
+# с прошитым тестовым текстом "Bu Eskiz dan test". Для прода в кабинете
+# Eskiz регистрируется свой alpha-name (напр. YEMBRO) и подставляется сюда.
+ESKIZ_FROM = env.str("ESKIZ_FROM", default="4546")
+ESKIZ_TIMEOUT_SECONDS = env.float("ESKIZ_TIMEOUT_SECONDS", default=10.0)
+# Опциональный публичный URL, на который Eskiz пришлёт статус доставки
+# каждого SMS. Полезно для прода (увидеть delivered/failed без поллинга).
+# Пока endpoint /api/otp/callback/ не реализован — оставляем пустым и
+# просто доверяем синхронному ответу send_sms.
+ESKIZ_CALLBACK_URL = env.str("ESKIZ_CALLBACK_URL", default="")
+
+# Длина и время жизни кода. 6 цифр × 5 минут — стандарт.
+OTP_CODE_LENGTH = env.int("OTP_CODE_LENGTH", default=6)
+OTP_TTL_SECONDS = env.int("OTP_TTL_SECONDS", default=300)
+OTP_MAX_ATTEMPTS = env.int("OTP_MAX_ATTEMPTS", default=5)
+# Сколько секунд между повторными запросами кода для одного телефона+purpose.
+OTP_RESEND_INTERVAL_SECONDS = env.int("OTP_RESEND_INTERVAL_SECONDS", default=60)
+# Шаблон сообщения. {code} подставляется. Текст должен быть предварительно
+# согласован в кабинете Eskiz, иначе провайдер откажет (кроме sender 4546
+# + текста "Bu Eskiz dan test" — тестовый режим).
+OTP_MESSAGE_TEMPLATE = env.str(
+    "OTP_MESSAGE_TEMPLATE",
+    default="Bu Eskiz dan test",
+)
+# Можно ли клиенту присылать свой текст SMS (через поле message_template
+# в /api/otp/request/). По умолчанию выключено — иначе наш endpoint
+# превращается в spam-шлюз для произвольных текстов.
+OTP_ALLOW_CLIENT_TEMPLATE = env.bool("OTP_ALLOW_CLIENT_TEMPLATE", default=False)
+# В DEBUG по умолчанию шлём не в Eskiz, а в лог — чтобы не тратить SMS
+# на дев-сборках. На проде должен быть False.
+OTP_DEV_PRINT = env.bool("OTP_DEV_PRINT", default=DEBUG)
 
 # ── Matochnik KPI-алерты ────────────────────────────────────────────────────
 # Средняя яйценоскость за неделю ниже этого % → TG-алерт.
