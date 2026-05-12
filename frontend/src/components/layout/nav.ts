@@ -49,9 +49,11 @@ export const NAV: NavEntry[] = [
 
   // ── Справочники ─────────────────────────────────────────────────────
   { group: 'Ядро' },
-  { key: 'nomenclature',   label: 'Номенклатура', icon: 'box',     href: '/nomenclature',   module: 'core',
+  // min='rw' — это редакторские справочники, бухгалтер с core=r их не видит,
+  // а Контрагенты живут отдельно в группе «Люди» с дефолтным min='r'.
+  { key: 'nomenclature',   label: 'Номенклатура', icon: 'box',     href: '/nomenclature',   module: 'core', min: 'rw',
     aliases: ['товары', 'sku', 'позиции'] },
-  { key: 'blocks',         label: 'Блоки',        icon: 'factory', href: '/blocks',         module: 'core',
+  { key: 'blocks',         label: 'Блоки',        icon: 'factory', href: '/blocks',         module: 'core', min: 'rw',
     aliases: ['корпус', 'птичник', 'шкаф', 'линия'] },
 
   // ── Люди ────────────────────────────────────────────────────────────
@@ -93,10 +95,10 @@ export const NAV: NavEntry[] = [
     aliases: ['усушка', 'shrinkage', 'потери', 'испарение'] },
   { key: 'vet', label: 'Вет. аптека', icon: 'pharma', href: '/vet', module: 'vet',
     aliases: ['ветеринар', 'препараты', 'лекарства'] },
-  // Токены — это API-доступ к vet-сканеру для продавцов. Показываем только
-  // тем, у кого есть отношение к vet или sales.
+  // Токены — это API-доступ к vet-сканеру для продавцов. Привязано к
+  // вет-аптеке, поэтому видно только vet-ролям (или admin'у).
   { key: 'seller-tokens', label: 'Токены продавцов', icon: 'users', href: '/vet/seller-tokens',
-    requireAnyModule: ['vet', 'sales', 'admin'],
+    requireAnyModule: ['vet', 'admin'],
     aliases: ['токен', 'api', 'продавец', 'scan'] },
 
   // ── Операции (движения денег и товаров) ─────────────────────────────
