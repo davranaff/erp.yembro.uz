@@ -132,7 +132,9 @@ def test_sync_does_not_touch_paid_supplier_po(org, supplier):
     assert po.amount_uzs == Decimal("100000")
 
 
-def test_sync_cancels_unpaid_when_debt_zeroed(org, supplier):
+def test_sync_keeps_po_when_debt_zeroed_after_migration(org, supplier):
+    """После материализации opening_debt → PurchaseOrder обнуление поля
+    не отменяет реальный счёт автоматически. Отмена — явно через UI."""
     supplier.opening_debt_uzs = Decimal("100000")
     supplier.save()
     po = sync_opening_balance_for_supplier(supplier)
@@ -141,7 +143,8 @@ def test_sync_cancels_unpaid_when_debt_zeroed(org, supplier):
     supplier.save()
     sync_opening_balance_for_supplier(supplier)
     po.refresh_from_db()
-    assert po.status == PurchaseOrder.Status.CANCELLED
+    assert po.status == PurchaseOrder.Status.CONFIRMED
+    assert po.amount_uzs == Decimal("100000")
 
 
 def test_sync_skips_buyer(org, buyer):

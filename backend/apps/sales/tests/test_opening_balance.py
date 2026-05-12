@@ -146,7 +146,10 @@ def test_sync_does_not_touch_partially_paid_so(org, buyer):
     assert so.amount_uzs == Decimal("100000")
 
 
-def test_sync_cancels_unpaid_so_when_debt_zeroed(org, buyer):
+def test_sync_keeps_so_when_debt_zeroed_after_migration(org, buyer):
+    """После материализации миграционный SO живёт самостоятельно:
+    обнуление opening_debt_uzs НЕ авто-отменяет реальный счёт клиента.
+    Админ должен отменить SO явно через UI (это меняет дебиторку)."""
     buyer.opening_debt_uzs = Decimal("100000")
     buyer.save()
     so = sync_opening_balance_for_counterparty(buyer)
@@ -155,7 +158,8 @@ def test_sync_cancels_unpaid_so_when_debt_zeroed(org, buyer):
     buyer.save()
     sync_opening_balance_for_counterparty(buyer)
     so.refresh_from_db()
-    assert so.status == SaleOrder.Status.CANCELLED
+    assert so.status == SaleOrder.Status.CONFIRMED
+    assert so.amount_uzs == Decimal("100000")
 
 
 def test_sync_skips_supplier(org, supplier):
