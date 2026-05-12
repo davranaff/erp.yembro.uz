@@ -64,14 +64,52 @@ class OrganizationMembership(UUIDModel, TimestampedModel):
     )
     joined_at = models.DateTimeField(auto_now_add=True)
 
+    # Руководитель этого сотрудника. Используется HR-флоу:
+    #   - на /people табе «Мои» руководитель видит своих подчинённых;
+    #   - на /payroll/balances руководитель может быстро поставить +/−
+    #     своим подчинённым (без выбора сотрудника).
+    # Один сотрудник — один руководитель (для оргструктур со сложной
+    # иерархией хватит цепочки manager → manager.manager → …).
+    manager = models.ForeignKey(
+        "self",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="subordinates",
+        help_text=(
+            "Руководитель этого сотрудника. На /people у юзера видны "
+            "подчинённые (фильтр my_subordinates), на /payroll/balances "
+            "он может быстро ставить +/− по их ЗП."
+        ),
+    )
+
     class Meta:
         unique_together = (("user", "organization"),)
         indexes = [
             models.Index(fields=["organization", "is_active"]),
             models.Index(fields=["organization", "work_status"]),
+            models.Index(fields=["manager"]),
         ]
         verbose_name = "Участник организации"
         verbose_name_plural = "Участники организаций"
 
     def __str__(self):
         return f"{self.user} @ {self.organization.code}"
+
+    def clean(self):
+        super().clean()
+        # Manager обязан быть в той же организации — иначе teh chain «vet-head
+        # видит feed-сотрудника» сломает RBAC.
+        if (
+            self.manager_id
+            and self.organization_id
+            and self.manager.organization_id != self.organization_id
+        ):
+            from django.core.exceptions import ValidationError
+            raise ValidationError({
+                "manager": "Руководитель должен быть в той же организации.",
+            })
+        # Самого себя руководителем назначать нельзя.
+        if self.manager_id and self.manager_id == self.pk:
+            from django.core.exceptions import ValidationError
+            raise ValidationError({"manager": "Сотрудник не может быть себе руководителем."})

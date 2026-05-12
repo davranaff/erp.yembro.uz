@@ -357,6 +357,8 @@ export interface MembershipRow {
   work_phone: string;
   work_status: string;
   joined_at: string;
+  manager: string | null;
+  manager_name: string | null;
   user_email: string;
   user_full_name: string;
   organization_code: string;

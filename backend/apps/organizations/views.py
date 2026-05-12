@@ -136,6 +136,16 @@ class OrganizationMembershipViewSet(OrgScopedModelViewSet):
         membership = getattr(self.request, "membership", None)
         if membership is None:
             return qs.none()
+
+        # Quick-фильтр «мои подчинённые» (по manager FK). Работает для любой
+        # роли — кто себе назначил manager, того и видит. Org-admin тоже
+        # имеет «своих» подчинённых, но при my_subordinates=true он не
+        # обходит фильтр (логика «мои» — это про дерево manager, а не
+        # про admin-доступ).
+        if (self.request.query_params.get("my_subordinates") or "").lower() in ("1", "true", "yes"):
+            qs = qs.filter(manager__user=self.request.user)
+            return qs
+
         if is_org_admin(membership):
             return qs
 
@@ -332,6 +342,12 @@ class OrganizationMembershipViewSet(OrgScopedModelViewSet):
                 {"email": "Этот пользователь уже сотрудник компании."}
             )
 
+        manager = data.get("manager")
+        if manager and manager.organization_id != org.id:
+            raise ValidationError({
+                "manager": "Руководитель должен быть в той же организации.",
+            })
+
         membership = OrganizationMembership.objects.create(
             user=user,
             organization=org,
@@ -339,6 +355,7 @@ class OrganizationMembershipViewSet(OrgScopedModelViewSet):
             position_title=data.get("position_title", ""),
             work_phone=data.get("work_phone", "") or data.get("phone", ""),
             work_status=data.get("work_status", OrganizationMembership.WorkStatus.ACTIVE),
+            manager=manager,
         )
         audit_log(
             organization=org,

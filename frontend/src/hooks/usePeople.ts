@@ -14,6 +14,8 @@ export interface PeopleFilter {
   search?: string;
   include_compensation?: boolean;
   include_balance?: boolean;
+  /** Только подчинённые текущего пользователя (по `manager` FK). */
+  my_subordinates?: boolean;
 }
 
 function appendFilter(params: URLSearchParams, filter: PeopleFilter) {
@@ -22,6 +24,7 @@ function appendFilter(params: URLSearchParams, filter: PeopleFilter) {
   if (filter.search) params.set('search', filter.search);
   if (filter.include_compensation) params.set('include_compensation', '1');
   if (filter.include_balance) params.set('include_balance', '1');
+  if (filter.my_subordinates) params.set('my_subordinates', 'true');
 }
 
 export function usePeople(filter: PeopleFilter = {}) {
@@ -82,6 +85,7 @@ export type CreatePersonVars = {
   position_title?: string;
   work_phone?: string;
   work_status?: string;
+  manager?: string | null;
 };
 
 export function useCreatePerson() {
@@ -102,6 +106,7 @@ export type UpdatePersonVars = {
     work_phone?: string;
     work_status?: string;
     is_active?: boolean;
+    manager?: string | null;
   };
 };
 

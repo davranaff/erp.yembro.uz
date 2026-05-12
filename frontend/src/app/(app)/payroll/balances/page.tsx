@@ -8,6 +8,9 @@ import DataTable from '@/components/ui/DataTable';
 import KpiCard from '@/components/ui/KpiCard';
 import Panel from '@/components/ui/Panel';
 import { useAllBalances } from '@/hooks/usePayroll';
+import { useHasLevel } from '@/hooks/usePermissions';
+
+import QuickAdjustmentPopover from './QuickAdjustmentPopover';
 
 const COMP_LABEL: Record<string, string> = {
   monthly_salary: 'Оклад',
@@ -37,11 +40,34 @@ export default function PayrollBalancesPage() {
   const today = new Date();
   const [asOf, setAsOf] = useState(ymd(today));
   const [includeInactive, setIncludeInactive] = useState(false);
+  const [popover, setPopover] = useState<{
+    employeeId: string;
+    employeeName: string;
+    kind: 'bonus' | 'deduction';
+    anchor: { top: number; left: number };
+  } | null>(null);
+
+  const hasLevel = useHasLevel();
+  const canAdjust = hasLevel('hr', 'rw');
 
   const { data, isLoading, error } = useAllBalances(asOf, includeInactive);
   const rows = data?.rows ?? [];
   const totals = data?.totals;
   const monthly = data?.monthly_fund ?? [];
+
+  const openPopover = (
+    e: React.MouseEvent<HTMLButtonElement>,
+    employeeId: string,
+    employeeName: string,
+    kind: 'bonus' | 'deduction',
+  ) => {
+    const r = e.currentTarget.getBoundingClientRect();
+    // Открываем попап под кнопкой и слегка левее, чтобы не вываливался за край.
+    setPopover({
+      employeeId, employeeName, kind,
+      anchor: { top: r.bottom + 4, left: Math.max(8, r.right - 280) },
+    });
+  };
 
   // KPI
   const totalDebt = rows
@@ -222,9 +248,48 @@ export default function PayrollBalancesPage() {
               render: (r) => r.is_active
                 ? <Badge tone="success" dot>Активен</Badge>
                 : <Badge tone="neutral" dot>Уволен</Badge> },
+            ...(canAdjust ? [{
+              key: 'quick', label: 'Сегодня', align: 'right' as const,
+              render: (r: typeof rows[number]) => r.is_active
+                ? (
+                  <span style={{ display: 'inline-flex', gap: 4 }}>
+                    <button
+                      type="button"
+                      className="btn btn-sm"
+                      onClick={(e) => openPopover(e, r.employee_id, r.full_name || '—', 'bonus')}
+                      title="Добавить премию / доплату за сегодня"
+                      style={{
+                        background: '#16a34a', color: '#fff', borderColor: '#16a34a',
+                        padding: '2px 8px', fontWeight: 700, minWidth: 28,
+                      }}
+                    >+</button>
+                    <button
+                      type="button"
+                      className="btn btn-sm"
+                      onClick={(e) => openPopover(e, r.employee_id, r.full_name || '—', 'deduction')}
+                      title="Удержать (штраф / опоздание)"
+                      style={{
+                        background: '#dc2626', color: '#fff', borderColor: '#dc2626',
+                        padding: '2px 8px', fontWeight: 700, minWidth: 28,
+                      }}
+                    >−</button>
+                  </span>
+                )
+                : <span style={{ color: 'var(--fg-3)' }}>—</span>,
+            }] : []),
           ]}
         />
       </Panel>
+
+      {popover && (
+        <QuickAdjustmentPopover
+          employeeId={popover.employeeId}
+          employeeName={popover.employeeName}
+          kind={popover.kind}
+          anchor={popover.anchor}
+          onClose={() => setPopover(null)}
+        />
+      )}
     </>
   );
 }

@@ -5,7 +5,7 @@ import { useState } from 'react';
 import Modal from '@/components/ui/Modal';
 import { ApiError } from '@/lib/api';
 import { useCurrenciesSorted } from '@/hooks/useCurrencyRates';
-import { useCreatePerson, useUpdatePerson } from '@/hooks/usePeople';
+import { useCreatePerson, usePeople, useUpdatePerson } from '@/hooks/usePeople';
 import { useCreateRate, useSaveCompensationPlan } from '@/hooks/usePayroll';
 import { useHasLevel } from '@/hooks/usePermissions';
 import type { MembershipRow } from '@/types/auth';
@@ -45,6 +45,11 @@ export default function PersonModal({ initial, onClose, onSaved }: Props) {
   const [positionTitle, setPositionTitle] = useState(initial?.position_title ?? '');
   const [workPhone, setWorkPhone] = useState(initial?.work_phone ?? '');
   const [workStatus, setWorkStatus] = useState(initial?.work_status ?? 'active');
+  const [managerId, setManagerId] = useState<string>(initial?.manager ?? '');
+
+  // Кандидаты в руководители: активные сотрудники текущей org, кроме самого
+  // редактируемого (нельзя быть себе руководителем).
+  const { data: candidates = [] } = usePeople({ is_active: 'true' });
 
   // Compensation поля — показываются только при создании и при наличии hr:rw.
   const [compType, setCompType] = useState<CompensationType>('monthly_salary');
@@ -68,6 +73,7 @@ export default function PersonModal({ initial, onClose, onSaved }: Props) {
             position_title: positionTitle,
             work_phone: workPhone,
             work_status: workStatus,
+            manager: managerId || null,
           },
         });
         onSaved?.(res);
@@ -80,6 +86,7 @@ export default function PersonModal({ initial, onClose, onSaved }: Props) {
           position_title: positionTitle,
           work_phone: workPhone,
           work_status: workStatus,
+          manager: managerId || null,
         });
         // Если у юзера hr:rw — сразу настроим план и (опц.) первую ставку.
         if (canSetCompensation) {
@@ -243,6 +250,34 @@ export default function PersonModal({ initial, onClose, onSaved }: Props) {
               </option>
             ))}
           </select>
+        </div>
+        <div className="field" style={{ gridColumn: '1/3' }}>
+          <label>Руководитель</label>
+          <select
+            className="input"
+            value={managerId}
+            onChange={(e) => setManagerId(e.target.value)}
+          >
+            <option value="">— не назначен —</option>
+            {candidates
+              .filter((c) => !initial || c.id !== initial.id)
+              .map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.user_full_name}{c.position_title ? ` · ${c.position_title}` : ''}
+                </option>
+              ))}
+          </select>
+          {fieldErrors.manager && (
+            <div style={{ fontSize: 11, color: 'var(--danger)' }}>
+              {Array.isArray(fieldErrors.manager)
+                ? fieldErrors.manager.join(' · ')
+                : String(fieldErrors.manager)}
+            </div>
+          )}
+          <div style={{ fontSize: 11, color: 'var(--fg-3)', marginTop: 4 }}>
+            Руководитель видит этого сотрудника в табе «Мои» на /people и может
+            быстро ставить +/− по его ЗП на /payroll/balances.
+          </div>
         </div>
       </div>
 

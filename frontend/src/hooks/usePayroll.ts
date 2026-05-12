@@ -488,6 +488,7 @@ export function useCreateAdjustment() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ADJUSTMENTS_KEY });
       qc.invalidateQueries({ queryKey: ['payroll', 'balance'] });
+      qc.invalidateQueries({ queryKey: ['payroll', 'balances-all'] });
       qc.invalidateQueries({ queryKey: ['memberships'] });
     },
   });
