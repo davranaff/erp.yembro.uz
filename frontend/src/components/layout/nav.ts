@@ -49,11 +49,11 @@ export const NAV: NavEntry[] = [
 
   // ── Справочники ─────────────────────────────────────────────────────
   { group: 'Ядро' },
-  { key: 'nomenclature',   label: 'Номенклатура', icon: 'box',     href: '/nomenclature',   module: 'core',
+  // min='rw' — это редакторские справочники, бухгалтер с core=r их не видит,
+  // а Контрагенты живут отдельно в группе «Люди» с дефолтным min='r'.
+  { key: 'nomenclature',   label: 'Номенклатура', icon: 'box',     href: '/nomenclature',   module: 'core', min: 'rw',
     aliases: ['товары', 'sku', 'позиции'] },
-  { key: 'accounts',       label: 'План счетов',  icon: 'book',    href: '/accounts',       module: 'ledger',
-    aliases: ['gl', 'субсчета'] },
-  { key: 'blocks',         label: 'Блоки',        icon: 'factory', href: '/blocks',         module: 'core',
+  { key: 'blocks',         label: 'Блоки',        icon: 'factory', href: '/blocks',         module: 'core', min: 'rw',
     aliases: ['корпус', 'птичник', 'шкаф', 'линия'] },
 
   // ── Люди ────────────────────────────────────────────────────────────
@@ -95,10 +95,10 @@ export const NAV: NavEntry[] = [
     aliases: ['усушка', 'shrinkage', 'потери', 'испарение'] },
   { key: 'vet', label: 'Вет. аптека', icon: 'pharma', href: '/vet', module: 'vet',
     aliases: ['ветеринар', 'препараты', 'лекарства'] },
-  // Токены — это API-доступ к vet-сканеру для продавцов. Показываем только
-  // тем, у кого есть отношение к vet или sales.
+  // Токены — это API-доступ к vet-сканеру для продавцов. Привязано к
+  // вет-аптеке, поэтому видно только vet-ролям (или admin'у).
   { key: 'seller-tokens', label: 'Токены продавцов', icon: 'users', href: '/vet/seller-tokens',
-    requireAnyModule: ['vet', 'sales', 'admin'],
+    requireAnyModule: ['vet', 'admin'],
     aliases: ['токен', 'api', 'продавец', 'scan'] },
 
   // ── Операции (движения денег и товаров) ─────────────────────────────
@@ -116,6 +116,10 @@ export const NAV: NavEntry[] = [
   { key: 'cashbox',   label: 'Касса и банк',     icon: 'book',  href: '/finance/cashbox',
     requireAnyModule: ['ledger', 'purchases', 'sales', 'vet', 'feed', 'admin'],
     aliases: ['платёж', 'оплата', 'банк', 'касса'] },
+  // История оповещений: журнал SMS+TG (для админов и sales-руководителей).
+  { key: 'notifications', label: 'Оповещения',  icon: 'inbox', href: '/notifications',
+    module: 'admin', min: 'admin',
+    aliases: ['уведомления', 'sms', 'telegram', 'история', 'отправлено'] },
 
   // ── Аналитика (всё отчётно-аналитическое) ───────────────────────────
   { group: 'Аналитика' },
@@ -129,6 +133,8 @@ export const NAV: NavEntry[] = [
     aliases: ['холдинг', 'консолидация', 'все компании'] },
   { key: 'rates',     label: 'Курсы валют',      icon: 'chart', href: '/finance/rates',   module: 'ledger',
     aliases: ['валюта', 'usd', 'cbu'] },
+  { key: 'accounts',  label: 'План счетов',      icon: 'book',  href: '/accounts',        module: 'ledger',
+    aliases: ['gl', 'субсчета'] },
   { key: 'ledger',    label: 'Проводки',         icon: 'book',  href: '/ledger',          module: 'ledger',
     aliases: ['журнал', 'je', 'gl'] },
   { key: 'audit',   label: 'Журнал аудита',    icon: 'book',     href: '/audit-log', module: 'admin',

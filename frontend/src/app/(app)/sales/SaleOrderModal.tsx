@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 
 import BatchSelector from '@/components/BatchSelector';
+import AmountInput from '@/components/ui/AmountInput';
 import Icon from '@/components/ui/Icon';
 import Modal from '@/components/ui/Modal';
 import { useCounterparties } from '@/hooks/useCounterparties';
@@ -985,14 +986,11 @@ export default function SaleOrderModal({ initial, preselect, onClose }: Props) {
                           ? it.unit_price_uzs
                           : (stored > 0 ? String(stored / bagKg) : '');
                         return (
-                          <input
+                          <AmountInput
                             className="input mono"
-                            type="number"
-                            step="0.01"
-                            value={displayed}
+                            value={displayed || ''}
                             placeholder={isBag && priceUnit === 'kg' ? 'UZS за кг' : 'UZS за мешок'}
-                            onChange={(e) => {
-                              const val = e.target.value;
+                            onChange={(val) => {
                               if (!isBag || bagKg <= 0 || priceUnit === 'bag') {
                                 updateItem(it.key, { unit_price_uzs: val });
                                 return;

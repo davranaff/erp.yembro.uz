@@ -322,6 +322,15 @@ OTP_ALLOW_CLIENT_TEMPLATE = env.bool("OTP_ALLOW_CLIENT_TEMPLATE", default=False)
 # на дев-сборках. На проде должен быть False.
 OTP_DEV_PRINT = env.bool("OTP_DEV_PRINT", default=DEBUG)
 
+# Webhook от Eskiz: shared secret в URL `/api/sms/callback/<secret>/`.
+# Совпадает с тем, что подставляется в ESKIZ_CALLBACK_URL.
+ESKIZ_CALLBACK_SECRET = env.str("ESKIZ_CALLBACK_SECRET", default="")
+# Порог балансо-алерта (UZS). При балансе ниже — TG-уведомление в
+# DEMO_NOTIFY_CHAT_IDS. По умолчанию 50 000 (≈ 165 SMS по 300 UZS).
+ESKIZ_BALANCE_ALERT_THRESHOLD_UZS = env.int(
+    "ESKIZ_BALANCE_ALERT_THRESHOLD_UZS", default=50_000,
+)
+
 # ── Matochnik KPI-алерты ────────────────────────────────────────────────────
 # Средняя яйценоскость за неделю ниже этого % → TG-алерт.
 MATOCHNIK_LOW_PRODUCTIVITY_ALERT_PCT = env.float(

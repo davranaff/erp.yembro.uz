@@ -459,6 +459,64 @@ class CounterpartyViewSet(OrgScopedModelViewSet):
             },
         })
 
+    @action(detail=True, methods=["post"], url_path="notify-debt")
+    def notify_debt(self, request, pk=None):
+        """POST /api/counterparties/{id}/notify-debt/
+
+        body: {"channels": ["sms", "tg"]} — выбор каналов уведомления.
+        Возвращает по каждому каналу: успех/ошибка + текстовый detail
+        для UI ("у клиента нет телефона", "Eskiz отказал", и т.п.).
+
+        Безопасно к повторному вызову — каждый зов плодит новую запись
+        в SmsMessage/TgMessage (это и есть audit trail).
+        """
+        from .services.notify import notify_counterparty_debt
+
+        cp = self.get_object()
+        raw = request.data.get("channels") or []
+        if not isinstance(raw, list):
+            return Response(
+                {"detail": "channels должен быть массивом."},
+                status=400,
+            )
+        channels = [str(c).lower() for c in raw if c in ("sms", "tg")]
+        if not channels:
+            return Response(
+                {"detail": "Укажите хотя бы один канал: sms или tg."},
+                status=400,
+            )
+
+        result = notify_counterparty_debt(
+            counterparty=cp,
+            organization=request.organization,
+            channels=channels,
+            sender_user=request.user,
+        )
+        return Response(result.to_dict())
+
+    @action(detail=True, methods=["post"], url_path="invite-tg")
+    def invite_tg(self, request, pk=None):
+        """POST /api/counterparties/{id}/invite-tg/
+
+        Генерит одноразовый TgLinkToken, формирует deep-link и шлёт SMS
+        с приглашением (узбекская латиница, чтобы Eskiz не считал
+        кириллицу как 2 байта/символ — экономия 3× по стоимости).
+        """
+        from .services.notify import invite_counterparty_to_tg
+
+        cp = self.get_object()
+        res = invite_counterparty_to_tg(
+            counterparty=cp,
+            organization=request.organization,
+            sender_user=request.user,
+        )
+        return Response({
+            "channel": res.channel,
+            "ok": res.ok,
+            "detail": res.detail,
+            "record_id": res.record_id,
+        })
+
     @action(detail=True, methods=["get"], url_path="debt_summary")
     def debt_summary(self, request, pk=None):
         """GET /api/counterparties/{id}/debt_summary/

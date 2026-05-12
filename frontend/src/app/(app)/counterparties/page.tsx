@@ -32,12 +32,28 @@ function kindTone(kind: CounterpartyKind): 'success' | 'neutral' | 'info' {
   return 'neutral';
 }
 
-function fmtBalance(v: string): { text: string; color: string } {
+function fmtBalance(
+  v: string, kind: string,
+): { text: string; sub: string; color: string } {
   const n = parseFloat(v || '0');
-  const text = n.toLocaleString('ru-RU', { maximumFractionDigits: 2 });
-  if (n > 0) return { text: `+${text}`, color: 'var(--success)' };
-  if (n < 0) return { text, color: 'var(--danger)' };
-  return { text, color: 'var(--fg-1)' };
+  const abs = Math.abs(n).toLocaleString('ru-RU', { maximumFractionDigits: 2 });
+  if (n === 0) {
+    return { text: '0', sub: 'нет расчётов', color: 'var(--fg-3)' };
+  }
+  // Семантика знака зависит от роли:
+  //   buyer  : + клиент нам должен (зелёный),  − у нас его предоплата (синий)
+  //   supplier: + мы ему должны (красный),     − его предоплата (синий)
+  //   other  : чистый знак (как есть)
+  if (kind === 'buyer') {
+    if (n > 0) return { text: `+${abs}`, sub: 'должен нам', color: 'var(--success)' };
+    return { text: `−${abs}`,           sub: 'предоплата', color: 'var(--info)' };
+  }
+  if (kind === 'supplier') {
+    if (n > 0) return { text: `+${abs}`, sub: 'мы должны', color: 'var(--danger)' };
+    return { text: `−${abs}`,           sub: 'наша предоплата', color: 'var(--info)' };
+  }
+  if (n > 0) return { text: `+${abs}`, sub: '', color: 'var(--success)' };
+  return { text: `−${abs}`, sub: '', color: 'var(--danger)' };
 }
 
 export default function CounterpartiesPage() {
@@ -184,16 +200,24 @@ export default function CounterpartiesPage() {
               render: (r) => r.name },
             { key: 'kind', label: 'Тип',
               render: (r) => <Badge tone={kindTone(r.kind)}>{KIND_LABEL[r.kind]}</Badge> },
-            { key: 'spec', label: 'Специализация',
-              cellStyle: { fontSize: 12, color: 'var(--fg-2)' },
-              render: (r) => r.specialization || '—' },
-            { key: 'inn', label: 'ИНН', mono: true,
-              cellStyle: { fontSize: 12, color: 'var(--fg-2)' },
-              render: (r) => r.inn || '—' },
-            { key: 'balance', label: 'Сальдо, UZS', align: 'right', mono: true,
+            { key: 'balance', label: 'Баланс, UZS', align: 'right', mono: true,
               render: (r) => {
-                const bal = fmtBalance(r.balance_uzs);
-                return <span style={{ fontWeight: 600, color: bal.color }}>{bal.text}</span>;
+                const bal = fmtBalance(r.balance_uzs, r.kind);
+                return (
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
+                    <span style={{ fontWeight: 700, color: bal.color, fontSize: 13 }}>
+                      {bal.text}
+                    </span>
+                    {bal.sub && (
+                      <span style={{
+                        fontSize: 10, color: 'var(--fg-3)',
+                        textTransform: 'uppercase', letterSpacing: '.04em',
+                      }}>
+                        {bal.sub}
+                      </span>
+                    )}
+                  </div>
+                );
               } },
             { key: 'status', label: 'Статус',
               render: (r) => r.is_active

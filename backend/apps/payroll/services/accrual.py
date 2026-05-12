@@ -7,6 +7,7 @@ apps.payroll.services.fx.convert_to_uzs.
 """
 from __future__ import annotations
 
+from calendar import monthrange
 from dataclasses import dataclass, field
 from datetime import date, timedelta
 from datetime import timedelta as _td
@@ -20,6 +21,26 @@ from .compensation import compensation_type_at
 from .fx import convert_to_uzs
 from .rates import rate_at
 from .schedule import expected_workdays_in_month, template_for_employee_on
+
+
+def _standard_hours_per_day(template) -> Decimal:
+    """
+    Сколько часов в стандартной смене по шаблону. Берём pattern.duration_hours
+    если есть (типично 8 или 12), иначе fallback 8. Используется для
+    pro-rata начисления частичных дней (когда WorkShift.hours отличается).
+    """
+    if template is not None:
+        pat = getattr(template, "pattern", None)
+        if isinstance(pat, dict):
+            dh = pat.get("duration_hours")
+            if dh is not None:
+                try:
+                    val = Decimal(str(dh))
+                    if val > 0:
+                        return val
+                except Exception:
+                    pass
+    return Decimal("8")
 
 
 def _safe_convert(amount: Decimal, currency_code: str, on_date: date) -> Optional[Decimal]:
@@ -232,6 +253,27 @@ def accrue_for_period(
         )
     }
 
+    # Cache "сколько прогулов в этом месяце" (для MONTHLY_SALARY новая логика):
+    # 0 прогулов → платим за все календарные дни (rate / days_in_month);
+    # ≥1 прогул → переключаемся на rate / working_days_in_month, и за
+    # выходные/праздники по шаблону не платим. Считаем по календарному
+    # месяцу (а не period), потому что user рассуждает в терминах
+    # «прогулов за месяц», а не за произвольный отрезок.
+    absences_in_month_cache: dict[tuple[int, int], int] = {}
+
+    def _absences_in_month(year: int, month: int) -> int:
+        key = (year, month)
+        if key not in absences_in_month_cache:
+            last_day = monthrange(year, month)[1]
+            absences_in_month_cache[key] = WorkShift.objects.filter(
+                employee=employee,
+                shift_date__gte=date(year, month, 1),
+                shift_date__lte=date(year, month, last_day),
+                shift_index=0,
+                kind=WorkShift.Kind.ABSENCE,
+            ).count()
+        return absences_in_month_cache[key]
+
     d = from_date
     total_uzs = Decimal("0")
     while d <= to_date:
@@ -274,26 +316,56 @@ def accrue_for_period(
         rate_currency = rate.currency.code if rate.currency_id else "UZS"
 
         if comp_type == CompensationPlan.Type.MONTHLY_SALARY:
-            # Для оклада: начисляем за каждый рабочий день шаблона, если
-            # в табеле нет явной отметки absence/day_off (vacation/sick уже
-            # обработаны выше). Если шаблона нет — fallback к фактическим
-            # work-сменам (старое поведение).
+            # Новая логика (см. услов. оплаты по новым правилам):
+            #   - 0 прогулов за месяц → платим за все КАЛЕНДАРНЫЕ дни
+            #     (включая вс/праздник). Дневная ставка = rate / days_in_month.
+            #   - ≥1 прогул → переключаемся на старый «по рабочим дням»:
+            #     платим только за work/overtime + рабочие дни шаблона.
+            #     Дневная ставка = rate / working_days_in_month.
+            # Pro-rata по часам (WorkShift.hours): дневная × hours/std_hours,
+            # где std_hours = pattern.duration_hours (или 8 если шаблона нет).
             tpl = template_for_employee_on(employee, d)
-            is_work_day: bool
-            if tpl is not None:
-                # Берём один день из шаблона
-                from .schedule import expand_template
-                expected = expand_template(tpl, d, d, apply_holidays=True)
-                is_work_day = bool(expected) and expected[0].kind == WorkShift.Kind.WORK
-            else:
-                # Без шаблона — только если в табеле явно work/overtime
-                is_work_day = marked_kind in (WorkShift.Kind.WORK, WorkShift.Kind.OVERTIME)
+            misses = _absences_in_month(d.year, d.month)
+            std_hours = _standard_hours_per_day(tpl)
+            mode_lbl: str
+            day_native: Decimal | None = None
+            is_paid_day: bool
 
-            if is_work_day:
+            if misses == 0:
+                # Calendar-mode: каждый день месяца оплачивается.
+                days_in_month = monthrange(d.year, d.month)[1]
+                day_native = rate.amount / Decimal(days_in_month)
+                is_paid_day = True
+                mode_lbl = f"calendar 1/{days_in_month}"
+            else:
                 wd = expected_workdays_in_month(
                     tpl, d, organization=employee.organization,
                 ) or 22
-                day_native = (rate.amount / Decimal(wd)).quantize(Decimal("0.01"))
+                day_native = rate.amount / Decimal(wd)
+                # Этот день — рабочий?
+                if tpl is not None:
+                    from .schedule import expand_template
+                    expected = expand_template(tpl, d, d, apply_holidays=True)
+                    is_paid_day = bool(expected) and expected[0].kind == WorkShift.Kind.WORK
+                else:
+                    # Без шаблона — оплачиваем только если в табеле явный work/overtime
+                    is_paid_day = marked_kind in (
+                        WorkShift.Kind.WORK, WorkShift.Kind.OVERTIME,
+                    )
+                mode_lbl = f"work-day 1/{wd}"
+
+            if is_paid_day and day_native is not None:
+                # Pro-rata по часам: если у смены задано hours, и оно
+                # отличается от стандарта — берём пропорционально.
+                hours_note = ""
+                if shift is not None and shift.hours is not None and shift.hours > 0:
+                    if std_hours > 0:
+                        factor = Decimal(shift.hours) / std_hours
+                        if factor != Decimal("1"):
+                            day_native = day_native * factor
+                            hours_note = f" {shift.hours}/{std_hours}h"
+
+                day_native = day_native.quantize(Decimal("0.01"))
                 fx = _convert_or_none(day_native, rate_currency, d)
                 if fx is None:
                     d += timedelta(days=1)
@@ -307,7 +379,10 @@ def accrue_for_period(
                     accrued_native=day_native,
                     accrued=fx.amount_uzs,
                     exchange_rate=fx.exchange_rate,
-                    note=f"pro-rated 1/{wd} ({source})" + (f" @ {rate_currency}" if rate_currency != "UZS" else ""),
+                    note=(
+                        f"monthly {mode_lbl} ({source}){hours_note}"
+                        + (f" @ {rate_currency}" if rate_currency != "UZS" else "")
+                    ),
                 ))
         elif comp_type == CompensationPlan.Type.PER_SHIFT:
             if shift is not None and marked_kind in (WorkShift.Kind.WORK, WorkShift.Kind.OVERTIME):

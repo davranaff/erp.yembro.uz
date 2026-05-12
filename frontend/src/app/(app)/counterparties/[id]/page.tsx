@@ -9,11 +9,15 @@ import DataTable from '@/components/ui/DataTable';
 import Icon from '@/components/ui/Icon';
 import Panel from '@/components/ui/Panel';
 import Seg from '@/components/ui/Seg';
-import { useCounterpartyFullSummary } from '@/hooks/useCounterparties';
+import {
+  useCounterpartyFullSummary,
+  useInviteToTg,
+} from '@/hooks/useCounterparties';
 import { useDeleteCommunicationWithDebtRefresh } from '@/hooks/useSales';
 import type { SaleCommunication } from '@/types/auth';
 
 import CommunicationFormModal from '../../sales/CommunicationFormModal';
+import NotifyDebtModal from './NotifyDebtModal';
 
 type TabKey = 'info' | 'docs' | 'payments';
 
@@ -67,7 +71,9 @@ export default function CounterpartyDetailPage() {
   const [tab, setTab] = useState<TabKey>('info');
   const [adding, setAdding] = useState(false);
   const [editing, setEditing] = useState<SaleCommunication | null>(null);
+  const [notifyOpen, setNotifyOpen] = useState(false);
   const deleteComm = useDeleteCommunicationWithDebtRefresh();
+  const inviteTg = useInviteToTg();
 
   if (isLoading) return <div className="page-hdr"><div><h1>Загружаем…</h1></div></div>;
   if (error) return (
@@ -104,6 +110,36 @@ export default function CounterpartyDetailPage() {
             {cp.inn && <span className="mono">ИНН {cp.inn}</span>}
             {cp.phone && <span>· {cp.phone}</span>}
           </div>
+        </div>
+        <div className="actions" style={{ display: 'flex', gap: 6 }}>
+          {isBuyer && debt > 0 && (
+            <button
+              className="btn btn-primary btn-sm"
+              onClick={() => setNotifyOpen(true)}
+              title="Отправить SMS/Telegram-напоминание о долге"
+            >
+              <Icon name="download" size={12} /> Уведомить о долге
+            </button>
+          )}
+          {cp.phone && (
+            <button
+              className="btn btn-secondary btn-sm"
+              disabled={inviteTg.isPending}
+              onClick={async () => {
+                const res = await inviteTg.mutateAsync(id!);
+                alert(
+                  (res.ok ? '✓ ' : '✗ ') + res.detail
+                  + (res.ok
+                    ? '\n\nКогда контрагент откроет ссылку и нажмёт Старт, '
+                      + 'дальнейшие уведомления будут уходить в Telegram.'
+                    : ''),
+                );
+              }}
+              title="Послать SMS с ссылкой на Telegram-бот (узб. латиница)"
+            >
+              <Icon name="users" size={12} /> Пригласить в TG
+            </button>
+          )}
         </div>
       </div>
 
@@ -204,6 +240,14 @@ export default function CounterpartyDetailPage() {
           communication={editing}
           customerId={id}
           onClose={() => setEditing(null)}
+        />
+      )}
+      {notifyOpen && id && (
+        <NotifyDebtModal
+          counterpartyId={id}
+          counterpartyName={cp.name}
+          hasPhone={Boolean(cp.phone)}
+          onClose={() => setNotifyOpen(false)}
         />
       )}
     </>

@@ -251,3 +251,40 @@ export function useDeleteCounterparty() {
     },
   });
 }
+
+
+export interface NotifyChannelResult {
+  channel: 'sms' | 'tg';
+  ok: boolean;
+  detail: string;
+  record_id: string | null;
+}
+
+export interface NotifyDebtResponse {
+  results: NotifyChannelResult[];
+  any_ok: boolean;
+}
+
+export function useNotifyDebt() {
+  return useMutation<
+    NotifyDebtResponse,
+    ApiError,
+    { id: string; channels: Array<'sms' | 'tg'> }
+  >({
+    mutationFn: ({ id, channels }) =>
+      apiFetch<NotifyDebtResponse>(
+        `/api/counterparties/${id}/notify-debt/`,
+        { method: 'POST', body: { channels } },
+      ),
+  });
+}
+
+export function useInviteToTg() {
+  return useMutation<NotifyChannelResult, ApiError, string>({
+    mutationFn: (id) =>
+      apiFetch<NotifyChannelResult>(
+        `/api/counterparties/${id}/invite-tg/`,
+        { method: 'POST', body: {} },
+      ),
+  });
+}

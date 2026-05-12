@@ -55,7 +55,10 @@ function initials(name: string) {
     .join('');
 }
 
+type Scope = 'all' | 'mine';
+
 export default function PeoplePage() {
+  const [scope, setScope] = useState<Scope>('all');
   const [isActive, setIsActive] = useState('true');
   const [workStatus, setWorkStatus] = useState('');
   const [search, setSearch] = useState('');
@@ -76,8 +79,9 @@ export default function PeoplePage() {
       search: search || undefined,
       include_compensation: hrVisible || undefined,
       include_balance: hrVisible || undefined,
+      my_subordinates: scope === 'mine' || undefined,
     }),
-    [isActive, workStatus, search, hrVisible],
+    [isActive, workStatus, search, hrVisible, scope],
   );
 
   const { data: pageData, isLoading, error, refetch, isFetching } = usePeoplePaginated(filter, page, pageSize);
@@ -144,6 +148,14 @@ export default function PeoplePage() {
       </div>
 
       <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
+        <Seg
+          options={[
+            { value: 'all',  label: 'Все' },
+            { value: 'mine', label: 'Мои' },
+          ]}
+          value={scope}
+          onChange={(v) => { setScope(v as Scope); setPage(1); }}
+        />
         <Seg
           options={[
             { value: 'true',  label: 'Активные' },
@@ -227,6 +239,9 @@ export default function PeoplePage() {
               ) },
             { key: 'pos', label: 'Должность', cellStyle: { fontSize: 12 },
               render: (p) => p.position_title || '—' },
+            { key: 'manager', label: 'Руководитель',
+              cellStyle: { fontSize: 12, color: 'var(--fg-2)' },
+              render: (p) => p.manager_name || <span style={{ color: 'var(--fg-3)' }}>—</span> },
             { key: 'email', label: 'Email', mono: true,
               cellStyle: { fontSize: 12, color: 'var(--fg-2)' },
               render: (p) => p.user_email ?? '—' },

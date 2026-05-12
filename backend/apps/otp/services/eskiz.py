@@ -50,14 +50,12 @@ class EskizClient:
         При 401 один раз пере-логинимся и повторяем отправку — это
         стандартный кейс «токен внезапно отозван».
         """
-        token = self._get_token()
-        resp = self._post_send(token, phone, message)
-        # 401 = протух токен, перелогинимся. 403 — это аккаунт реально
-        # заблокирован/нет прав, перелогин не поможет, не дёргаем зря.
-        if resp.status_code == 401:
-            logger.info("eskiz: token rejected (401), re-login")
-            token = self._get_token(force_refresh=True)
-            resp = self._post_send(token, phone, message)
+        resp = self._authed_request("POST", "/api/message/sms/send", files={
+            "mobile_phone": (None, phone),
+            "message": (None, message),
+            "from": (None, self.sender),
+            "callback_url": (None, self.callback_url),
+        })
 
         if resp.status_code != 200:
             raise EskizSendError(
@@ -73,7 +71,73 @@ class EskizClient:
             raise EskizSendError(f"Eskiz: id отсутствует в ответе — {data}")
         return str(message_id)
 
+    def get_balance(self) -> int:
+        """
+        Текущий баланс аккаунта в SMS-кредитах (== UZS, цена 1 SMS ≈ 300 UZS).
+        Используется celery-таской мониторинга.
+        """
+        resp = self._authed_request("GET", "/api/user/get-limit")
+        if resp.status_code != 200:
+            raise EskizError(
+                f"Eskiz balance failed: HTTP {resp.status_code} — {resp.text[:300]}"
+            )
+        data = _safe_json(resp)
+        balance = data.get("data", {}).get("balance")
+        if balance is None:
+            raise EskizError(f"Eskiz balance: balance отсутствует — {data}")
+        return int(balance)
+
+    def get_status(self, message_id: str) -> dict:
+        """
+        Статус доставки SMS по его id. Используется fallback-поллером, когда
+        webhook не пришёл за разумное время.
+
+        Возвращает dict с ключами как минимум: `status` ('DELIVERED'/'FAILED'/...),
+        `delivery_sm_at`, `price`, `to`, `message`.
+        """
+        resp = self._authed_request(
+            "GET", f"/api/message/sms/status_by_id/{message_id}",
+        )
+        if resp.status_code != 200:
+            raise EskizError(
+                f"Eskiz status failed: HTTP {resp.status_code} — {resp.text[:300]}"
+            )
+        data = _safe_json(resp)
+        # Реальные данные сидят в `data.data` (Eskiz двойную обёртку любит).
+        return data.get("data", {}) or {}
+
     # ── internal ────────────────────────────────────────────────────────────
+
+    def _authed_request(
+        self, method: str, path: str, *, files=None, data=None,
+    ) -> requests.Response:
+        """
+        Универсальный обёртка-вызов с auto-relogin при 401.
+        """
+        token = self._get_token()
+        resp = self._raw_request(method, path, token=token, files=files, data=data)
+        # 401 = протух токен, перелогинимся. 403 — это аккаунт реально
+        # заблокирован/нет прав, перелогин не поможет, не дёргаем зря.
+        if resp.status_code == 401:
+            logger.info("eskiz: token rejected (401), re-login")
+            token = self._get_token(force_refresh=True)
+            resp = self._raw_request(method, path, token=token, files=files, data=data)
+        return resp
+
+    def _raw_request(
+        self, method: str, path: str, *, token: str, files=None, data=None,
+    ) -> requests.Response:
+        try:
+            return requests.request(
+                method,
+                f"{self.base_url}{path}",
+                headers={"Authorization": f"Bearer {token}"},
+                files=files,
+                data=data,
+                timeout=self.timeout,
+            )
+        except requests.RequestException as exc:
+            raise EskizError(f"Eskiz {method} {path}: сетевая ошибка — {exc}") from exc
 
     def _get_token(self, *, force_refresh: bool = False) -> str:
         if not force_refresh:
@@ -104,27 +168,6 @@ class EskizClient:
         if not token:
             raise EskizAuthError(f"Eskiz login: token отсутствует — {data}")
         return token
-
-    def _post_send(self, token: str, phone: str, message: str) -> requests.Response:
-        # Eskiz хочет multipart/form-data (см. их официальный Python SDK).
-        # На вид form-urlencoded работает тоже, но multipart — это
-        # эталонный путь, не хотим словить странности на edge-кейсах.
-        files = {
-            "mobile_phone": (None, phone),
-            "message": (None, message),
-            "from": (None, self.sender),
-            "callback_url": (None, self.callback_url),
-        }
-        try:
-            return requests.post(
-                f"{self.base_url}/api/message/sms/send",
-                headers={"Authorization": f"Bearer {token}"},
-                files=files,
-                timeout=self.timeout,
-            )
-        except requests.RequestException as exc:
-            raise EskizSendError(f"Eskiz send: сетевая ошибка — {exc}") from exc
-
 
 def get_eskiz_client() -> EskizClient:
     """Собирает клиент из настроек. Не кеширует — клиент сам легковесный."""

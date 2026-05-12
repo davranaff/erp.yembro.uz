@@ -42,6 +42,7 @@ class OrganizationMembershipSerializer(serializers.ModelSerializer):
     user_email = serializers.SerializerMethodField()
     user_full_name = serializers.SerializerMethodField()
     organization_code = serializers.SerializerMethodField()
+    manager_name = serializers.SerializerMethodField()
     # HR-расширения. Заполняются только если context['include_compensation'] / ['include_balance']
     # и у юзера есть hr:r. Иначе всегда None.
     compensation_type = serializers.SerializerMethodField()
@@ -61,6 +62,8 @@ class OrganizationMembershipSerializer(serializers.ModelSerializer):
             "work_phone",
             "work_status",
             "joined_at",
+            "manager",
+            "manager_name",
             "user_email",
             "user_full_name",
             "organization_code",
@@ -75,6 +78,7 @@ class OrganizationMembershipSerializer(serializers.ModelSerializer):
         read_only_fields = (
             "id",
             "joined_at",
+            "manager_name",
             "user_email",
             "user_full_name",
             "organization_code",
@@ -95,6 +99,29 @@ class OrganizationMembershipSerializer(serializers.ModelSerializer):
 
     def get_organization_code(self, obj):
         return obj.organization.code if obj.organization_id else None
+
+    def get_manager_name(self, obj):
+        if not obj.manager_id:
+            return None
+        mgr = obj.manager
+        return mgr.user.full_name if mgr.user_id else None
+
+    def validate_manager(self, value):
+        """Manager должен быть в той же org что и сам membership (модель clean()
+        тоже это проверяет, но раннее DRF-сообщение понятнее)."""
+        if value is None:
+            return value
+        request = self.context.get("request")
+        org = getattr(request, "organization", None) if request else None
+        if org and value.organization_id != org.id:
+            raise serializers.ValidationError(
+                "Руководитель должен быть в той же организации.",
+            )
+        if self.instance and value.id == self.instance.id:
+            raise serializers.ValidationError(
+                "Сотрудник не может быть себе руководителем.",
+            )
+        return value
 
     def _hr_visible(self) -> bool:
         ctx = self.context or {}
@@ -166,6 +193,10 @@ class OrganizationMembershipCreateSerializer(serializers.Serializer):
         choices=OrganizationMembership.WorkStatus.choices,
         default=OrganizationMembership.WorkStatus.ACTIVE,
         required=False,
+    )
+    manager = serializers.PrimaryKeyRelatedField(
+        queryset=OrganizationMembership.objects.all(),
+        required=False, allow_null=True,
     )
 
     def to_representation(self, instance):

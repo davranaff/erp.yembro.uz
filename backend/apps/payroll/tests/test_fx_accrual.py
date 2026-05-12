@@ -219,9 +219,9 @@ def test_balance_live_recalc_when_rate_changes(org, usd, usd_rates):
 
 
 def test_monthly_salary_eur_pro_rated(org, eur):
-    """MONTHLY EUR-оклад прорейтится с конвертацией."""
-    # Создаём ежедневные курсы (FX_FALLBACK_DAYS=7 — недостаточно для 10 дней).
-    for day in range(1, 11):
+    """MONTHLY EUR-оклад с конвертацией: 0 прогулов → полный оклад за месяц."""
+    # Курсы на каждый день месяца (без них дни без курса не платятся).
+    for day in range(1, 32):
         ExchangeRate.objects.create(
             currency=eur, date=date(2026, 7, day),
             rate=Decimal("13500.000000"), nominal=1,
@@ -234,8 +234,8 @@ def test_monthly_salary_eur_pro_rated(org, eur):
         amount=Decimal("2200"), currency=eur,  # 2200 EUR в месяц
         effective_from=date(2026, 7, 1),
     )
-    # Шаблон 22 рабочих дня (fallback)
-    workdays = [date(2026, 7, d) for d in range(1, 11)]  # 10 смен
+    # 10 work-shifts в первой половине месяца; 0 прогулов.
+    workdays = [date(2026, 7, d) for d in range(1, 11)]
     WorkShift.objects.bulk_create([
         WorkShift(
             organization=org, employee=employee,
@@ -245,6 +245,9 @@ def test_monthly_salary_eur_pro_rated(org, eur):
         for d in workdays
     ])
     res = accrue_for_period(employee, date(2026, 7, 1), date(2026, 7, 31))
-    # 10 × (2200 / 22) × 13500 = 10 × 100 × 13500 = 13_500_000
-    assert res.accrued_uzs == Decimal("13500000.00")
+    # 0 прогулов → calendar mode: 31 день × (2200/31) × 13500 = 2200 × 13500
+    # = 29_700_000. Округление per-day: (2200/31).quantize(.01) × 31 × 13500.
+    per_day = (Decimal("2200") / Decimal("31")).quantize(Decimal("0.01"))
+    expected = per_day * Decimal("31") * Decimal("13500")
+    assert res.accrued_uzs == expected
     assert all(ln.rate_currency == "EUR" for ln in res.breakdown)

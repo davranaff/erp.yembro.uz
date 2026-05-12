@@ -112,7 +112,11 @@ def test_accrual_with_mixed_type_period(employee, org, uzs):
         source=WorkShift.Source.MANUAL,
     )
     res = accrue_for_period(employee, date(2026, 4, 1), date(2026, 7, 31))
-    # per_shift: 1 × 100_000 = 100_000
-    # monthly_salary: 100_000 / 22 ≈ 4_545.45
-    assert res.accrued_uzs > Decimal("100000")
-    assert res.accrued_uzs < Decimal("110000")
+    # apr (per_shift): 1 × 100_000 = 100_000
+    # may (per_shift, 0 смен): 0
+    # jun (monthly, 0 прогулов): calendar mode → 30 × (100_000/30 округл.)
+    # jul (monthly, 0 прогулов): calendar mode → 31 × (100_000/31 округл.)
+    # Точное значение с учётом копеечного округления.
+    jun = (Decimal("100000") / Decimal("30")).quantize(Decimal("0.01")) * Decimal("30")
+    jul = (Decimal("100000") / Decimal("31")).quantize(Decimal("0.01")) * Decimal("31")
+    assert res.accrued_uzs == Decimal("100000") + jun + jul
