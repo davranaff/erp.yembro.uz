@@ -4,7 +4,6 @@ import Link from 'next/link';
 import { useState } from 'react';
 
 import Badge from '@/components/ui/Badge';
-import Icon from '@/components/ui/Icon';
 import KpiCard from '@/components/ui/KpiCard';
 import Panel from '@/components/ui/Panel';
 import Seg from '@/components/ui/Seg';
@@ -37,8 +36,6 @@ interface SectionConfig {
   type: CollectionTaskType;
   title: string;
   desc: string;
-  iconColor: string;
-  emptyMsg: string;
 }
 
 const SECTIONS: SectionConfig[] = [
@@ -46,29 +43,21 @@ const SECTIONS: SectionConfig[] = [
     type: 'escalation',
     title: 'Эскалация — нужна реакция руководителя',
     desc: 'Долг 60+ дней, последнее касание было больше 7 дней назад (или вообще не было).',
-    iconColor: 'var(--danger)',
-    emptyMsg: 'Эскалаций нет — все «тяжёлые» долги под контролем.',
   },
   {
     type: 'promise_broken',
     title: 'Клиент не сдержал обещание',
     desc: 'Прошёл срок который САМ клиент назвал, но оплата не пришла.',
-    iconColor: 'var(--brand-orange)',
-    emptyMsg: 'Все обещания клиентов выполнены.',
   },
   {
     type: 'forecast_due',
     title: 'Не пришла прогнозная оплата',
     desc: 'Менеджер прогнозировал оплату к этой дате, но её нет.',
-    iconColor: 'var(--brand-orange)',
-    emptyMsg: 'Все прогнозы оправдались.',
   },
   {
     type: 'callback_due',
     title: 'Запланированный обзвон',
-    desc: 'Касания с next_action_date <= сегодня.',
-    iconColor: 'var(--fg-2)',
-    emptyMsg: 'Запланированных обзвонов нет.',
+    desc: 'Касания с next_action_date ≤ сегодня.',
   },
 ];
 
@@ -167,27 +156,17 @@ export default function TasksPage() {
       )}
 
       {data && data.total > 0 && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 14, marginTop: 14 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 14 }}>
           {SECTIONS.map((s) => {
             const tasks = (data[s.type] ?? []) as CollectionTask[];
             if (tasks.length === 0) return null;
             return (
-              <Panel
+              <TaskSection
                 key={s.type}
                 title={`${s.title} (${tasks.length})`}
-              >
-                <div style={{
-                  padding: '10px 12px 4px', fontSize: 11,
-                  color: 'var(--fg-3)', borderBottom: '1px solid var(--border)',
-                }}>
-                  {s.desc}
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column' }}>
-                  {tasks.map((t, idx) => (
-                    <TaskRow key={`${t.order_id}-${idx}`} task={t} />
-                  ))}
-                </div>
-              </Panel>
+                desc={s.desc}
+                tasks={tasks}
+              />
             );
           })}
         </div>
@@ -196,65 +175,105 @@ export default function TasksPage() {
   );
 }
 
+function TaskSection({
+  title, desc, tasks,
+}: {
+  title: string;
+  desc: string;
+  tasks: CollectionTask[];
+}) {
+  return (
+    <Panel title={title} flush>
+      <div style={{
+        padding: '6px 12px', fontSize: 11,
+        color: 'var(--fg-3)', borderBottom: '1px solid var(--border)',
+      }}>
+        {desc}
+      </div>
+      <table style={{
+        width: '100%', fontSize: 12, borderCollapse: 'collapse',
+      }}>
+        <thead>
+          <tr style={{
+            color: 'var(--fg-3)', fontSize: 10, textAlign: 'left',
+            textTransform: 'uppercase', letterSpacing: '.04em',
+            background: 'var(--bg-raised)',
+          }}>
+            <th style={{ padding: '6px 12px', width: 64 }}>Прио</th>
+            <th style={{ padding: '6px 12px' }}>Клиент / документ</th>
+            <th style={{ padding: '6px 12px', width: 90 }}>Просрочка</th>
+            <th style={{ padding: '6px 12px' }}>Детали</th>
+            <th style={{ padding: '6px 12px', width: 160 }}>Менеджер</th>
+            <th style={{ padding: '6px 12px', textAlign: 'right', width: 130 }}>
+              Сумма, сум
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          {tasks.map((t, idx) => (
+            <TaskRow key={`${t.order_id}-${idx}`} task={t} />
+          ))}
+        </tbody>
+      </table>
+    </Panel>
+  );
+}
+
 function TaskRow({ task }: { task: CollectionTask }) {
   return (
-    <div
-      style={{
-        display: 'flex', alignItems: 'flex-start', gap: 12,
-        padding: 12, borderBottom: '1px solid var(--border)',
-      }}
-    >
-      <Badge tone={PRIO_TONE[task.priority]}>{PRIO_LABEL[task.priority]}</Badge>
-
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{
-          display: 'flex', alignItems: 'center', gap: 8,
-          flexWrap: 'wrap', marginBottom: 4,
-        }}>
+    <tr style={{ borderTop: '1px solid var(--border)' }}>
+      <td style={{ padding: '8px 12px', verticalAlign: 'middle' }}>
+        <Badge tone={PRIO_TONE[task.priority]}>{PRIO_LABEL[task.priority]}</Badge>
+      </td>
+      <td style={{ padding: '8px 12px', verticalAlign: 'middle' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
           <Link
             href={`/counterparties/${task.customer_id}`}
             style={{
-              fontWeight: 600, fontSize: 14, color: 'var(--fg-1)',
-              textDecoration: 'none',
+              fontWeight: 500, color: 'var(--fg-1)', textDecoration: 'none',
             }}
           >
             {task.customer_name}
           </Link>
-          <span className="mono" style={{ fontSize: 11, color: 'var(--fg-3)' }}>
+          <span className="mono" style={{ fontSize: 10, color: 'var(--fg-3)' }}>
             {task.customer_code}
           </span>
           <span style={{ color: 'var(--fg-3)' }}>·</span>
           <Link
             href={`/sales?doc=${task.order_doc}`}
             className="mono"
-            style={{ fontSize: 12, color: 'var(--brand-orange)', textDecoration: 'none' }}
+            style={{
+              fontSize: 11, color: 'var(--brand-orange)', textDecoration: 'none',
+            }}
           >
             {task.order_doc}
           </Link>
-          <span style={{ fontSize: 11, color: 'var(--fg-3)' }}>
-            (просрочка {task.days_overdue} дн)
-          </span>
         </div>
-
-        <div style={{ fontSize: 13, marginBottom: 4 }}>
-          {task.detail}
-        </div>
-
-        {task.contacted_by_name && (
-          <div style={{ fontSize: 11, color: 'var(--fg-3)' }}>
-            Менеджер: {task.contacted_by_name}
-          </div>
-        )}
-      </div>
-
-      <div style={{ textAlign: 'right', flexShrink: 0 }}>
-        <div className="mono" style={{
-          fontSize: 16, fontWeight: 600, color: 'var(--brand-orange)',
-        }}>
-          {fmt(task.outstanding_uzs)}
-        </div>
-        <div style={{ fontSize: 10, color: 'var(--fg-3)' }}>сум</div>
-      </div>
-    </div>
+      </td>
+      <td className="mono" style={{
+        padding: '8px 12px', verticalAlign: 'middle',
+        color: task.days_overdue >= 30 ? 'var(--danger)' : 'var(--fg-2)',
+      }}>
+        {task.days_overdue} дн
+      </td>
+      <td style={{
+        padding: '8px 12px', verticalAlign: 'middle',
+        color: 'var(--fg-2)',
+      }}>
+        {task.detail}
+      </td>
+      <td style={{
+        padding: '8px 12px', verticalAlign: 'middle',
+        fontSize: 11, color: 'var(--fg-3)',
+      }}>
+        {task.contacted_by_name ?? '—'}
+      </td>
+      <td className="mono" style={{
+        padding: '8px 12px', textAlign: 'right', verticalAlign: 'middle',
+        fontWeight: 600, color: 'var(--brand-orange)',
+      }}>
+        {fmt(task.outstanding_uzs)}
+      </td>
+    </tr>
   );
 }

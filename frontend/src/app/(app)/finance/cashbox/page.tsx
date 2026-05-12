@@ -1,113 +1,36 @@
 'use client';
 
+import Link from 'next/link';
 import { useMemo, useState } from 'react';
 
-import Badge from '@/components/ui/Badge';
-import DataTable from '@/components/ui/DataTable';
 import Icon from '@/components/ui/Icon';
-import KpiCard from '@/components/ui/KpiCard';
-import Panel from '@/components/ui/Panel';
-import RowActions from '@/components/ui/RowActions';
-import Seg from '@/components/ui/Seg';
-import TablePagination from '@/components/ui/TablePagination';
-import { useDeleteSubaccount, useSubaccounts } from '@/hooks/useAccounts';
+import { useSubaccounts } from '@/hooks/useAccounts';
 import { useModules } from '@/hooks/useModules';
-import {
-  paymentsCrud,
-  useCancelPayment,
-  usePostPayment,
-  useReversePayment,
-} from '@/hooks/usePayments';
+import { paymentsCrud } from '@/hooks/usePayments';
 import { useHasLevel, usePermissions } from '@/hooks/usePermissions';
 import { LEVEL_ORDER } from '@/types/auth';
-import type { GLSubaccount, Payment, PaymentKind, PaymentStatus } from '@/types/auth';
+import type { GLSubaccount } from '@/types/auth';
 
 import CashAccountModal from './CashAccountModal';
-import OpexModal from './OpexModal';
-import PaymentDrawer from './PaymentDrawer';
 
-const KIND_LABEL: Record<PaymentKind, string> = {
-  counterparty: 'Контрагент',
-  opex: 'Расход',
-  income: 'Доход',
-  salary: 'Зарплата',
-  internal: 'Перемещение',
-};
-
-const KIND_TONE: Record<PaymentKind, 'neutral' | 'success' | 'warn' | 'danger' | 'info'> = {
-  counterparty: 'info',
-  opex: 'danger',
-  income: 'success',
-  salary: 'warn',
-  internal: 'neutral',
-};
-
-const STATUS_LABEL: Record<PaymentStatus, string> = {
-  draft: 'Черновик',
-  confirmed: 'Подтверждён',
-  posted: 'Проведён',
-  cancelled: 'Отменён',
-};
-
-const STATUS_TONE: Record<PaymentStatus, 'neutral' | 'success' | 'warn' | 'danger' | 'info'> = {
-  draft: 'neutral',
-  confirmed: 'info',
-  posted: 'success',
-  cancelled: 'danger',
-};
-
-function fmtUzs(v: string | number | null | undefined, short = false): string {
-  if (v == null || v === '') return '—';
-  const n = typeof v === 'string' ? parseFloat(v) : v;
-  if (Number.isNaN(n)) return '—';
-  if (short && Math.abs(n) >= 1_000_000) return (n / 1_000_000).toFixed(1) + 'М';
-  if (short && Math.abs(n) >= 1_000) return (n / 1_000).toFixed(1) + 'К';
-  return n.toLocaleString('ru-RU', { maximumFractionDigits: 0 });
+function fmtUzs(v: number): string {
+  return v.toLocaleString('ru-RU', { maximumFractionDigits: 0 });
 }
 
-function todayISO() {
-  return new Date().toISOString().slice(0, 10);
-}
-
-function daysAgoISO(days: number) {
-  const d = new Date();
-  d.setDate(d.getDate() - days);
-  return d.toISOString().slice(0, 10);
-}
-
-type StatusTab = 'all' | 'posted' | 'draft' | 'cancelled';
-
-export default function CashboxPage() {
-  // accountCode = 'all' | sub.code (динамический список — карточки и фильтр
-  // строятся из реально существующих 50.NN/51.NN субсчетов).
-  const [accountCode, setAccountCode] = useState<string>('all');
-  const [dateFrom, setDateFrom] = useState(daysAgoISO(30));
-  const [dateTo, setDateTo] = useState(todayISO());
-  const [moduleId, setModuleId] = useState('');
-  const [statusTab, setStatusTab] = useState<StatusTab>('posted');
-  const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(50);
-  const [opexOpen, setOpexOpen] = useState<false | 'out' | 'in'>(false);
+export default function CashboxListPage() {
   const [cashAccountOpen, setCashAccountOpen] = useState(false);
-  const [drawerPayment, setDrawerPayment] = useState<Payment | null>(null);
+  const [moduleId, setModuleId] = useState('');
 
   const hasLevel = useHasLevel();
-  const canEdit = hasLevel('ledger', 'rw');
   // Org-admin: только владелец/CFO. Управление кассами/счетами — это
   // структурное изменение плана счетов, не делегируется heads.
   const isOrgAdmin = hasLevel('admin', 'admin') || hasLevel('ledger', 'admin');
 
   const { data: subs } = useSubaccounts();
   const { data: modules } = useModules();
-
-  // Per-module-head изоляция: head вет-модуля не должен видеть feed-кассу
-  // и наоборот. Backend уже скоупит payments через get_queryset, но
-  // справочник субсчетов общий (используется во всех дропдаунах) —
-  // поэтому фильтрацию касс делаем здесь, на frontend.
-  //
-  // org-admin / ledger:admin → null (без ограничений).
-  // head'ы → set ID модулей, на которых у юзера ≥ rw.
   const permissions = usePermissions();
+
+  // Скоупим список касс по RBAC: head вет не видит feed-кассу и наоборот.
   const accessibleModuleIds = useMemo<Set<string> | null>(() => {
     if (isOrgAdmin) return null;
     if (!modules) return new Set();
@@ -120,70 +43,10 @@ export default function CashboxPage() {
       modules.filter((m) => allowedCodes.has(m.code)).map((m) => m.id),
     );
   }, [isOrgAdmin, modules, permissions]);
-  const post = usePostPayment();
-  const cancel = useCancelPayment();
-  const reverse = useReversePayment();
-  const remove = paymentsCrud.useDelete();
-  const deleteSubaccount = useDeleteSubaccount();
-  const [editingAccount, setEditingAccount] = useState<GLSubaccount | null>(null);
 
-  // Фильтрованный список платежей
-  const filter = useMemo(() => {
-    const f: Record<string, string> = {};
-    if (statusTab !== 'all') f.status = statusTab;
-    if (accountCode !== 'all' && subs) {
-      const s = subs.find((x) => x.code === accountCode);
-      if (s) f.cash_subaccount = s.id;
-    }
-    if (moduleId) f.module = moduleId;
-    return f;
-  }, [statusTab, accountCode, subs, moduleId]);
-
-  const { data: pageData, isLoading } = paymentsCrud.useListPaginated(filter, page, pageSize);
-  const payments = pageData?.results ?? [];
-
-  // Для KPI/балансов всегда нужны posted (без зависимости от вкладки)
+  // Все posted-платежи для расчёта баланса по каждой кассе.
   const { data: postedPayments } = paymentsCrud.useList({ status: 'posted' });
 
-  // Клиентская фильтрация по дате (поскольку там нет прямого фильтра)
-  const filteredPayments = useMemo(() => {
-    if (!payments) return [];
-    return payments.filter((p) => {
-      if (dateFrom && p.date < dateFrom) return false;
-      if (dateTo && p.date > dateTo) return false;
-      return true;
-    });
-  }, [payments, dateFrom, dateTo]);
-
-  // Список «cash-аккаунтов» — субсчета под счётом 50 (касса) или 51 (банк).
-  // Скоупим:
-  //   1. По доступным модулям (head вет не видит feed-кассу и наоборот).
-  //      Кассы без module (общие, например 50.01) показываем только
-  //      org-admin'у, чтобы heads не путались между «своей» и «общей».
-  //   2. Дополнительно по выбранному в дропдауне moduleId, если задан.
-  const cashAccounts = useMemo(() => {
-    if (!subs) return [];
-    return subs
-      .filter((s) => s.code.startsWith('50.') || s.code.startsWith('51.'))
-      .filter((s) => {
-        if (accessibleModuleIds === null) return true; // org-admin
-        if (!s.module) return false;                   // null-module → только admin
-        return accessibleModuleIds.has(s.module);
-      })
-      .filter((s) => !moduleId || s.module === moduleId)
-      .sort((a, b) => a.code.localeCompare(b.code));
-  }, [subs, moduleId, accessibleModuleIds]);
-
-  // Список модулей в дропдауне-фильтре: head'ам показываем только их,
-  // org-admin'у — все. Иначе head может выбрать «feed» и получить пустую
-  // таблицу (backend всё равно отфильтрует), что только запутывает.
-  const filterableModules = useMemo(() => {
-    if (!modules) return [];
-    if (accessibleModuleIds === null) return modules;
-    return modules.filter((m) => accessibleModuleIds.has(m.id));
-  }, [modules, accessibleModuleIds]);
-
-  // Балансы по каждому cash-аккаунту + period totals.
   const balanceByAccount = useMemo(() => {
     const map = new Map<string, number>();
     if (!postedPayments) return map;
@@ -197,385 +60,186 @@ export default function CashboxPage() {
     return map;
   }, [postedPayments]);
 
-  const periodTotals = useMemo(() => {
-    let periodIn = 0;
-    let periodOut = 0;
-    if (!postedPayments) return { periodIn, periodOut };
-    const accountIds = new Set(cashAccounts.map((s) => s.id));
-    for (const p of postedPayments) {
-      if (!p.cash_subaccount || !accountIds.has(p.cash_subaccount)) continue;
-      if (p.date < dateFrom || p.date > dateTo) continue;
-      const amt = parseFloat(p.amount_uzs || '0');
-      if (Number.isNaN(amt)) continue;
-      if (p.direction === 'in') periodIn += amt;
-      else periodOut += amt;
-    }
-    return { periodIn, periodOut };
-  }, [postedPayments, cashAccounts, dateFrom, dateTo]);
+  const cashAccounts: GLSubaccount[] = useMemo(() => {
+    if (!subs) return [];
+    return subs
+      .filter((s) => s.code.startsWith('50.') || s.code.startsWith('51.'))
+      .filter((s) => {
+        if (accessibleModuleIds === null) return true; // org-admin
+        if (!s.module) return false;                   // null-module → только admin
+        return accessibleModuleIds.has(s.module);
+      })
+      .filter((s) => !moduleId || s.module === moduleId)
+      .sort((a, b) => a.code.localeCompare(b.code));
+  }, [subs, moduleId, accessibleModuleIds]);
 
-  const handlePost = async (p: Payment) => {
-    if (!window.confirm('Провести платёж ' + p.doc_number + '? Будет создана проводка в ГК.')) return;
-    try {
-      await post.mutateAsync({ id: p.id });
-    } catch (e) {
-      alert('Не удалось провести: ' + (e instanceof Error ? e.message : ''));
-    }
-  };
-
-  const handleCancel = async (p: Payment) => {
-    if (!window.confirm('Отменить платёж ' + p.doc_number + '?')) return;
-    try {
-      await cancel.mutateAsync({ id: p.id, body: { reason: '' } });
-    } catch (e) {
-      alert('Не удалось отменить: ' + (e instanceof Error ? e.message : ''));
-    }
-  };
-
-  const handleReverse = async (p: Payment) => {
-    const reason = window.prompt('Причина сторнирования (необязательно):');
-    if (reason === null) return;
-    try {
-      await reverse.mutateAsync({ id: p.id, body: { reason } });
-    } catch (e) {
-      alert('Не удалось сторнировать: ' + (e instanceof Error ? e.message : ''));
-    }
-  };
-
-  const handleDelete = async (p: Payment) => {
-    if (!window.confirm('Удалить черновик ' + p.doc_number + ' безвозвратно?')) return;
-    try {
-      await remove.mutateAsync(p.id);
-    } catch (e) {
-      alert('Не удалось удалить: ' + (e instanceof Error ? e.message : ''));
-    }
-  };
+  // Список модулей в дропдауне-фильтре: head'ам показываем только их,
+  // org-admin'у — все.
+  const filterableModules = useMemo(() => {
+    if (!modules) return [];
+    if (accessibleModuleIds === null) return modules;
+    return modules.filter((m) => accessibleModuleIds.has(m.id));
+  }, [modules, accessibleModuleIds]);
 
   return (
     <>
       <div className="page-hdr">
         <div>
           <h1>Касса и банк</h1>
-          <div className="sub">Кассы (50.NN) и расчётные счета (51.NN) — каждый со своим модулем</div>
+          <div className="sub">
+            Выберите кассу или счёт, чтобы посмотреть движения и провести операции.
+          </div>
         </div>
         <div className="actions">
           {isOrgAdmin && (
             <button
-              className="btn btn-ghost btn-sm"
-              onClick={() => { setEditingAccount(null); setCashAccountOpen(true); }}
-              title="Создать новую кассу или расчётный счёт под выбранный модуль (только админ)"
+              className="btn btn-primary btn-sm"
+              onClick={() => setCashAccountOpen(true)}
+              title="Создать новую кассу или расчётный счёт под выбранный модуль"
             >
               <Icon name="plus" size={14} /> Касса/Банк
             </button>
           )}
-          {canEdit && (
-            <>
-              <button className="btn btn-secondary btn-sm" onClick={() => setOpexOpen('in')}>
-                <Icon name="download" size={14} /> Приход
-              </button>
-              <button className="btn btn-primary btn-sm" onClick={() => setOpexOpen('out')}>
-                <Icon name="arrow-right" size={14} /> Расход
-              </button>
-            </>
-          )}
         </div>
       </div>
 
-      <div className="kpi-row">
-        {cashAccounts.length === 0 && (
-          <KpiCard
-            tone="orange"
-            iconName="bag"
-            label="Нет касс/счетов"
-            sub={moduleId ? 'для выбранного модуля' : 'создайте через «+ Касса/Банк»'}
-            value="—"
-          />
-        )}
-        {cashAccounts.map((acc) => {
-          const balance = balanceByAccount.get(acc.id) ?? 0;
-          const isBank = acc.code.startsWith('51.');
-          const moduleLabel = acc.module
-            ? modules?.find((m) => m.id === acc.module)?.name
-            : null;
-          return (
-            <KpiCard
-              key={acc.id}
-              tone={balance >= 0 ? 'green' : 'red'}
-              iconName={isBank ? 'book' : 'bag'}
-              label={`${isBank ? 'Банк' : 'Касса'} ${acc.code}`}
-              sub={moduleLabel ? `${acc.name} · ${moduleLabel}` : acc.name}
-              value={postedPayments ? fmtUzs(balance) + ' сум' : '—'}
-            />
-          );
-        })}
-        <KpiCard
-          tone="blue"
-          iconName="download"
-          label="Приход за период"
-          sub={`${dateFrom} — ${dateTo}`}
-          value={postedPayments ? fmtUzs(periodTotals.periodIn, true) : '—'}
-        />
-        <KpiCard
-          tone="red"
-          iconName="arrow-right"
-          label="Расход за период"
-          sub={`${dateFrom} — ${dateTo}`}
-          value={postedPayments ? fmtUzs(periodTotals.periodOut, true) : '—'}
-        />
-      </div>
-
-      {/* Список касс/счетов — управление только для org-admin */}
-      {cashAccounts.length > 0 && (
-        <Panel
-          title={`Кассы и счета (${cashAccounts.length})`}
-          flush
-        >
-          <table style={{ width: '100%', fontSize: 13, borderCollapse: 'collapse' }}>
-            <thead>
-              <tr style={{ color: 'var(--fg-3)', fontSize: 11, textAlign: 'left' }}>
-                <th style={{ padding: '6px 12px' }}>Код</th>
-                <th style={{ padding: '6px 12px' }}>Тип</th>
-                <th style={{ padding: '6px 12px' }}>Наименование</th>
-                <th style={{ padding: '6px 12px' }}>Модуль</th>
-                <th style={{ padding: '6px 12px', textAlign: 'right' }}>Баланс, сум</th>
-                {isOrgAdmin && <th style={{ padding: '6px 12px', width: 60 }}></th>}
-              </tr>
-            </thead>
-            <tbody>
-              {cashAccounts.map((acc) => {
-                const isBank = acc.code.startsWith('51.');
-                const balance = balanceByAccount.get(acc.id) ?? 0;
-                const moduleLabel = acc.module
-                  ? modules?.find((m) => m.id === acc.module)?.name ?? '—'
-                  : <span style={{ color: 'var(--fg-3)' }}>общий</span>;
-                return (
-                  <tr key={acc.id} style={{ borderTop: '1px solid var(--border)' }}>
-                    <td className="mono" style={{ padding: '8px 12px', fontWeight: 500 }}>
-                      {acc.code}
-                    </td>
-                    <td style={{ padding: '8px 12px', fontSize: 12 }}>
-                      {isBank ? 'Банк' : 'Касса'}
-                    </td>
-                    <td style={{ padding: '8px 12px' }}>{acc.name}</td>
-                    <td style={{ padding: '8px 12px', fontSize: 12 }}>{moduleLabel}</td>
-                    <td className="mono" style={{
-                      padding: '8px 12px', textAlign: 'right',
-                      color: balance >= 0 ? 'var(--success)' : 'var(--danger)',
-                      fontWeight: 600,
-                    }}>
-                      {fmtUzs(balance)}
-                    </td>
-                    {isOrgAdmin && (
-                      <td style={{ padding: '8px 12px', textAlign: 'right' }}>
-                        <RowActions
-                          actions={[
-                            {
-                              label: 'Редактировать',
-                              onClick: () => { setEditingAccount(acc); setCashAccountOpen(true); },
-                            },
-                            {
-                              label: 'Удалить',
-                              danger: true,
-                              disabled: deleteSubaccount.isPending || balance !== 0,
-                              onClick: async () => {
-                                if (!window.confirm(
-                                  `Удалить кассу/счёт ${acc.code} «${acc.name}»? ` +
-                                  `Если есть привязанные платежи — удаление невозможно.`,
-                                )) return;
-                                try {
-                                  await deleteSubaccount.mutateAsync(acc.id);
-                                } catch (e) {
-                                  alert(e instanceof Error ? e.message : 'Не удалось удалить');
-                                }
-                              },
-                            },
-                          ]}
-                        />
-                      </td>
-                    )}
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </Panel>
-      )}
-
-      {/* Статус-табы */}
-      <div style={{ marginBottom: 12, marginTop: 12 }}>
-        <Seg
-          options={[
-            { value: 'posted',    label: 'Проведённые' },
-            { value: 'draft',     label: 'Черновики' },
-            { value: 'cancelled', label: 'Отменённые' },
-            { value: 'all',       label: 'Все' },
-          ]}
-          value={statusTab}
-          onChange={(v) => { setStatusTab(v as StatusTab); setPage(1); }}
-        />
-      </div>
-
-      {/* Фильтры */}
-      <div className="filter-bar">
-        <div className="filter-cell" style={{ minWidth: 220 }}>
-          <label>Счёт</label>
-          <select
-            className="input"
-            value={accountCode}
-            onChange={(e) => { setAccountCode(e.target.value); setPage(1); }}
-          >
-            <option value="all">Все кассы и банки</option>
-            {cashAccounts.map((acc) => (
-              <option key={acc.id} value={acc.code}>
-                {acc.code} · {acc.name}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div className="filter-cell">
-          <label>С</label>
-          <input className="input" type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} />
-        </div>
-        <div className="filter-cell">
-          <label>По</label>
-          <input className="input" type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
-        </div>
-        <div className="filter-cell" style={{ minWidth: 200 }}>
-          <label>Модуль</label>
-          <select className="input" value={moduleId} onChange={(e) => { setModuleId(e.target.value); setPage(1); }}>
-            <option value="">{accessibleModuleIds === null ? 'Все' : 'Все мои'}</option>
-            {filterableModules.map((m) => (
-              <option key={m.id} value={m.id}>{m.name}</option>
-            ))}
-          </select>
-        </div>
-        <div className="filter-cell">
-          <label>Пресет</label>
-          <div className="filter-presets">
-            <button className="btn btn-ghost btn-sm" onClick={() => { setDateFrom(daysAgoISO(7)); setDateTo(todayISO()); }}>7 дн</button>
-            <button className="btn btn-ghost btn-sm" onClick={() => { setDateFrom(daysAgoISO(30)); setDateTo(todayISO()); }}>30 дн</button>
-            <button className="btn btn-ghost btn-sm" onClick={() => { setDateFrom(daysAgoISO(90)); setDateTo(todayISO()); }}>90 дн</button>
+      {/* Фильтр по модулю — оставляем только если их больше одного. */}
+      {filterableModules.length > 1 && (
+        <div className="filter-bar" style={{ marginBottom: 16 }}>
+          <div className="filter-cell" style={{ minWidth: 240 }}>
+            <label>Модуль</label>
+            <select
+              className="input"
+              value={moduleId}
+              onChange={(e) => setModuleId(e.target.value)}
+            >
+              <option value="">{accessibleModuleIds === null ? 'Все' : 'Все мои'}</option>
+              {filterableModules.map((m) => (
+                <option key={m.id} value={m.id}>{m.name}</option>
+              ))}
+            </select>
           </div>
         </div>
-      </div>
+      )}
 
-      <Panel flush>
-        <DataTable<Payment>
-          isLoading={isLoading}
-          rows={filteredPayments}
-          rowKey={(p) => p.id}
-          emptyMessage="Движений нет за выбранный период."
-          onRowClick={(p) => setDrawerPayment(p)}
-          rowProps={(p) => ({ active: drawerPayment?.id === p.id })}
-          columns={[
-            { key: 'date', label: 'Дата', mono: true,
-              cellStyle: { fontSize: 12 },
-              render: (p) => p.date },
-            { key: 'doc', label: 'Документ', mono: true,
-              cellStyle: { fontSize: 12 },
-              render: (p) => p.doc_number },
-            { key: 'kind', label: 'Тип',
-              render: (p) => <Badge tone={KIND_TONE[p.kind]}>{KIND_LABEL[p.kind]}</Badge> },
-            { key: 'direction', label: 'Направ.',
-              render: (p) => p.direction === 'in'
-                ? <span style={{ color: 'var(--success)' }}>⬇️ IN</span>
-                : <span style={{ color: 'var(--danger)' }}>⬆️ OUT</span> },
-            { key: 'module', label: 'Модуль', mono: true, muted: true,
-              render: (p) => p.module_code ?? '—' },
-            { key: 'who', label: 'Контрагент / Статья',
-              cellStyle: { fontSize: 12 },
-              render: (p) => p.counterparty_name ?? (
-                p.contra_subaccount_code
-                  ? <span className="mono" style={{ color: 'var(--fg-2)' }}>
-                      {p.contra_subaccount_code} · {p.contra_subaccount_name}
-                    </span>
-                  : '—'
-              ) },
-            { key: 'account', label: 'Счёт', mono: true, muted: true,
-              render: (p) => p.cash_subaccount_code ?? '—' },
-            {
-              key: 'amount', label: 'Сумма', align: 'right', mono: true,
-              cellStyle: { fontWeight: 600 },
-              render: (p) => (
-                <span style={{ color: p.direction === 'in' ? 'var(--success)' : 'var(--danger)' }}>
-                  {p.direction === 'in' ? '+' : '−'}{fmtUzs(p.amount_uzs)}
-                </span>
-              ),
-            },
-            { key: 'status', label: 'Статус',
-              render: (p) => <Badge tone={STATUS_TONE[p.status]}>{STATUS_LABEL[p.status]}</Badge> },
-            { key: 'actions', label: '', align: 'right',
-              render: (p) => (
-                <RowActions
-                  actions={[
-                    {
-                      label: 'Подробнее',
-                      onClick: () => setDrawerPayment(p),
-                    },
-                    {
-                      label: 'Провести',
-                      hidden: !canEdit || !(p.status === 'draft' || p.status === 'confirmed'),
-                      disabled: post.isPending,
-                      onClick: () => handlePost(p),
-                    },
-                    {
-                      label: 'Отменить',
-                      hidden: !canEdit || !(p.status === 'draft' || p.status === 'confirmed'),
-                      disabled: cancel.isPending,
-                      onClick: () => handleCancel(p),
-                    },
-                    {
-                      label: 'Сторно',
-                      danger: true,
-                      hidden: !canEdit || p.status !== 'posted',
-                      disabled: reverse.isPending,
-                      onClick: () => handleReverse(p),
-                    },
-                    {
-                      label: 'Удалить черновик',
-                      danger: true,
-                      hidden: !canEdit || p.status !== 'draft',
-                      disabled: remove.isPending,
-                      onClick: () => handleDelete(p),
-                    },
-                  ]}
-                />
-              ) },
-          ]}
-        />
-        {pageData && (
-          <TablePagination
-            page={page}
-            pageSize={pageSize}
-            count={pageData.count}
-            hasPrev={Boolean(pageData.previous)}
-            hasNext={Boolean(pageData.next)}
-            onPageChange={setPage}
-            onPageSizeChange={setPageSize}
-          />
-        )}
-      </Panel>
+      {cashAccounts.length === 0 ? (
+        <div style={{
+          padding: 32, textAlign: 'center',
+          background: 'var(--bg-soft)', borderRadius: 8,
+          color: 'var(--fg-3)',
+        }}>
+          <Icon name="bag" size={28} />
+          <div style={{ marginTop: 8, fontSize: 14, fontWeight: 500 }}>
+            Нет касс/счетов
+          </div>
+          <div style={{ fontSize: 12, marginTop: 4 }}>
+            {moduleId
+              ? 'Для выбранного модуля нет касс.'
+              : isOrgAdmin
+                ? 'Создайте первую кассу через «+ Касса/Банк».'
+                : 'Попросите администратора создать кассу для вашего модуля.'}
+          </div>
+        </div>
+      ) : (
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))',
+            gap: 12,
+          }}
+        >
+          {cashAccounts.map((acc) => {
+            const balance = balanceByAccount.get(acc.id) ?? 0;
+            const isBank = acc.code.startsWith('51.');
+            const moduleLabel = acc.module
+              ? modules?.find((m) => m.id === acc.module)?.name ?? '—'
+              : 'Общая';
+            const balanceColor = balance >= 0 ? 'var(--success)' : 'var(--danger)';
 
-      {opexOpen !== false && (
-        <OpexModal
-          preselect={{ direction: opexOpen }}
-          onClose={() => setOpexOpen(false)}
-        />
+            return (
+              <Link
+                key={acc.id}
+                href={`/finance/cashbox/${acc.id}`}
+                style={{
+                  display: 'block',
+                  padding: 16,
+                  background: 'var(--bg-raised)',
+                  border: '1px solid var(--border)',
+                  borderRadius: 10,
+                  textDecoration: 'none',
+                  color: 'inherit',
+                  transition: 'border-color .12s, transform .12s, box-shadow .12s',
+                }}
+                className="cashbox-card"
+              >
+                <div style={{
+                  display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12,
+                }}>
+                  <div style={{
+                    width: 36, height: 36, borderRadius: 8,
+                    background: 'var(--bg-soft)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    fontSize: 18,
+                  }}>
+                    {isBank ? '🏦' : '💵'}
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{
+                      fontSize: 14, fontWeight: 600,
+                      overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                    }}>
+                      {acc.name}
+                    </div>
+                    <div className="mono" style={{ fontSize: 11, color: 'var(--fg-3)' }}>
+                      {acc.code} · {isBank ? 'Банк' : 'Касса'}
+                    </div>
+                  </div>
+                  <Icon name="chevron-right" size={16} />
+                </div>
+
+                <div style={{
+                  fontSize: 11, color: 'var(--fg-3)',
+                  textTransform: 'uppercase', letterSpacing: '.04em',
+                  marginBottom: 4,
+                }}>
+                  Текущий баланс
+                </div>
+                <div className="mono" style={{
+                  fontSize: 20, fontWeight: 700, color: balanceColor,
+                  marginBottom: 8,
+                }}>
+                  {postedPayments ? `${fmtUzs(balance)} сум` : '—'}
+                </div>
+
+                <div style={{
+                  display: 'flex', alignItems: 'center', gap: 6,
+                  fontSize: 12, color: 'var(--fg-2)',
+                  paddingTop: 8, borderTop: '1px solid var(--border)',
+                }}>
+                  <Icon name="building" size={12} />
+                  <span>Модуль: {moduleLabel}</span>
+                </div>
+              </Link>
+            );
+          })}
+        </div>
       )}
 
       {cashAccountOpen && (
         <CashAccountModal
-          initial={editingAccount}
+          initial={null}
           defaultModuleId={moduleId || undefined}
-          onClose={() => { setCashAccountOpen(false); setEditingAccount(null); }}
+          onClose={() => setCashAccountOpen(false)}
         />
       )}
 
-      {drawerPayment && (
-        <PaymentDrawer
-          payment={drawerPayment}
-          onClose={() => setDrawerPayment(null)}
-        />
-      )}
+      <style jsx>{`
+        :global(.cashbox-card:hover) {
+          border-color: var(--brand-orange) !important;
+          transform: translateY(-1px);
+          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
+        }
+      `}</style>
     </>
   );
 }
