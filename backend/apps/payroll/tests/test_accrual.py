@@ -68,8 +68,7 @@ def test_accrue_per_shift_rate_change(employee_per_shift, uzs):
 
 
 def test_accrue_monthly_pro_rated(employee_monthly, uzs, org):
-    # Берём июль 2026 — нет UZ-праздников, fallback 22 рабочих дня.
-    # Ставка 4_400_000/мес → 200_000 за день. Отрабатываем 10 дней.
+    """0 прогулов → calendar mode: оплачиваются все 31 день месяца."""
     set_rate(
         employee=employee_monthly,
         amount=Decimal("4400000"),
@@ -81,8 +80,66 @@ def test_accrue_monthly_pro_rated(employee_monthly, uzs, org):
     res = accrue_for_period(
         employee_monthly, date(2026, 7, 1), date(2026, 7, 31)
     )
-    # 10 * (4_400_000 / 22) = 2_000_000
+    # 0 прогулов → calendar mode: per-day = 4_400_000/31 округлено до 0.01,
+    # итог = 31 × per_day (с накопленной копеечной погрешностью).
+    per_day = (Decimal("4400000") / Decimal("31")).quantize(Decimal("0.01"))
+    assert res.accrued_uzs == per_day * Decimal("31")
+
+
+def test_accrue_monthly_switches_to_workdays_on_absence(employee_monthly, uzs, org):
+    """≥1 прогул → working-day mode: платим только за рабочие/work-смены."""
+    from apps.payroll.models import WorkShift
+
+    set_rate(
+        employee=employee_monthly,
+        amount=Decimal("4400000"),
+        effective_from=date(2026, 7, 1),
+        currency=uzs,
+    )
+    # 10 work-смен подряд, и 1 явный прогул (без шаблона → fallback 22)
+    workdays = [date(2026, 7, d) for d in range(1, 11)]
+    _make_shifts(employee_monthly, workdays)
+    WorkShift.objects.create(
+        organization=org, employee=employee_monthly,
+        shift_date=date(2026, 7, 15), kind=WorkShift.Kind.ABSENCE,
+        source=WorkShift.Source.MANUAL,
+    )
+    res = accrue_for_period(
+        employee_monthly, date(2026, 7, 1), date(2026, 7, 31)
+    )
+    # 1 прогул → working mode без шаблона: платим только за явные work/overtime
+    # смены. 10 × (4_400_000 / 22) = 2_000_000.
     assert res.accrued_uzs == Decimal("2000000.00")
+
+
+def test_accrue_monthly_hours_pro_rata(employee_monthly, uzs, org):
+    """Если у смены задано hours отличное от стандарта (8) — pro-rata."""
+    from apps.payroll.models import WorkShift
+
+    set_rate(
+        employee=employee_monthly,
+        amount=Decimal("4400000"),
+        effective_from=date(2026, 7, 1),
+        currency=uzs,
+    )
+    # 0 прогулов, calendar mode. Один день из 31 — половинка (4ч/8ч).
+    workdays = [date(2026, 7, d) for d in range(1, 31)]
+    _make_shifts(employee_monthly, workdays)
+    # 31 июля — half-day (4 часа)
+    WorkShift.objects.create(
+        organization=org, employee=employee_monthly,
+        shift_date=date(2026, 7, 31), kind=WorkShift.Kind.WORK,
+        hours=Decimal("4"),
+        source=WorkShift.Source.MANUAL,
+    )
+    res = accrue_for_period(
+        employee_monthly, date(2026, 7, 1), date(2026, 7, 31)
+    )
+    # 30 полных + 1 × 0.5 = 30.5 дней; (4_400_000 / 31) × 30.5
+    # = 141_935.48 × 30.5 = 4_329_032.14 (точное округление)
+    expected = (Decimal("4400000") / Decimal("31")).quantize(Decimal("0.01")) * Decimal("30")
+    expected += (Decimal("4400000") / Decimal("31") * Decimal("0.5")).quantize(Decimal("0.01"))
+    assert res.accrued_uzs == expected
 
 
 def test_accrue_per_shift_skips_non_work_days(employee_per_shift, uzs):

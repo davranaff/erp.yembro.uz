@@ -118,15 +118,15 @@ def test_accrue_pro_rated_uses_holidays(org, uzs, tpl_weekday):
         organization=org, employee=m, template=tpl_weekday,
         effective_from=date(2026, 1, 1),
     )
-    # Декабрь 2026: 23 пн-пт, минус 8 декабря (праздник) = 22 рабочих.
-    # MONTHLY_SALARY с шаблоном начисляет за каждый рабочий день шаблона
-    # автоматически (даже без явных work-смен в табеле).
-    # 22 дня × (4_400_000 / 22) = 4_400_000.
+    # Декабрь 2026: 31 календарный день. 0 прогулов → calendar mode:
+    # платим за все 31 день (включая 8 декабря — праздник). Дневная
+    # = 4_400_000/31, итог = 31 × per_day ≈ 4_400_000 (точное округление).
     res = accrue_for_period(m, date(2026, 12, 1), date(2026, 12, 31))
-    assert res.accrued_uzs == Decimal("4400000.00")
-    # Проверяем что 8 декабря (праздник) не попало в начисления
+    per_day = (Decimal("4400000") / Decimal("31")).quantize(Decimal("0.01"))
+    assert res.accrued_uzs == per_day * Decimal("31")
+    # В calendar-mode 8 декабря (праздник) тоже оплачивается.
     breakdown_dates = {ln.date for ln in res.breakdown}
-    assert date(2026, 12, 8) not in breakdown_dates
+    assert date(2026, 12, 8) in breakdown_dates
 
 
 # ─── API ─────────────────────────────────────────────────────────────────
