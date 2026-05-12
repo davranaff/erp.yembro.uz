@@ -7,6 +7,7 @@ import DataTable from '@/components/ui/DataTable';
 import Icon from '@/components/ui/Icon';
 import Modal from '@/components/ui/Modal';
 import Panel from '@/components/ui/Panel';
+import Seg from '@/components/ui/Seg';
 import { useSubaccounts } from '@/hooks/useAccounts';
 import { useHasLevel } from '@/hooks/usePermissions';
 import {
@@ -15,6 +16,8 @@ import {
   usePreviewRun,
 } from '@/hooks/usePayroll';
 import type { PayrollRunPreviewRow } from '@/types/payroll';
+
+import MyTeamCheckin from './MyTeamCheckin';
 
 const TYPE_LABEL: Record<string, string> = {
   advance: 'Аванс',
@@ -34,7 +37,10 @@ function ymd(d: Date): string {
   return d.toISOString().slice(0, 10);
 }
 
+type Scope = 'all' | 'mine';
+
 export default function PayrollRunsPage() {
+  const [scope, setScope] = useState<Scope>('all');
   const { data: runs = [], isLoading } = usePayrollRuns();
   const hasLevel = useHasLevel();
   const canExecute = hasLevel('hr', 'rw');
@@ -44,45 +50,61 @@ export default function PayrollRunsPage() {
     <>
       <div className="page-hdr">
         <div>
-          <h1>Ведомости на выплату</h1>
-          <div className="sub">Массовая выплата ЗП всем сотрудникам с долгом за период</div>
+          <h1>Ведомости и check-in</h1>
+          <div className="sub">
+            {scope === 'all'
+              ? 'Массовая выплата ЗП всем сотрудникам с долгом за период'
+              : 'Отметка прихода/неприхода для моих подчинённых на сегодня'}
+          </div>
         </div>
-        {canExecute && (
-          <div className="actions">
+        <div className="actions" style={{ display: 'flex', gap: 8 }}>
+          <Seg
+            options={[
+              { value: 'all',  label: 'Все' },
+              { value: 'mine', label: 'Мои' },
+            ]}
+            value={scope}
+            onChange={(v) => setScope(v as Scope)}
+          />
+          {canExecute && scope === 'all' && (
             <button className="btn btn-primary btn-sm" onClick={() => setShowWizard(true)}>
               <Icon name="plus" size={14} /> Запустить ведомость
             </button>
-          </div>
-        )}
+          )}
+        </div>
       </div>
 
-      <Panel flush>
-        <DataTable
-          isLoading={isLoading}
-          rows={runs}
-          rowKey={(r) => r.id}
-          emptyMessage="Ведомостей пока не было. Используйте «Запустить ведомость» для массовой выплаты."
-          columns={[
-            { key: 'period', label: 'Период', mono: true,
-              render: (r) => `${r.period_from} — ${r.period_to}` },
-            { key: 'type', label: 'Тип',
-              render: (r) => <Badge tone="info">{TYPE_LABEL[r.payout_type] ?? r.payout_type}</Badge> },
-            { key: 'count', label: 'Сотрудников', align: 'right',
-              render: (r) => String(r.employees_count) },
-            { key: 'amount', label: 'Сумма', mono: true, align: 'right',
-              render: (r) => `${fmt(r.total_amount_uzs)} сум` },
-            { key: 'status', label: 'Статус',
-              render: (r) => (
-                <Badge tone={r.status === 'executed' ? 'success' : r.status === 'cancelled' ? 'neutral' : 'warn'}>
-                  {r.status}
-                </Badge>
-              ) },
-            { key: 'date', label: 'Выполнено', mono: true, cellStyle: { fontSize: 12 },
-              render: (r) => r.executed_at ? r.executed_at.slice(0, 16).replace('T', ' ') : '—' },
-            { key: 'notes', label: 'Заметка', render: (r) => r.notes || '—' },
-          ]}
-        />
-      </Panel>
+      {scope === 'all' ? (
+        <Panel flush>
+          <DataTable
+            isLoading={isLoading}
+            rows={runs}
+            rowKey={(r) => r.id}
+            emptyMessage="Ведомостей пока не было. Используйте «Запустить ведомость» для массовой выплаты."
+            columns={[
+              { key: 'period', label: 'Период', mono: true,
+                render: (r) => `${r.period_from} — ${r.period_to}` },
+              { key: 'type', label: 'Тип',
+                render: (r) => <Badge tone="info">{TYPE_LABEL[r.payout_type] ?? r.payout_type}</Badge> },
+              { key: 'count', label: 'Сотрудников', align: 'right',
+                render: (r) => String(r.employees_count) },
+              { key: 'amount', label: 'Сумма', mono: true, align: 'right',
+                render: (r) => `${fmt(r.total_amount_uzs)} сум` },
+              { key: 'status', label: 'Статус',
+                render: (r) => (
+                  <Badge tone={r.status === 'executed' ? 'success' : r.status === 'cancelled' ? 'neutral' : 'warn'}>
+                    {r.status}
+                  </Badge>
+                ) },
+              { key: 'date', label: 'Выполнено', mono: true, cellStyle: { fontSize: 12 },
+                render: (r) => r.executed_at ? r.executed_at.slice(0, 16).replace('T', ' ') : '—' },
+              { key: 'notes', label: 'Заметка', render: (r) => r.notes || '—' },
+            ]}
+          />
+        </Panel>
+      ) : (
+        <MyTeamCheckin />
+      )}
 
       {showWizard && <RunWizard onClose={() => setShowWizard(false)} />}
     </>
