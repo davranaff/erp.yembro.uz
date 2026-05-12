@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from 'react';
 
+import Badge from '@/components/ui/Badge';
 import Modal from '@/components/ui/Modal';
 import Panel from '@/components/ui/Panel';
 import { usePeople } from '@/hooks/usePeople';
@@ -21,21 +22,23 @@ const KIND_LABEL: Record<WorkShiftKind, string> = {
   holiday:    'Праздник',
 };
 
-const KIND_TONE: Record<WorkShiftKind, string> = {
-  work:       '#16a34a',
-  overtime:   '#0ea5e9',
-  vacation:   '#f59e0b',
-  sick_leave: '#a855f7',
-  absence:    '#dc2626',
-  day_off:    '#6b7280',
-  holiday:    '#ec4899',
+type BadgeTone = 'success' | 'danger' | 'warn' | 'info' | 'neutral';
+
+const KIND_TONE: Record<WorkShiftKind, BadgeTone> = {
+  work:       'success',
+  overtime:   'info',
+  vacation:   'warn',
+  sick_leave: 'warn',
+  absence:    'danger',
+  day_off:    'neutral',
+  holiday:    'info',
 };
 
 const QUICK_BUTTONS: { kind: WorkShiftKind; label: string }[] = [
-  { kind: 'work',       label: '✓ Пришёл' },
-  { kind: 'vacation',   label: '🏖 Отпуск' },
-  { kind: 'sick_leave', label: '🤒 Больничный' },
-  { kind: 'absence',    label: '✗ Прогул' },
+  { kind: 'work',       label: 'Пришёл' },
+  { kind: 'vacation',   label: 'Отпуск' },
+  { kind: 'sick_leave', label: 'Больничный' },
+  { kind: 'absence',    label: 'Прогул' },
 ];
 
 function todayISO(): string {
@@ -57,15 +60,19 @@ export default function MyTeamCheckin() {
   } | null>(null);
 
   if (isLoading) {
-    return <Panel title="Check-in"><div style={{ padding: 24, color: 'var(--fg-3)' }}>Загружаем команду…</div></Panel>;
+    return (
+      <Panel title="Отметка явки">
+        <div style={{ padding: 24, color: 'var(--fg-3)' }}>Загружаем команду…</div>
+      </Panel>
+    );
   }
 
   if (team.length === 0) {
     return (
-      <Panel title="Check-in моей команды">
+      <Panel title="Отметка явки моих подчинённых">
         <div style={{ padding: 24, color: 'var(--fg-3)', textAlign: 'center' }}>
           У вас пока нет подчинённых. Назначьте сотрудникам руководителя
-          на странице /people через карточку сотрудника.
+          на странице «Сотрудники» через карточку сотрудника.
         </div>
       </Panel>
     );
@@ -73,15 +80,12 @@ export default function MyTeamCheckin() {
 
   return (
     <>
-      <Panel
-        title={`Check-in на ${today}`}
-        flush
-      >
+      <Panel title={`Отметка явки на ${today}`} flush>
         <div style={{
           padding: '6px 12px', fontSize: 11, color: 'var(--fg-3)',
           borderBottom: '1px solid var(--border)',
         }}>
-          Жмите кнопку — текущая отметка за день сохраняется мгновенно.
+          Жмите кнопку — отметка за день сохраняется мгновенно.
           «Другое…» — для нестандартных причин или часов.
         </div>
         <table style={{ width: '100%', fontSize: 13, borderCollapse: 'collapse' }}>
@@ -144,6 +148,7 @@ function TeamRow({
   const expected = cal?.expected.find((e) => e.date === today);
   const currentKind = (actual?.kind || expected?.kind || null) as WorkShiftKind | null;
   const currentId = actual?.id;
+  const isPlanOnly = !actual && !!expected;
 
   const doQuick = (k: WorkShiftKind) => {
     save.mutate({
@@ -166,17 +171,12 @@ function TeamRow({
       </td>
       <td style={{ padding: '8px 12px', verticalAlign: 'middle' }}>
         {currentKind ? (
-          <span style={{
-            display: 'inline-flex', alignItems: 'center', gap: 6,
-            padding: '2px 8px', borderRadius: 12,
-            background: KIND_TONE[currentKind] + '20',
-            color: KIND_TONE[currentKind],
-            fontSize: 12, fontWeight: 500,
-            border: `1px solid ${KIND_TONE[currentKind]}40`,
-          }}>
-            {actual ? '●' : '○'} {KIND_LABEL[currentKind]}
-            {!actual && expected && (
-              <span style={{ fontSize: 10, opacity: 0.7 }}>(план)</span>
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+            <Badge tone={KIND_TONE[currentKind]} dot>
+              {KIND_LABEL[currentKind]}
+            </Badge>
+            {isPlanOnly && (
+              <span style={{ fontSize: 10, color: 'var(--fg-3)' }}>по плану</span>
             )}
           </span>
         ) : (
@@ -184,24 +184,23 @@ function TeamRow({
         )}
       </td>
       <td style={{ padding: '8px 12px', verticalAlign: 'middle' }}>
-        <div style={{ display: 'inline-flex', gap: 4, flexWrap: 'wrap' }}>
+        <div style={{ display: 'inline-flex', gap: 6, flexWrap: 'wrap' }}>
           {QUICK_BUTTONS.map((b) => {
             const isActive = actual?.kind === b.kind;
+            // Активная кнопка = заполненный primary, прогул — danger,
+            // остальные — ghost. Это совпадает с общим стилем CTA на других страницах.
+            let cls = 'btn btn-sm';
+            if (isActive) cls += ' btn-primary';
+            else if (b.kind === 'absence') cls += ' btn-danger';
+            else cls += ' btn-ghost';
             return (
               <button
                 key={b.kind}
                 type="button"
-                className="btn btn-sm"
+                className={cls}
                 disabled={save.isPending}
                 onClick={() => doQuick(b.kind)}
-                title={isActive ? `Уже стоит: ${b.label}` : `Поставить: ${b.label}`}
-                style={{
-                  fontSize: 11, padding: '3px 8px',
-                  borderColor: isActive ? KIND_TONE[b.kind] : 'var(--border)',
-                  background: isActive ? KIND_TONE[b.kind] : 'transparent',
-                  color: isActive ? '#fff' : KIND_TONE[b.kind],
-                  fontWeight: isActive ? 600 : 500,
-                }}
+                title={isActive ? `Стоит сейчас: ${b.label}` : `Поставить: ${b.label}`}
               >
                 {b.label}
               </button>
@@ -219,9 +218,8 @@ function TeamRow({
             shiftId: currentId,
             initialKind: currentKind || 'work',
           })}
-          style={{ fontSize: 11 }}
         >
-          ✏ Другое…
+          Другое…
         </button>
       </td>
     </tr>

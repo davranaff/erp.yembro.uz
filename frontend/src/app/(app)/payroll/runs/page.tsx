@@ -50,11 +50,11 @@ export default function PayrollRunsPage() {
     <>
       <div className="page-hdr">
         <div>
-          <h1>Ведомости и check-in</h1>
+          <h1>Ведомости и явка</h1>
           <div className="sub">
             {scope === 'all'
               ? 'Массовая выплата ЗП всем сотрудникам с долгом за период'
-              : 'Отметка прихода/неприхода для моих подчинённых на сегодня'}
+              : 'Отметка прихода / неприхода для моих подчинённых на сегодня'}
           </div>
         </div>
         <div className="actions" style={{ display: 'flex', gap: 8 }}>
