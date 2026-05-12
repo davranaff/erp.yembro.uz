@@ -116,6 +116,10 @@ export const NAV: NavEntry[] = [
   { key: 'cashbox',   label: 'Касса и банк',     icon: 'book',  href: '/finance/cashbox',
     requireAnyModule: ['ledger', 'purchases', 'sales', 'vet', 'feed', 'admin'],
     aliases: ['платёж', 'оплата', 'банк', 'касса'] },
+  // История оповещений: журнал SMS+TG (для админов и sales-руководителей).
+  { key: 'notifications', label: 'Оповещения',  icon: 'inbox', href: '/notifications',
+    module: 'admin', min: 'admin',
+    aliases: ['уведомления', 'sms', 'telegram', 'история', 'отправлено'] },
 
   // ── Аналитика (всё отчётно-аналитическое) ───────────────────────────
   { group: 'Аналитика' },

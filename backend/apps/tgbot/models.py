@@ -108,6 +108,73 @@ class TgLinkToken(UUIDModel, TimestampedModel):
         return not self.used and timezone.now() < self.expires_at
 
 
+class TgMessage(UUIDModel, TimestampedModel):
+    """
+    Журнал исходящих Telegram-сообщений (debt-reminders, system, и т.д.).
+    Аналог `apps.otp.SmsMessage`, но для TG-канала. Объединяющий endpoint
+    `/api/notifications/` склеивает обе модели для UI «История оповещений».
+    """
+
+    class Source(models.TextChoices):
+        DEBT_REMINDER = "debt_reminder", "Напоминание о долге"
+        TG_INVITE = "tg_invite", "Приглашение в TG"
+        SYSTEM = "system", "Системное"
+        OTHER = "other", "Прочее"
+
+    class Status(models.TextChoices):
+        SENT = "sent", "Отправлено"
+        FAILED = "failed", "Ошибка"
+
+    organization = models.ForeignKey(
+        "organizations.Organization",
+        on_delete=models.CASCADE,
+        related_name="tg_messages",
+    )
+    chat_id = models.BigIntegerField(db_index=True)
+    counterparty = models.ForeignKey(
+        "counterparties.Counterparty",
+        null=True, blank=True,
+        on_delete=models.SET_NULL,
+        related_name="tg_messages",
+    )
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True, blank=True,
+        on_delete=models.SET_NULL,
+        related_name="tg_messages_received",
+    )
+    text = models.TextField()
+    source = models.CharField(
+        max_length=24, choices=Source.choices, default=Source.OTHER, db_index=True,
+    )
+    status = models.CharField(
+        max_length=16, choices=Status.choices, default=Status.SENT, db_index=True,
+    )
+    error_msg = models.TextField(blank=True)
+    sent_at = models.DateTimeField(null=True, blank=True)
+    failed_at = models.DateTimeField(null=True, blank=True)
+
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True, blank=True,
+        on_delete=models.SET_NULL,
+        related_name="tg_messages_sent",
+    )
+
+    class Meta:
+        ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["organization", "-created_at"]),
+            models.Index(fields=["counterparty", "-created_at"]),
+            models.Index(fields=["source", "-created_at"]),
+        ]
+        verbose_name = "TG-сообщение"
+        verbose_name_plural = "TG-сообщения"
+
+    def __str__(self) -> str:
+        return f"TgMessage({self.chat_id} · {self.source} · {self.status})"
+
+
 def _wizard_expires() -> object:
     return timezone.now() + timedelta(minutes=30)
 
