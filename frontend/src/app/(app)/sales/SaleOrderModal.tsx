@@ -76,6 +76,12 @@ interface ItemDraft {
    * за единицу учёта (мешок), kg-версия конвертируется через bag_weight_kg.
    */
   price_unit?: 'bag' | 'kg';
+  /**
+   * UI-only: режим ввода количества для FeedBagLot. 'bag' — пишем мешки
+   * (default), 'kg' — пишем кг, система округляет до целого числа мешков
+   * (1 мешок = bag_weight_kg). На бэк всегда уходит quantity в мешках.
+   */
+  quantity_unit?: 'bag' | 'kg';
 }
 
 function makeItemDraft(overrides: Partial<ItemDraft> = {}): ItemDraft {
@@ -898,11 +904,43 @@ export default function SaleOrderModal({ initial, preselect, onClose }: Props) {
                   ? parseFloat(it.available_quantity)
                   : 0;
                 const availKg = isBag && bagKg > 0 ? availNum * bagKg : 0;
+                const qtyUnit = (it.quantity_unit ?? 'bag') as 'bag' | 'kg';
+                // В kg-режиме показываем эквивалент в кг (qty_мешков × bagKg);
+                // юзер вводит kg, мы округляем до целого мешка.
+                const displayedQty = isBag && qtyUnit === 'kg' && bagKg > 0
+                  ? (qtyKg > 0 ? String(qtyKg) : '')
+                  : it.quantity;
                 return (
                   <>
                     <div className="field">
-                      <label>
-                        Кол-во *
+                      <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <span>Кол-во *</span>
+                        {isBag && bagKg > 0 && (
+                          <span style={{ display: 'inline-flex', gap: 4, marginLeft: 6 }}>
+                            <button
+                              type="button"
+                              onClick={() => updateItem(it.key, { quantity_unit: 'bag' })}
+                              className="btn btn-sm"
+                              style={{
+                                fontSize: 10, padding: '2px 8px',
+                                background: qtyUnit === 'bag' ? 'var(--brand-orange)' : 'var(--bg-card)',
+                                color: qtyUnit === 'bag' ? '#fff' : 'var(--fg-2)',
+                                border: '1px solid var(--border)', borderRadius: 4,
+                              }}
+                            >шт</button>
+                            <button
+                              type="button"
+                              onClick={() => updateItem(it.key, { quantity_unit: 'kg' })}
+                              className="btn btn-sm"
+                              style={{
+                                fontSize: 10, padding: '2px 8px',
+                                background: qtyUnit === 'kg' ? 'var(--brand-orange)' : 'var(--bg-card)',
+                                color: qtyUnit === 'kg' ? '#fff' : 'var(--fg-2)',
+                                border: '1px solid var(--border)', borderRadius: 4,
+                              }}
+                            >кг</button>
+                          </span>
+                        )}
                         {it.available_quantity && (
                           <span style={{ fontSize: 10, color: 'var(--fg-3)', fontWeight: 400, marginLeft: 6 }}>
                             доступно {availNum.toLocaleString('ru-RU')} {it.unit_code ?? ''}
@@ -915,11 +953,25 @@ export default function SaleOrderModal({ initial, preselect, onClose }: Props) {
                       <input
                         className="input mono"
                         type="number"
-                        step={isBag ? '1' : '0.001'}
+                        step={isBag && qtyUnit === 'kg' ? '0.1' : (isBag ? '1' : '0.001')}
                         min="0"
-                        max={it.available_quantity || undefined}
-                        value={it.quantity}
-                        onChange={(e) => updateItem(it.key, { quantity: e.target.value })}
+                        value={displayedQty}
+                        placeholder={isBag && qtyUnit === 'kg' ? 'кг' : (isBag ? 'мешков' : '')}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          if (!isBag || qtyUnit === 'bag' || bagKg <= 0) {
+                            updateItem(it.key, { quantity: val });
+                            return;
+                          }
+                          // KG-режим: пересчитываем в мешки, округляем до целого.
+                          const kg = parseFloat(val || '0');
+                          if (kg <= 0) {
+                            updateItem(it.key, { quantity: '' });
+                            return;
+                          }
+                          const bags = Math.round(kg / bagKg);
+                          updateItem(it.key, { quantity: String(bags) });
+                        }}
                         style={
                           it.available_quantity
                             && qtyNum > availNum

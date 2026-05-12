@@ -63,8 +63,11 @@ jobs:
           cache: pip
           cache-dependency-path: backend/requirements.txt
 
-      - name: Install system dependencies
-        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends libpq-dev
+      # libpq-dev уже не нужен — в requirements стоит psycopg[binary], а это
+      # уже скомпилированный wheel с встроенным libpq. apt-get шаг убрали:
+      #   - экономит 1–2 мин в каждом CI-прогоне
+      #   - убирает зависимость от azure-apt-mirror, который у GHA-runner-а
+      #     периодически отвечает медленно/невообще (см. инцидент 2026-05-12).
 
       - name: Install backend dependencies
         run: |
