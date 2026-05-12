@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 
+import AmountInput from '@/components/ui/AmountInput';
 import { useCreateAdjustment } from '@/hooks/usePayroll';
 
 interface Props {
@@ -115,12 +116,11 @@ export default function QuickAdjustmentPopover({
 
       <div className="field" style={{ marginBottom: 8 }}>
         <label style={{ fontSize: 11 }}>Сумма, UZS</label>
-        <input
+        <AmountInput
           className="input"
-          inputMode="decimal"
           autoFocus
           value={amount}
-          onChange={(e) => setAmount(e.target.value)}
+          onChange={setAmount}
           placeholder="100 000"
           style={{ fontSize: 14, fontWeight: 600 }}
         />

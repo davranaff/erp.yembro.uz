@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 
+import AmountInput from '@/components/ui/AmountInput';
 import Icon from '@/components/ui/Icon';
 import Modal from '@/components/ui/Modal';
 import { useCounterparties } from '@/hooks/useCounterparties';
@@ -429,17 +430,15 @@ export default function OpexModal({ preselect, onClose }: Props) {
 
         <div className="field">
           <label>Сумма, UZS *</label>
-          <input
+          <AmountInput
             className={'input mono' + (getFieldErr('amount_uzs') ? ' err' : '')}
-            type="number"
-            step="0.01"
             value={amount}
-            onChange={(e) => setAmount(e.target.value)}
-            placeholder="0.00"
+            onChange={setAmount}
+            placeholder="0"
           />
           {getFieldErr('amount_uzs')
             ? <span className="hint" style={{ color: 'var(--danger)' }}>{getFieldErr('amount_uzs')}</span>
-            : <span className="hint">Только число, без пробелов</span>}
+            : <span className="hint">Например: 1 000 000</span>}
         </div>
       </div>
 

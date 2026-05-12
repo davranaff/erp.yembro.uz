@@ -51,8 +51,6 @@ export const NAV: NavEntry[] = [
   { group: 'Ядро' },
   { key: 'nomenclature',   label: 'Номенклатура', icon: 'box',     href: '/nomenclature',   module: 'core',
     aliases: ['товары', 'sku', 'позиции'] },
-  { key: 'accounts',       label: 'План счетов',  icon: 'book',    href: '/accounts',       module: 'ledger',
-    aliases: ['gl', 'субсчета'] },
   { key: 'blocks',         label: 'Блоки',        icon: 'factory', href: '/blocks',         module: 'core',
     aliases: ['корпус', 'птичник', 'шкаф', 'линия'] },
 
@@ -133,6 +131,8 @@ export const NAV: NavEntry[] = [
     aliases: ['холдинг', 'консолидация', 'все компании'] },
   { key: 'rates',     label: 'Курсы валют',      icon: 'chart', href: '/finance/rates',   module: 'ledger',
     aliases: ['валюта', 'usd', 'cbu'] },
+  { key: 'accounts',  label: 'План счетов',      icon: 'book',  href: '/accounts',        module: 'ledger',
+    aliases: ['gl', 'субсчета'] },
   { key: 'ledger',    label: 'Проводки',         icon: 'book',  href: '/ledger',          module: 'ledger',
     aliases: ['журнал', 'je', 'gl'] },
   { key: 'audit',   label: 'Журнал аудита',    icon: 'book',     href: '/audit-log', module: 'admin',
