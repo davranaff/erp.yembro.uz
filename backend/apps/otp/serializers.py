@@ -2,6 +2,8 @@ import re
 
 from rest_framework import serializers
 
+from .models import SmsMessage
+
 
 _PURPOSE_RE = re.compile(r"^[a-z0-9_\-]{1,32}$")
 
@@ -41,3 +43,40 @@ class OtpVerifySerializer(serializers.Serializer):
         if not value.isdigit():
             raise serializers.ValidationError("Код должен состоять из цифр.")
         return value
+
+
+class SmsSendSerializer(serializers.Serializer):
+    """Ручная/программная отправка одного SMS через `/api/sms/send/`."""
+
+    phone = serializers.CharField(max_length=32)
+    message = serializers.CharField(max_length=918)  # 6 SMS-парт макс
+    purpose = serializers.CharField(max_length=32, required=False, allow_blank=True)
+
+    def validate_message(self, value: str) -> str:
+        value = (value or "").strip()
+        if not value:
+            raise serializers.ValidationError("Текст сообщения не может быть пустым.")
+        return value
+
+
+class SmsMessageSerializer(serializers.ModelSerializer):
+    """Серилизатор лог-записи SMS для `/api/sms/messages/`."""
+
+    class Meta:
+        model = SmsMessage
+        fields = (
+            "id",
+            "phone",
+            "message",
+            "source",
+            "purpose",
+            "status",
+            "provider_message_id",
+            "sent_at",
+            "delivered_at",
+            "failed_at",
+            "error_msg",
+            "cost_uzs",
+            "created_at",
+        )
+        read_only_fields = fields

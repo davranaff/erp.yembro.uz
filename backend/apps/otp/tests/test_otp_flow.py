@@ -37,10 +37,13 @@ def stub_send(monkeypatch):
         captured["code"] = code
         return code
 
-    def fake_send(phone: str, message: str) -> str:
+    class _StubSms:
+        provider_message_id = "test-stub-id"
+
+    def fake_send(*, phone, message, source=None, purpose="", created_by=None):
         captured["phone"] = phone
         captured["message"] = message
-        return "test-stub-id"
+        return _StubSms()
 
     monkeypatch.setattr(otp_service, "_generate_code", fake_generate)
     monkeypatch.setattr(otp_service, "send_sms", fake_send)

@@ -11,7 +11,7 @@ from django.conf import settings
 from django.db import transaction
 from django.utils import timezone
 
-from ..models import OtpCode
+from ..models import OtpCode, SmsMessage
 from .sender import send_sms
 
 logger = logging.getLogger(__name__)
@@ -151,13 +151,18 @@ def request_otp(
             requested_ip=requested_ip,
         )
         message = _format_message(code, message_template)
-        message_id = send_sms(phone, message)
+        sms = send_sms(
+            phone=phone,
+            message=message,
+            source=SmsMessage.Source.OTP,
+            purpose=purpose,
+        )
 
     return RequestResult(
         otp_id=str(otp.id),
         expires_at=otp.expires_at,
         resend_available_at=otp.created_at + timedelta(seconds=resend_interval),
-        message_id=message_id,
+        message_id=sms.provider_message_id or "",
     )
 
 
