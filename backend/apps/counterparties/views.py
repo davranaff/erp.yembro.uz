@@ -310,6 +310,65 @@ class CounterpartyViewSet(OrgScopedModelViewSet):
     ordering_fields = ["code", "name", "balance_uzs", "created_at"]
     ordering = ["code"]
 
+    def get_serializer_context(self):
+        """
+        Для list-ответа один раз агрегируем outstanding по непогашенным
+        SaleOrder (AR) и PurchaseOrder (AP) — это и есть «реальный долг»,
+        включая синтетический OPENING_BALANCE SO. Передаём словарём в
+        context, сериализатор берёт оттуда current_debt_uzs.
+        """
+        ctx = super().get_serializer_context()
+        # debt_map нужен только на list. retrieve/create/update обходятся
+        # fallback'ом на opening_debt_uzs в сериализаторе.
+        if self.action != "list":
+            return ctx
+
+        from decimal import Decimal
+
+        from django.db.models import F, Sum
+
+        from apps.purchases.models import PurchaseOrder
+        from apps.sales.models import SaleOrder
+
+        org = getattr(self.request, "organization", None)
+        if org is None:
+            return ctx
+
+        debt_map: dict = {}
+
+        ar_rows = (
+            SaleOrder.objects
+            .filter(organization=org, status=SaleOrder.Status.CONFIRMED)
+            .exclude(payment_status=SaleOrder.PaymentStatus.PAID)
+            .values("customer_id")
+            .annotate(out=Sum(F("amount_uzs") - F("paid_amount_uzs")))
+        )
+        for r in ar_rows:
+            cp_id = r["customer_id"]
+            if cp_id is None:
+                continue
+            outstanding = r["out"] or Decimal("0")
+            if outstanding > 0:
+                debt_map[cp_id] = debt_map.get(cp_id, Decimal("0")) + outstanding
+
+        ap_rows = (
+            PurchaseOrder.objects
+            .filter(organization=org, status=PurchaseOrder.Status.CONFIRMED)
+            .exclude(payment_status=PurchaseOrder.PaymentStatus.PAID)
+            .values("counterparty_id")
+            .annotate(out=Sum(F("amount_uzs") - F("paid_amount_uzs")))
+        )
+        for r in ap_rows:
+            cp_id = r["counterparty_id"]
+            if cp_id is None:
+                continue
+            outstanding = r["out"] or Decimal("0")
+            if outstanding > 0:
+                debt_map[cp_id] = debt_map.get(cp_id, Decimal("0")) + outstanding
+
+        ctx["current_debt_map"] = debt_map
+        return ctx
+
     def perform_create(self, serializer):
         super().perform_create(serializer)
         self._sync_opening_balance(serializer.instance)
