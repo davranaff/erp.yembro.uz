@@ -505,6 +505,12 @@ export interface Counterparty {
   email: string;
   address: string;
   balance_uzs: string;
+  /** Реальный текущий долг по непогашенным SaleOrder/PurchaseOrder
+   * (включая синтетический OPENING_BALANCE SO от opening_debt_uzs).
+   * Если SO ещё не материализован — приходит opening_debt_uzs как fallback.
+   * Знак тот же что у balance_uzs: для buyer + клиент нам должен,
+   * для supplier + мы должны. */
+  current_debt_uzs: string;
   /** Кредитный лимит покупателя в сумах. NULL = без ограничения. */
   credit_limit_uzs: string | null;
   /** Макс. допустимая просрочка в днях. NULL = без ограничения. */

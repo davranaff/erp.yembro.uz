@@ -202,7 +202,10 @@ export default function CounterpartiesPage() {
               render: (r) => <Badge tone={kindTone(r.kind)}>{KIND_LABEL[r.kind]}</Badge> },
             { key: 'balance', label: 'Баланс, UZS', align: 'right', mono: true,
               render: (r) => {
-                const bal = fmtBalance(r.balance_uzs, r.kind);
+                // current_debt_uzs учитывает opening_debt + outstanding по SO/PO.
+                // balance_uzs практически не используется в проекте — fallback ради
+                // совместимости старых данных.
+                const bal = fmtBalance(r.current_debt_uzs || r.balance_uzs, r.kind);
                 return (
                   <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
                     <span style={{ fontWeight: 700, color: bal.color, fontSize: 13 }}>
