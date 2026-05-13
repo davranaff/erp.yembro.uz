@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 
 import AmountInput from '@/components/ui/AmountInput';
 import Modal from '@/components/ui/Modal';
+import SmartSelect from '@/components/ui/SmartSelect';
 import { useCounterparties } from '@/hooks/useCounterparties';
 import { useModules } from '@/hooks/useModules';
 import { useNomenclatureItems } from '@/hooks/useNomenclature';
@@ -282,19 +283,19 @@ export default function StockMovementModal({ onClose, onSaved, onSwitchToFeedRaw
 
         <div className="field">
           <label>Номенклатура *</label>
-          <select
-            className="input"
+          <SmartSelect
             value={nomenclatureId}
-            onChange={(e) => setNomenclatureId(e.target.value)}
+            onChange={setNomenclatureId}
+            options={(items ?? []).map((i) => ({
+              value: i.id,
+              label: i.name,
+              sublabel: i.sku,
+            }))}
             disabled={!moduleId}
-          >
-            <option value="">{moduleId ? '— выберите —' : 'выберите модуль'}</option>
-            {items?.map((i) => (
-              <option key={i.id} value={i.id}>
-                {i.name}
-              </option>
-            ))}
-          </select>
+            placeholder={moduleId ? '— выберите номенклатуру —' : 'сначала выберите модуль'}
+            searchPlaceholder="Поиск по SKU или названию…"
+            emptyText="Не найдено"
+          />
           {renderError('nomenclature')}
         </div>
 
@@ -326,18 +327,17 @@ export default function StockMovementModal({ onClose, onSaved, onSwitchToFeedRaw
         {needFrom && (
           <div className="field">
             <label>Со склада *</label>
-            <select
-              className="input"
+            <SmartSelect
               value={whFrom}
-              onChange={(e) => setWhFrom(e.target.value)}
-            >
-              <option value="">— выберите —</option>
-              {visibleWarehouses.map((w) => (
-                <option key={w.id} value={w.id}>
-                  {w.name}
-                </option>
-              ))}
-            </select>
+              onChange={setWhFrom}
+              options={visibleWarehouses.map((w) => ({
+                value: w.id,
+                label: w.name,
+                sublabel: w.code,
+              }))}
+              placeholder="— выберите склад —"
+              searchPlaceholder="Поиск склада…"
+            />
             {renderError('warehouse_from')}
           </div>
         )}
@@ -345,18 +345,17 @@ export default function StockMovementModal({ onClose, onSaved, onSwitchToFeedRaw
         {needTo && (
           <div className="field">
             <label>На склад *</label>
-            <select
-              className="input"
+            <SmartSelect
               value={whTo}
-              onChange={(e) => setWhTo(e.target.value)}
-            >
-              <option value="">— выберите —</option>
-              {visibleWarehouses.map((w) => (
-                <option key={w.id} value={w.id}>
-                  {w.name}
-                </option>
-              ))}
-            </select>
+              onChange={setWhTo}
+              options={visibleWarehouses.map((w) => ({
+                value: w.id,
+                label: w.name,
+                sublabel: w.code,
+              }))}
+              placeholder="— выберите склад —"
+              searchPlaceholder="Поиск склада…"
+            />
             {renderError('warehouse_to')}
           </div>
         )}
@@ -365,18 +364,18 @@ export default function StockMovementModal({ onClose, onSaved, onSwitchToFeedRaw
           <label>
             Контрагент {kind === 'incoming' ? '*' : '(опционально)'}
           </label>
-          <select
-            className="input"
+          <SmartSelect
             value={counterparty}
-            onChange={(e) => setCounterparty(e.target.value)}
-          >
-            <option value="">— не указан —</option>
-            {parties?.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.code} · {p.name}
-              </option>
-            ))}
-          </select>
+            onChange={setCounterparty}
+            options={(parties ?? []).map((p) => ({
+              value: p.id,
+              label: p.name,
+              sublabel: p.code,
+            }))}
+            placeholder="— не указан —"
+            searchPlaceholder="Поиск по названию или коду…"
+            emptyText="Контрагенты не найдены"
+          />
           {kind === 'incoming' && (
             <div style={{ fontSize: 11, color: 'var(--fg-3)', marginTop: 4 }}>
               Для прихода поставщик обязателен — автоматически создастся

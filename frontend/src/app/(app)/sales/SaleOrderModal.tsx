@@ -7,6 +7,7 @@ import AmountInput from '@/components/ui/AmountInput';
 import Icon from '@/components/ui/Icon';
 import Modal from '@/components/ui/Modal';
 import Seg from '@/components/ui/Seg';
+import SmartSelect from '@/components/ui/SmartSelect';
 import { useCounterparties } from '@/hooks/useCounterparties';
 import { POPULAR_CURRENCY_CODES, useCurrenciesSorted, useRateOnDate } from '@/hooks/useCurrencyRates';
 import { feedBagLotsCrud, feedBatchesCrud, rawBatchesCrud } from '@/hooks/useFeed';
@@ -435,30 +436,35 @@ export default function SaleOrderModal({ initial, preselect, onClose }: Props) {
 
         <div className="field">
           <label>Клиент *</label>
-          <select className="input" value={customerId} onChange={(e) => setCustomerId(e.target.value)}>
-            <option value="">—</option>
-            {customers?.map((c) => (
-              <option key={c.id} value={c.id}>{c.name}</option>
-            ))}
-          </select>
+          <SmartSelect
+            value={customerId}
+            onChange={setCustomerId}
+            options={customers?.map((c) => ({
+              value: c.id,
+              label: c.name,
+              sublabel: c.code,
+            })) ?? []}
+            placeholder="— выберите клиента —"
+            searchPlaceholder="Поиск по названию или коду…"
+            emptyText="Клиенты не найдены"
+          />
           {getFieldErr('customer') && <div style={{ fontSize: 11, color: 'var(--danger)' }}>{getFieldErr('customer')}</div>}
         </div>
 
         <div className="field">
           <label>Склад отгрузки *</label>
-          <select
-            className="input"
+          <SmartSelect
             value={warehouseId}
-            onChange={(e) => setWarehouseId(e.target.value)}
+            onChange={setWarehouseId}
+            options={(warehouses ?? []).map((w) => ({
+              value: w.id,
+              label: `${w.code} · ${w.name}`,
+            }))}
             disabled={!moduleId}
-          >
-            <option value="">
-              {moduleId ? '—' : 'Сначала выберите модуль'}
-            </option>
-            {warehouses?.map((w) => (
-              <option key={w.id} value={w.id}>{w.code} · {w.name}</option>
-            ))}
-          </select>
+            placeholder={moduleId ? '— выберите склад —' : 'сначала выберите модуль'}
+            searchPlaceholder="Поиск склада…"
+            emptyText="Складов модуля нет"
+          />
           {moduleId && warehouses && warehouses.length === 0 && (
             <div style={{ fontSize: 11, color: 'var(--warning)', marginTop: 4 }}>
               У модуля «{selectedModuleCode}» нет складов. Создайте в /stock.

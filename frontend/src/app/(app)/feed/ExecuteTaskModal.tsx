@@ -4,6 +4,7 @@ import { useState } from 'react';
 
 import HelpHint from '@/components/ui/HelpHint';
 import Modal from '@/components/ui/Modal';
+import SmartSelect from '@/components/ui/SmartSelect';
 import { ApiError } from '@/lib/api';
 import { useProductionBlocks } from '@/hooks/useBlocks';
 import { useExecuteTask } from '@/hooks/useFeed';
@@ -86,12 +87,18 @@ export default function ExecuteTaskModal({ task, onClose }: Props) {
             details="Это должен быть склад модуля «Корма» предназначенный для готовой продукции (не сырьевой). Если склад пуст — создайте в /stock."
           />
         </label>
-        <select className="input" value={outputWarehouse} onChange={(e) => setOutputWarehouse(e.target.value)}>
-          <option value="">—</option>
-          {warehouses?.filter((w) => w.module_code === 'feed').map((w) => (
-            <option key={w.id} value={w.id}>{w.code} · {w.name}</option>
-          ))}
-        </select>
+        <SmartSelect
+          value={outputWarehouse}
+          onChange={setOutputWarehouse}
+          options={warehouses?.filter((w) => w.module_code === 'feed').map((w) => ({
+            value: w.id,
+            label: w.name,
+            sublabel: w.code,
+          })) ?? []}
+          placeholder="— выберите склад ГП —"
+          searchPlaceholder="Поиск склада…"
+          emptyText="Складов готовой продукции нет"
+        />
       </div>
       <div className="field">
         <label>
@@ -101,10 +108,18 @@ export default function ExecuteTaskModal({ task, onClose }: Props) {
             details="Корм хранится в бункерах разной ёмкости. Если бункеров нет — создайте блоки типа storage_bin в /blocks."
           />
         </label>
-        <select className="input" value={storageBin} onChange={(e) => setStorageBin(e.target.value)}>
-          <option value="">—</option>
-          {bins?.map((b) => <option key={b.id} value={b.id}>{b.code} · {b.name}</option>)}
-        </select>
+        <SmartSelect
+          value={storageBin}
+          onChange={setStorageBin}
+          options={bins?.map((b) => ({
+            value: b.id,
+            label: b.name,
+            sublabel: b.code,
+          })) ?? []}
+          placeholder="— выберите бункер —"
+          searchPlaceholder="Поиск бункера…"
+          emptyText="Бункеров нет — создайте в /blocks"
+        />
       </div>
       <div className="field">
         <label>
