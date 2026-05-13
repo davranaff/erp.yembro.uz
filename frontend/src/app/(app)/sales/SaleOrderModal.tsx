@@ -6,6 +6,7 @@ import BatchSelector from '@/components/BatchSelector';
 import AmountInput from '@/components/ui/AmountInput';
 import Icon from '@/components/ui/Icon';
 import Modal from '@/components/ui/Modal';
+import Seg from '@/components/ui/Seg';
 import { useCounterparties } from '@/hooks/useCounterparties';
 import { POPULAR_CURRENCY_CODES, useCurrenciesSorted, useRateOnDate } from '@/hooks/useCurrencyRates';
 import { feedBagLotsCrud, feedBatchesCrud, rawBatchesCrud } from '@/hooks/useFeed';
@@ -82,6 +83,13 @@ interface ItemDraft {
    * (1 мешок = bag_weight_kg). На бэк всегда уходит quantity в мешках.
    */
   quantity_unit?: 'bag' | 'kg';
+  /**
+   * UI-only буфер для kg-режима: то, что пользователь физически набрал
+   * в инпуте. quantity (мешки) пересчитывается через round(kg / bagKg),
+   * но если показывать в инпуте `bags * bagKg`, при наборе 99 (≈2 мешка)
+   * значение прыгает обратно в 100 — кажется, что не печатается.
+   */
+  quantity_kg_input?: string;
 }
 
 function makeItemDraft(overrides: Partial<ItemDraft> = {}): ItemDraft {
@@ -905,44 +913,36 @@ export default function SaleOrderModal({ initial, preselect, onClose }: Props) {
                   : 0;
                 const availKg = isBag && bagKg > 0 ? availNum * bagKg : 0;
                 const qtyUnit = (it.quantity_unit ?? 'bag') as 'bag' | 'kg';
-                // В kg-режиме показываем эквивалент в кг (qty_мешков × bagKg);
-                // юзер вводит kg, мы округляем до целого мешка.
+                const priceUnit = (it.price_unit ?? 'bag') as 'bag' | 'kg';
+                // В kg-режиме показываем то, что юзер реально набрал
+                // (quantity_kg_input), а не bags × bagKg — иначе при наборе
+                // «99» значение прыгает обратно в 100 (1 мешок ≈ 50 кг).
                 const displayedQty = isBag && qtyUnit === 'kg' && bagKg > 0
-                  ? (qtyKg > 0 ? String(qtyKg) : '')
+                  ? (it.quantity_kg_input ?? (qtyKg > 0 ? String(qtyKg) : ''))
                   : it.quantity;
                 return (
                   <>
                     <div className="field">
-                      <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                         <span>Кол-во *</span>
                         {isBag && bagKg > 0 && (
-                          <span style={{ display: 'inline-flex', gap: 4, marginLeft: 6 }}>
-                            <button
-                              type="button"
-                              onClick={() => updateItem(it.key, { quantity_unit: 'bag' })}
-                              className="btn btn-sm"
-                              style={{
-                                fontSize: 10, padding: '2px 8px',
-                                background: qtyUnit === 'bag' ? 'var(--brand-orange)' : 'var(--bg-card)',
-                                color: qtyUnit === 'bag' ? '#fff' : 'var(--fg-2)',
-                                border: '1px solid var(--border)', borderRadius: 4,
-                              }}
-                            >шт</button>
-                            <button
-                              type="button"
-                              onClick={() => updateItem(it.key, { quantity_unit: 'kg' })}
-                              className="btn btn-sm"
-                              style={{
-                                fontSize: 10, padding: '2px 8px',
-                                background: qtyUnit === 'kg' ? 'var(--brand-orange)' : 'var(--bg-card)',
-                                color: qtyUnit === 'kg' ? '#fff' : 'var(--fg-2)',
-                                border: '1px solid var(--border)', borderRadius: 4,
-                              }}
-                            >кг</button>
-                          </span>
+                          <Seg
+                            options={[{ value: 'bag', label: 'шт' }, { value: 'kg', label: 'кг' }]}
+                            value={qtyUnit}
+                            onChange={(v) => {
+                              const next = v as 'bag' | 'kg';
+                              const patch: Partial<ItemDraft> = { quantity_unit: next };
+                              // При переключении на kg заполняем буфер из текущих мешков,
+                              // чтобы юзер сразу видел эквивалент в кг.
+                              if (next === 'kg' && qtyKg > 0) {
+                                patch.quantity_kg_input = String(qtyKg);
+                              }
+                              updateItem(it.key, patch);
+                            }}
+                          />
                         )}
                         {it.available_quantity && (
-                          <span style={{ fontSize: 10, color: 'var(--fg-3)', fontWeight: 400, marginLeft: 6 }}>
+                          <span style={{ fontSize: 10, color: 'var(--fg-3)', fontWeight: 400 }}>
                             доступно {availNum.toLocaleString('ru-RU')} {it.unit_code ?? ''}
                             {isBag && availKg > 0 && (
                               <> = {availKg.toLocaleString('ru-RU')} кг</>
@@ -963,14 +963,19 @@ export default function SaleOrderModal({ initial, preselect, onClose }: Props) {
                             updateItem(it.key, { quantity: val });
                             return;
                           }
-                          // KG-режим: пересчитываем в мешки, округляем до целого.
+                          // KG-режим: сохраняем сырой ввод в буфер, чтобы юзер мог
+                          // свободно набирать; в quantity (мешки) кладём округлённое
+                          // значение для бэка.
                           const kg = parseFloat(val || '0');
-                          if (kg <= 0) {
-                            updateItem(it.key, { quantity: '' });
+                          if (val === '' || kg <= 0) {
+                            updateItem(it.key, { quantity: '', quantity_kg_input: val });
                             return;
                           }
                           const bags = Math.round(kg / bagKg);
-                          updateItem(it.key, { quantity: String(bags) });
+                          updateItem(it.key, {
+                            quantity: String(bags),
+                            quantity_kg_input: val,
+                          });
                         }}
                         style={
                           it.available_quantity
@@ -995,44 +1000,23 @@ export default function SaleOrderModal({ initial, preselect, onClose }: Props) {
                     </div>
 
                     <div className="field">
-                      <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                         <span>Цена * ({currencyCode})</span>
                         {isBag && bagKg > 0 && (
-                          <span style={{ display: 'inline-flex', gap: 4, marginLeft: 6 }}>
-                            <button
-                              type="button"
-                              onClick={() => updateItem(it.key, { price_unit: 'bag' })}
-                              className="btn btn-sm"
-                              style={{
-                                fontSize: 10, padding: '2px 8px',
-                                background: (it.price_unit ?? 'bag') === 'bag' ? 'var(--brand-orange)' : 'var(--bg-card)',
-                                color: (it.price_unit ?? 'bag') === 'bag' ? '#fff' : 'var(--fg-2)',
-                                border: '1px solid var(--border)', borderRadius: 4,
-                              }}
-                            >
-                              за мешок
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => updateItem(it.key, { price_unit: 'kg' })}
-                              className="btn btn-sm"
-                              style={{
-                                fontSize: 10, padding: '2px 8px',
-                                background: it.price_unit === 'kg' ? 'var(--brand-orange)' : 'var(--bg-card)',
-                                color: it.price_unit === 'kg' ? '#fff' : 'var(--fg-2)',
-                                border: '1px solid var(--border)', borderRadius: 4,
-                              }}
-                            >
-                              за кг
-                            </button>
-                          </span>
+                          <Seg
+                            options={[
+                              { value: 'bag', label: 'за мешок' },
+                              { value: 'kg', label: 'за кг' },
+                            ]}
+                            value={priceUnit}
+                            onChange={(v) => updateItem(it.key, { price_unit: v as 'bag' | 'kg' })}
+                          />
                         )}
                       </label>
                       {(() => {
                         // Храним unit_price_uzs всегда как цену «за мешок» —
                         // это то что нужно бэку (SaleItem.unit_price × quantity_шт).
                         // Если юзер ввёл «за кг» — конвертим: bag_price = kg × bagKg.
-                        const priceUnit = (it.price_unit ?? 'bag') as 'bag' | 'kg';
                         const stored = parseFloat(it.unit_price_uzs || '0');
                         const displayed = !isBag || bagKg <= 0 || priceUnit === 'bag'
                           ? it.unit_price_uzs
