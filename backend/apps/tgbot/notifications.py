@@ -104,6 +104,10 @@ def fmt_purchase_confirmed(order) -> str:
     except Exception:
         pass
 
+    notes_block = ""
+    if getattr(order, "notes", "") and order.notes.strip():
+        notes_block = f"\n💬 <b>Izoh:</b> <i>{order.notes.strip()}</i>"
+
     return (
         "🛒 <b>Xarid o'tkazildi</b>\n"
         "\n"
@@ -111,7 +115,7 @@ def fmt_purchase_confirmed(order) -> str:
         f"🏢 <b>Yetkazib beruvchi:</b> {order.counterparty.name}\n"
         f"🗂 <b>Modul:</b> {_module_label(order.module)}\n"
         f"💰 <b>Summa:</b> {_fmt_money(order.amount_uzs)} so'm"
-        f"{debt_block}\n"
+        f"{debt_block}{notes_block}\n"
         "\n"
         f"📅 <b>Sana:</b> {_fmt_date(order.date)}\n"
         f"🕐 <b>O'tkazildi:</b> {_fmt_dt(order.updated_at)}"
@@ -161,6 +165,12 @@ def fmt_payment_posted(payment) -> str:
 
     lines.append("")
     lines.append(f"💰 <b>Summa:</b> <code>{_fmt_money(payment.amount_uzs)}</code> so'm")
+
+    # Комментарий оператора — важная подсказка «за что/откуда платёж»
+    if getattr(payment, "notes", "") and payment.notes.strip():
+        lines.append("")
+        lines.append(f"💬 <b>Izoh:</b> <i>{payment.notes.strip()}</i>")
+
     lines.append("")
 
     # Даты
@@ -709,6 +719,10 @@ def fmt_sale_confirmed(order) -> str:
     elif paid > 0 and debt <= 0:
         lines.append("✅ <b>To'lov to'liq qabul qilingan</b>")
 
+    if getattr(order, "notes", "") and order.notes.strip():
+        lines.append("")
+        lines.append(f"💬 <b>Izoh:</b> <i>{order.notes.strip()}</i>")
+
     lines.append("")
     lines.append(f"📅 <b>Sana:</b> {_fmt_date(order.date)}")
     lines.append(f"🕐 <b>O'tkazildi:</b> {_fmt_dt(order.updated_at)}")
@@ -785,6 +799,8 @@ def fmt_sale_for_feed_module(order, items: list) -> str:
         lines.append(f"\n⏳ Qarz: <b>{_fmt_money(debt)} so'm</b> (pul kelmagan)")
     elif paid > 0:
         lines.append(f"\n✅ To'lov to'liq qabul qilingan: {_fmt_money(paid)} so'm")
+    if getattr(order, "notes", "") and order.notes.strip():
+        lines.append(f"\n💬 <i>{order.notes.strip()}</i>")
     return "\n".join(lines)
 
 
@@ -812,6 +828,8 @@ def fmt_sale_for_vet_module(order, items: list) -> str:
                 f"• {name} · {_fmt_qty(it.quantity)} dona"
                 f" → {_fmt_money(it.line_total_uzs)} so'm"
             )
+    if getattr(order, "notes", "") and order.notes.strip():
+        lines.append(f"\n💬 <i>{order.notes.strip()}</i>")
     return "\n".join(lines)
 
 
@@ -832,4 +850,6 @@ def fmt_sale_for_generic_module(order, items: list, module_label: str) -> str:
                 f" {_fmt_qty(it.quantity)} {b.unit.code if b.unit_id else 'dona'}"
                 f" → {_fmt_money(it.line_total_uzs)} so'm"
             )
+    if getattr(order, "notes", "") and order.notes.strip():
+        lines.append(f"\n💬 <i>{order.notes.strip()}</i>")
     return "\n".join(lines)
