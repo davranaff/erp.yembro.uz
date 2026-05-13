@@ -70,9 +70,10 @@ export default function SalesPage() {
   const [remindFor, setRemindFor] = useState<SaleOrder | null>(null);
   const [confirmingFor, setConfirmingFor] = useState<SaleOrder | null>(null);
 
-  // По умолчанию — текущий день. Юзер может расширить вручную или сбросить.
-  const [dateFrom, setDateFrom] = useState<string>(todayISO());
-  const [dateTo, setDateTo] = useState<string>(todayISO());
+  // По умолчанию фильтр по датам пустой — показываем все продажи.
+  // Юзер может выставить «Сегодня» кнопкой или ввести период вручную.
+  const [dateFrom, setDateFrom] = useState<string>('');
+  const [dateTo, setDateTo] = useState<string>('');
 
   const hasLevel = useHasLevel();
   const canEdit = hasLevel('sales', 'rw');
