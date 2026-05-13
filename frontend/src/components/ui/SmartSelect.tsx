@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 
 import Icon from './Icon';
 
@@ -61,9 +62,32 @@ export default function SmartSelect({
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState('');
   const [highlighted, setHighlighted] = useState(0);
+  // Координаты дропдауна в viewport (для портала). Считаются от
+  // bounding-rect триггера. Пересчитываются на scroll/resize пока открыт.
+  const [pos, setPos] = useState<{ top: number; left: number; width: number; flipUp: boolean } | null>(null);
   const rootRef = useRef<HTMLDivElement | null>(null);
+  const triggerRef = useRef<HTMLButtonElement | null>(null);
+  const dropdownRef = useRef<HTMLDivElement | null>(null);
   const searchRef = useRef<HTMLInputElement | null>(null);
   const listRef = useRef<HTMLDivElement | null>(null);
+
+  // Рассчитать позицию дропдауна. Если внизу мало места и сверху больше —
+  // открываемся вверх.
+  const recalcPosition = () => {
+    const trigger = triggerRef.current;
+    if (!trigger) return;
+    const r = trigger.getBoundingClientRect();
+    const DROPDOWN_MAX_H = 320;
+    const spaceBelow = window.innerHeight - r.bottom;
+    const spaceAbove = r.top;
+    const flipUp = spaceBelow < DROPDOWN_MAX_H && spaceAbove > spaceBelow;
+    setPos({
+      top: flipUp ? r.top - 4 : r.bottom + 4,
+      left: r.left,
+      width: r.width,
+      flipUp,
+    });
+  };
 
   // Текущая опция — для отображения в заголовке
   const selected = useMemo(
@@ -86,23 +110,41 @@ export default function SmartSelect({
     setHighlighted(0);
   }, [search]);
 
-  // Открыли → автофокус в поиск + поставить highlight на текущий value
-  useEffect(() => {
+  // Открыли → автофокус в поиск + highlight + рассчитать позицию портала.
+  // useLayoutEffect — чтобы измерить и спозиционировать ДО первого пэйнта
+  // дропдауна (без useLayoutEffect видно «прыжок» из угла экрана).
+  useLayoutEffect(() => {
     if (!open) return;
+    recalcPosition();
     setTimeout(() => searchRef.current?.focus(), 0);
     const idx = filtered.findIndex((o) => o.value === value);
     setHighlighted(idx >= 0 ? idx : 0);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
-  // Клик вне → закрыть
+  // Пока открыт — следим за скроллом/ресайзом контейнера, обновляем позицию.
+  // Это нужно потому что портал = position: fixed, а триггер живёт внутри
+  // прокручиваемого .modal-body.
+  useEffect(() => {
+    if (!open) return;
+    const onScroll = () => recalcPosition();
+    window.addEventListener('scroll', onScroll, true);
+    window.addEventListener('resize', onScroll);
+    return () => {
+      window.removeEventListener('scroll', onScroll, true);
+      window.removeEventListener('resize', onScroll);
+    };
+  }, [open]);
+
+  // Клик вне (триггера И самого дропдауна) → закрыть.
   useEffect(() => {
     if (!open) return;
     const handler = (e: MouseEvent) => {
-      if (!rootRef.current?.contains(e.target as Node)) {
-        setOpen(false);
-        setSearch('');
-      }
+      const t = e.target as Node;
+      if (rootRef.current?.contains(t)) return;
+      if (dropdownRef.current?.contains(t)) return;
+      setOpen(false);
+      setSearch('');
     };
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
@@ -145,6 +187,7 @@ export default function SmartSelect({
       style={{ position: 'relative', ...style }}
     >
       <button
+        ref={triggerRef}
         type="button"
         className="input"
         onClick={() => !disabled && setOpen((o) => !o)}
@@ -191,18 +234,22 @@ export default function SmartSelect({
         <Icon name="chevron-down" size={12} style={{ color: 'var(--fg-3)' }} />
       </button>
 
-      {open && (
+      {open && pos && typeof document !== 'undefined' && createPortal(
         <div
+          ref={dropdownRef}
           style={{
-            position: 'absolute',
-            top: 'calc(100% + 4px)',
-            left: 0,
-            right: 0,
-            zIndex: 100,
+            position: 'fixed',
+            top: pos.flipUp ? undefined : pos.top,
+            bottom: pos.flipUp ? window.innerHeight - pos.top : undefined,
+            left: pos.left,
+            width: pos.width,
+            // z-index выше .modal-backdrop (var(--z-modal)) — иначе портал
+            // под бэкдропом. 1100 безопасно поверх любой модалки.
+            zIndex: 1100,
             background: 'var(--bg-card)',
             border: '1px solid var(--border-strong)',
             borderRadius: 6,
-            boxShadow: '0 8px 24px rgba(0,0,0,0.12)',
+            boxShadow: '0 8px 24px rgba(0,0,0,0.18)',
             overflow: 'hidden',
             display: 'flex',
             flexDirection: 'column',
@@ -309,7 +356,8 @@ export default function SmartSelect({
               })
             )}
           </div>
-        </div>
+        </div>,
+        document.body,
       )}
     </div>
   );
