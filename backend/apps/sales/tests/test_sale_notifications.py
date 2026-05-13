@@ -151,7 +151,9 @@ def test_confirm_feed_sale_notifies_sales_and_feed_admins(
         c.args[0] for c in calls if "feed" in _modules_of(c)
     )
     assert "Yem-xashak jo'natildi" in feed_text
-    assert approved_feed_batch.doc_number in feed_text
+    # Per-module нотификация перешла на список товаров вместо doc_number —
+    # ищем код рецепта (он в строке `• Р-БР-СТ · 100 kg → ...`).
+    assert approved_feed_batch.recipe_version.recipe.code in feed_text
 
 
 def test_confirm_bag_lot_sale_notifies_feed_admin_with_bag_count(
@@ -186,5 +188,6 @@ def test_confirm_bag_lot_sale_notifies_feed_admin_with_bag_count(
     feed_call = next((c for c in calls if "feed" in _modules_of(c)), None)
     assert feed_call is not None, "feed module not notified"
     text = feed_call.args[0]
-    assert bag_lot.doc_number in text
+    # Per-module нотификация перешла на код рецепта вместо doc_number мешка.
+    assert bag_lot.recipe_version.recipe.code in text
     assert "5 qop" in text  # узбекский: «5 qop × 50 kg»

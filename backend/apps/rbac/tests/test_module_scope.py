@@ -100,7 +100,10 @@ def test_apply_scope_module_id_filter(admin_user, org, feed_module, vet_module):
     )
     scope = get_user_scope(admin_user, org)
 
-    qs = Warehouse.objects.filter(organization=org)
+    # Фильтр только по складам, созданным в этом тесте — в seed уже есть
+    # warehouse'ы с module=feed (`DEF-СК-К`), они тоже пройдут scope-фильтр,
+    # но это не нарушает корректности — проверяем что vet-склад отвалился.
+    qs = Warehouse.objects.filter(organization=org, code__in=["W-FEED-1", "W-VET-1"])
     filtered = apply_scope(qs, scope, scope_fields=("module_id",))
     codes = set(filtered.values_list("code", flat=True))
     assert codes == {"W-FEED-1"}
