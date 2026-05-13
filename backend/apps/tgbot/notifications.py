@@ -78,10 +78,15 @@ def _module_label(module) -> str:
 
 
 def _cash_label(payment) -> str:
-    """«50.02 · Вет аптека Касса» или fallback по каналу."""
+    """Имя кассы без префикса субсчёта.
+
+    Раньше показывали «50.02 · YemBro Korm kassa naqt» — но получателю
+    уведомления номер счёта ничего не говорит, только зашумляет. Сейчас
+    отдаём только название кассы.
+    """
     sub = getattr(payment, "cash_subaccount", None)
     if sub is not None:
-        return f"{sub.code} · {sub.name}"
+        return sub.name
     return payment.get_channel_display()
 
 
@@ -89,37 +94,43 @@ def _cash_label(payment) -> str:
 
 
 def fmt_purchase_confirmed(order) -> str:
-    """Xarid uchun barcha muhim ma'lumotlar: hujjat, yetkazib beruvchi,
-    summa, modul, sana + vaqt o'tkazilgan."""
-    debt_block = ""
-    try:
-        from decimal import Decimal
-        paid = Decimal(order.paid_amount_uzs or 0)
-        total = Decimal(order.amount_uzs or 0)
-        debt = total - paid
-        if debt > 0:
-            debt_block = f"\n⏳ <b>Qarz biz:</b> {_fmt_money(debt)} so'm"
-        elif paid > 0:
-            debt_block = "\n✅ <b>To'liq to'langan</b>"
-    except Exception:
-        pass
+    """Xarid: yetkazib beruvchi, mahsulotlar, summa, o'tkazildi-vaqti."""
+    from decimal import Decimal
 
-    notes_block = ""
+    paid = Decimal(order.paid_amount_uzs or 0)
+    total = Decimal(order.amount_uzs or 0)
+    debt = total - paid
+
+    lines = [
+        "📉 🛒 <b>Xarid o'tkazildi</b>",
+        "",
+        f"🏢 <b>Yetkazib beruvchi:</b> {order.counterparty.name}",
+    ]
+
+    # Список товаров — короткая сводка по позициям. Без doc# номера
+    # документа (получателю он ничего не говорит).
+    items = list(order.items.select_related("nomenclature")) if hasattr(order, "items") else []
+    if items:
+        lines.append("")
+        lines.append("📦 <b>Mahsulotlar:</b>")
+        for it in items:
+            name = it.nomenclature.name if it.nomenclature_id else "—"
+            lines.append(f"• {name} · {_fmt_qty(it.quantity)} → {_fmt_money(it.line_total_uzs)} so'm")
+
+    lines.append("")
+    lines.append(f"💰 <b>Summa:</b> {_fmt_money(total)} so'm")
+    if debt > 0:
+        lines.append(f"⏳ <b>Qarz biz:</b> {_fmt_money(debt)} so'm")
+    elif paid > 0:
+        lines.append("✅ <b>To'liq to'langan</b>")
+
     if getattr(order, "notes", "") and order.notes.strip():
-        notes_block = f"\n💬 <b>Izoh:</b> <i>{order.notes.strip()}</i>"
+        lines.append("")
+        lines.append(f"💬 <b>Izoh:</b> <i>{order.notes.strip()}</i>")
 
-    return (
-        "🛒 <b>Xarid o'tkazildi</b>\n"
-        "\n"
-        f"📄 <b>Hujjat:</b> <code>{order.doc_number}</code>\n"
-        f"🏢 <b>Yetkazib beruvchi:</b> {order.counterparty.name}\n"
-        f"🗂 <b>Modul:</b> {_module_label(order.module)}\n"
-        f"💰 <b>Summa:</b> {_fmt_money(order.amount_uzs)} so'm"
-        f"{debt_block}{notes_block}\n"
-        "\n"
-        f"📅 <b>Sana:</b> {_fmt_date(order.date)}\n"
-        f"🕐 <b>O'tkazildi:</b> {_fmt_dt(order.updated_at)}"
-    )
+    lines.append("")
+    lines.append(f"🕐 <b>O'tkazildi:</b> {_fmt_dt(order.updated_at)}")
+    return "\n".join(lines)
 
 
 # ─── Платёж (uz) — для админов модуля ─────────────────────────────────────
@@ -137,9 +148,9 @@ def fmt_payment_posted(payment) -> str:
         - Дата операции + полное datetime проведения
     """
     if payment.direction == "out":
-        icon, header = "💸", "Chiqim — to'lov amalga oshirildi"
+        icon, header = "📉 💸", "Chiqim — to'lov amalga oshirildi"
     else:
-        icon, header = "💰", "Kirim — pul tushdi"
+        icon, header = "📈 💰", "Kirim — pul tushdi"
 
     lines = [f"{icon} <b>{header}</b>", ""]
 
@@ -147,17 +158,9 @@ def fmt_payment_posted(payment) -> str:
     if payment.counterparty_id:
         lines.append(f"🏢 <b>Kontragent:</b> {payment.counterparty.name}")
 
-    # Тип платежа
-    kind_display = payment.get_kind_display()
-    lines.append(f"🏷 <b>Turi:</b> {kind_display}")
-
     # Касса/счёт — критично для понимания «куда деньги»
     lines.append(f"💼 <b>Kassa/hisob:</b> {_cash_label(payment)}")
     lines.append(f"💳 <b>Kanal:</b> {payment.get_channel_display()}")
-
-    # Модуль (если задан) — для модульной аналитики
-    if payment.module_id:
-        lines.append(f"🗂 <b>Modul:</b> {_module_label(payment.module)}")
 
     # Статья расходов (для opex)
     if payment.expense_article_id:
@@ -172,14 +175,7 @@ def fmt_payment_posted(payment) -> str:
         lines.append(f"💬 <b>Izoh:</b> <i>{payment.notes.strip()}</i>")
 
     lines.append("")
-
-    # Даты
-    lines.append(f"📅 <b>Operatsiya sanasi:</b> {_fmt_date(payment.date)}")
     lines.append(f"🕐 <b>O'tkazildi:</b> {_fmt_dt(payment.updated_at)}")
-
-    # Документ
-    lines.append("")
-    lines.append(f"📄 <code>{payment.doc_number}</code>")
 
     return "\n".join(lines)
 
@@ -698,22 +694,29 @@ def fmt_sale_confirmed(order) -> str:
     """Хедер: «Sotuv qaydlandi · mahsulot jo'natildi» — чтобы не путали с
     приходом денег. Явно показываем qarz и срок оплаты."""
     from decimal import Decimal
-    items_count = order.items.count() if hasattr(order, "items") else 0
     paid = Decimal(order.paid_amount_uzs or 0)
     total = Decimal(order.amount_uzs or 0)
     debt = total - paid
 
     lines = [
-        "📋 <b>Sotuv qaydlandi · mahsulot jo'natildi</b>",
+        "📈 📋 <b>Sotuv qaydlandi · mahsulot jo'natildi</b>",
         "<i>Pul hali kelgani yo'q — alohida bildirish bo'ladi</i>",
         "",
-        f"📄 <b>Hujjat:</b> <code>{order.doc_number}</code>",
         f"👤 <b>Mijoz:</b> {order.customer.name}",
-        f"🗂 <b>Modul:</b> {_module_label(order.module)}",
-        f"📦 <b>Pozitsiyalar:</b> {items_count}",
-        "",
-        f"💰 <b>Summa:</b> <code>{_fmt_money(total)}</code> so'm",
     ]
+
+    # Список товаров вместо «Pozitsiyalar: 5» и doc# — название и сумма
+    # по строкам.
+    items = list(order.items.select_related("nomenclature")) if hasattr(order, "items") else []
+    if items:
+        lines.append("")
+        lines.append("📦 <b>Mahsulotlar:</b>")
+        for it in items:
+            name = it.nomenclature.name if it.nomenclature_id else "—"
+            lines.append(f"• {name} · {_fmt_qty(it.quantity)} → {_fmt_money(it.line_total_uzs)} so'm")
+
+    lines.append("")
+    lines.append(f"💰 <b>Summa:</b> <code>{_fmt_money(total)}</code> so'm")
     if debt > 0:
         lines.append(f"⏳ <b>To'lanmagan:</b> {_fmt_money(debt)} so'm")
     elif paid > 0 and debt <= 0:
@@ -724,7 +727,6 @@ def fmt_sale_confirmed(order) -> str:
         lines.append(f"💬 <b>Izoh:</b> <i>{order.notes.strip()}</i>")
 
     lines.append("")
-    lines.append(f"📅 <b>Sana:</b> {_fmt_date(order.date)}")
     lines.append(f"🕐 <b>O'tkazildi:</b> {_fmt_dt(order.updated_at)}")
     if order.due_date and debt > 0:
         lines.append(f"📆 <b>To'lov muddati:</b> {_fmt_date(order.due_date)}")
@@ -773,8 +775,7 @@ def fmt_sale_for_feed_module(order, items: list) -> str:
     total = Decimal(order.amount_uzs or 0)
     debt = total - paid
     lines = [
-        "🌾 <b>Yem-xashak jo'natildi</b>",
-        f"📄 {order.doc_number} · {order.date}",
+        "📈 🌾 <b>Yem-xashak jo'natildi</b>",
         f"👤 {order.customer.name}",
         "",
     ]
@@ -783,7 +784,7 @@ def fmt_sale_for_feed_module(order, items: list) -> str:
             bl = it.feed_bag_lot
             qty = int(float(it.quantity))
             lines.append(
-                f"• <code>{bl.doc_number}</code> · {bl.recipe_version.recipe.code} ·"
+                f"• {bl.recipe_version.recipe.code} ·"
                 f" {qty} qop × {_fmt_qty(bl.bag_weight_kg)} kg"
                 f" → {_fmt_money(it.line_total_uzs)} so'm"
             )
@@ -791,8 +792,7 @@ def fmt_sale_for_feed_module(order, items: list) -> str:
             fb = it.feed_batch
             recipe = fb.recipe_version.recipe.code if fb.recipe_version_id else "—"
             lines.append(
-                f"• <code>{fb.doc_number}</code> · {recipe} ·"
-                f" {_fmt_qty(it.quantity)} kg"
+                f"• {recipe} · {_fmt_qty(it.quantity)} kg"
                 f" → {_fmt_money(it.line_total_uzs)} so'm"
             )
     if debt > 0:
@@ -807,8 +807,7 @@ def fmt_sale_for_feed_module(order, items: list) -> str:
 def fmt_sale_for_vet_module(order, items: list) -> str:
     """Vet modul boshlig'iga: qanday vet-tovar sotildi."""
     lines = [
-        "💊 <b>Vet-tovar sotildi</b>",
-        f"📄 {order.doc_number} · {order.date}",
+        "📈 💊 <b>Vet-tovar sotildi</b>",
         f"👤 {order.customer.name}",
         "",
     ]
@@ -817,8 +816,7 @@ def fmt_sale_for_vet_module(order, items: list) -> str:
             vsb = it.vet_stock_batch
             drug = vsb.drug.nomenclature.name if vsb.drug.nomenclature_id else vsb.lot_number
             lines.append(
-                f"• <code>{vsb.doc_number}</code> · {drug} ·"
-                f" {_fmt_qty(it.quantity)} {vsb.unit.code if vsb.unit_id else 'dona'}"
+                f"• {drug} · {_fmt_qty(it.quantity)} {vsb.unit.code if vsb.unit_id else 'dona'}"
                 f" → {_fmt_money(it.line_total_uzs)} so'm"
             )
         elif it.vet_accessory_id:
@@ -836,18 +834,20 @@ def fmt_sale_for_vet_module(order, items: list) -> str:
 def fmt_sale_for_generic_module(order, items: list, module_label: str) -> str:
     """Slaughter/feedlot/matochnik/incubation — обычные batches."""
     lines = [
-        f"📦 <b>«{module_label}» dan sotildi</b>",
-        f"📄 {order.doc_number} · {order.date}",
+        f"📈 📦 <b>«{module_label}» dan sotildi</b>",
         f"👤 {order.customer.name}",
         "",
     ]
     for it in items:
         if it.batch_id:
             b = it.batch
-            sku = b.nomenclature.sku if b.nomenclature_id else "—"
+            name = (
+                b.nomenclature.name
+                if b.nomenclature_id and b.nomenclature.name
+                else (b.nomenclature.sku if b.nomenclature_id else "—")
+            )
             lines.append(
-                f"• <code>{b.doc_number}</code> · {sku} ·"
-                f" {_fmt_qty(it.quantity)} {b.unit.code if b.unit_id else 'dona'}"
+                f"• {name} · {_fmt_qty(it.quantity)} {b.unit.code if b.unit_id else 'dona'}"
                 f" → {_fmt_money(it.line_total_uzs)} so'm"
             )
     if getattr(order, "notes", "") and order.notes.strip():
