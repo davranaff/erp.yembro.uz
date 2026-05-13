@@ -23,14 +23,13 @@ Atomic:
        expiration_date > received_date; warehouse.module == vet;
        purchase обязателен (для compliance/audit).
     2. Генерация doc_number (ВП-YYYY-NNNNN).
-    3. Авто-генерация barcode: `VET-{sku}-{lot}-{rand4}` уникален в рамках org.
+    3. Авто-генерация barcode: числовой EAN-13 с префиксом 230, уникален в рамках org.
     4. Create VetStockBatch со status=start_status (default QUARANTINE).
        current_quantity = quantity.
     5. AuditLog.
 """
 from __future__ import annotations
 
-import secrets
 from dataclasses import dataclass
 from datetime import date as date_type
 from decimal import Decimal
@@ -41,6 +40,7 @@ from django.db import transaction
 
 from apps.audit.models import AuditLog
 from apps.audit.services.writer import audit_log
+from apps.common.services.barcode import generate_ean13_barcode
 from apps.common.services.numbering import next_doc_number
 from apps.counterparties.models import Counterparty
 from apps.modules.models import Module
@@ -121,23 +121,15 @@ def receive_vet_stock_batch(
         on_date=received_date,
     )
 
-    # Авто-генерация штрих-кода если не задан явно.
-    # Формат: VET-<SKU>-<LOT>-<RAND4>. Уникален в рамках организации.
+    # Авто-генерация штрих-кода если не задан явно. Числовой EAN-13,
+    # уникален в рамках организации.
     if not barcode:
-        sku = drug.nomenclature.sku.upper().replace(" ", "")
-        lot = lot_number.upper().replace(" ", "")
-        # Защита от коллизии: 3 попытки сгенерировать
-        for _ in range(3):
-            candidate = f"VET-{sku}-{lot}-{secrets.token_hex(2).upper()}"
-            if not VetStockBatch.objects.filter(
-                organization=organization, barcode=candidate,
-            ).exists():
-                barcode = candidate
-                break
-        else:
-            raise VetStockReceiveError(
-                {"barcode": "Не удалось сгенерировать уникальный barcode."}
+        try:
+            barcode = generate_ean13_barcode(
+                VetStockBatch, organization, prefix="230",
             )
+        except RuntimeError as e:
+            raise VetStockReceiveError({"barcode": str(e)})
 
     sb = VetStockBatch(
         organization=organization,
