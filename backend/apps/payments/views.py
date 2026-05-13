@@ -48,6 +48,10 @@ class PaymentViewSet(ImmutableStatusMixin, DeleteReasonMixin, OrgScopedModelView
     # module_code не задан намеренно — HasAnyModuleRw + queryset-скоуп
     # сами обеспечивают защиту. required_level/write_level тоже не нужны.
 
+    # Row-level scope по module_id: finance_head с module-assignment
+    # видит платежи только своего модуля. Применяется поверх RW-фильтра.
+    scope_fields = ("module_id",)
+
     # Проведённые/отменённые платежи иммутабельны (для reverse — отдельный action).
     immutable_statuses = ("posted", "cancelled")
     status_field = "status"

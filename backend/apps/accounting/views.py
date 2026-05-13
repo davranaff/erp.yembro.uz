@@ -58,6 +58,9 @@ class GLSubaccountViewSet(OrgScopedModelViewSet):
     queryset = GLSubaccount.objects.select_related("account", "module").order_by("code")
     # module_code/write_level не задаём — кастомная логика в _check_module_access
     organization_field = "account__organization"
+    # Row-level scope по module_id: finance_head конкретного модуля
+    # видит только кассы/счета своего модуля.
+    scope_fields = ("module_id",)
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
     filterset_fields = ["account", "module"]
     search_fields = ["code", "name"]
@@ -132,6 +135,8 @@ class JournalEntryViewSet(OrgReadOnlyViewSet):
         "currency", "counterparty", "batch", "expense_article",
     )
     module_code = "ledger"
+    # Row-level scope по module_id для multi-module finance heads.
+    scope_fields = ("module_id",)
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
     filterset_fields = [
         "module",

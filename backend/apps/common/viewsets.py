@@ -173,7 +173,11 @@ class OrganizationScopedMixin(OrganizationContextMixin, AuditMixin):
     """
 
     organization_field = "organization"
+    # Legacy: одиночное имя поля. Новые места используют scope_fields.
     scope_field: str | None = None
+    # Кортеж/список имён полей для row-level scope фильтрации.
+    # Например: ("module_id",) или ("module_id", "warehouse_id").
+    scope_fields: tuple[str, ...] | None = None
 
     def get_queryset(self):
         qs = super().get_queryset()
@@ -182,11 +186,15 @@ class OrganizationScopedMixin(OrganizationContextMixin, AuditMixin):
             return qs.none()
         qs = qs.filter(**{self.organization_field: org})
 
-        if self.scope_field:
+        if self.scope_field or self.scope_fields:
             from .scope import apply_scope, get_user_scope
             user = getattr(self.request, "user", None)
             scope = get_user_scope(user, org)
-            qs = apply_scope(qs, scope, scope_field=self.scope_field)
+            qs = apply_scope(
+                qs, scope,
+                scope_field=self.scope_field,
+                scope_fields=self.scope_fields,
+            )
         return qs
 
     def _save_kwargs_for_create(self, serializer) -> dict:

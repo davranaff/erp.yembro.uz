@@ -68,6 +68,10 @@ class WarehouseViewSet(OrgScopedModelViewSet):
     required_level = "r"
     write_level = "rw"
 
+    # Row-level scope по module_id: finance_head конкретного модуля
+    # видит только склады своего модуля.
+    scope_fields = ("module_id",)
+
     filter_backends = [DjangoFilterBackend, OrderingFilter]
     filterset_class = WarehouseFilter
     ordering_fields = ["code", "created_at"]
@@ -261,6 +265,9 @@ class StockMovementViewSet(
     module_code = "stock"
     required_level = "r"
     write_level = "rw"
+
+    # Row-level scope по module_id.
+    scope_fields = ("module_id",)
 
     filter_backends = [DjangoFilterBackend, OrderingFilter]
     filterset_class = StockMovementFilter
