@@ -33,6 +33,10 @@ class SaleOrderViewSet(ImmutableStatusMixin, DeleteReasonMixin, OrgScopedModelVi
     required_level = "r"
     write_level = "rw"
 
+    # Row-level scope по модулю: пользователь с UserScopeAssignment на
+    # конкретный модуль видит продажи только этого модуля.
+    scope_fields = ("module_id",)
+
     # После confirm/cancel запрещаем PATCH/DELETE — изменения только через
     # reverse-action.
     immutable_statuses = ("confirmed", "cancelled")

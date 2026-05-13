@@ -8,6 +8,7 @@ from rest_framework.exceptions import ValidationError as DRFValidationError
 from rest_framework.filters import OrderingFilter, SearchFilter
 from rest_framework.response import Response
 
+from apps.common.services.barcode import generate_ean13_barcode
 from apps.common.viewsets import OrgScopedModelViewSet
 
 from .models import (
@@ -61,8 +62,9 @@ class VetDrugViewSet(OrgScopedModelViewSet):
         # Auto-barcode для shelf-tag (этикетка на полке).
         # Не путать с barcode у VetStockBatch — там штрих-код конкретного лота.
         if not serializer.validated_data.get("barcode"):
-            sku = serializer.validated_data["nomenclature"].sku.upper()[:16]
-            kwargs["barcode"] = f"VET-D-{sku}-{secrets.token_hex(2).upper()}"
+            kwargs["barcode"] = generate_ean13_barcode(
+                VetDrug, kwargs["organization"], prefix="210",
+            )
         instance = serializer.save(**kwargs)
         self._write_audit(AuditLog.Action.CREATE, instance)
 
@@ -692,11 +694,11 @@ class VetAccessoryViewSet(OrgScopedModelViewSet):
             if last_in is not None:
                 kwargs["cost_per_unit_uzs"] = last_in
 
-        # Auto-barcode если пользователь не задал. Формат:
-        # `VET-A-{sku}-{rand4}` уникален в рамках org.
+        # Auto-barcode если пользователь не задал — числовой EAN-13.
         if not serializer.validated_data.get("barcode"):
-            sku = nomenclature.sku.upper()[:16]
-            kwargs["barcode"] = f"VET-A-{sku}-{secrets.token_hex(2).upper()}"
+            kwargs["barcode"] = generate_ean13_barcode(
+                VetAccessory, kwargs["organization"], prefix="220",
+            )
         instance = serializer.save(**kwargs)
         self._write_audit(AuditLog.Action.CREATE, instance)
 

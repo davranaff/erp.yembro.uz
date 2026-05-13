@@ -152,6 +152,7 @@ class UserScopeAssignment(UUIDModel, TimestampedModel):
     class ScopeType(models.TextChoices):
         WAREHOUSE = "warehouse", "Склад"
         PRODUCTION_BLOCK = "production_block", "Производственный блок"
+        MODULE = "module", "Модуль"
 
     organization = models.ForeignKey(
         "organizations.Organization",

@@ -41,6 +41,7 @@ from django.utils import timezone
 
 from apps.audit.models import AuditLog
 from apps.audit.services.writer import audit_log
+from apps.common.services.barcode import generate_ean13_barcode
 from apps.common.services.numbering import next_doc_number
 from apps.warehouses.models import StockMovement
 
@@ -254,16 +255,11 @@ def package_feed_batch(
         FeedBagLot, organization=org, prefix="ФП", on_date=entry_date, width=5
     )
 
-    # Auto-barcode: FEED-{recipe_code}-{rand4} — для розничного скан-фло.
+    # Auto-barcode: числовой EAN-13 — для розничного скан-фло.
     # Сканер откроет /scan/<barcode> и публичный API вернёт инфу о мешках.
-    import secrets as _secrets
-    recipe_code = source.recipe_version.recipe.code.upper().replace(" ", "")[:24]
-    bag_lot_barcode = None
-    for _ in range(3):
-        candidate = f"FEED-{recipe_code}-{_secrets.token_hex(2).upper()}"
-        if not FeedBagLot.objects.filter(organization=org, barcode=candidate).exists():
-            bag_lot_barcode = candidate
-            break
+    bag_lot_barcode = generate_ean13_barcode(
+        FeedBagLot, org, prefix="240",
+    )
 
     bag_lot = FeedBagLot(
         organization=org,

@@ -101,8 +101,9 @@ def test_receive_creates_quarantined_batch(org, drug, warehouse, supplier, unit_
     assert sb.current_quantity == Decimal("1000")
     assert sb.quantity == Decimal("1000")
     assert sb.doc_number.startswith("ВП-")
-    # Авто-генерация штрих-кода
-    assert sb.barcode and sb.barcode.startswith("VET-")
+    # Авто-генерация штрих-кода: числовой EAN-13 с префиксом 230.
+    assert sb.barcode and len(sb.barcode) == 13 and sb.barcode.isdigit()
+    assert sb.barcode.startswith("230")
 
 
 def test_receive_without_purchase_raises(org, drug, warehouse, supplier, unit_ml):

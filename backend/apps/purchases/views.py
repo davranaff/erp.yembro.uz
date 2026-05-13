@@ -35,6 +35,9 @@ class PurchaseOrderViewSet(ImmutableStatusMixin, DeleteReasonMixin, OrgScopedMod
     required_level = "r"
     write_level = "rw"
 
+    # Row-level scope по module_id для multi-module finance heads.
+    scope_fields = ("module_id",)
+
     # После confirm/paid/cancel закуп иммутабелен. Для отмены — reverse-action.
     immutable_statuses = ("confirmed", "paid", "cancelled")
     status_field = "status"
