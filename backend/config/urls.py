@@ -14,9 +14,6 @@ from rest_framework_simplejwt.views import (
     TokenVerifyView,
 )
 
-from apps.otp.notifications_views import NotificationsListView
-
-
 def healthcheck(_request):
     """Liveness probe used by CI/CD and Docker healthchecks."""
     return JsonResponse({"status": "ok"})
@@ -142,8 +139,7 @@ urlpatterns = [
     path("api/sms/", include("apps.otp.sms_urls", namespace="sms")),
     path(
         "api/notifications/",
-        NotificationsListView.as_view(),
-        name="notifications-list",
+        include("apps.otp.notifications_urls", namespace="notifications"),
     ),
     # Media-файлы (загруженные приложения к закупам и т.п.). Caddy уже
     # проксирует /media/* на backend, поэтому Django должен сам их отдавать.
