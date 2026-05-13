@@ -147,9 +147,9 @@ export default function DashboardPage() {
             iconName="chart"
             label="Выручка"
             sub="продажи проведённые"
-            value={fmt(k.sales_revenue_uzs, { short: true })}
+            value={fmt(k.sales_revenue_uzs)}
             valueSuffix="UZS"
-            meta={`себест.: ${fmt(k.sales_cost_uzs, { short: true })}`}
+            meta={`себест.: ${fmt(k.sales_cost_uzs)}`}
           />
           <KpiCard
             tone={margin >= 0 ? 'orange' : 'red'}
@@ -160,7 +160,7 @@ export default function DashboardPage() {
                 ? `маржа ${marginPct.toFixed(1)}%`
                 : 'нет продаж'
             }
-            value={fmt(k.sales_margin_uzs, { short: true })}
+            value={fmt(k.sales_margin_uzs)}
             valueSuffix="UZS"
           />
           <KpiCard
@@ -168,7 +168,7 @@ export default function DashboardPage() {
             iconName="users"
             label="Кредиторка"
             sub="должны мы (всё время)"
-            value={fmt(k.creditor_balance_uzs, { short: true })}
+            value={fmt(k.creditor_balance_uzs)}
             valueSuffix="UZS"
           />
           <KpiCard
@@ -176,7 +176,7 @@ export default function DashboardPage() {
             iconName="users"
             label="Дебиторка"
             sub="должны нам (всё время)"
-            value={fmt(k.debtor_balance_uzs, { short: true })}
+            value={fmt(k.debtor_balance_uzs)}
             valueSuffix="UZS"
           />
         </div>
@@ -190,7 +190,7 @@ export default function DashboardPage() {
             iconName="download"
             label="Поступления"
             sub="за период"
-            value={fmt(k.payments_in_uzs, { short: true })}
+            value={fmt(k.payments_in_uzs)}
             valueSuffix="UZS"
           />
           <KpiCard
@@ -198,7 +198,7 @@ export default function DashboardPage() {
             iconName="arrow-right"
             label="Платежи исх."
             sub="за период"
-            value={fmt(k.payments_out_uzs, { short: true })}
+            value={fmt(k.payments_out_uzs)}
             valueSuffix="UZS"
           />
           <KpiCard
@@ -206,7 +206,7 @@ export default function DashboardPage() {
             iconName="chart"
             label="Чистый денежный поток"
             sub="in − out за период"
-            value={(netCash >= 0 ? '+' : '−') + fmt(Math.abs(netCash), { short: true })}
+            value={(netCash >= 0 ? '+' : '−') + fmt(Math.abs(netCash))}
             valueSuffix="UZS"
           />
           <KpiCard
@@ -214,7 +214,7 @@ export default function DashboardPage() {
             iconName="bag"
             label="Касса всего"
             sub="по каналам"
-            value={fmt(typeof cash._total_uzs === 'string' ? cash._total_uzs : '0', { short: true })}
+            value={fmt(typeof cash._total_uzs === 'string' ? cash._total_uzs : '0')}
             valueSuffix="UZS"
           />
         </div>
@@ -513,7 +513,7 @@ function ArSnapshotPanel({ ar }: { ar: DashboardArSummary }) {
           <div>
             <div style={{ fontSize: 11, color: 'var(--fg-3)', marginBottom: 2 }}>Всего долгов</div>
             <div className="mono" style={{ fontSize: 20, fontWeight: 600 }}>
-              {fmt(ar.total_ar_uzs, { short: true })}{' '}
+              {fmt(ar.total_ar_uzs)}{' '}
               <span style={{ fontSize: 11, color: 'var(--fg-3)' }}>UZS</span>
             </div>
             <div style={{ fontSize: 11, color: 'var(--fg-3)', marginTop: 2 }}>
@@ -529,7 +529,7 @@ function ArSnapshotPanel({ ar }: { ar: DashboardArSummary }) {
           <div>
             <div style={{ fontSize: 11, color: 'var(--fg-3)', marginBottom: 4 }}>
               Просрочено: <strong style={{ color: overduePct > 30 ? 'var(--danger)' : 'var(--fg-2)' }}>
-                {fmt(ar.total_overdue_uzs, { short: true })} UZS
+                {fmt(ar.total_overdue_uzs)} UZS
               </strong> ({overduePct}%)
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
