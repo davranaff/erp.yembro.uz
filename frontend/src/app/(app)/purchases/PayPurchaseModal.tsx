@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 
 import { useQueryClient } from '@tanstack/react-query';
+import AmountInput from '@/components/ui/AmountInput';
 import Modal from '@/components/ui/Modal';
 import { useSubaccounts } from '@/hooks/useAccounts';
 import { useModules } from '@/hooks/useModules';
@@ -207,12 +208,10 @@ export default function PayPurchaseModal({ order, onClose }: Props) {
 
         <div className="field">
           <label>Сумма, UZS *</label>
-          <input
+          <AmountInput
             className="input mono"
-            type="number"
-            step="0.01"
             value={amount}
-            onChange={(e) => setAmount(e.target.value)}
+            onChange={setAmount}
             placeholder="0.00"
           />
           {getErr('amount_uzs') && (

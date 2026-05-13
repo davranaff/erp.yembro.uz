@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from 'react';
 
+import AmountInput from '@/components/ui/AmountInput';
 import HelpHint from '@/components/ui/HelpHint';
 import Modal from '@/components/ui/Modal';
 import { useSubaccounts } from '@/hooks/useAccounts';
@@ -245,12 +246,10 @@ export default function RecordPaymentModal({ order, onClose }: Props) {
               details="По умолчанию — остаток долга. Если клиент платит часть — уменьшите; статус продажи станет «Частично оплачен». Если больше — «Переплата»."
             />
           </label>
-          <input
+          <AmountInput
             className="input mono"
-            type="number"
-            step="0.01"
             value={amount}
-            onChange={(e) => setAmount(e.target.value)}
+            onChange={setAmount}
             style={overPay ? { borderColor: 'var(--warning)' } : undefined}
           />
           {overPay && (

@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from 'react';
 
+import AmountInput from '@/components/ui/AmountInput';
 import HelpHint from '@/components/ui/HelpHint';
 import Modal from '@/components/ui/Modal';
 import { useProductionBlocks } from '@/hooks/useBlocks';
@@ -300,13 +301,11 @@ export default function RawBatchModal({ initial, prefill, onClose, onPickStockMo
 
         <div className="field">
           <label>Цена за 1 кг (UZS) *</label>
-          <input
+          <AmountInput
             className="input mono"
-            type="number"
-            step="0.01"
             value={pricePerUnit}
-            onChange={(e) => setPricePerUnit(e.target.value)}
-            placeholder="3200"
+            onChange={setPricePerUnit}
+            placeholder="3 200"
           />
         </div>
 

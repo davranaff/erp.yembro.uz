@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 
+import AmountInput from '@/components/ui/AmountInput';
 import Modal from '@/components/ui/Modal';
 import { ApiError } from '@/lib/api';
 import { uppercaseChange } from '@/lib/forms';
@@ -262,12 +263,10 @@ export default function ReceiveModal({ onClose }: Props) {
         </div>
         <div className="field">
           <label>Цена за ед. (UZS) *</label>
-          <input
+          <AmountInput
             className="input mono"
-            type="number"
-            step="0.01"
             value={price}
-            onChange={(e) => setPrice(e.target.value)}
+            onChange={setPrice}
           />
         </div>
         <div className="field">
