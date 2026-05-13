@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from 'react';
 import AmountInput from '@/components/ui/AmountInput';
 import Icon from '@/components/ui/Icon';
 import Modal from '@/components/ui/Modal';
+import SmartSelect from '@/components/ui/SmartSelect';
 import { useCounterparties } from '@/hooks/useCounterparties';
 import { POPULAR_CURRENCY_CODES, useCurrenciesSorted, useRateOnDate } from '@/hooks/useCurrencyRates';
 import { useModules } from '@/hooks/useModules';
@@ -44,15 +45,18 @@ export default function PurchaseOrderModal({ initial, onClose }: Props) {
 
   const { data: modules } = useModules();
   const { data: suppliers } = useCounterparties({ kind: 'supplier' });
-  const { data: warehouses } = useWarehouses();
   const { data: currencies } = useCurrenciesSorted();
 
   const [moduleId, setModuleId] = useState(initial?.module ?? '');
 
   // Номенклатура — фильтр по выбранному модулю-цели закупки. Без него
   // покупка для feed выводила список всех SKU включая тушки/яйца, что
-  // бессмысленно.
+  // бессмысленно. Склад тоже фильтруется по модулю — иначе finance_head
+  // feed-модуля видел бы склады vet/slaughter.
   const selectedModuleCode = modules?.find((m) => m.id === moduleId)?.code;
+  const { data: warehouses } = useWarehouses(
+    selectedModuleCode ? { module_code: selectedModuleCode } : {},
+  );
   const { data: nomenclature } = useNomenclatureItems({
     is_active: 'true',
     ...(selectedModuleCode ? { module_code: selectedModuleCode } : {}),
@@ -212,12 +216,18 @@ export default function PurchaseOrderModal({ initial, onClose }: Props) {
 
         <div className="field">
           <label>Поставщик *</label>
-          <select className="input" value={supplierId} onChange={(e) => setSupplierId(e.target.value)}>
-            <option value="">—</option>
-            {suppliers?.map((c) => (
-              <option key={c.id} value={c.id}>{c.name}</option>
-            ))}
-          </select>
+          <SmartSelect
+            value={supplierId}
+            onChange={setSupplierId}
+            options={(suppliers ?? []).map((c) => ({
+              value: c.id,
+              label: c.name,
+              sublabel: c.code,
+            }))}
+            placeholder="— выберите поставщика —"
+            searchPlaceholder="Поиск по названию или коду…"
+            emptyText="Поставщики не найдены"
+          />
           {getFieldErr('counterparty') && (
             <div style={{ fontSize: 11, color: 'var(--danger)' }}>{getFieldErr('counterparty')}</div>
           )}
@@ -225,12 +235,17 @@ export default function PurchaseOrderModal({ initial, onClose }: Props) {
 
         <div className="field">
           <label>Склад прихода *</label>
-          <select className="input" value={warehouseId} onChange={(e) => setWarehouseId(e.target.value)}>
-            <option value="">—</option>
-            {warehouses?.map((w) => (
-              <option key={w.id} value={w.id}>{w.code} · {w.name}</option>
-            ))}
-          </select>
+          <SmartSelect
+            value={warehouseId}
+            onChange={setWarehouseId}
+            options={(warehouses ?? []).map((w) => ({
+              value: w.id,
+              label: `${w.code} · ${w.name}`,
+            }))}
+            placeholder="— выберите склад —"
+            searchPlaceholder="Поиск склада…"
+            emptyText={selectedModuleCode ? 'Складов модуля нет' : 'Сначала выберите модуль'}
+          />
         </div>
 
         <div className="field">
