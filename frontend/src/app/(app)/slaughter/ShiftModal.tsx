@@ -28,7 +28,6 @@ export default function ShiftModal({ onClose }: Props) {
   const slaughterModuleId = modules?.find((m) => m.code === 'slaughter')?.id ?? '';
 
   const today = new Date();
-  const [docNumber, setDocNumber] = useState('');
   const [lineBlock, setLineBlock] = useState('');
   const [sourceBatch, setSourceBatch] = useState('');
   const [pickedBatch, setPickedBatch] = useState<Batch | null>(null);
@@ -77,7 +76,6 @@ export default function ShiftModal({ onClose }: Props) {
     if (!slaughterModuleId) { alert('Модуль slaughter не найден'); return; }
     try {
       await create.mutateAsync({
-        doc_number: docNumber,
         module: slaughterModuleId,
         line_block: lineBlock,
         source_batch: sourceBatch,
@@ -101,7 +99,7 @@ export default function ShiftModal({ onClose }: Props) {
           <button className="btn btn-ghost" onClick={onClose}>Отмена</button>
           <button
             className="btn btn-primary"
-            disabled={!docNumber || !lineBlock || !sourceBatch || !liveHeads || !liveWeight || !foreman || create.isPending}
+            disabled={!lineBlock || !sourceBatch || !liveHeads || !liveWeight || !foreman || create.isPending}
             onClick={handleSubmit}
           >
             {create.isPending ? 'Создание…' : 'Создать смену'}
@@ -167,16 +165,6 @@ export default function ShiftModal({ onClose }: Props) {
       )}
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-        <div className="field">
-          <label>Документ *</label>
-          <input
-            className="input mono"
-            value={docNumber}
-            onChange={(e) => setDocNumber(e.target.value)}
-            placeholder="УБ-2026-001"
-          />
-          {fieldErrors.doc_number && <div style={{ fontSize: 11, color: 'var(--danger)' }}>{fieldErrors.doc_number.join(' · ')}</div>}
-        </div>
         <div className="field">
           <label>Линия *</label>
           <select className="input" value={lineBlock} onChange={(e) => setLineBlock(e.target.value)}>

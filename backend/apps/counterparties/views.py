@@ -1,3 +1,4 @@
+import re
 from decimal import Decimal
 
 from django.db.models import Sum
@@ -10,6 +11,36 @@ from apps.common.viewsets import OrgScopedModelViewSet
 
 from .models import Counterparty
 from .serializers import CounterpartySerializer
+
+
+_CP_CODE_RE = re.compile(r"^(.+)-(\d+)$")
+
+
+def _next_counterparty_code(organization, prefix: str) -> str:
+    """Следующий свободный код вида `{prefix}-NNN` в рамках организации.
+
+    Сканируем существующие коды по `code__startswith`, парсим цифровой
+    суффикс, берём max+1. Без advisory lock — конкурентные создания
+    редки, в худшем случае unique_together словит дубль и юзер
+    перезапустит.
+    """
+    existing = Counterparty.objects.filter(
+        organization=organization, code__startswith=f"{prefix}-",
+    ).values_list("code", flat=True)
+    max_n = 0
+    for c in existing:
+        m = _CP_CODE_RE.match(c)
+        if not m:
+            continue
+        if m.group(1) != prefix:
+            continue
+        try:
+            n = int(m.group(2))
+            if n > max_n:
+                max_n = n
+        except ValueError:
+            continue
+    return f"{prefix}-{max_n + 1:03d}"
 
 
 def _build_debt_summary(counterparty, organization) -> dict:
@@ -370,6 +401,13 @@ class CounterpartyViewSet(OrgScopedModelViewSet):
         return ctx
 
     def perform_create(self, serializer):
+        """Авто-генерация code по kind если не задан: К-NNN / КС-NNN / КП-NNN."""
+        org = getattr(self.request, "organization", None)
+        code = (serializer.validated_data.get("code") or "").strip()
+        if not code and org is not None:
+            kind = serializer.validated_data.get("kind", "other")
+            prefix = {"buyer": "К", "supplier": "КС"}.get(kind, "КП")
+            serializer.validated_data["code"] = _next_counterparty_code(org, prefix)
         super().perform_create(serializer)
         self._sync_opening_balance(serializer.instance)
 

@@ -27,7 +27,6 @@ export default function RunModal({ onClose }: Props) {
 
   const incubationModuleId = modules?.find((m) => m.code === 'incubation')?.id ?? '';
 
-  const [docNumber, setDocNumber] = useState('');
   const [incubatorBlock, setIncubatorBlock] = useState('');
   const [batchId, setBatchId] = useState('');
   const [loadedDate, setLoadedDate] = useState(new Date().toISOString().slice(0, 10));
@@ -46,7 +45,6 @@ export default function RunModal({ onClose }: Props) {
     if (!incubationModuleId) { alert('Модуль incubation не найден'); return; }
     try {
       await create.mutateAsync({
-        doc_number: docNumber,
         module: incubationModuleId,
         incubator_block: incubatorBlock,
         batch: batchId,
@@ -70,7 +68,7 @@ export default function RunModal({ onClose }: Props) {
           <button className="btn btn-ghost" onClick={onClose}>Отмена</button>
           <button
             className="btn btn-primary"
-            disabled={create.isPending || !docNumber || !incubatorBlock || !batchId || !eggsLoaded || !technologist || !expectedHatchDate}
+            disabled={create.isPending || !incubatorBlock || !batchId || !eggsLoaded || !technologist || !expectedHatchDate}
             onClick={handleSave}
           >
             {create.isPending ? 'Сохранение…' : 'Загрузить партию'}
@@ -102,11 +100,6 @@ export default function RunModal({ onClose }: Props) {
       {fieldErrors.batch && <div style={{ fontSize: 11, color: 'var(--danger)' }}>{fieldErrors.batch.join(' · ')}</div>}
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-        <div className="field">
-          <label>Номер партии *</label>
-          <input className="input mono" value={docNumber} onChange={(e) => setDocNumber(e.target.value)} placeholder="ИНК-2026-01" />
-          {fieldErrors.doc_number && <div style={{ fontSize: 11, color: 'var(--danger)' }}>{fieldErrors.doc_number.join(' · ')}</div>}
-        </div>
         <div className="field">
           <label>Инкубатор (шкаф) *</label>
           <select className="input" value={incubatorBlock} onChange={(e) => setIncubatorBlock(e.target.value)}>

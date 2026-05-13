@@ -43,6 +43,20 @@ class SlaughterShiftViewSet(ImmutableStatusMixin, OrgScopedModelViewSet):
     search_fields = ["doc_number"]
     ordering = ["-shift_date"]
 
+    def perform_create(self, serializer):
+        """Авто-генерация doc_number с префиксом «УБ» (убой) если не задан."""
+        from apps.common.services.numbering import next_doc_number
+
+        kwargs = self._save_kwargs_for_create(serializer)
+        org = kwargs.get("organization")
+        if org is not None and not serializer.validated_data.get("doc_number"):
+            kwargs["doc_number"] = next_doc_number(
+                SlaughterShift, organization=org, prefix="УБ",
+            )
+        instance = serializer.save(**kwargs)
+        from apps.audit.models import AuditLog
+        self._write_audit(AuditLog.Action.CREATE, instance)
+
     @action(detail=True, methods=["post"])
     def post_shift(self, request, pk=None):
         """POST /api/slaughter/shifts/{id}/post_shift/

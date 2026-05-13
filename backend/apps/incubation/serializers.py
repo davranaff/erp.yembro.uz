@@ -10,6 +10,8 @@ class IncubationRunSerializer(serializers.ModelSerializer):
     incubator_block_code = serializers.SerializerMethodField()
     hatcher_block_code = serializers.SerializerMethodField()
     batch_doc = serializers.SerializerMethodField()
+    # doc_number автогенерируется в load_eggs сервисе если не задан.
+    doc_number = serializers.CharField(max_length=32, required=False, allow_blank=True)
     # Computed — actual days since loaded_date (клампится в [0..days_total]).
     # Поле current_day в БД deprecated, но остаётся для back-compat.
     current_day = serializers.SerializerMethodField()

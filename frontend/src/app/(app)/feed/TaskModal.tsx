@@ -29,7 +29,6 @@ export default function TaskModal({ onClose }: Props) {
   const local = new Date(today.getTime() - today.getTimezoneOffset() * 60000)
     .toISOString().slice(0, 16);
 
-  const [docNumber, setDocNumber] = useState('');
   const [recipeVersion, setRecipeVersion] = useState('');
   const [productionLine, setProductionLine] = useState('');
   const [shift, setShift] = useState<'day' | 'night'>('day');
@@ -58,7 +57,6 @@ export default function TaskModal({ onClose }: Props) {
     if (!feedModuleId) { alert('Модуль feed не найден'); return; }
     try {
       await create.mutateAsync({
-        doc_number: docNumber,
         module: feedModuleId,
         recipe_version: recipeVersion,
         production_line: productionLine,
@@ -83,7 +81,7 @@ export default function TaskModal({ onClose }: Props) {
           <button className="btn btn-ghost" onClick={onClose}>Отмена</button>
           <button
             className="btn btn-primary"
-            disabled={!docNumber || !recipeVersion || !productionLine || !plannedKg || !tech || create.isPending}
+            disabled={!recipeVersion || !productionLine || !plannedKg || !tech || create.isPending}
             onClick={handleSubmit}
           >
             {create.isPending ? 'Создание…' : 'Создать'}
@@ -97,11 +95,6 @@ export default function TaskModal({ onClose }: Props) {
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-        <div className="field">
-          <label>Документ *</label>
-          <input className="input mono" value={docNumber} onChange={(e) => setDocNumber(e.target.value)} placeholder="ЗМ-001" />
-          {fieldErrors.doc_number && <div style={{ fontSize: 11, color: 'var(--danger)' }}>{fieldErrors.doc_number.join(' · ')}</div>}
-        </div>
         <div className="field">
           <label>
             Версия рецепта *

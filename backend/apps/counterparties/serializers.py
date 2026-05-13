@@ -13,6 +13,9 @@ class CounterpartySerializer(serializers.ModelSerializer):
     # Знак сохраняется как balance_uzs: для buyer + = клиент нам должен,
     # для supplier + = мы должны.
     current_debt_uzs = serializers.SerializerMethodField()
+    # code автогенерируется в viewset.perform_create если не задан
+    # (К-NNN для покупателей, КС-NNN для поставщиков, КП-NNN для прочих).
+    code = serializers.CharField(max_length=32, required=False, allow_blank=True)
 
     class Meta:
         model = Counterparty

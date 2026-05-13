@@ -320,10 +320,21 @@ class ProductionTaskViewSet(OrgScopedModelViewSet):
         После создания задания автоматически копируем компоненты из выбранной
         версии рецепта (с FIFO-подбором партий сырья). Без этого замес
         невозможно провести — execute_task требует наличия компонентов.
+
+        Если doc_number не задан — автогенерируем с префиксом «ЗМ»
+        (задание на замес).
         """
+        from apps.common.services.numbering import next_doc_number
+
         from .services.copy_components import copy_components_from_version
 
-        instance = serializer.save(**self._save_kwargs_for_create(serializer))
+        kwargs = self._save_kwargs_for_create(serializer)
+        org = kwargs.get("organization")
+        if org is not None and not serializer.validated_data.get("doc_number"):
+            kwargs["doc_number"] = next_doc_number(
+                ProductionTask, organization=org, prefix="ЗМ",
+            )
+        instance = serializer.save(**kwargs)
         copy_components_from_version(instance)
 
         from apps.audit.models import AuditLog

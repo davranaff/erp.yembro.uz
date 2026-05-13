@@ -28,7 +28,6 @@ export default function HerdModal({ initial, onClose, onSaved }: Props) {
 
   const matochnikModuleId = modules?.find((m) => m.code === 'matochnik')?.id ?? '';
 
-  const [docNumber, setDocNumber] = useState(initial?.doc_number ?? '');
   const [block, setBlock] = useState(initial?.block ?? '');
   const [direction, setDirection] = useState(initial?.direction ?? 'broiler_parent');
   const [placedAt, setPlacedAt] = useState(initial?.placed_at ?? new Date().toISOString().slice(0, 10));
@@ -54,7 +53,6 @@ export default function HerdModal({ initial, onClose, onSaved }: Props) {
       return;
     }
     const payload = {
-      doc_number: docNumber,
       module: matochnikModuleId,
       block,
       direction,
@@ -84,7 +82,7 @@ export default function HerdModal({ initial, onClose, onSaved }: Props) {
           <button className="btn btn-ghost" onClick={onClose}>Отмена</button>
           <button
             className="btn btn-primary"
-            disabled={create.isPending || update.isPending || !docNumber || !block || !technologist || !initialHeads || !ageWeeks}
+            disabled={create.isPending || update.isPending || !block || !technologist || !initialHeads || !ageWeeks}
             onClick={handleSave}
           >
             {create.isPending || update.isPending ? 'Сохранение…' : 'Сохранить'}
@@ -93,17 +91,6 @@ export default function HerdModal({ initial, onClose, onSaved }: Props) {
       }
     >
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-        <div className="field">
-          <label>Номер *</label>
-          <input
-            className="input mono"
-            value={docNumber}
-            onChange={(e) => setDocNumber(e.target.value)}
-            disabled={isEdit}
-            placeholder="СТ-2026-01"
-          />
-          {fieldErrors.doc_number && <div style={{ fontSize: 11, color: 'var(--danger)' }}>{fieldErrors.doc_number.join(' · ')}</div>}
-        </div>
         <div className="field">
           <label>Направление *</label>
           <select className="input" value={direction} onChange={(e) => setDirection(e.target.value as typeof direction)}>

@@ -18,6 +18,8 @@ class BreedingHerdSerializer(serializers.ModelSerializer):
     # Колонка БД `current_age_weeks` больше не используется, но оставлена для
     # обратной совместимости (deprecated).
     current_age_weeks = serializers.SerializerMethodField()
+    # doc_number автогенерируется в viewset.perform_create если не задан.
+    doc_number = serializers.CharField(max_length=32, required=False, allow_blank=True)
 
     class Meta:
         model = BreedingHerd

@@ -112,7 +112,7 @@ export default function CounterpartyModal({ initial, onClose, onSaved }: Props) 
           </button>
           <button
             className="btn btn-primary"
-            disabled={saving || !code || !name}
+            disabled={saving || !name}
             onClick={handleSave}
           >
             {saving ? 'Сохранение…' : 'Сохранить'}
@@ -122,13 +122,13 @@ export default function CounterpartyModal({ initial, onClose, onSaved }: Props) 
     >
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
         <div className="field">
-          <label>Код *</label>
+          <label>Код {!isEdit && <span style={{ fontSize: 10, color: 'var(--fg-3)', fontWeight: 400 }}>(пусто = авто)</span>}</label>
           <input
             className="input mono upper"
             value={code}
             onChange={uppercaseChange(setCode)}
             disabled={isEdit}
-            placeholder="К-001"
+            placeholder={isEdit ? 'К-001' : 'оставьте пустым — система сгенерит'}
           />
           {fieldErrors.code && (
             <div style={{ fontSize: 11, color: 'var(--danger)' }}>

@@ -33,7 +33,6 @@ export default function PlaceModal({ onClose }: Props) {
   const [initialHeads, setInitialHeads] = useState('');
   const [targetWeight, setTargetWeight] = useState('2.5');
   const [targetSlaughter, setTargetSlaughter] = useState('');
-  const [docNumber, setDocNumber] = useState('');
   const [notes, setNotes] = useState('');
 
   const error = place.error;
@@ -51,7 +50,6 @@ export default function PlaceModal({ onClose }: Props) {
         initial_heads: initialHeads ? Number(initialHeads) : undefined,
         target_weight_kg: targetWeight || undefined,
         target_slaughter_date: targetSlaughter || undefined,
-        doc_number: docNumber || undefined,
         notes,
       });
       onClose();
@@ -127,15 +125,6 @@ export default function PlaceModal({ onClose }: Props) {
             type="date"
             value={targetSlaughter}
             onChange={(e) => setTargetSlaughter(e.target.value)}
-          />
-        </div>
-        <div className="field">
-          <label>№ документа (опц.)</label>
-          <input
-            className="input mono"
-            value={docNumber}
-            onChange={(e) => setDocNumber(e.target.value)}
-            placeholder="авто, если пусто"
           />
         </div>
         <div className="field" style={{ gridColumn: '1/3' }}>
