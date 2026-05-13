@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 
+import AmountInput from '@/components/ui/AmountInput';
 import Modal from '@/components/ui/Modal';
 import { ApiError } from '@/lib/api';
 import { uppercaseChange } from '@/lib/forms';
@@ -240,13 +241,11 @@ export default function CounterpartyModal({ initial, onClose, onSaved }: Props) 
             </div>
             <div className="field">
               <label>Кредитный лимит, сум</label>
-              <input
+              <AmountInput
                 className="input mono"
-                type="number"
                 value={creditLimit}
-                onChange={(e) => setCreditLimit(e.target.value)}
-                placeholder="например 50000000"
-                min={0}
+                onChange={setCreditLimit}
+                placeholder="например 50 000 000"
               />
               {fieldErrors.credit_limit_uzs && (
                 <div style={{ fontSize: 11, color: 'var(--danger)' }}>
@@ -290,12 +289,10 @@ export default function CounterpartyModal({ initial, onClose, onSaved }: Props) 
         </div>
         <div className="field">
           <label>Стартовый долг, сум</label>
-          <input
+          <AmountInput
             className="input mono"
-            type="number"
-            step="0.01"
             value={openingDebt}
-            onChange={(e) => setOpeningDebt(e.target.value)}
+            onChange={setOpeningDebt}
             placeholder="0"
           />
           {fieldErrors.opening_debt_uzs && (

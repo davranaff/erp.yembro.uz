@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 
+import AmountInput from '@/components/ui/AmountInput';
 import Modal from '@/components/ui/Modal';
 import { ApiError } from '@/lib/api';
 import { useModules } from '@/hooks/useModules';
@@ -212,13 +213,10 @@ export default function AccessoryFormModal({ initial, onClose }: Props) {
 
       <div className="field">
         <label>Цена продажи, сум *</label>
-        <input
+        <AmountInput
           className="input mono"
-          type="number"
-          step="0.01"
-          min={0}
           value={salePrice}
-          onChange={(e) => setSalePrice(e.target.value)}
+          onChange={setSalePrice}
         />
         <div style={{ fontSize: 11, color: 'var(--fg-3)', marginTop: 4 }}>
           Меняется без переоценки склада.
@@ -228,13 +226,10 @@ export default function AccessoryFormModal({ initial, onClose }: Props) {
       {isEdit && (
         <div className="field">
           <label>Себестоимость, сум</label>
-          <input
+          <AmountInput
             className="input mono"
-            type="number"
-            step="0.01"
-            min={0}
             value={costPrice}
-            onChange={(e) => setCostPrice(e.target.value)}
+            onChange={setCostPrice}
             placeholder="0.00"
           />
           <div style={{ fontSize: 11, color: 'var(--fg-3)', marginTop: 4 }}>

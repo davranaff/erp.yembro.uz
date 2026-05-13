@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 
+import AmountInput from '@/components/ui/AmountInput';
 import Icon from '@/components/ui/Icon';
 import Modal from '@/components/ui/Modal';
 import { useCounterparties } from '@/hooks/useCounterparties';
@@ -324,12 +325,10 @@ export default function PurchaseOrderModal({ initial, onClose }: Props) {
 
               <div className="field">
                 <label>Цена за ед. ({currencyCode}) *</label>
-                <input
+                <AmountInput
                   className="input mono"
-                  type="number"
-                  step="0.01"
                   value={it.unit_price}
-                  onChange={(e) => updateItem(it.key, { unit_price: e.target.value })}
+                  onChange={(raw) => updateItem(it.key, { unit_price: raw })}
                 />
               </div>
 

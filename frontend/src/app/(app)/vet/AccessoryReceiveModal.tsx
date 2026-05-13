@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 
+import AmountInput from '@/components/ui/AmountInput';
 import Modal from '@/components/ui/Modal';
 import { ApiError } from '@/lib/api';
 import { useReceiveAccessory } from '@/hooks/useVet';
@@ -105,13 +106,10 @@ export default function AccessoryReceiveModal({ accessory, onClose }: Props) {
 
       <div className="field">
         <label>Себестоимость новой партии (опц.)</label>
-        <input
+        <AmountInput
           className="input mono"
-          type="number"
-          step="0.01"
-          min={0}
           value={unitCost}
-          onChange={(e) => setUnitCost(e.target.value)}
+          onChange={setUnitCost}
           placeholder="оставьте пустым — без переоценки"
         />
         <div style={{ fontSize: 11, color: 'var(--fg-3)', marginTop: 4 }}>

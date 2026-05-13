@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 
+import AmountInput from '@/components/ui/AmountInput';
 import Modal from '@/components/ui/Modal';
 import { useCounterparties } from '@/hooks/useCounterparties';
 import { useModules } from '@/hooks/useModules';
@@ -313,13 +314,10 @@ export default function StockMovementModal({ onClose, onSaved, onSwitchToFeedRaw
 
         <div className="field">
           <label>Цена за ед., UZS *</label>
-          <input
+          <AmountInput
             className="input mono"
-            type="number"
-            step="0.01"
-            min="0"
             value={unitPrice}
-            onChange={(e) => setUnitPrice(e.target.value)}
+            onChange={setUnitPrice}
             placeholder="0.00"
           />
           {renderError('unit_price_uzs')}
