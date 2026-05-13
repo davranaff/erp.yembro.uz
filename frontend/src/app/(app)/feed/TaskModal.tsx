@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react';
 
 import HelpHint from '@/components/ui/HelpHint';
 import Modal from '@/components/ui/Modal';
+import SmartSelect from '@/components/ui/SmartSelect';
 import { ApiError } from '@/lib/api';
 import { useProductionBlocks } from '@/hooks/useBlocks';
 import { recipeVersionsCrud, recipesCrud, tasksCrud } from '@/hooks/useFeed';
@@ -108,14 +109,18 @@ export default function TaskModal({ onClose }: Props) {
               }
             />
           </label>
-          <select className="input" value={recipeVersion} onChange={(e) => setRecipeVersion(e.target.value)}>
-            <option value="">—</option>
-            {versions?.map((v) => (
-              <option key={v.id} value={v.id}>
-                {v.recipe_code ?? '—'} v{v.version_number} · {v.components.length} компонентов
-              </option>
-            ))}
-          </select>
+          <SmartSelect
+            value={recipeVersion}
+            onChange={setRecipeVersion}
+            options={versions?.map((v) => ({
+              value: v.id,
+              label: `${v.recipe_code ?? '—'} v${v.version_number}`,
+              sublabel: `${v.components.length} компонентов`,
+            })) ?? []}
+            placeholder="— выберите версию рецепта —"
+            searchPlaceholder="Поиск по коду рецепта…"
+            emptyText="Активных версий нет"
+          />
           {selectedRecipe && selectedVersion && (
             <div style={{ fontSize: 11, color: 'var(--fg-3)', marginTop: 4 }}>
               {selectedRecipe.name} · {selectedRecipe.direction} · {selectedRecipe.age_range}
@@ -130,10 +135,18 @@ export default function TaskModal({ onClose }: Props) {
               details="Физическая линия где будет происходить замес. Если линий нет — создайте блок типа mixer_line в /blocks."
             />
           </label>
-          <select className="input" value={productionLine} onChange={(e) => setProductionLine(e.target.value)}>
-            <option value="">—</option>
-            {lines?.map((b) => <option key={b.id} value={b.id}>{b.code} · {b.name}</option>)}
-          </select>
+          <SmartSelect
+            value={productionLine}
+            onChange={setProductionLine}
+            options={lines?.map((b) => ({
+              value: b.id,
+              label: b.name,
+              sublabel: b.code,
+            })) ?? []}
+            placeholder="— выберите линию —"
+            searchPlaceholder="Поиск линии…"
+            emptyText="Линий замеса нет"
+          />
         </div>
         <div className="field">
           <label>Смена</label>
@@ -158,12 +171,18 @@ export default function TaskModal({ onClose }: Props) {
         </div>
         <div className="field" style={{ gridColumn: '1/3' }}>
           <label>Технолог *</label>
-          <select className="input" value={tech} onChange={(e) => setTech(e.target.value)}>
-            <option value="">—</option>
-            {people?.map((p) => (
-              <option key={p.user} value={p.user}>{p.user_full_name} · {p.position_title || p.user_email}</option>
-            ))}
-          </select>
+          <SmartSelect
+            value={tech}
+            onChange={setTech}
+            options={people?.map((p) => ({
+              value: p.user,
+              label: p.user_full_name,
+              sublabel: p.position_title || p.user_email,
+            })) ?? []}
+            placeholder="— выберите технолога —"
+            searchPlaceholder="Поиск по ФИО или должности…"
+            emptyText="Активных сотрудников нет"
+          />
         </div>
         <div className="field" style={{ gridColumn: '1/3', flexDirection: 'row', alignItems: 'center', gap: 16, display: 'flex' }}>
           <label style={{ display: 'flex', gap: 6, alignItems: 'center', fontSize: 12 }}>

@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 
 import Modal from '@/components/ui/Modal';
+import SmartSelect from '@/components/ui/SmartSelect';
 import { ApiError } from '@/lib/api';
 import { useProductionBlocks } from '@/hooks/useBlocks';
 import { useModules } from '@/hooks/useModules';
@@ -100,12 +101,17 @@ export default function HerdModal({ initial, onClose, onSaved }: Props) {
         </div>
         <div className="field">
           <label>Корпус *</label>
-          <select className="input" value={block} onChange={(e) => setBlock(e.target.value)}>
-            <option value="">— выберите —</option>
-            {blocks?.map((b) => (
-              <option key={b.id} value={b.id}>{b.code} · {b.name}</option>
-            ))}
-          </select>
+          <SmartSelect
+            value={block}
+            onChange={setBlock}
+            options={blocks?.map((b) => ({
+              value: b.id,
+              label: b.name,
+              sublabel: b.code,
+            })) ?? []}
+            placeholder="— выберите корпус —"
+            searchPlaceholder="Поиск корпуса…"
+          />
         </div>
         <div className="field">
           <label>Статус</label>
@@ -133,14 +139,18 @@ export default function HerdModal({ initial, onClose, onSaved }: Props) {
         </div>
         <div className="field" style={{ gridColumn: '1/3' }}>
           <label>Технолог *</label>
-          <select className="input" value={technologist} onChange={(e) => setTechnologist(e.target.value)}>
-            <option value="">— выберите —</option>
-            {people?.map((p) => (
-              <option key={p.user} value={p.user}>
-                {p.user_full_name} · {p.position_title || p.user_email}
-              </option>
-            ))}
-          </select>
+          <SmartSelect
+            value={technologist}
+            onChange={setTechnologist}
+            options={people?.map((p) => ({
+              value: p.user,
+              label: p.user_full_name,
+              sublabel: p.position_title || p.user_email,
+            })) ?? []}
+            placeholder="— выберите технолога —"
+            searchPlaceholder="Поиск по ФИО или должности…"
+            emptyText="Сотрудников нет"
+          />
         </div>
         <div className="field" style={{ gridColumn: '1/3' }}>
           <label>Заметка</label>

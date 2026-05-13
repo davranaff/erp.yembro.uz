@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 
 import BatchSelector from '@/components/BatchSelector';
 import Modal from '@/components/ui/Modal';
+import SmartSelect from '@/components/ui/SmartSelect';
 import { ApiError } from '@/lib/api';
 import { useProductionBlocks } from '@/hooks/useBlocks';
 import { feedlotCrud } from '@/hooks/useFeedlot';
@@ -167,10 +168,18 @@ export default function ShiftModal({ onClose }: Props) {
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
         <div className="field">
           <label>Линия *</label>
-          <select className="input" value={lineBlock} onChange={(e) => setLineBlock(e.target.value)}>
-            <option value="">—</option>
-            {lines?.map((b) => <option key={b.id} value={b.id}>{b.code} · {b.name}</option>)}
-          </select>
+          <SmartSelect
+            value={lineBlock}
+            onChange={setLineBlock}
+            options={lines?.map((b) => ({
+              value: b.id,
+              label: b.name,
+              sublabel: b.code,
+            })) ?? []}
+            placeholder="— выберите линию —"
+            searchPlaceholder="Поиск линии…"
+            emptyText="Линий разделки нет"
+          />
         </div>
         <div className="field">
           <label>Дата смены *</label>
@@ -220,12 +229,17 @@ export default function ShiftModal({ onClose }: Props) {
         </div>
         <div className="field" style={{ gridColumn: '1/3' }}>
           <label>Бригадир *</label>
-          <select className="input" value={foreman} onChange={(e) => setForeman(e.target.value)}>
-            <option value="">—</option>
-            {people?.map((p) => (
-              <option key={p.user} value={p.user}>{p.user_full_name} · {p.position_title || p.user_email}</option>
-            ))}
-          </select>
+          <SmartSelect
+            value={foreman}
+            onChange={setForeman}
+            options={people?.map((p) => ({
+              value: p.user,
+              label: p.user_full_name,
+              sublabel: p.position_title || p.user_email,
+            })) ?? []}
+            placeholder="— выберите бригадира —"
+            searchPlaceholder="Поиск по ФИО или должности…"
+          />
         </div>
         <div className="field" style={{ gridColumn: '1/3' }}>
           <label>Заметка</label>

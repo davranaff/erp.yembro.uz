@@ -5,6 +5,7 @@ import { useMemo, useState } from 'react';
 import AmountInput from '@/components/ui/AmountInput';
 import HelpHint from '@/components/ui/HelpHint';
 import Modal from '@/components/ui/Modal';
+import SmartSelect from '@/components/ui/SmartSelect';
 import { useSubaccounts } from '@/hooks/useAccounts';
 import { useModules } from '@/hooks/useModules';
 import { useHasLevel, usePermissions } from '@/hooks/usePermissions';
@@ -209,18 +210,18 @@ export default function RecordPaymentModal({ order, onClose }: Props) {
               details="Список сужен по модулю продажи. Если нужной кассы нет — попросите админа создать в /finance/cashbox → «+ Касса/Банк»."
             />
           </label>
-          <select
-            className="input"
+          <SmartSelect
             value={cashSubId}
-            onChange={(e) => setCashSubId(e.target.value)}
-          >
-            <option value="">— выберите кассу —</option>
-            {cashAccounts.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.name}
-              </option>
-            ))}
-          </select>
+            onChange={setCashSubId}
+            options={cashAccounts.map((s) => ({
+              value: s.id,
+              label: s.name,
+              sublabel: s.code,
+            }))}
+            placeholder="— выберите кассу —"
+            searchPlaceholder="Поиск по названию или коду…"
+            emptyText="Касс/счетов в этом модуле нет"
+          />
           {!cashAccounts.length && (
             <div style={{ fontSize: 11, color: 'var(--danger)', marginTop: 4 }}>
               Нет доступных касс/счетов{order.module ? ' в этом модуле' : ''}.

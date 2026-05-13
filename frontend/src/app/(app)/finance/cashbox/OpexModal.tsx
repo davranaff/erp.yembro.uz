@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from 'react';
 import AmountInput from '@/components/ui/AmountInput';
 import Icon from '@/components/ui/Icon';
 import Modal from '@/components/ui/Modal';
+import SmartSelect from '@/components/ui/SmartSelect';
 import { useCounterparties } from '@/hooks/useCounterparties';
 import { expenseArticlesCrud } from '@/hooks/useExpenseArticles';
 import { useModules } from '@/hooks/useModules';
@@ -489,22 +490,21 @@ export default function OpexModal({ preselect, onClose }: Props) {
             создать кассу для вашего модуля в /finance/cashbox.
           </div>
         ) : (
-          <select
-            className="input"
+          <SmartSelect
             value={cashSubId}
-            onChange={(e) => setCashSubId(e.target.value)}
-          >
-            <option value="">— выберите кассу —</option>
-            {cashOptions.map((s) => {
+            onChange={setCashSubId}
+            options={cashOptions.map((s) => {
               const isCash = s.code.startsWith('50.');
-              return (
-                <option key={s.id} value={s.id}>
-                  {isCash ? '💵 ' : '🏦 '}{s.name}
-                  {s.module_code ? ` · ${s.module_code}` : ''}
-                </option>
-              );
+              return {
+                value: s.id,
+                label: `${isCash ? '💵 ' : '🏦 '}${s.name}`,
+                sublabel: s.module_code ?? s.code,
+              };
             })}
-          </select>
+            placeholder="— выберите кассу —"
+            searchPlaceholder="Поиск кассы/банка…"
+            emptyText="Касс/счетов нет"
+          />
         )}
         <span className="hint">
           {cashLocked
@@ -711,19 +711,18 @@ export default function OpexModal({ preselect, onClose }: Props) {
               ))}
             </div>
           )}
-          <select
-            className="input"
+          <SmartSelect
             value={contraSubId}
-            onChange={(e) => setContraSubId(e.target.value)}
-          >
-            <option value="">— выберите субсчёт —</option>
-            {contraOptions.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.name}
-                {s.module_code ? ` · ${s.module_code}` : ''}
-              </option>
-            ))}
-          </select>
+            onChange={setContraSubId}
+            options={contraOptions.map((s) => ({
+              value: s.id,
+              label: s.name,
+              sublabel: s.module_code ?? s.code,
+            }))}
+            placeholder="— выберите субсчёт —"
+            searchPlaceholder="Поиск по плану счетов…"
+            emptyText="Субсчетов нет"
+          />
           <span className="hint">
             Бухгалтерский план счетов. Если не уверены — выберите «Категория» выше.
           </span>
@@ -759,12 +758,18 @@ export default function OpexModal({ preselect, onClose }: Props) {
 
       <div className="field">
         <label>Контрагент</label>
-        <select className="input" value={counterpartyId} onChange={(e) => setCounterpartyId(e.target.value)}>
-          <option value="">— не указан —</option>
-          {counterparties?.map((c) => (
-            <option key={c.id} value={c.id}>{c.name}</option>
-          ))}
-        </select>
+        <SmartSelect
+          value={counterpartyId}
+          onChange={setCounterpartyId}
+          options={counterparties?.map((c) => ({
+            value: c.id,
+            label: c.name,
+            sublabel: c.code,
+          })) ?? []}
+          placeholder="— не указан —"
+          searchPlaceholder="Поиск по названию или коду…"
+          emptyText="Контрагенты не найдены"
+        />
         <span className="hint">
           {direction === 'out' ? 'Кому платим' : 'От кого получили'}. Можно пропустить
         </span>

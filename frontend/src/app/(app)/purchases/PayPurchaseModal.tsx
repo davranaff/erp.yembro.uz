@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import AmountInput from '@/components/ui/AmountInput';
 import Modal from '@/components/ui/Modal';
+import SmartSelect from '@/components/ui/SmartSelect';
 import { useSubaccounts } from '@/hooks/useAccounts';
 import { useModules } from '@/hooks/useModules';
 import { useHasLevel, usePermissions } from '@/hooks/usePermissions';
@@ -235,16 +236,18 @@ export default function PayPurchaseModal({ order, onClose }: Props) {
 
         <div className="field">
           <label>Счёт (касса/банк) *</label>
-          <select
-            className="input"
+          <SmartSelect
             value={cashSubId}
-            onChange={(e) => setCashSubId(e.target.value)}
-          >
-            <option value="">— выберите —</option>
-            {filteredSubs.map((s) => (
-              <option key={s.id} value={s.id}>{s.name}</option>
-            ))}
-          </select>
+            onChange={setCashSubId}
+            options={filteredSubs.map((s) => ({
+              value: s.id,
+              label: s.name,
+              sublabel: s.code,
+            }))}
+            placeholder="— выберите кассу/счёт —"
+            searchPlaceholder="Поиск по названию или коду…"
+            emptyText="Нет касс/счетов в этом модуле"
+          />
           {!filteredSubs.length && (
             <div style={{ fontSize: 11, color: 'var(--danger)', marginTop: 4 }}>
               Нет доступных касс/счетов в этом модуле — попросите админа создать.
