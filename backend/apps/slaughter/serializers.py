@@ -11,6 +11,8 @@ from .models import (
 class SlaughterShiftSerializer(serializers.ModelSerializer):
     line_code = serializers.SerializerMethodField()
     batch_doc = serializers.SerializerMethodField()
+    # doc_number автогенерируется в viewset.perform_create если не задан.
+    doc_number = serializers.CharField(max_length=32, required=False, allow_blank=True)
     # Computed KPI (read-only)
     total_output_kg = serializers.SerializerMethodField()
     total_output_pct = serializers.SerializerMethodField()

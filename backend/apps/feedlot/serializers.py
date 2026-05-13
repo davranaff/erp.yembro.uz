@@ -13,6 +13,8 @@ from .models import (
 class FeedlotBatchSerializer(serializers.ModelSerializer):
     house_code = serializers.SerializerMethodField()
     batch_doc = serializers.SerializerMethodField()
+    # doc_number автогенерируется в place_feedlot_batch сервисе если не задан.
+    doc_number = serializers.CharField(max_length=32, required=False, allow_blank=True)
     # Computed KPI (read-only)
     days_on_feedlot = serializers.SerializerMethodField()
     survival_pct = serializers.SerializerMethodField()
