@@ -122,15 +122,14 @@ def sync_opening_balance_for_counterparty(
     opening = Decimal(counterparty.opening_debt_uzs or 0)
     existing = get_opening_balance_sale(counterparty)
 
-    # Долг убрали (или предоплата): отменяем неоплаченный SO, частично
-    # оплаченный не трогаем (оплаты уже зафиксированы — пусть остаётся
-    # как есть; админ разберётся вручную).
+    # opening_debt = 0: оставляем существующий SO как есть. После того как
+    # миграция выполнена и счёт материализован в SaleOrder, поле
+    # opening_debt_uzs воспринимается как «исторический snapshot», а
+    # отвязка от него (обнуление) НЕ должна авто-отменять реальный долг
+    # клиента, который уже живёт в SaleOrder и может ожидать оплату или
+    # быть частично закрытым через record_payment. Если админ хочет
+    # отменить миграционный SO — пусть делает это явно через UI.
     if opening <= 0:
-        if existing and existing.status == SaleOrder.Status.CONFIRMED:
-            paid = Decimal(existing.paid_amount_uzs or 0)
-            if paid == 0:
-                existing.status = SaleOrder.Status.CANCELLED
-                existing.save(update_fields=["status", "updated_at"])
         return existing
 
     # Долг положительный.

@@ -347,6 +347,27 @@ export function useBulkSetKind() {
   });
 }
 
+export type BulkClearVars = {
+  employee: string;
+  dates: string[];
+};
+
+export function useBulkClearShifts() {
+  const qc = useQueryClient();
+  return useMutation<{ deleted: number }, ApiError, BulkClearVars>({
+    mutationFn: (body) =>
+      apiFetch<{ deleted: number }>(
+        '/api/payroll/work-shifts/bulk-clear/',
+        { method: 'POST', body },
+      ),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: SHIFTS_KEY });
+      qc.invalidateQueries({ queryKey: ['payroll', 'calendar'] });
+      qc.invalidateQueries({ queryKey: ['memberships'] });
+    },
+  });
+}
+
 // ─── payouts ──────────────────────────────────────────────────────────────
 
 const PAYOUTS_KEY = ['payroll', 'payouts'] as const;

@@ -517,6 +517,36 @@ class WorkShiftViewSet(OrgScopedModelViewSet):
                     created += 1
         return Response({"created": created, "updated": updated})
 
+    @action(detail=False, methods=["post"], url_path="bulk-clear")
+    def bulk_clear(self, request):
+        """
+        POST /api/payroll/work-shifts/bulk-clear/
+        Body: {employee, dates: [...]}.
+        Удаляет WorkShift'ы на указанных датах. После этого даты «чистые» —
+        для accrual они становятся обычными календарными днями (платятся
+        как rate / days_in_month), пока HR явно не назначит другой kind.
+        """
+        from django.db import transaction as _tx
+
+        ser = BulkSetKindSerializer(data={**request.data, "kind": WorkShift.Kind.WORK})
+        # Используем тот же сериализатор для валидации employee/dates;
+        # kind игнорируем (передан фиктивный, чтобы валидатор не ругался).
+        ser.is_valid(raise_exception=True)
+        org = request.organization
+        try:
+            employee = OrganizationMembership.objects.get(
+                pk=ser.validated_data["employee"], organization=org,
+            )
+        except OrganizationMembership.DoesNotExist:
+            raise NotFound({"employee": "Сотрудник не найден."})
+
+        dates = ser.validated_data["dates"]
+        with _tx.atomic():
+            deleted, _details = WorkShift.objects.filter(
+                employee=employee, shift_date__in=dates,
+            ).delete()
+        return Response({"deleted": deleted})
+
     @action(detail=False, methods=["post"], url_path="bulk")
     def bulk_apply_template(self, request):
         """

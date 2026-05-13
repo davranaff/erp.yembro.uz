@@ -99,12 +99,11 @@ def sync_opening_balance_for_supplier(
     opening = Decimal(counterparty.opening_debt_uzs or 0)
     existing = get_opening_balance_purchase(counterparty)
 
+    # opening_debt = 0: оставляем существующий PO как есть. После материализации
+    # миграционного счёта поле opening_debt_uzs становится историческим
+    # snapshot'ом — обнулять его безопасно, но это НЕ должно авто-отменять
+    # реальный счёт поставщику. Отмену делает админ явно через UI.
     if opening <= 0:
-        if existing and existing.status == PurchaseOrder.Status.CONFIRMED:
-            paid = Decimal(existing.paid_amount_uzs or 0)
-            if paid == 0:
-                existing.status = PurchaseOrder.Status.CANCELLED
-                existing.save(update_fields=["status", "updated_at"])
         return existing
 
     if existing is None:

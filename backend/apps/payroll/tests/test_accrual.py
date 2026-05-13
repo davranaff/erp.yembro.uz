@@ -86,8 +86,14 @@ def test_accrue_monthly_pro_rated(employee_monthly, uzs, org):
     assert res.accrued_uzs == per_day * Decimal("31")
 
 
-def test_accrue_monthly_switches_to_workdays_on_absence(employee_monthly, uzs, org):
-    """≥1 прогул → working-day mode: платим только за рабочие/work-смены."""
+def test_accrue_monthly_absence_excludes_only_that_day(employee_monthly, uzs, org):
+    """Прогул отнимает только этот день; остальные оплачиваются в calendar-mode.
+
+    HR-флоу: ничего автоматически не «срезается» (выходные/праздники продолжают
+    оплачиваться). Чтобы вычесть пропущенный день, HR явно ставит kind=absence
+    в табеле — этот один день уходит в 0, остальные 30 дней июля платятся
+    по rate/31.
+    """
     from apps.payroll.models import WorkShift
 
     set_rate(
@@ -96,9 +102,6 @@ def test_accrue_monthly_switches_to_workdays_on_absence(employee_monthly, uzs, o
         effective_from=date(2026, 7, 1),
         currency=uzs,
     )
-    # 10 work-смен подряд, и 1 явный прогул (без шаблона → fallback 22)
-    workdays = [date(2026, 7, d) for d in range(1, 11)]
-    _make_shifts(employee_monthly, workdays)
     WorkShift.objects.create(
         organization=org, employee=employee_monthly,
         shift_date=date(2026, 7, 15), kind=WorkShift.Kind.ABSENCE,
@@ -107,9 +110,9 @@ def test_accrue_monthly_switches_to_workdays_on_absence(employee_monthly, uzs, o
     res = accrue_for_period(
         employee_monthly, date(2026, 7, 1), date(2026, 7, 31)
     )
-    # 1 прогул → working mode без шаблона: платим только за явные work/overtime
-    # смены. 10 × (4_400_000 / 22) = 2_000_000.
-    assert res.accrued_uzs == Decimal("2000000.00")
+    # 30 дней × (4_400_000 / 31) с copyek-округлением.
+    per_day = (Decimal("4400000") / Decimal("31")).quantize(Decimal("0.01"))
+    assert res.accrued_uzs == per_day * Decimal("30")
 
 
 def test_accrue_monthly_hours_pro_rata(employee_monthly, uzs, org):
