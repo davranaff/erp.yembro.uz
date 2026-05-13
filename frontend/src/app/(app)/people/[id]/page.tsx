@@ -11,7 +11,7 @@ import Panel from '@/components/ui/Panel';
 import Seg from '@/components/ui/Seg';
 import { useCurrenciesSorted } from '@/hooks/useCurrencyRates';
 import {
-  useApplyTemplate,
+  useBulkClearShifts,
   useBulkSetKind,
   useCancelPayout,
   useCompensationPlanForEmployee,
@@ -513,11 +513,10 @@ function TimesheetTab({
   const fromStr = ymd(monthStart);
   const toStr = ymd(monthEnd);
   const { data: cal } = useEmployeeCalendar(employeeId, fromStr, toStr);
-  const { data: templates = [] } = useScheduleTemplates();
-  const apply = useApplyTemplate();
   const saveShift = useSaveWorkShift();
   const delShift = useDeleteWorkShift();
   const bulkSet = useBulkSetKind();
+  const bulkClear = useBulkClearShifts();
   const [editing, setEditing] = useState<{ date: string; id?: string; kind: WorkShiftKind } | null>(null);
   const [selectMode, setSelectMode] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -536,24 +535,23 @@ function TimesheetTab({
     cells.push({ date: ymd(dt), day: d });
   }
 
-  const handleApply = () => {
-    const tpl = templates.find((t) => t.is_active);
-    if (!tpl) { alert('Сначала создайте шаблон в /payroll/templates'); return; }
-    apply.mutate({
-      employee: employeeId, template: tpl.id,
-      from_date: fromStr, to_date: toStr,
-    }, {
-      onError: (e) => alert(e.message),
-      onSuccess: (r) => alert(`Создано смен: ${r.created}`),
-    });
-  };
-
   const applyBulkKind = (k: WorkShiftKind) => {
     if (selected.size === 0) { alert('Выделите дни'); return; }
     bulkSet.mutate({
       employee: employeeId,
       dates: Array.from(selected).sort(),
       kind: k,
+    }, {
+      onSuccess: () => { setSelected(new Set()); setSelectMode(false); },
+      onError: (e) => alert(e.message),
+    });
+  };
+
+  const applyBulkClear = () => {
+    if (selected.size === 0) { alert('Выделите дни'); return; }
+    bulkClear.mutate({
+      employee: employeeId,
+      dates: Array.from(selected).sort(),
     }, {
       onSuccess: () => { setSelected(new Set()); setSelectMode(false); },
       onError: (e) => alert(e.message),
@@ -570,9 +568,6 @@ function TimesheetTab({
           <button className="btn btn-ghost btn-sm" onClick={() => setMonth((p) => p.m === 11 ? { y: p.y + 1, m: 0 } : { y: p.y, m: p.m + 1 })}>→</button>
           {hrRw && (
             <>
-              <button className="btn btn-secondary btn-sm" onClick={handleApply} disabled={apply.isPending}>
-                Заполнить по графику
-              </button>
               <button
                 className={selectMode ? 'btn btn-primary btn-sm' : 'btn btn-ghost btn-sm'}
                 onClick={() => { setSelectMode(!selectMode); setSelected(new Set()); }}
@@ -581,9 +576,17 @@ function TimesheetTab({
               </button>
               {selectMode && selected.size > 0 && (
                 <>
+                  <button className="btn btn-ghost btn-sm" onClick={() => applyBulkKind('work')}>→ В работе</button>
                   <button className="btn btn-ghost btn-sm" onClick={() => applyBulkKind('vacation')}>→ Отпуск</button>
                   <button className="btn btn-ghost btn-sm" onClick={() => applyBulkKind('sick_leave')}>→ Больничный</button>
                   <button className="btn btn-ghost btn-sm" onClick={() => applyBulkKind('absence')}>→ Прогул</button>
+                  <button
+                    className="btn btn-sm"
+                    style={{ color: 'var(--danger)', borderColor: 'var(--border)' }}
+                    onClick={applyBulkClear}
+                  >
+                    Очистить
+                  </button>
                 </>
               )}
             </>
