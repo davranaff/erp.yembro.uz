@@ -12,7 +12,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from apps.common.permissions import can_see_finances
+from apps.common.permissions import can_see_finances, get_user_readable_module_codes
 from apps.common.viewsets import OrganizationContextMixin
 
 from .services import (
@@ -60,13 +60,24 @@ class DashboardSummaryView(OrganizationContextMixin, APIView):
         org = request.organization
         finances_visible = can_see_finances(request.user, org)
 
-        kpis = kpi_summary(org)
+        # Superusers see all modules; everyone else is scoped to their role's ≥r
+        # modules. None signals "unlimited" to the service layer.
+        membership = request.membership
+        if request.user.is_superuser:
+            readable_modules = None
+        else:
+            readable_modules = (
+                get_user_readable_module_codes(membership)
+                if membership else frozenset()
+            )
+
+        kpis = kpi_summary(org, readable_modules=readable_modules)
         if not finances_visible:
             kpis = _strip_financial_kpis(kpis)
 
         return Response({
             "kpis": kpis,
-            "production": production_summary(org),
+            "production": production_summary(org, readable_modules=readable_modules),
             "cash": cash_balances(org) if finances_visible else None,
             "ar": ar_summary(org) if finances_visible else None,
             "_finances_visible": finances_visible,
