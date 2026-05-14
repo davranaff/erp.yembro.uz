@@ -37,7 +37,17 @@ class BalanceResult:
 
 
 def compute_balance(employee, as_of: date) -> BalanceResult:
-    start = employee.joined_at.date() if employee.joined_at else as_of
+    from ..models import SalaryRate
+    joined = employee.joined_at.date() if employee.joined_at else as_of
+    first_rate_date = (
+        SalaryRate.objects.filter(employee=employee)
+        .order_by("effective_from")
+        .values_list("effective_from", flat=True)
+        .first()
+    )
+    # Start accrual from whichever is earlier: membership creation or first salary rate.
+    # Handles the case where a salary is backdated (effective_from < joined_at).
+    start = min(joined, first_rate_date) if first_rate_date else joined
     if start > as_of:
         start = as_of
     accrued = accrue_for_period(employee, start, as_of)

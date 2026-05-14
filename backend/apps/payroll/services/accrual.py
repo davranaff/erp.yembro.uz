@@ -18,7 +18,7 @@ from django.core.exceptions import ValidationError
 
 from ..models import CompensationPlan, WorkShift
 from .compensation import compensation_type_at
-from .fx import convert_to_uzs
+from .fx import FXConversion, convert_to_uzs
 from .rates import rate_at
 from .schedule import expected_workdays_in_month, template_for_employee_on
 
@@ -384,4 +384,22 @@ def _convert_or_none(amount: Decimal, currency_code: str, on_date: date):
     try:
         return convert_to_uzs(amount, currency_code, on_date)
     except ValidationError:
+        pass
+    # Fallback: if no rate within 7-day window, use the nearest available rate.
+    # Prevents payroll gaps when exchange rates haven't been backfilled.
+    code = (currency_code or "").upper()
+    if code in ("UZS", ""):
         return None
+    from apps.currency.selectors import get_latest_rate
+    rate_obj = get_latest_rate(code)
+    if rate_obj is None:
+        return None
+    nominal = Decimal(str(rate_obj.nominal or 1))
+    unit_rate = Decimal(str(rate_obj.rate)) / nominal
+    return FXConversion(
+        amount_native=amount,
+        currency_code=code,
+        amount_uzs=(amount * unit_rate).quantize(Decimal("0.01")),
+        exchange_rate=unit_rate,
+        rate_date=rate_obj.date,
+    )
