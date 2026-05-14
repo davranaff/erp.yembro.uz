@@ -487,7 +487,7 @@ export interface DashboardArSummary {
 export interface DashboardSummary {
   kpis: DashboardKpis;
   production: DashboardProduction;
-  cash: DashboardCash;
+  cash: DashboardCash | null;
   /** AR snapshot (NULL если у пользователя нет ledger.r). */
   ar?: DashboardArSummary | null;
   _finances_visible?: boolean;

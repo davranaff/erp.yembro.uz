@@ -233,6 +233,6 @@ def test_unlimited_readable_modules_returns_all_fields():
     kpis = kpi_summary(org, readable_modules=None)
 
     for key in ("matochnik_heads", "feedlot_heads", "incubation_runs", "incubation_eggs_loaded"):
-        assert prod[key] is not None, f"production.{key} should not be None for unlimited scope"
+        assert isinstance(prod[key], int), f"production.{key} should be int (not None) for unlimited scope"
     for key in ("purchases_drafts", "sales_drafts", "payments_drafts"):
-        assert kpis[key] is not None, f"kpis.{key} should not be None for unlimited scope"
+        assert isinstance(kpis[key], int), f"kpis.{key} should be int (not None) for unlimited scope"
