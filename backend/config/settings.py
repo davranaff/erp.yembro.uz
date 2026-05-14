@@ -114,6 +114,31 @@ DATABASES = {
         "PASSWORD": env("POSTGRES_PASSWORD", default="erp"),
         "HOST": env("POSTGRES_HOST", default="db"),
         "PORT": env("POSTGRES_PORT", default="5432"),
+        # Persistent connections: reuse the same PG connection across requests
+        # instead of opening a new one every time. On Railway (same-region)
+        # this saves ~5-15ms per request. Set to 0 for Celery workers.
+        "CONN_MAX_AGE": env.int("DB_CONN_MAX_AGE", default=60),
+        "CONN_HEALTH_CHECKS": True,
+        "OPTIONS": {
+            "connect_timeout": 10,
+        },
+    }
+}
+
+# ── Cache (Redis) ─────────────────────────────────────────────────────────────
+# Uses Django 5.1 built-in RedisCache (requires redis>=4). DB 1 to separate
+# from Celery broker (DB 0). In prod set CACHE_URL to the Railway Redis
+# internal URL, e.g. redis://$REDIS_HOST:$REDIS_PORT/1
+CACHES = {
+    "default": {
+        "BACKEND": "django.core.cache.backends.redis.RedisCache",
+        "LOCATION": env("CACHE_URL", default="redis://redis:6379/1"),
+        "KEY_PREFIX": "yembro",
+        "TIMEOUT": 300,
+        "OPTIONS": {
+            "socket_timeout": 2,
+            "socket_connect_timeout": 2,
+        },
     }
 }
 
