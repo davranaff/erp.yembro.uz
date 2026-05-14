@@ -176,6 +176,27 @@ class HasModulePermission(BasePermission):
         return level_satisfies(actual, required)
 
 
+def _get_user_module_codes(membership, min_level: str) -> set[str]:
+    """Return set of module codes where membership's effective level >= min_level."""
+    from apps.rbac.models import RolePermission, UserModuleAccessOverride
+
+    candidate_codes: set[str] = set()
+    candidate_codes.update(
+        UserModuleAccessOverride.objects.filter(membership=membership)
+        .values_list("module__code", flat=True)
+    )
+    candidate_codes.update(
+        RolePermission.objects.filter(
+            role__in=membership.user_roles.values("role")
+        ).values_list("module__code", flat=True)
+    )
+    result: set[str] = set()
+    for code in candidate_codes:
+        if level_satisfies(_effective_level(membership, code), min_level):
+            result.add(code)
+    return result
+
+
 def get_user_rw_module_codes(membership) -> set[str]:
     """
     Список module-кодов на которые у membership уровень rw или admin.
@@ -185,32 +206,17 @@ def get_user_rw_module_codes(membership) -> set[str]:
 
     Учитывает override и роли (effective level через _effective_level).
     """
-    from apps.modules.models import Module
-    from apps.rbac.models import RolePermission, UserModuleAccessOverride
+    return _get_user_module_codes(membership, "rw")
 
-    candidate_codes: set[str] = set()
 
-    # Коды модулей где есть override (любой level).
-    candidate_codes.update(
-        UserModuleAccessOverride.objects.filter(membership=membership)
-        .values_list("module__code", flat=True)
-    )
+def get_user_readable_module_codes(membership) -> set[str]:
+    """Module codes where membership has effective level >= r (read).
 
-    # Коды модулей где есть RolePermission через роли membership.
-    candidate_codes.update(
-        RolePermission.objects.filter(
-            role__in=membership.user_roles.values("role")
-        ).values_list("module__code", flat=True)
-    )
-
-    # Фильтруем по effective level >= rw
-    result: set[str] = set()
-    for code in candidate_codes:
-        actual = _effective_level(membership, code)
-        if level_satisfies(actual, "rw"):
-            result.add(code)
-
-    return result
+    Used to scope the dashboard: a module-head sees aggregates only for
+    modules they can actually open. Superusers bypass this via the call
+    site (readable_modules=None means unlimited).
+    """
+    return _get_user_module_codes(membership, "r")
 
 
 def is_org_admin(membership) -> bool:
