@@ -58,18 +58,16 @@ class DashboardSummaryView(OrganizationContextMixin, APIView):
 
     def get(self, request):
         org = request.organization
-        finances_visible = can_see_finances(request.user, org)
+        # Superusers see everything including finances; RBAC applies to everyone else.
+        finances_visible = request.user.is_superuser or can_see_finances(request.user, org)
 
-        # Superusers see all modules; everyone else is scoped to their role's ≥r
-        # modules. None signals "unlimited" to the service layer.
+        # membership is guaranteed non-None here: OrganizationContextMixin raises
+        # 403 before get() is called when membership cannot be resolved.
         membership = request.membership
         if request.user.is_superuser:
-            readable_modules = None
+            readable_modules = None  # unlimited: superuser bypasses module-level RBAC
         else:
-            readable_modules = (
-                get_user_readable_module_codes(membership)
-                if membership else frozenset()
-            )
+            readable_modules = get_user_readable_module_codes(membership)
 
         kpis = kpi_summary(org, readable_modules=readable_modules)
         if not finances_visible:
