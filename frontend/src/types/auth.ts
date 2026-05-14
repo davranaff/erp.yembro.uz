@@ -382,7 +382,10 @@ export interface HoldingCompany {
   direction: 'broiler' | 'egg' | 'mixed';
   accounting_currency: string;
   is_active: boolean;
+  /** Полный объём закупок за период (начисление, включая ещё не оплаченное). */
   purchases_confirmed_uzs: string;
+  /** Реально оплачено поставщикам за период (актуальные деньги, без долга). */
+  purchases_paid_uzs: string;
   payments_in_uzs: string;
   payments_out_uzs: string;
   creditor_balance_uzs: string;
@@ -398,6 +401,8 @@ export interface HoldingTotals {
   modules: number;
   active_batches: number;
   purchases_confirmed_uzs: string;
+  /** Реально оплачено поставщикам по холдингу за период (без долга). */
+  purchases_paid_uzs: string;
   payments_in_uzs: string;
   payments_out_uzs: string;
   creditor_balance_uzs: string;
@@ -413,26 +418,35 @@ export interface HoldingPayload {
 
 export interface DashboardKpis {
   period: { from: string; to: string };
+  /** Полный объём закупок за период (начисление, включая ещё не оплаченное). */
   purchases_confirmed_uzs: string;
+  /** Реально оплачено поставщикам за период (актуальные деньги, без долга). */
+  purchases_paid_uzs: string;
   creditor_balance_uzs: string;
   debtor_balance_uzs: string;
   payments_in_uzs: string;
   payments_out_uzs: string;
+  /** Реально оплачено клиентами за период (актуальные деньги, без долга). */
   sales_revenue_uzs: string;
+  /** Полный объём отгрузок за период (начисление, включая ещё не оплаченное). */
+  sales_invoiced_uzs: string;
+  /** Долг по продажам периода = invoiced − revenue. */
+  sales_unpaid_uzs: string;
   sales_cost_uzs: string;
+  /** Валовая маржа по отгрузке: sales_invoiced_uzs − sales_cost_uzs. */
   sales_margin_uzs: string;
   active_batches: number;
   transfers_pending: number;
-  purchases_drafts: number;
-  sales_drafts: number;
-  payments_drafts: number;
+  purchases_drafts: number | null;
+  sales_drafts: number | null;
+  payments_drafts: number | null;
 }
 
 export interface DashboardProduction {
-  matochnik_heads: number;
-  feedlot_heads: number;
-  incubation_runs: number;
-  incubation_eggs_loaded: number;
+  matochnik_heads: number | null;
+  feedlot_heads: number | null;
+  incubation_runs: number | null;
+  incubation_eggs_loaded: number | null;
 }
 
 export type DashboardCashChannel = { label: string; balance_uzs: string };
@@ -473,7 +487,7 @@ export interface DashboardArSummary {
 export interface DashboardSummary {
   kpis: DashboardKpis;
   production: DashboardProduction;
-  cash: DashboardCash;
+  cash: DashboardCash | null;
   /** AR snapshot (NULL если у пользователя нет ledger.r). */
   ar?: DashboardArSummary | null;
   _finances_visible?: boolean;

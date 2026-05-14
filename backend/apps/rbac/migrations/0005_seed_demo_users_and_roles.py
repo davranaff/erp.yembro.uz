@@ -49,7 +49,6 @@ ROLE_DEFINITIONS = [
             "vet": "r",            # видит вакцинации/лечения
             "stock": "r",
             "purchases": "r",
-            "ledger": "r",
             "reports": "r",
         },
     },
@@ -62,7 +61,6 @@ ROLE_DEFINITIONS = [
             "matochnik": "r",      # откуда пришли яйца
             "core": "rw",
             "stock": "r",
-            "ledger": "r",
             "reports": "r",
         },
     },
@@ -77,7 +75,6 @@ ROLE_DEFINITIONS = [
             "vet": "r",            # лечения
             "core": "rw",
             "stock": "r",
-            "ledger": "r",
             "reports": "r",
         },
     },
@@ -91,7 +88,6 @@ ROLE_DEFINITIONS = [
             "sales": "rw",         # продажа готовой продукции
             "core": "rw",
             "stock": "r",
-            "ledger": "r",
             "reports": "r",
         },
     },
@@ -109,7 +105,6 @@ ROLE_DEFINITIONS = [
             "feedlot": "r",
             "slaughter": "r",
             "core": "rw",
-            "ledger": "r",
             "reports": "r",
         },
     },

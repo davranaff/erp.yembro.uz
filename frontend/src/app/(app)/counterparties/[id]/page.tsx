@@ -279,6 +279,9 @@ function InfoTab({
 }) {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
+  // totalInvoiced — полный объём отгрузок (начисление), totalSales — реально
+  // оплаченная клиентом часть (актуальные деньги). Долг между ними не двоится.
+  const totalInvoiced = monthly.reduce((s, r) => s + parseFloat(r.sales_invoiced_uzs || '0'), 0);
   const totalSales = monthly.reduce((s, r) => s + parseFloat(r.sales_uzs || '0'), 0);
   const totalPurchases = monthly.reduce((s, r) => s + parseFloat(r.purchases_uzs || '0'), 0);
 
@@ -376,7 +379,7 @@ function InfoTab({
       )}
 
       {/* Обороты */}
-      {(totalSales > 0 || totalPurchases > 0) && (
+      {(totalInvoiced > 0 || totalPurchases > 0) && (
         <>
           <div style={{ height: 12 }} />
           <Panel title="Обороты за 12 месяцев">
@@ -386,7 +389,10 @@ function InfoTab({
                   <div>
                     <div className="sub">Куплено всего</div>
                     <div className="mono" style={{ fontSize: 22, fontWeight: 600 }}>
-                      {fmt(totalSales)} <span style={{ fontSize: 13, fontWeight: 400 }}>сум</span>
+                      {fmt(totalInvoiced)} <span style={{ fontSize: 13, fontWeight: 400 }}>сум</span>
+                    </div>
+                    <div className="sub" style={{ marginTop: 2 }}>
+                      оплачено: {fmt(totalSales)} сум
                     </div>
                   </div>
                   <div>

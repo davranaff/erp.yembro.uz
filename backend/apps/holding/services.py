@@ -40,7 +40,8 @@ class CompanyConsolidation:
     accounting_currency: str
     is_active: bool
 
-    purchases_confirmed_uzs: str
+    purchases_confirmed_uzs: str  # полный объём закупок периода (начисление)
+    purchases_paid_uzs: str       # реально оплаченная поставщикам часть
     payments_in_uzs: str
     payments_out_uzs: str
     creditor_balance_uzs: str  # сколько мы должны поставщикам
@@ -75,15 +76,17 @@ def consolidate(
 
     out: list[CompanyConsolidation] = []
     for org in organizations:
-        purchases_total = (
-            PurchaseOrder.objects.filter(
-                organization=org,
-                status=PurchaseOrder.Status.CONFIRMED,
-                date__gte=period_from,
-                date__lte=period_to,
-            ).aggregate(s=Sum("amount_uzs"))["s"]
-            or Decimal("0")
-        )
+        # purchases_total — начислено (Σ amount_uzs), purchases_paid —
+        # реально оплачено поставщикам (Σ paid_amount_uzs). Симметрично
+        # продажам; долг по закупкам виден отдельно как creditor_balance_uzs.
+        purchases_agg = PurchaseOrder.objects.filter(
+            organization=org,
+            status=PurchaseOrder.Status.CONFIRMED,
+            date__gte=period_from,
+            date__lte=period_to,
+        ).aggregate(invoiced=Sum("amount_uzs"), paid=Sum("paid_amount_uzs"))
+        purchases_total = purchases_agg["invoiced"] or Decimal("0")
+        purchases_paid = purchases_agg["paid"] or Decimal("0")
 
         creditor = (
             PurchaseOrder.objects.filter(
@@ -161,6 +164,7 @@ def consolidate(
                 ),
                 is_active=org.is_active,
                 purchases_confirmed_uzs=str(purchases_total),
+                purchases_paid_uzs=str(purchases_paid),
                 payments_in_uzs=str(pay_in),
                 payments_out_uzs=str(pay_out),
                 creditor_balance_uzs=str(creditor_balance),
@@ -182,6 +186,7 @@ def total_kpis(rows: list[CompanyConsolidation]) -> dict:
             "modules": 0,
             "active_batches": 0,
             "purchases_confirmed_uzs": "0",
+            "purchases_paid_uzs": "0",
             "payments_in_uzs": "0",
             "payments_out_uzs": "0",
             "creditor_balance_uzs": "0",
@@ -193,6 +198,9 @@ def total_kpis(rows: list[CompanyConsolidation]) -> dict:
         "active_batches": sum(r.active_batches for r in rows),
         "purchases_confirmed_uzs": str(
             sum((Decimal(r.purchases_confirmed_uzs) for r in rows), Decimal("0"))
+        ),
+        "purchases_paid_uzs": str(
+            sum((Decimal(r.purchases_paid_uzs) for r in rows), Decimal("0"))
         ),
         "payments_in_uzs": str(
             sum((Decimal(r.payments_in_uzs) for r in rows), Decimal("0"))

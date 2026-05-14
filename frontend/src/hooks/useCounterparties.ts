@@ -180,7 +180,10 @@ export interface CounterpartyFullSummary extends CounterpartyDebtSummary {
   all_payments_count: number;
   monthly_turnover: Array<{
     month: string; // "YYYY-MM"
+    /** Реально оплаченная клиентом часть продаж за месяц (актуальные деньги). */
     sales_uzs: string;
+    /** Полный объём отгрузок за месяц (начисление, включая неоплаченное). */
+    sales_invoiced_uzs: string;
     purchases_uzs: string;
     payments_in_uzs: string;
     payments_out_uzs: string;

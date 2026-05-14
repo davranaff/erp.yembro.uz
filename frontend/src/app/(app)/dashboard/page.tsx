@@ -101,15 +101,17 @@ export default function DashboardPage() {
   // KPI приходят как null, а cash может быть полностью null.
   const financesVisible = (summary as { _finances_visible?: boolean })._finances_visible !== false;
 
+  // Маржа считается по отгрузке (sales_margin_uzs = invoiced − cost), поэтому
+  // и процент маржи берётся от отгруженного, а не от оплаченного.
   const margin = financesVisible && k.sales_margin_uzs ? parseFloat(k.sales_margin_uzs) : 0;
-  const marginPct = financesVisible && k.sales_revenue_uzs && parseFloat(k.sales_revenue_uzs) > 0
-    ? (margin / parseFloat(k.sales_revenue_uzs)) * 100
+  const marginPct = financesVisible && k.sales_invoiced_uzs && parseFloat(k.sales_invoiced_uzs) > 0
+    ? (margin / parseFloat(k.sales_invoiced_uzs)) * 100
     : 0;
   const netCash = financesVisible && k.payments_in_uzs && k.payments_out_uzs
     ? parseFloat(k.payments_in_uzs) - parseFloat(k.payments_out_uzs)
     : 0;
 
-  const totalDrafts = k.purchases_drafts + k.sales_drafts + k.payments_drafts;
+  const totalDrafts = (k.purchases_drafts ?? 0) + (k.sales_drafts ?? 0) + (k.payments_drafts ?? 0);
 
   return (
     <>
@@ -146,18 +148,18 @@ export default function DashboardPage() {
             tone="green"
             iconName="chart"
             label="Выручка"
-            sub="продажи проведённые"
+            sub="оплачено клиентами"
             value={fmt(k.sales_revenue_uzs)}
             valueSuffix="UZS"
-            meta={`себест.: ${fmt(k.sales_cost_uzs)}`}
+            meta={`отгружено: ${fmt(k.sales_invoiced_uzs)} · себест.: ${fmt(k.sales_cost_uzs)}`}
           />
           <KpiCard
             tone={margin >= 0 ? 'orange' : 'red'}
             iconName="book"
             label="Прибыль (валовая)"
             sub={
-              parseFloat(k.sales_revenue_uzs) > 0
-                ? `маржа ${marginPct.toFixed(1)}%`
+              parseFloat(k.sales_invoiced_uzs) > 0
+                ? `маржа ${marginPct.toFixed(1)}% · по отгрузке`
                 : 'нет продаж'
             }
             value={fmt(k.sales_margin_uzs)}
@@ -315,27 +317,33 @@ export default function DashboardPage() {
           className="grid-auto-180"
           style={{ padding: 12 }}
         >
-          <ProductionTile
-            label="Маточник"
-            value={prod.matochnik_heads}
-            unit="голов"
-            tone="neutral"
-            href="/matochnik"
-          />
-          <ProductionTile
-            label="Инкубация"
-            value={prod.incubation_runs}
-            unit={`закладок (${fmt(prod.incubation_eggs_loaded)} яиц)`}
-            tone="warn"
-            href="/incubation"
-          />
-          <ProductionTile
-            label="Откорм"
-            value={prod.feedlot_heads}
-            unit="голов"
-            tone="info"
-            href="/feedlot"
-          />
+          {prod.matochnik_heads != null && (
+            <ProductionTile
+              label="Маточник"
+              value={prod.matochnik_heads}
+              unit="голов"
+              tone="neutral"
+              href="/matochnik"
+            />
+          )}
+          {prod.incubation_runs != null && (
+            <ProductionTile
+              label="Инкубация"
+              value={prod.incubation_runs}
+              unit={`закладок (${fmt(prod.incubation_eggs_loaded ?? 0)} яиц)`}
+              tone="warn"
+              href="/incubation"
+            />
+          )}
+          {prod.feedlot_heads != null && (
+            <ProductionTile
+              label="Откорм"
+              value={prod.feedlot_heads}
+              unit="голов"
+              tone="info"
+              href="/feedlot"
+            />
+          )}
           <ProductionTile
             label="Активных партий"
             value={k.active_batches}
@@ -352,27 +360,33 @@ export default function DashboardPage() {
         style={{ marginBottom: 12 }}
       >
         <div style={{ padding: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
-          <ActionRow
-            label="Закупки в черновиках"
-            count={k.purchases_drafts}
-            href="/purchases"
-            help="Не проведены — товар не оприходован"
-            tone="warn"
-          />
-          <ActionRow
-            label="Продажи в черновиках"
-            count={k.sales_drafts}
-            href="/sales"
-            help="Резервируют партии, но не отгружены"
-            tone="warn"
-          />
-          <ActionRow
-            label="Платежи в черновиках"
-            count={k.payments_drafts}
-            href="/finance/cashbox"
-            help="Не проведены в ГК"
-            tone="warn"
-          />
+          {k.purchases_drafts != null && (
+            <ActionRow
+              label="Закупки в черновиках"
+              count={k.purchases_drafts}
+              href="/purchases"
+              help="Не проведены — товар не оприходован"
+              tone="warn"
+            />
+          )}
+          {k.sales_drafts != null && (
+            <ActionRow
+              label="Продажи в черновиках"
+              count={k.sales_drafts}
+              href="/sales"
+              help="Резервируют партии, но не отгружены"
+              tone="warn"
+            />
+          )}
+          {k.payments_drafts != null && (
+            <ActionRow
+              label="Платежи в черновиках"
+              count={k.payments_drafts}
+              href="/finance/cashbox"
+              help="Не проведены в ГК"
+              tone="warn"
+            />
+          )}
           <ActionRow
             label="Межмодульные передачи на приёмке"
             count={k.transfers_pending}
