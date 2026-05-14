@@ -187,3 +187,52 @@ def test_cashflow_clamps_to_max_365(client):
     resp = client.get("/api/dashboard/cashflow/?days=99999")
     assert resp.status_code == 200
     assert resp.json()["days"] == 365
+
+
+def test_head_slaughter_sees_only_accessible_production():
+    """HEAD_SLAUGHTER has feedlot:r, slaughter:admin, sales:rw — no matochnik/incubation.
+    production_summary must return None for matochnik and incubation tiles."""
+    from apps.dashboard.services import production_summary
+    from apps.organizations.models import Organization
+
+    org = Organization.objects.get(code="DEFAULT")
+    readable = {"slaughter", "feedlot", "sales", "core", "stock", "reports"}
+    # Note: ledger intentionally absent (removed from role by Task 5 migration)
+
+    prod = production_summary(org, readable_modules=readable)
+
+    assert prod["matochnik_heads"] is None      # no matochnik access
+    assert prod["incubation_runs"] is None      # no incubation access
+    assert prod["incubation_eggs_loaded"] is None
+    assert prod["feedlot_heads"] is not None    # feedlot:r → visible (int or 0)
+
+
+def test_head_slaughter_drafts_scoped():
+    """purchases_drafts is None (no purchases access), sales_drafts is int (sales:rw)."""
+    from apps.dashboard.services import kpi_summary
+    from apps.organizations.models import Organization
+
+    org = Organization.objects.get(code="DEFAULT")
+    readable = {"slaughter", "feedlot", "sales", "core", "stock", "reports"}
+
+    kpis = kpi_summary(org, readable_modules=readable)
+
+    assert kpis["purchases_drafts"] is None   # purchases not in readable
+    assert kpis["payments_drafts"] is None    # ledger not in readable
+    assert isinstance(kpis["sales_drafts"], int)  # sales:rw → visible
+
+
+def test_unlimited_readable_modules_returns_all_fields():
+    """readable_modules=None (superuser/org-admin) → all fields are non-None."""
+    from apps.dashboard.services import production_summary, kpi_summary
+    from apps.organizations.models import Organization
+
+    org = Organization.objects.get(code="DEFAULT")
+
+    prod = production_summary(org, readable_modules=None)
+    kpis = kpi_summary(org, readable_modules=None)
+
+    for key in ("matochnik_heads", "feedlot_heads", "incubation_runs", "incubation_eggs_loaded"):
+        assert prod[key] is not None, f"production.{key} should not be None for unlimited scope"
+    for key in ("purchases_drafts", "sales_drafts", "payments_drafts"):
+        assert kpis[key] is not None, f"kpis.{key} should not be None for unlimited scope"
