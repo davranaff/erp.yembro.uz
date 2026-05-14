@@ -30,14 +30,20 @@ def _month_bounds(today: Optional[date] = None) -> tuple[date, date]:
     return start, today
 
 
-def kpi_summary(organization, *, today: Optional[date] = None) -> dict:
-    """Базовые KPI: денежные потоки + остатки за период."""
+def kpi_summary(organization, *, readable_modules: Optional[set] = None, today: Optional[date] = None) -> dict:
+    """Базовые KPI: денежные потоки + остатки за период.
+
+    readable_modules — set of module codes the user can read (≥r). None means
+    unlimited (superuser). Controls which non-financial counters are included.
+    Financial aggregates are always computed org-wide; the view strips them via
+    _strip_financial_kpis when the user lacks ledger.r.
+    """
     start, end = _month_bounds(today)
 
-    # `purchases_confirmed_uzs` = полный объём закупок периода (начисление),
-    # `purchases_paid_uzs` = реально оплаченная поставщикам часть. Симметрично
-    # продажам; непогашенный долг по закупкам виден отдельно как
-    # `creditor_balance_uzs`.
+    def _can_see(module_code: str) -> bool:
+        return readable_modules is None or module_code in readable_modules
+
+    # ── Financial aggregates (org-wide; view strips if not finances_visible) ──
     purchases_agg = PurchaseOrder.objects.filter(
         organization=organization,
         status=PurchaseOrder.Status.CONFIRMED,
@@ -79,13 +85,6 @@ def kpi_summary(organization, *, today: Optional[date] = None) -> dict:
         or Decimal("0")
     )
 
-    # ── Продажи за период ───────────────────────────────────────────────
-    # `sales_revenue_uzs` = реально оплаченная клиентами часть (актуальные
-    # деньги), долг в эту цифру НЕ попадает — он виден отдельно как
-    # `sales_unpaid_uzs` и в общей дебиторке. `sales_invoiced_uzs` —
-    # полный объём отгрузок (начисление), вторичная метрика.
-    # `sales_margin_uzs` — валовая маржа по отгрузке (accrual): выручка
-    # сопоставляется со своей себестоимостью независимо от факта оплаты.
     sales_agg = (
         SaleOrder.objects.filter(
             organization=organization,
@@ -103,7 +102,6 @@ def kpi_summary(organization, *, today: Optional[date] = None) -> dict:
     sales_unpaid = sales_invoiced - sales_paid
     sales_margin = sales_invoiced - sales_cost
 
-    # ── Дебиторка (что должны нам) — по всем не-paid SaleOrder ──────────
     debtor_agg = (
         SaleOrder.objects.filter(
             organization=organization,
@@ -118,29 +116,48 @@ def kpi_summary(organization, *, today: Optional[date] = None) -> dict:
     if debtor < 0:
         debtor = Decimal("0")
 
-    # ── Черновики, ждущие действия ──────────────────────────────────────
-    purchases_drafts = PurchaseOrder.objects.filter(
-        organization=organization, status=PurchaseOrder.Status.DRAFT,
-    ).count()
-    sales_drafts = SaleOrder.objects.filter(
-        organization=organization, status=SaleOrder.Status.DRAFT,
-    ).count()
-    payments_drafts = Payment.objects.filter(
-        organization=organization,
-        status__in=[Payment.Status.DRAFT, Payment.Status.CONFIRMED],
-    ).count()
+    # ── Module-scoped counts (None when user lacks access to that module) ──
+    purchases_drafts = (
+        PurchaseOrder.objects.filter(
+            organization=organization, status=PurchaseOrder.Status.DRAFT,
+        ).count()
+        if _can_see("purchases") else None
+    )
+    sales_drafts = (
+        SaleOrder.objects.filter(
+            organization=organization, status=SaleOrder.Status.DRAFT,
+        ).count()
+        if _can_see("sales") else None
+    )
+    payments_drafts = (
+        Payment.objects.filter(
+            organization=organization,
+            status__in=[Payment.Status.DRAFT, Payment.Status.CONFIRMED],
+        ).count()
+        if _can_see("ledger") else None
+    )
 
-    active_batches = Batch.objects.filter(
-        organization=organization, state=Batch.State.ACTIVE
-    ).count()
+    # active_batches: only batches in modules the user can read
+    batches_qs = Batch.objects.filter(
+        organization=organization, state=Batch.State.ACTIVE,
+    )
+    if readable_modules is not None:
+        batches_qs = batches_qs.filter(current_module__code__in=readable_modules)
+    active_batches = batches_qs.count()
 
-    transfers_pending = InterModuleTransfer.objects.filter(
+    # transfers_pending: transfers where the user's module is source or dest
+    transfers_qs = InterModuleTransfer.objects.filter(
         organization=organization,
         state__in=[
             InterModuleTransfer.State.AWAITING_ACCEPTANCE,
             InterModuleTransfer.State.UNDER_REVIEW,
         ],
-    ).count()
+    )
+    if readable_modules is not None:
+        transfers_qs = transfers_qs.filter(
+            Q(from_module__code__in=readable_modules) | Q(to_module__code__in=readable_modules)
+        )
+    transfers_pending = transfers_qs.count()
 
     return {
         "period": {"from": start.isoformat(), "to": end.isoformat()},
@@ -163,45 +180,64 @@ def kpi_summary(organization, *, today: Optional[date] = None) -> dict:
     }
 
 
-def production_summary(organization) -> dict:
-    """Сколько голов/партий в каждом производственном модуле сейчас."""
+def production_summary(organization, *, readable_modules: Optional[set] = None) -> dict:
+    """Сколько голов/партий в каждом производственном модуле сейчас.
+
+    readable_modules — set of module codes the user can read. None = unlimited.
+    Modules not in readable_modules return None; the frontend hides those tiles.
+    """
+    def _can_see(module_code: str) -> bool:
+        return readable_modules is None or module_code in readable_modules
+
     breeding_heads = (
-        BreedingHerd.objects.filter(
-            organization=organization,
-            status__in=[
-                BreedingHerd.Status.GROWING,
-                BreedingHerd.Status.PRODUCING,
-            ],
-        ).aggregate(s=Sum("current_heads"))["s"]
-        or 0
+        (
+            BreedingHerd.objects.filter(
+                organization=organization,
+                status__in=[
+                    BreedingHerd.Status.GROWING,
+                    BreedingHerd.Status.PRODUCING,
+                ],
+            ).aggregate(s=Sum("current_heads"))["s"]
+            or 0
+        )
+        if _can_see("matochnik") else None
     )
     feedlot_heads = (
-        FeedlotBatch.objects.filter(
-            organization=organization,
-            status__in=[
-                FeedlotBatch.Status.PLACED,
-                FeedlotBatch.Status.GROWING,
-                FeedlotBatch.Status.READY_SLAUGHTER,
-            ],
-        ).aggregate(s=Sum("current_heads"))["s"]
-        or 0
+        (
+            FeedlotBatch.objects.filter(
+                organization=organization,
+                status__in=[
+                    FeedlotBatch.Status.PLACED,
+                    FeedlotBatch.Status.GROWING,
+                    FeedlotBatch.Status.READY_SLAUGHTER,
+                ],
+            ).aggregate(s=Sum("current_heads"))["s"]
+            or 0
+        )
+        if _can_see("feedlot") else None
     )
-    incubation_runs = IncubationRun.objects.filter(
-        organization=organization,
-        status__in=[
-            IncubationRun.Status.INCUBATING,
-            IncubationRun.Status.HATCHING,
-        ],
-    ).count()
-    incubation_eggs = (
+    incubation_runs = (
         IncubationRun.objects.filter(
             organization=organization,
             status__in=[
                 IncubationRun.Status.INCUBATING,
                 IncubationRun.Status.HATCHING,
             ],
-        ).aggregate(s=Sum("eggs_loaded"))["s"]
-        or 0
+        ).count()
+        if _can_see("incubation") else None
+    )
+    incubation_eggs = (
+        (
+            IncubationRun.objects.filter(
+                organization=organization,
+                status__in=[
+                    IncubationRun.Status.INCUBATING,
+                    IncubationRun.Status.HATCHING,
+                ],
+            ).aggregate(s=Sum("eggs_loaded"))["s"]
+            or 0
+        )
+        if _can_see("incubation") else None
     )
 
     return {
