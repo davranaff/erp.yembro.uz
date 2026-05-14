@@ -12,7 +12,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from apps.common.permissions import can_see_finances
+from apps.common.permissions import can_see_finances, get_user_readable_module_codes
 from apps.common.viewsets import OrganizationContextMixin
 
 from .services import (
@@ -27,11 +27,14 @@ from .services import (
 # Финансовые KPI — скрываются если у юзера нет ledger.r
 _FINANCIAL_KPI_KEYS = (
     "purchases_confirmed_uzs",
+    "purchases_paid_uzs",
     "creditor_balance_uzs",
     "debtor_balance_uzs",
     "payments_in_uzs",
     "payments_out_uzs",
     "sales_revenue_uzs",
+    "sales_invoiced_uzs",
+    "sales_unpaid_uzs",
     "sales_cost_uzs",
     "sales_margin_uzs",
 )
@@ -55,15 +58,24 @@ class DashboardSummaryView(OrganizationContextMixin, APIView):
 
     def get(self, request):
         org = request.organization
-        finances_visible = can_see_finances(request.user, org)
+        # Superusers see everything including finances; RBAC applies to everyone else.
+        finances_visible = request.user.is_superuser or can_see_finances(request.user, org)
 
-        kpis = kpi_summary(org)
+        # membership is guaranteed non-None here: OrganizationContextMixin raises
+        # 403 before get() is called when membership cannot be resolved.
+        membership = request.membership
+        if request.user.is_superuser:
+            readable_modules = None  # unlimited: superuser bypasses module-level RBAC
+        else:
+            readable_modules = get_user_readable_module_codes(membership)
+
+        kpis = kpi_summary(org, readable_modules=readable_modules)
         if not finances_visible:
             kpis = _strip_financial_kpis(kpis)
 
         return Response({
             "kpis": kpis,
-            "production": production_summary(org),
+            "production": production_summary(org, readable_modules=readable_modules),
             "cash": cash_balances(org) if finances_visible else None,
             "ar": ar_summary(org) if finances_visible else None,
             "_finances_visible": finances_visible,

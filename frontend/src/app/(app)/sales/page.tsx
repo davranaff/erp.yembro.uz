@@ -97,16 +97,18 @@ export default function SalesPage() {
   const totals = useMemo(() => {
     const list = allOrders ?? [];
     const confirmed = list.filter((o) => o.status === 'confirmed');
-    const revenue = confirmed.reduce((s, o) => s + parseFloat(o.amount_uzs || '0'), 0);
+    // invoiced — полный объём отгрузок (начисление), revenue — реально
+    // оплаченная клиентами часть (актуальные деньги). Долг (receivable)
+    // в «Выручку» не попадает, он показан отдельной карточкой.
+    const invoiced = confirmed.reduce((s, o) => s + parseFloat(o.amount_uzs || '0'), 0);
+    const revenue = confirmed.reduce((s, o) => s + parseFloat(o.paid_amount_uzs || '0'), 0);
     const cost = confirmed.reduce((s, o) => s + parseFloat(o.cost_uzs || '0'), 0);
-    const receivable = confirmed.reduce(
-      (s, o) => s + (parseFloat(o.amount_uzs || '0') - parseFloat(o.paid_amount_uzs || '0')),
-      0,
-    );
+    const receivable = invoiced - revenue;
     return {
       count: pageData?.count ?? list.length,
+      invoiced,
       revenue,
-      margin: revenue - cost,
+      margin: invoiced - cost, // валовая маржа по отгрузке (accrual)
       receivable,
     };
   }, [allOrders, pageData]);
@@ -146,8 +148,9 @@ export default function SalesPage() {
 
       <div className="kpi-row">
         <KpiCard tone="orange" iconName="bag" label="Всего" sub="документов" value={String(totals.count)} />
-        <KpiCard tone="green" iconName="chart" label="Выручка" sub="проведено" value={fmtUzs(String(totals.revenue))} />
-        <KpiCard tone="blue" iconName="book" label="Маржа" sub="revenue − cost" value={fmtUzs(String(totals.margin))} />
+        <KpiCard tone="green" iconName="chart" label="Выручка" sub="оплачено" value={fmtUzs(String(totals.revenue))} />
+        <KpiCard tone="blue" iconName="bag" label="Отгружено" sub="начислено" value={fmtUzs(String(totals.invoiced))} />
+        <KpiCard tone="blue" iconName="book" label="Маржа" sub="по отгрузке" value={fmtUzs(String(totals.margin))} />
         <KpiCard tone="red" iconName="users" label="Должны нам" sub="не оплачено" value={fmtUzs(String(totals.receivable))} />
       </div>
 
