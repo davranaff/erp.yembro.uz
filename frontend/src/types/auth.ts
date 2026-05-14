@@ -437,16 +437,16 @@ export interface DashboardKpis {
   sales_margin_uzs: string;
   active_batches: number;
   transfers_pending: number;
-  purchases_drafts: number;
-  sales_drafts: number;
-  payments_drafts: number;
+  purchases_drafts: number | null;
+  sales_drafts: number | null;
+  payments_drafts: number | null;
 }
 
 export interface DashboardProduction {
-  matochnik_heads: number;
-  feedlot_heads: number;
-  incubation_runs: number;
-  incubation_eggs_loaded: number;
+  matochnik_heads: number | null;
+  feedlot_heads: number | null;
+  incubation_runs: number | null;
+  incubation_eggs_loaded: number | null;
 }
 
 export type DashboardCashChannel = { label: string; balance_uzs: string };
