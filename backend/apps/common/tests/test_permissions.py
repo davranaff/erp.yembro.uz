@@ -1,7 +1,7 @@
 import pytest
 from apps.modules.models import Module
 from apps.organizations.models import Organization, OrganizationMembership
-from apps.rbac.models import AccessLevel, Role, RolePermission, UserModuleAccessOverride
+from apps.rbac.models import AccessLevel, Role, RolePermission, UserModuleAccessOverride, UserRole
 from apps.users.models import User
 from apps.common.permissions import get_user_readable_module_codes
 
@@ -29,7 +29,6 @@ def test_readable_includes_r_and_rw_and_admin(org, membership):
     RolePermission.objects.create(role=role, module=m_slaughter, level=AccessLevel.ADMIN)
     RolePermission.objects.create(role=role, module=m_feedlot, level=AccessLevel.READ)
     RolePermission.objects.create(role=role, module=m_purchases, level=AccessLevel.NONE)
-    from apps.rbac.models import UserRole
     UserRole.objects.create(membership=membership, role=role)
 
     result = get_user_readable_module_codes(membership)
@@ -44,7 +43,6 @@ def test_readable_override_beats_role(org, membership):
     role = Role.objects.create(organization=org, code="TEST_OVR_ROLE", name="Ovr")
     m_sales = Module.objects.get(code="sales")
     RolePermission.objects.create(role=role, module=m_sales, level=AccessLevel.READ_WRITE)
-    from apps.rbac.models import UserRole
     UserRole.objects.create(membership=membership, role=role)
     UserModuleAccessOverride.objects.create(
         membership=membership, module=m_sales, level=AccessLevel.NONE
@@ -56,5 +54,6 @@ def test_readable_override_beats_role(org, membership):
 
 
 def test_readable_empty_when_no_roles(membership):
+    """Returns empty set when membership has no roles and no overrides."""
     result = get_user_readable_module_codes(membership)
     assert result == set()
