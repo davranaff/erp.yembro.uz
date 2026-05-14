@@ -36,6 +36,15 @@ export default function RolesPage() {
   const hasLevel = useHasLevel();
   const canEdit = hasLevel('admin', 'rw');
 
+  // Always derive the displayed role from the freshest server data.
+  // After any mutation (matrix click, toggle active, etc.) ROLES_KEY
+  // invalidates → roles refetches → currentRole updates automatically,
+  // so the drawer reflects the new state without user interaction.
+  const currentRole = useMemo(
+    () => (selectedRole ? (roles?.find((r) => r.id === selectedRole.id) ?? selectedRole) : null),
+    [roles, selectedRole],
+  );
+
   const assignmentCount = useMemo(() => {
     const m = new Map<string, number>();
     for (const a of allAssignments ?? []) {
@@ -240,9 +249,10 @@ export default function RolesPage() {
 
       {tab === 'overrides' && <UserOverridesPanel />}
 
-      {selectedRole && (
+      {currentRole && (
         <RoleDetailDrawer
-          role={selectedRole}
+          key={currentRole.id}
+          role={currentRole}
           onClose={() => setSelectedRole(null)}
         />
       )}

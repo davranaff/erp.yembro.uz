@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 import Modal from '@/components/ui/Modal';
 import { useModules } from '@/hooks/useModules';
@@ -39,6 +39,14 @@ export default function OverrideModal({ initial, onClose }: Props) {
   const [moduleId, setModuleId] = useState(initial?.module ?? '');
   const [level, setLevel] = useState<ModuleLevel>(initial?.level ?? 'r');
   const [reason, setReason] = useState(initial?.reason ?? '');
+
+  // Re-sync form when switching between edit targets or create→edit.
+  useEffect(() => {
+    setMembership(initial?.membership ?? '');
+    setModuleId(initial?.module ?? '');
+    setLevel(initial?.level ?? 'r');
+    setReason(initial?.reason ?? '');
+  }, [initial]);
 
   const fieldErrors =
     error instanceof ApiError && error.status === 400

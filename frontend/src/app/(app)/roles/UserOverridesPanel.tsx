@@ -53,7 +53,9 @@ export default function UserOverridesPanel() {
     ) {
       return;
     }
-    remove.mutate(o.id);
+    remove.mutate(o.id, {
+      onSuccess: () => setPage(1),
+    });
   };
 
   return (

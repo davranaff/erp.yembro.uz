@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
 import DetailDrawer, { KV } from '@/components/DetailDrawer';
 import Badge from '@/components/ui/Badge';
@@ -68,18 +68,46 @@ export default function RoleDetailDrawer({ role, onClose }: Props) {
     [memberships],
   );
 
+  // Optimistic local permission overrides: module UUID → level.
+  // Immediately reflect the user's click; server refetch clears this once
+  // role.permissions arrives with the confirmed value.
+  const [localPerms, setLocalPerms] = useState<Map<string, ModuleLevel>>(new Map());
+  const [permError, setPermError] = useState<string | null>(null);
+
+  // Stable key over the server permissions array. Changes only when
+  // a refetch brings new data — at that point we clear local overrides.
+  const permsKey = useMemo(
+    () => role.permissions.map((p) => `${p.module_code}:${p.level}`).sort().join('|'),
+    [role.permissions],
+  );
+  useEffect(() => {
+    setLocalPerms(new Map());
+    setPermError(null);
+  }, [permsKey]);
+
   const handleToggleCell = (
     moduleId: string,
     current: ModuleLevel,
     existingId: string | null,
   ) => {
     const next = cycleLevel(current);
-    upsertPermission.mutate({
-      role: role.id,
-      module: moduleId,
-      level: next,
-      existing_id: existingId,
-    });
+    setPermError(null);
+    // Optimistic: show the new level immediately.
+    setLocalPerms((prev) => new Map(prev).set(moduleId, next));
+    upsertPermission.mutate(
+      { role: role.id, module: moduleId, level: next, existing_id: existingId },
+      {
+        onError: () => {
+          // Revert optimistic change and tell the user.
+          setLocalPerms((prev) => {
+            const m = new Map(prev);
+            m.delete(moduleId);
+            return m;
+          });
+          setPermError('Не удалось сохранить изменение. Попробуйте ещё раз.');
+        },
+      },
+    );
   };
 
   const handleDelete = () => {
@@ -178,6 +206,19 @@ export default function RoleDetailDrawer({ role, onClose }: Props) {
           >
             Клик по ячейке переключает уровень: — → R → RW → A → —
           </div>
+          {permError && (
+            <div
+              style={{
+                fontSize: 11,
+                color: 'var(--danger)',
+                background: 'var(--danger-soft, #fff0f0)',
+                padding: '6px 12px',
+                borderBottom: '1px solid var(--border)',
+              }}
+            >
+              {permError}
+            </div>
+          )}
           <div style={{ overflowX: 'auto', padding: 12 }}>
             <table className="matrix">
               <thead>
@@ -191,12 +232,14 @@ export default function RoleDetailDrawer({ role, onClose }: Props) {
                   const found = role.permissions.find(
                     (p) => p.module_code === m.code,
                   );
-                  const lvl: ModuleLevel = (found?.level as ModuleLevel) ?? 'none';
+                  // Show optimistic value if pending, else server value.
+                  const lvl: ModuleLevel =
+                    localPerms.get(m.id) ?? (found?.level as ModuleLevel) ?? 'none';
                   const existingId = found?.id ?? null;
-                  const busy =
-                    upsertPermission.isPending &&
-                    upsertPermission.variables?.role === role.id &&
-                    upsertPermission.variables?.module === m.id;
+                  // While any mutation is in-flight, disable all cells to
+                  // prevent concurrent updates. Show spinner on the pending cell.
+                  const anyPending = upsertPermission.isPending;
+                  const thisCell = localPerms.has(m.id) && anyPending;
                   return (
                     <tr key={m.id}>
                       <td className="rowhead">
@@ -211,7 +254,7 @@ export default function RoleDetailDrawer({ role, onClose }: Props) {
                       <td style={{ textAlign: 'center' }}>
                         <button
                           onClick={() => handleToggleCell(m.id, lvl, existingId)}
-                          disabled={busy || role.is_system}
+                          disabled={anyPending || role.is_system}
                           style={{
                             background: LEVEL_BG[lvl],
                             color: LEVEL_COLOR[lvl],
@@ -221,9 +264,10 @@ export default function RoleDetailDrawer({ role, onClose }: Props) {
                             padding: '4px 12px',
                             border: '1px solid ' + LEVEL_COLOR[lvl],
                             borderRadius: 4,
-                            cursor: role.is_system ? 'not-allowed' : 'pointer',
+                            cursor: (anyPending || role.is_system) ? 'not-allowed' : 'pointer',
                             minWidth: 50,
-                            opacity: role.is_system ? 0.5 : 1,
+                            opacity: (anyPending && !thisCell) || role.is_system ? 0.4 : 1,
+                            transition: 'background 0.1s, color 0.1s',
                           }}
                           title={
                             role.is_system
@@ -231,7 +275,7 @@ export default function RoleDetailDrawer({ role, onClose }: Props) {
                               : 'Клик для смены уровня'
                           }
                         >
-                          {busy ? '…' : LEVEL_LABEL[lvl]}
+                          {thisCell ? '…' : LEVEL_LABEL[lvl]}
                         </button>
                       </td>
                     </tr>
