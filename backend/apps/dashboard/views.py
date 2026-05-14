@@ -27,11 +27,14 @@ from .services import (
 # Финансовые KPI — скрываются если у юзера нет ledger.r
 _FINANCIAL_KPI_KEYS = (
     "purchases_confirmed_uzs",
+    "purchases_paid_uzs",
     "creditor_balance_uzs",
     "debtor_balance_uzs",
     "payments_in_uzs",
     "payments_out_uzs",
     "sales_revenue_uzs",
+    "sales_invoiced_uzs",
+    "sales_unpaid_uzs",
     "sales_cost_uzs",
     "sales_margin_uzs",
 )

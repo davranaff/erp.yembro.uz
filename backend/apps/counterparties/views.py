@@ -287,10 +287,15 @@ def _build_extended_summary(counterparty, organization) -> dict:
             next_start = date(year, month + 1, 1)
         month_end = next_start - timedelta(days=1)
 
-        sales_total = sale_qs.filter(
+        # sales_uzs — реально оплаченная клиентом часть (актуальные деньги),
+        # sales_invoiced_uzs — полный объём отгрузок (начисление). Долг в
+        # оборот по «оплачено» не попадает.
+        sales_agg = sale_qs.filter(
             date__gte=month_start, date__lte=month_end,
             status=SaleOrder.Status.CONFIRMED,
-        ).aggregate(s=Sum("amount_uzs"))["s"] or Decimal("0")
+        ).aggregate(invoiced=Sum("amount_uzs"), paid=Sum("paid_amount_uzs"))
+        sales_invoiced = sales_agg["invoiced"] or Decimal("0")
+        sales_paid = sales_agg["paid"] or Decimal("0")
         purchases_total = purchase_qs.filter(
             date__gte=month_start, date__lte=month_end,
         ).aggregate(s=Sum("amount_uzs"))["s"] or Decimal("0")
@@ -307,7 +312,8 @@ def _build_extended_summary(counterparty, organization) -> dict:
 
         months.append({
             "month": month_start.isoformat()[:7],  # "2026-04"
-            "sales_uzs": str(sales_total),
+            "sales_uzs": str(sales_paid),
+            "sales_invoiced_uzs": str(sales_invoiced),
             "purchases_uzs": str(purchases_total),
             "payments_in_uzs": str(payments_in),
             "payments_out_uzs": str(payments_out),

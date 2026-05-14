@@ -101,9 +101,11 @@ export default function DashboardPage() {
   // KPI приходят как null, а cash может быть полностью null.
   const financesVisible = (summary as { _finances_visible?: boolean })._finances_visible !== false;
 
+  // Маржа считается по отгрузке (sales_margin_uzs = invoiced − cost), поэтому
+  // и процент маржи берётся от отгруженного, а не от оплаченного.
   const margin = financesVisible && k.sales_margin_uzs ? parseFloat(k.sales_margin_uzs) : 0;
-  const marginPct = financesVisible && k.sales_revenue_uzs && parseFloat(k.sales_revenue_uzs) > 0
-    ? (margin / parseFloat(k.sales_revenue_uzs)) * 100
+  const marginPct = financesVisible && k.sales_invoiced_uzs && parseFloat(k.sales_invoiced_uzs) > 0
+    ? (margin / parseFloat(k.sales_invoiced_uzs)) * 100
     : 0;
   const netCash = financesVisible && k.payments_in_uzs && k.payments_out_uzs
     ? parseFloat(k.payments_in_uzs) - parseFloat(k.payments_out_uzs)
@@ -146,18 +148,18 @@ export default function DashboardPage() {
             tone="green"
             iconName="chart"
             label="Выручка"
-            sub="продажи проведённые"
+            sub="оплачено клиентами"
             value={fmt(k.sales_revenue_uzs)}
             valueSuffix="UZS"
-            meta={`себест.: ${fmt(k.sales_cost_uzs)}`}
+            meta={`отгружено: ${fmt(k.sales_invoiced_uzs)} · себест.: ${fmt(k.sales_cost_uzs)}`}
           />
           <KpiCard
             tone={margin >= 0 ? 'orange' : 'red'}
             iconName="book"
             label="Прибыль (валовая)"
             sub={
-              parseFloat(k.sales_revenue_uzs) > 0
-                ? `маржа ${marginPct.toFixed(1)}%`
+              parseFloat(k.sales_invoiced_uzs) > 0
+                ? `маржа ${marginPct.toFixed(1)}% · по отгрузке`
                 : 'нет продаж'
             }
             value={fmt(k.sales_margin_uzs)}

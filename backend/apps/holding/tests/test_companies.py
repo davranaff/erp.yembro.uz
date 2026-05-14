@@ -57,6 +57,7 @@ def test_totals_have_expected_keys(client):
     assert "modules" in totals
     assert "active_batches" in totals
     assert "purchases_confirmed_uzs" in totals
+    assert "purchases_paid_uzs" in totals
     assert "creditor_balance_uzs" in totals
 
 

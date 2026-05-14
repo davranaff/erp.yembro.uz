@@ -34,14 +34,17 @@ def kpi_summary(organization, *, today: Optional[date] = None) -> dict:
     """Базовые KPI: денежные потоки + остатки за период."""
     start, end = _month_bounds(today)
 
-    purchases_total = (
-        PurchaseOrder.objects.filter(
-            organization=organization,
-            status=PurchaseOrder.Status.CONFIRMED,
-            date__gte=start, date__lte=end,
-        ).aggregate(s=Sum("amount_uzs"))["s"]
-        or Decimal("0")
-    )
+    # `purchases_confirmed_uzs` = полный объём закупок периода (начисление),
+    # `purchases_paid_uzs` = реально оплаченная поставщикам часть. Симметрично
+    # продажам; непогашенный долг по закупкам виден отдельно как
+    # `creditor_balance_uzs`.
+    purchases_agg = PurchaseOrder.objects.filter(
+        organization=organization,
+        status=PurchaseOrder.Status.CONFIRMED,
+        date__gte=start, date__lte=end,
+    ).aggregate(invoiced=Sum("amount_uzs"), paid=Sum("paid_amount_uzs"))
+    purchases_total = purchases_agg["invoiced"] or Decimal("0")
+    purchases_paid = purchases_agg["paid"] or Decimal("0")
 
     creditor_agg = (
         PurchaseOrder.objects.filter(
@@ -77,19 +80,28 @@ def kpi_summary(organization, *, today: Optional[date] = None) -> dict:
     )
 
     # ── Продажи за период ───────────────────────────────────────────────
+    # `sales_revenue_uzs` = реально оплаченная клиентами часть (актуальные
+    # деньги), долг в эту цифру НЕ попадает — он виден отдельно как
+    # `sales_unpaid_uzs` и в общей дебиторке. `sales_invoiced_uzs` —
+    # полный объём отгрузок (начисление), вторичная метрика.
+    # `sales_margin_uzs` — валовая маржа по отгрузке (accrual): выручка
+    # сопоставляется со своей себестоимостью независимо от факта оплаты.
     sales_agg = (
         SaleOrder.objects.filter(
             organization=organization,
             status=SaleOrder.Status.CONFIRMED,
             date__gte=start, date__lte=end,
         ).aggregate(
-            revenue=Sum("amount_uzs"),
+            invoiced=Sum("amount_uzs"),
+            paid=Sum("paid_amount_uzs"),
             cost=Sum("cost_uzs"),
         )
     )
-    sales_revenue = sales_agg["revenue"] or Decimal("0")
+    sales_invoiced = sales_agg["invoiced"] or Decimal("0")
+    sales_paid = sales_agg["paid"] or Decimal("0")
     sales_cost = sales_agg["cost"] or Decimal("0")
-    sales_margin = sales_revenue - sales_cost
+    sales_unpaid = sales_invoiced - sales_paid
+    sales_margin = sales_invoiced - sales_cost
 
     # ── Дебиторка (что должны нам) — по всем не-paid SaleOrder ──────────
     debtor_agg = (
@@ -133,11 +145,14 @@ def kpi_summary(organization, *, today: Optional[date] = None) -> dict:
     return {
         "period": {"from": start.isoformat(), "to": end.isoformat()},
         "purchases_confirmed_uzs": str(purchases_total),
+        "purchases_paid_uzs": str(purchases_paid),
         "creditor_balance_uzs": str(creditor),
         "debtor_balance_uzs": str(debtor),
         "payments_in_uzs": str(pay_in_month),
         "payments_out_uzs": str(pay_out_month),
-        "sales_revenue_uzs": str(sales_revenue),
+        "sales_revenue_uzs": str(sales_paid),
+        "sales_invoiced_uzs": str(sales_invoiced),
+        "sales_unpaid_uzs": str(sales_unpaid),
         "sales_cost_uzs": str(sales_cost),
         "sales_margin_uzs": str(sales_margin),
         "active_batches": active_batches,
