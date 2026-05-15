@@ -7,9 +7,17 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        migrations.AddField(
-            model_name="tglink",
-            name="notify_enabled",
-            field=models.BooleanField(default=False),
+        # Column was added manually via ALTER TABLE before this migration ran.
+        # Use RunSQL with IF NOT EXISTS so re-running on prod doesn't crash.
+        migrations.RunSQL(
+            sql="ALTER TABLE tgbot_tglink ADD COLUMN IF NOT EXISTS notify_enabled boolean NOT NULL DEFAULT false;",
+            reverse_sql="ALTER TABLE tgbot_tglink DROP COLUMN IF EXISTS notify_enabled;",
+            state_operations=[
+                migrations.AddField(
+                    model_name="tglink",
+                    name="notify_enabled",
+                    field=models.BooleanField(default=False),
+                ),
+            ],
         ),
     ]
