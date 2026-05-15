@@ -26,22 +26,20 @@ def _msg(chat_id, text):
 
 def test_build_digest_returns_zero_for_empty_org(org):
     data = build_digest(org)
-    assert data.revenue == Decimal("0")
-    assert data.profit == Decimal("0")
-    assert data.active_batches >= 0  # просто sanity, может быть seed-партии
-    assert data.alerts == [] or all(isinstance(a, str) for a in data.alerts)
+    assert data.total_income == Decimal("0")
+    assert data.total_expense == Decimal("0")
+    assert data.total_debt >= Decimal("0")
 
 
 def test_format_digest_includes_all_sections(org):
     data = build_digest(org)
     text = format_digest(data, organization_name="Test Org")
-    assert "Сводка за" in text
+    assert "Сводка" in text
     assert "Test Org" in text
-    assert "Выручка" in text
-    assert "Расходы" in text
-    assert "Прибыль" in text
-    assert "Касса/банк" in text
-    assert "Активных партий" in text
+    assert "ПОСТУПЛЕНИЯ" in text
+    assert "РАСХОДЫ" in text
+    assert "ОСТАТКИ" in text
+    assert "ДЕБИТОРКА" in text
     assert "/menu" in text
 
 

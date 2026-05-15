@@ -799,7 +799,7 @@ def owner_digest_task() -> dict:
 
     from .bot import send_message
     from .models import TgLink
-    from .services.digest import build_digest, format_digest
+    from .services.digest import build_digest, digest_keyboard, format_digest
 
     total_orgs = 0
     total_sent = 0
@@ -827,9 +827,10 @@ def owner_digest_task() -> dict:
             logger.exception("owner_digest: build failed for org=%s", org.id)
             continue
 
+        keyboard = digest_keyboard()
         for link_id in link_ids:
             link = TgLink.objects.select_related("user").get(id=link_id)
-            ok = send_message(link.chat_id, text)
+            ok = send_message(link.chat_id, text, reply_markup=keyboard)
             if ok:
                 total_sent += 1
 
