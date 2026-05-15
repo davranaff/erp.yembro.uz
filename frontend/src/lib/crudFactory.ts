@@ -77,8 +77,9 @@ export function makeCrud<T extends { id: string }, CreateT = Partial<T>, UpdateT
     filter: Record<string, string | number | undefined | null> = {},
     page = 1,
     pageSize = 25,
+    orderingOverride?: string,
   ) {
-    const qs = buildQs({ ...filter, page, page_size: pageSize }, ordering);
+    const qs = buildQs({ ...filter, page, page_size: pageSize }, orderingOverride ?? ordering);
     return useQuery<Paginated<T>, ApiError>({
       queryKey: [...key, 'page', qs],
       queryFn: () =>

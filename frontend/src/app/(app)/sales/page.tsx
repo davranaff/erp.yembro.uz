@@ -70,13 +70,15 @@ export default function SalesPage() {
   const [remindFor, setRemindFor] = useState<SaleOrder | null>(null);
   const [confirmingFor, setConfirmingFor] = useState<SaleOrder | null>(null);
 
-  // По умолчанию фильтр по датам пустой — показываем все продажи.
-  // Юзер может выставить «Сегодня» кнопкой или ввести период вручную.
   const [dateFrom, setDateFrom] = useState<string>('');
   const [dateTo, setDateTo] = useState<string>('');
+  const [sortField, setSortField] = useState<'date' | 'amount_uzs' | 'doc_number'>('date');
+  const [sortDir, setSortDir] = useState<'desc' | 'asc'>('desc');
 
   const hasLevel = useHasLevel();
   const canEdit = hasLevel('sales', 'rw');
+
+  const ordering = `${sortDir === 'desc' ? '-' : ''}${sortField}`;
 
   const filter = useMemo(() => {
     const f: Record<string, string> = {};
@@ -86,9 +88,8 @@ export default function SalesPage() {
     return f;
   }, [tab, dateFrom, dateTo]);
 
-  const { data: pageData, isLoading } = salesCrud.useListPaginated(filter, page, pageSize);
+  const { data: pageData, isLoading } = salesCrud.useListPaginated(filter, page, pageSize, ordering);
   const orders = pageData?.results ?? [];
-  // KPI считаем по полному списку (до 2000 записей), не только по странице.
   const { data: allOrders } = salesCrud.useList(filter);
 
   const confirmMutation = useConfirmSale();
@@ -209,6 +210,32 @@ export default function SalesPage() {
             Сбросить
           </button>
         )}
+
+        <span style={{
+          fontSize: 11, fontWeight: 700, color: 'var(--fg-3)',
+          textTransform: 'uppercase', letterSpacing: '.04em', marginLeft: 8,
+        }}>
+          Сортировка:
+        </span>
+        <select
+          className="input"
+          value={sortField}
+          onChange={(e) => { setSortField(e.target.value as typeof sortField); setPage(1); }}
+          style={{ width: 130, fontSize: 13, padding: '3px 8px' }}
+        >
+          <option value="date">Дата</option>
+          <option value="amount_uzs">Сумма</option>
+          <option value="doc_number">Документ</option>
+        </select>
+        <button
+          type="button"
+          className="btn btn-ghost btn-sm"
+          onClick={() => { setSortDir((d) => d === 'desc' ? 'asc' : 'desc'); setPage(1); }}
+          title={sortDir === 'desc' ? 'По убыванию — нажмите для по возрастанию' : 'По возрастанию — нажмите для по убыванию'}
+          style={{ minWidth: 36, fontFamily: 'var(--font-mono)', fontSize: 14 }}
+        >
+          {sortDir === 'desc' ? '↓' : '↑'}
+        </button>
       </div>
 
       <Panel flush>
