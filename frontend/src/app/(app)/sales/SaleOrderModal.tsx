@@ -774,8 +774,7 @@ export default function SaleOrderModal({ initial, preselect, onClose }: Props) {
                             <option value="">— выберите партию —</option>
                             {sellable.map((f) => (
                               <option key={f.id} value={f.id}>
-                                {f.doc_number} · {f.recipe_code ?? ''}
-                                {f.nomenclature_name ? ` · ${f.nomenclature_name}` : ''} ·
+                                {f.nomenclature_name || f.recipe_code || f.doc_number} ·
                                 {' '}остаток {parseFloat(f.current_quantity_kg).toLocaleString('ru-RU')} кг
                                 {' '}· {parseFloat(f.unit_cost_uzs).toLocaleString('ru-RU', { maximumFractionDigits: 0 })} сум/кг
                               </option>
