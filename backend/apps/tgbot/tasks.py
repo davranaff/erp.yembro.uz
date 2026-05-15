@@ -797,23 +797,17 @@ def owner_digest_task() -> dict:
     """
     from apps.organizations.models import Organization
 
-    from .bot import send_message
     from .models import TgLink
-    from .services.digest import build_digest, digest_keyboard, format_digest
+    from .services.digest import build_digest, send_digest_to
 
     total_orgs = 0
     total_sent = 0
     for org in Organization.objects.filter(is_active=True).iterator():
-        # Линки этой организации с активной подпиской на digest.
-        # active_organization имеет приоритет (если юзер переключал /org),
-        # иначе — `organization`.
         link_ids = list(
             TgLink.objects.filter(
                 is_active=True, user__isnull=False,
                 digest_enabled=True, notify_enabled=True,
             ).filter(
-                # либо явный active_organization == org,
-                # либо нет active + organization == org
                 models_q_active_or_default(org),
             ).values_list("id", flat=True)
         )
@@ -822,17 +816,13 @@ def owner_digest_task() -> dict:
         total_orgs += 1
         try:
             data = build_digest(org)
-            text = format_digest(data, organization_name=org.name)
         except Exception:  # noqa: BLE001
             logger.exception("owner_digest: build failed for org=%s", org.id)
             continue
 
-        keyboard = digest_keyboard()
         for link_id in link_ids:
             link = TgLink.objects.select_related("user").get(id=link_id)
-            ok = send_message(link.chat_id, text, reply_markup=keyboard)
-            if ok:
-                total_sent += 1
+            total_sent += send_digest_to(link.chat_id, data, org_name=org.name)
 
     payload = {"orgs_with_subs": total_orgs, "sent": total_sent}
     logger.info("owner_digest_task: %s", payload)

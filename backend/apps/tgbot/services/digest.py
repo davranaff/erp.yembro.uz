@@ -1,32 +1,28 @@
 """
 Owner daily digest — вечерняя сводка за сегодня.
 
-Структура сообщения:
-    📅 Сводка · ДД.ММ.ГГГГ · <Орг>
+Каждый канал оплаты (касса/банк) отправляется отдельным сообщением,
+после чего — отдельное сообщение с дебиторкой.
 
-    💵 ПОСТУПЛЕНИЯ СЕГОДНЯ
-       по каждой кассе: сколько реально пришло
-       итого
-
-    💸 РАСХОДЫ СЕГОДНЯ
-       итого расход
-
-    💰 ОСТАТКИ КАСС
-       по каждой кассе текущий баланс (всё время)
-       итого
-
-    🔴 ДЕБИТОРКА (все долги клиентов)
+Использование:
+    data = build_digest(organization)
+    send_digest_to(chat_id, data, org_name="YemBro")
 
 Отправляется в 20:00 Asia/Tashkent через owner_digest_task всем
 admin-линкам с digest_enabled=True.
-
-Можно вызывать руками через команду /digest для preview.
 """
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import date, timedelta
+from datetime import date
 from decimal import Decimal
+
+
+_CHANNEL_ICONS: dict[str, str] = {
+    "cash": "💵",
+    "transfer": "🏦",
+    "click": "📱",
+}
 
 
 def _fmt(value) -> str:
@@ -38,6 +34,7 @@ def _fmt(value) -> str:
 
 @dataclass
 class CashChannelRow:
+    key: str
     label: str
     income_today: Decimal = Decimal("0")
     expense_today: Decimal = Decimal("0")
@@ -103,11 +100,11 @@ def build_digest(organization, *, on_date: date | None = None) -> DigestData:
         )
         balance = balance_in - balance_out
 
-        # Пропускаем каналы с нулевой активностью вообще
         if income_today == 0 and expense_today == 0 and balance == 0:
             continue
 
         channels.append(CashChannelRow(
+            key=ch_value,
             label=ch_label,
             income_today=income_today,
             expense_today=expense_today,
@@ -143,16 +140,94 @@ def build_digest(organization, *, on_date: date | None = None) -> DigestData:
     )
 
 
+def format_channel_digest(row: CashChannelRow, org_name: str, on_date: date) -> str:
+    """Отдельное красивое сообщение для одного канала оплаты."""
+    icon = _CHANNEL_ICONS.get(row.key, "💰")
+    date_str = on_date.strftime("%d.%m.%Y")
+    org_line = f"\n<i>{org_name}</i>" if org_name else ""
+
+    sign_bal = "−" if row.balance < 0 else ""
+
+    lines = [
+        f"{icon} <b>{row.label.upper()}</b>  ·  {date_str}{org_line}",
+        "",
+        "<pre>",
+    ]
+
+    if row.income_today > 0:
+        lines.append(f"{'📥 Поступило:':<20} +{_fmt(row.income_today):>16} сум")
+    else:
+        lines.append(f"{'📥 Поступило:':<20} {'—':>17}")
+
+    if row.expense_today > 0:
+        lines.append(f"{'📤 Расход:':<20}  -{_fmt(row.expense_today):>16} сум")
+    else:
+        lines.append(f"{'📤 Расход:':<20} {'—':>17}")
+
+    lines.append("─" * 38)
+    lines.append(f"{'💰 Остаток:':<20} {sign_bal}{_fmt(abs(row.balance)):>16} сум")
+    lines.append("</pre>")
+
+    return "\n".join(lines)
+
+
+def format_debt_digest(total_debt: Decimal, org_name: str, on_date: date) -> str:
+    """Отдельное сообщение с общей дебиторкой."""
+    date_str = on_date.strftime("%d.%m.%Y")
+    org_line = f"\n<i>{org_name}</i>" if org_name else ""
+
+    lines = [
+        f"🔴 <b>ДЕБИТОРКА</b>  ·  {date_str}{org_line}",
+        "",
+        "<pre>",
+        f"{'Общий долг клиентов:':<20} {_fmt(total_debt):>16} сум",
+        "</pre>",
+    ]
+    return "\n".join(lines)
+
+
+def send_digest_to(chat_id: int, data: DigestData, org_name: str = "") -> int:
+    """Отправляет N+1 сообщений: по одному на каждый канал + дебиторка.
+    Возвращает количество успешно отправленных."""
+    from apps.tgbot.bot import send_message
+
+    keyboard = digest_keyboard()
+    sent = 0
+
+    for row in data.channels:
+        text = format_channel_digest(row, org_name, data.on_date)
+        if send_message(chat_id, text, reply_markup=keyboard):
+            sent += 1
+
+    debt_text = format_debt_digest(data.total_debt, org_name, data.on_date)
+    if send_message(chat_id, debt_text, reply_markup=keyboard):
+        sent += 1
+
+    return sent
+
+
+def digest_keyboard() -> dict:
+    """Inline-кнопки под дайджестом для быстрого перехода в разделы."""
+    from apps.tgbot.keyboards import kb
+    return kb([
+        ("💵 Касса/банк",  "fin:cash"),
+        ("👥 Должники",    "fin:debt"),
+        ("📦 Склад",       "fin:stock"),
+        ("🏠 Меню",        "home"),
+    ], cols=2)
+
+
+# ─── Legacy combined format (used by tests / /digest preview) ────────────────
+
 def format_digest(data: DigestData, organization_name: str = "") -> str:
-    """HTML-сообщение для Telegram. Читабельный формат с разделами."""
+    """Совмещённый HTML-дайджест (устаревший формат, оставлен для тестов)."""
     org_line = f" · {organization_name}" if organization_name else ""
     date_str = data.on_date.strftime("%d.%m.%Y")
 
     lines: list[str] = [
-        f"📅 <b>Сводка · {date_str}</b>{org_line}",
+        f"📅 <b>Сводка за {date_str}</b>{org_line}",
     ]
 
-    # ── Поступления сегодня ──────────────────────────────────────
     lines.append("")
     lines.append("💵 <b>ПОСТУПЛЕНИЯ СЕГОДНЯ</b>")
     has_income = any(r.income_today > 0 for r in data.channels)
@@ -168,7 +243,6 @@ def format_digest(data: DigestData, organization_name: str = "") -> str:
     else:
         lines.append("<i>Поступлений не было</i>")
 
-    # ── Расходы сегодня ─────────────────────────────────────────
     lines.append("")
     lines.append("💸 <b>РАСХОДЫ СЕГОДНЯ</b>")
     if data.total_expense > 0:
@@ -183,7 +257,6 @@ def format_digest(data: DigestData, organization_name: str = "") -> str:
     else:
         lines.append("<i>Расходов не было</i>")
 
-    # ── Остатки касс ────────────────────────────────────────────
     lines.append("")
     lines.append("💰 <b>ОСТАТКИ КАСС</b>")
     if data.channels:
@@ -199,25 +272,10 @@ def format_digest(data: DigestData, organization_name: str = "") -> str:
     else:
         lines.append("<i>Нет данных</i>")
 
-    # ── Дебиторка ───────────────────────────────────────────────
     lines.append("")
     lines.append("🔴 <b>ДЕБИТОРКА (все долги)</b>")
-    debt_sign = "" if data.total_debt == 0 else ""
     lines.append("<pre>")
     lines.append(f"{'Итого долгов':<14} {_fmt(data.total_debt):>16} сум")
     lines.append("</pre>")
 
-    lines.append("")
-    lines.append("<i>Нажмите кнопку ниже чтобы открыть раздел:</i>")
     return "\n".join(lines)
-
-
-def digest_keyboard() -> dict:
-    """Inline-кнопки под дайджестом для быстрого перехода в разделы."""
-    from apps.tgbot.keyboards import kb
-    return kb([
-        ("💵 Касса/банк",  "fin:cash"),
-        ("👥 Должники",    "fin:debt"),
-        ("📦 Склад",       "fin:stock"),
-        ("🏠 Меню",        "home"),
-    ], cols=2)
