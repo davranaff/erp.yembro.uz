@@ -458,3 +458,56 @@ def cashflow_chart(organization, *, days: int = 30) -> list[dict]:
         })
         cur += timedelta(days=1)
     return points
+
+
+def module_cash_balances(
+    organization,
+    *,
+    readable_modules: Optional[set] = None,
+    today: Optional[date] = None,
+) -> list[dict]:
+    """Per-module cash balances for the dashboard kassas section.
+
+    Returns one entry per module that has any POSTED payment activity.
+    Filtered by readable_modules — modules the user cannot read are excluded.
+    Each entry includes all-time balance and current-period in/out.
+    """
+    from apps.modules.models import Module
+
+    start, end = _month_bounds(today)
+
+    base = Payment.objects.filter(
+        organization=organization,
+        status=Payment.Status.POSTED,
+        module__isnull=False,
+    )
+
+    module_ids = list(base.values_list("module_id", flat=True).distinct())
+    if not module_ids:
+        return []
+
+    modules = Module.objects.filter(id__in=module_ids).order_by("name")
+    result = []
+
+    for module in modules:
+        if readable_modules is not None and module.code not in readable_modules:
+            continue
+
+        mqs = base.filter(module=module)
+
+        balance_in = mqs.filter(direction=Payment.Direction.IN).aggregate(s=Sum("amount_uzs"))["s"] or Decimal("0")
+        balance_out = mqs.filter(direction=Payment.Direction.OUT).aggregate(s=Sum("amount_uzs"))["s"] or Decimal("0")
+        balance = balance_in - balance_out
+
+        period_in = mqs.filter(direction=Payment.Direction.IN, date__gte=start, date__lte=end).aggregate(s=Sum("amount_uzs"))["s"] or Decimal("0")
+        period_out = mqs.filter(direction=Payment.Direction.OUT, date__gte=start, date__lte=end).aggregate(s=Sum("amount_uzs"))["s"] or Decimal("0")
+
+        result.append({
+            "module_code": module.code,
+            "module_name": module.name,
+            "balance_uzs": str(balance),
+            "period_in_uzs": str(period_in),
+            "period_out_uzs": str(period_out),
+        })
+
+    return sorted(result, key=lambda x: Decimal(x["balance_uzs"]), reverse=True)

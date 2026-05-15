@@ -20,6 +20,7 @@ from .services import (
     cash_balances,
     cashflow_chart,
     kpi_summary,
+    module_cash_balances,
     production_summary,
 )
 
@@ -78,6 +79,9 @@ class DashboardSummaryView(OrganizationContextMixin, APIView):
             "production": production_summary(org, readable_modules=readable_modules),
             "cash": cash_balances(org) if finances_visible else None,
             "ar": ar_summary(org) if finances_visible else None,
+            # Per-module kassa balances — visible to anyone who can read that module.
+            # Finance role sees all modules; production roles see only their own.
+            "module_kassas": module_cash_balances(org, readable_modules=readable_modules),
             "_finances_visible": finances_visible,
         })
 

@@ -9,7 +9,7 @@ import KpiCard from '@/components/ui/KpiCard';
 import Panel from '@/components/ui/Panel';
 import Seg from '@/components/ui/Seg';
 import { useDashboardCashflow, useDashboardSummary } from '@/hooks/useDashboard';
-import type { DashboardArSummary, DashboardCashChannel } from '@/types/auth';
+import type { DashboardArSummary, DashboardCashChannel, DashboardModuleKassa } from '@/types/auth';
 
 import PurchaseOrderModal from '../purchases/PurchaseOrderModal';
 import CashflowChart from './CashflowChart';
@@ -101,14 +101,7 @@ export default function DashboardPage() {
   // KPI приходят как null, а cash может быть полностью null.
   const financesVisible = (summary as { _finances_visible?: boolean })._finances_visible !== false;
 
-  // Маржа по оплате: только реально оплаченная часть (cash-basis).
-  // sales_margin_uzs = Σ(paid_i − cost_i × paid_i/amount_i)
-  const margin = financesVisible && k.sales_margin_uzs ? parseFloat(k.sales_margin_uzs) : 0;
-  const marginPct = financesVisible && k.sales_revenue_uzs && parseFloat(k.sales_revenue_uzs) > 0
-    ? (margin / parseFloat(k.sales_revenue_uzs)) * 100
-    : 0;
   const forecast = financesVisible && k.sales_forecast_uzs ? parseFloat(k.sales_forecast_uzs) : 0;
-  const overdueLoss = financesVisible && k.sales_overdue_loss_uzs ? parseFloat(k.sales_overdue_loss_uzs) : 0;
   const netCash = financesVisible && k.payments_in_uzs && k.payments_out_uzs
     ? parseFloat(k.payments_in_uzs) - parseFloat(k.payments_out_uzs)
     : 0;
@@ -143,56 +136,15 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* ───── Финансовые KPI (этот месяц) — только при наличии ledger.r ───── */}
-      {financesVisible && (
+      {/* ───── 4 главных аналитики — только при ledger.r ───── */}
+      {financesVisible && cash && (
         <div className="kpi-row" style={{ marginBottom: 12 }}>
           <KpiCard
             tone="green"
-            iconName="chart"
-            label="Выручка"
-            sub="оплачено клиентами"
-            value={fmt(k.sales_revenue_uzs)}
-            valueSuffix="UZS"
-            meta={`отгружено: ${fmt(k.sales_invoiced_uzs)} · себест.: ${fmt(k.sales_cost_uzs)}`}
-          />
-          <KpiCard
-            tone={margin >= 0 ? 'orange' : 'red'}
-            iconName="book"
-            label="Прибыль (валовая)"
-            sub={
-              parseFloat(k.sales_revenue_uzs) > 0
-                ? `маржа ${marginPct.toFixed(1)}% · по оплате`
-                : 'нет оплат'
-            }
-            value={fmt(k.sales_margin_uzs)}
-            valueSuffix="UZS"
-          />
-          {forecast > 0 && (
-            <KpiCard
-              tone="blue"
-              iconName="chart"
-              label="Прогноз"
-              sub="отгружено · ожидаем оплату"
-              value={fmt(k.sales_forecast_uzs)}
-              valueSuffix="UZS"
-            />
-          )}
-          {overdueLoss > 0 && (
-            <KpiCard
-              tone="red"
-              iconName="users"
-              label="Долги (просрочка)"
-              sub="не оплачено после срока"
-              value={fmt(k.sales_overdue_loss_uzs)}
-              valueSuffix="UZS"
-            />
-          )}
-          <KpiCard
-            tone="red"
-            iconName="users"
-            label="Кредиторка"
-            sub="должны мы (всё время)"
-            value={fmt(k.creditor_balance_uzs)}
+            iconName="download"
+            label="Поступления"
+            sub={`за период · ${formatPeriod(k.period.from, k.period.to)}`}
+            value={fmt(k.payments_in_uzs)}
             valueSuffix="UZS"
           />
           <KpiCard
@@ -202,44 +154,24 @@ export default function DashboardPage() {
             sub="должны нам (всё время)"
             value={fmt(k.debtor_balance_uzs)}
             valueSuffix="UZS"
-          />
-        </div>
-      )}
-
-      {/* ───── Денежные потоки + чистый поток — только при ledger.r ───── */}
-      {financesVisible && cash && (
-        <div className="kpi-row" style={{ marginBottom: 12 }}>
-          <KpiCard
-            tone="green"
-            iconName="download"
-            label="Поступления"
-            sub="за период"
-            value={fmt(k.payments_in_uzs)}
-            valueSuffix="UZS"
+            meta={forecast > 0 ? `прогноз: +${fmt(k.sales_forecast_uzs)}` : undefined}
           />
           <KpiCard
             tone="red"
             iconName="arrow-right"
-            label="Платежи исх."
-            sub="за период"
+            label="Расходы"
+            sub={`за период · ${formatPeriod(k.period.from, k.period.to)}`}
             value={fmt(k.payments_out_uzs)}
-            valueSuffix="UZS"
-          />
-          <KpiCard
-            tone={netCash >= 0 ? 'green' : 'red'}
-            iconName="chart"
-            label="Чистый денежный поток"
-            sub="in − out за период"
-            value={(netCash >= 0 ? '+' : '−') + fmt(Math.abs(netCash))}
             valueSuffix="UZS"
           />
           <KpiCard
             tone="orange"
             iconName="bag"
             label="Касса всего"
-            sub="по каналам"
+            sub="текущий остаток"
             value={fmt(typeof cash._total_uzs === 'string' ? cash._total_uzs : '0')}
             valueSuffix="UZS"
+            meta={netCash !== 0 ? `поток: ${netCash >= 0 ? '+' : '−'}${fmt(Math.abs(netCash))}` : undefined}
           />
         </div>
       )}
@@ -247,6 +179,11 @@ export default function DashboardPage() {
       {/* ───── AR snapshot — дебиторка с aging + DSO + топ должников ───── */}
       {financesVisible && summary.ar && (
         <ArSnapshotPanel ar={summary.ar} />
+      )}
+
+      {/* ───── Кассы по подразделениям — видны по правам модуля ───── */}
+      {summary.module_kassas && summary.module_kassas.length > 0 && (
+        <ModuleKassasSection kassas={summary.module_kassas} period={formatPeriod(k.period.from, k.period.to)} />
       )}
 
       {/* ───── Cashflow chart + side panels — только при ledger.r ───── */}
@@ -626,6 +563,103 @@ function ArSnapshotPanel({ ar }: { ar: DashboardArSummary }) {
         </div>
       </Panel>
     </div>
+  );
+}
+
+const MODULE_ICON: Record<string, string> = {
+  feedlot:    'box',
+  feed:       'box',
+  matochnik:  'users',
+  incubation: 'box',
+  sales:      'chart',
+  purchases:  'download',
+  ledger:     'book',
+  slaughter:  'box',
+  vet:        'check',
+  hr:         'users',
+};
+
+function ModuleKassasSection({
+  kassas,
+  period,
+}: { kassas: DashboardModuleKassa[]; period: string }) {
+  return (
+    <Panel
+      title="Кассы по подразделениям"
+      tools={
+        <a href="/finance/cashbox" style={{ fontSize: 12, color: 'var(--brand-orange)', textDecoration: 'none' }}>
+          Все движения →
+        </a>
+      }
+      style={{ marginBottom: 12 }}
+    >
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))',
+          gap: 1,
+          background: 'var(--border)',
+        }}
+      >
+        {kassas.map((k) => {
+          const balance = parseFloat(k.balance_uzs);
+          const pIn = parseFloat(k.period_in_uzs);
+          const pOut = parseFloat(k.period_out_uzs);
+          const isNeg = balance < 0;
+          const isZero = balance === 0;
+
+          return (
+            <div
+              key={k.module_code}
+              style={{
+                background: 'var(--bg-card)',
+                padding: '14px 16px',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 6,
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 2 }}>
+                <div style={{
+                  width: 28, height: 28, borderRadius: 4,
+                  background: 'var(--bg-soft)',
+                  display: 'grid', placeItems: 'center', flexShrink: 0,
+                }}>
+                  <Icon name={MODULE_ICON[k.module_code] ?? 'box'} size={14} />
+                </div>
+                <span style={{ fontSize: 13, fontWeight: 600 }}>{k.module_name}</span>
+              </div>
+
+              <div
+                className="mono"
+                style={{
+                  fontSize: 18,
+                  fontWeight: 700,
+                  color: isNeg ? 'var(--danger)' : isZero ? 'var(--fg-3)' : 'var(--fg-1)',
+                }}
+              >
+                {isZero ? '—' : `${isNeg ? '−' : ''}${fmt(Math.abs(balance))}`}
+                {!isZero && (
+                  <span style={{ fontSize: 11, color: 'var(--fg-3)', fontWeight: 400, marginLeft: 4 }}>
+                    UZS
+                  </span>
+                )}
+              </div>
+
+              <div style={{ display: 'flex', gap: 12, fontSize: 11, color: 'var(--fg-3)' }}>
+                <span style={{ color: pIn > 0 ? 'var(--success)' : 'var(--fg-3)' }}>
+                  ↑ {pIn > 0 ? fmt(pIn, { short: true }) : '—'}
+                </span>
+                <span style={{ color: pOut > 0 ? 'var(--danger)' : 'var(--fg-3)' }}>
+                  ↓ {pOut > 0 ? fmt(pOut, { short: true }) : '—'}
+                </span>
+                <span style={{ color: 'var(--fg-3)' }}>{period}</span>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </Panel>
   );
 }
 

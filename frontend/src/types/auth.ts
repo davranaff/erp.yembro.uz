@@ -488,12 +488,25 @@ export interface DashboardArSummary {
   }>;
 }
 
+export interface DashboardModuleKassa {
+  module_code: string;
+  module_name: string;
+  /** All-time balance (in − out). */
+  balance_uzs: string;
+  /** Inflows for the current period (month). */
+  period_in_uzs: string;
+  /** Outflows for the current period (month). */
+  period_out_uzs: string;
+}
+
 export interface DashboardSummary {
   kpis: DashboardKpis;
   production: DashboardProduction;
   cash: DashboardCash | null;
   /** AR snapshot (NULL если у пользователя нет ledger.r). */
   ar?: DashboardArSummary | null;
+  /** Per-module kassa balances — only for modules the user can read. */
+  module_kassas?: DashboardModuleKassa[];
   _finances_visible?: boolean;
 }
 
