@@ -59,7 +59,7 @@ export default function WarehouseBalanceDrawer({ warehouse, onClose, onRowClick 
         <table style={{ width: '100%', fontSize: 12, borderCollapse: 'collapse' }}>
           <thead>
             <tr style={{ background: 'var(--bg-soft)', textAlign: 'left' }}>
-              <th style={{ padding: '6px 10px' }}>SKU</th>
+              <th style={{ padding: '6px 10px' }}>Номенклатура</th>
               <th style={{ padding: '6px 10px', textAlign: 'right' }}>Σ Приход</th>
               <th style={{ padding: '6px 10px', textAlign: 'right' }}>Σ Расход</th>
               <th style={{ padding: '6px 10px', textAlign: 'right' }}>Остаток</th>
@@ -81,8 +81,8 @@ export default function WarehouseBalanceDrawer({ warehouse, onClose, onRowClick 
                     title={onRowClick ? 'Открыть историю движений' : undefined}
                   >
                     <td style={{ padding: '6px 10px' }}>
-                      <div className="mono" style={{ fontWeight: 500 }}>{r.sku}</div>
-                      <div style={{ fontSize: 11, color: 'var(--fg-3)' }}>{r.name}</div>
+                      <div style={{ fontWeight: 500 }}>{r.name}</div>
+                      <div className="mono" style={{ fontSize: 11, color: 'var(--fg-3)' }}>{r.sku}</div>
                     </td>
                     <td className="mono" style={{
                       padding: '6px 10px', textAlign: 'right',
