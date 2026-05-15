@@ -499,10 +499,10 @@ export interface ModuleKpiPayload {
   period: { from: string; to: string };
   payments_in_uzs: string;
   payments_out_uzs: string;
-  /** All-time balance for this module (in − out of all POSTED payments). */
   balance_uzs: string;
-  /** Unpaid AR from CONFIRMED SaleOrders linked to this module. */
   ar_uzs: string;
+  sales_drafts: number;
+  purchases_drafts: number;
   cashflow: ModuleCashflowPoint[];
 }
 

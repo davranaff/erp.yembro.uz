@@ -2,6 +2,8 @@
 
 import { useState } from 'react';
 
+import Badge from '@/components/ui/Badge';
+import Icon from '@/components/ui/Icon';
 import KpiCard from '@/components/ui/KpiCard';
 import Panel from '@/components/ui/Panel';
 import { useModuleKpi } from '@/hooks/useDashboard';
@@ -132,10 +134,64 @@ export default function ModuleSection({ moduleCode, moduleName }: Props) {
 
           {/* ── Mini cashflow chart ── */}
           {data.cashflow.length > 1 && (
-            <div style={{ padding: '8px 12px 12px' }}>
+            <div style={{ padding: '8px 12px 0' }}>
               <CashflowChart points={data.cashflow} />
             </div>
           )}
+
+          {/* ── Draft alerts ── */}
+          {(data.purchases_drafts > 0 || data.sales_drafts > 0) && (
+            <div style={{ padding: '8px 12px 0', display: 'flex', flexDirection: 'column', gap: 6 }}>
+              {data.purchases_drafts > 0 && (
+                <a
+                  href="/purchases"
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 10,
+                    padding: '8px 10px', borderRadius: 6,
+                    border: '1px solid var(--border)', background: 'var(--bg-card)',
+                    textDecoration: 'none', color: 'inherit', fontSize: 13,
+                  }}
+                >
+                  <Badge tone="warn">{data.purchases_drafts}</Badge>
+                  <span style={{ flex: 1 }}>Закупки в черновиках</span>
+                  <Icon name="arrow-right" size={13} />
+                </a>
+              )}
+              {data.sales_drafts > 0 && (
+                <a
+                  href="/sales"
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 10,
+                    padding: '8px 10px', borderRadius: 6,
+                    border: '1px solid var(--border)', background: 'var(--bg-card)',
+                    textDecoration: 'none', color: 'inherit', fontSize: 13,
+                  }}
+                >
+                  <Badge tone="warn">{data.sales_drafts}</Badge>
+                  <span style={{ flex: 1 }}>Продажи в черновиках</span>
+                  <Icon name="arrow-right" size={13} />
+                </a>
+              )}
+            </div>
+          )}
+
+          {/* ── Quick actions for this module ── */}
+          <div style={{
+            padding: '10px 12px 12px',
+            borderTop: '1px solid var(--border)',
+            marginTop: 10,
+            display: 'flex', gap: 8, flexWrap: 'wrap',
+          }}>
+            <a href="/purchases" className="btn btn-secondary btn-sm">
+              <Icon name="plus" size={12} /> Новый закуп
+            </a>
+            <a href="/sales" className="btn btn-secondary btn-sm">
+              <Icon name="plus" size={12} /> Новая продажа
+            </a>
+            <a href="/finance/cashbox" className="btn btn-ghost btn-sm">
+              <Icon name="plus" size={12} /> Новый платёж
+            </a>
+          </div>
         </div>
       )}
     </Panel>

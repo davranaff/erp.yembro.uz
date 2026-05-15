@@ -558,6 +558,18 @@ def module_kpi(
         Decimal("0"),
     )
 
+    sales_drafts = SaleOrder.objects.filter(
+        organization=organization,
+        status=SaleOrder.Status.DRAFT,
+        module__code=module_code,
+    ).count()
+
+    purchases_drafts = PurchaseOrder.objects.filter(
+        organization=organization,
+        status=PurchaseOrder.Status.DRAFT,
+        module__code=module_code,
+    ).count()
+
     in_by_date = {
         r["date"]: r["s"]
         for r in base.filter(
@@ -590,5 +602,7 @@ def module_kpi(
         "payments_out_uzs": str(period_out),
         "balance_uzs": str(balance),
         "ar_uzs": str(ar),
+        "sales_drafts": sales_drafts,
+        "purchases_drafts": purchases_drafts,
         "cashflow": cashflow,
     }
