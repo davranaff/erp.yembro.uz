@@ -1174,45 +1174,39 @@ class FeedDashboardView(OrganizationContextMixin, APIView):
                 "status": fb.status,
             })
 
-        # ── Текущие остатки сырья по SKU (не привязано к дате) ────────────
-        # Берём net по StockMovement: Σ(IN − OUT) на feed-складах группируя по
-        # nomenclature. Дешёвый способ без таблицы остатков.
-        stock_in = (
-            StockMovement.objects
+        # ── Текущие остатки сырья по SKU ─────────────────────────────────
+        # Источник истины — RawMaterialBatch.current_quantity (AVAILABLE + QUARANTINE).
+        # Группируем по SKU, суммируем остатки, добавляем совокупный приход и расход.
+        from django.db.models import Sum as _Sum
+        batches_agg = (
+            RawMaterialBatch.objects
             .filter(
-                organization=org, module__code="feed",
-                kind=StockMovement.Kind.INCOMING,
-                nomenclature__sku__startswith="KORM-",
-            )
-            .values("nomenclature__sku", "nomenclature__name")
-            .annotate(qty=Sum("quantity"))
-        )
-        stock_out = (
-            StockMovement.objects
-            .filter(
-                organization=org, module__code="feed",
-                kind__in=[
-                    StockMovement.Kind.OUTGOING,
-                    StockMovement.Kind.WRITE_OFF,
+                organization=org,
+                status__in=[
+                    RawMaterialBatch.Status.AVAILABLE,
+                    RawMaterialBatch.Status.QUARANTINE,
                 ],
-                nomenclature__sku__startswith="KORM-",
             )
-            .values("nomenclature__sku", "nomenclature__name")
-            .annotate(qty=Sum("quantity"))
+            .values(
+                "nomenclature__sku",
+                "nomenclature__name",
+            )
+            .annotate(
+                total_received=_Sum("quantity"),
+                total_remaining=_Sum("current_quantity"),
+            )
+            .order_by("nomenclature__sku")
         )
-        in_map = {r["nomenclature__sku"]: (r["qty"] or Decimal(0), r["nomenclature__name"]) for r in stock_in}
-        out_map = {r["nomenclature__sku"]: r["qty"] or Decimal(0) for r in stock_out}
-        skus = sorted(set(in_map) | set(out_map))
         stock = []
-        for sku in skus:
-            inc = in_map.get(sku, (Decimal(0), ""))
-            out = out_map.get(sku, Decimal(0))
+        for row in batches_agg:
+            total_in = row["total_received"] or Decimal(0)
+            remaining = row["total_remaining"] or Decimal(0)
             stock.append({
-                "sku": sku,
-                "name": in_map[sku][1] if sku in in_map else "",
-                "incoming_total": str(inc[0]),
-                "outgoing_total": str(out),
-                "balance": str(inc[0] - out),
+                "sku": row["nomenclature__sku"],
+                "name": row["nomenclature__name"],
+                "incoming_total": str(total_in),
+                "outgoing_total": str(total_in - remaining),
+                "balance": str(remaining),
             })
 
         return Response({
