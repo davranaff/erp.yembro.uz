@@ -72,13 +72,19 @@ def seed(apps, schema_editor):
     ).delete()
 
     # ── 2. Remove generic (no-module) kassas ─────────────────────────────────
-    # Only delete subaccounts that have NO module (the generic seeded ones).
-    # If someone already linked them to a module, leave them alone.
-    GLSubaccount.objects.filter(
+    # Only delete subaccounts that have NO module AND no dependent records.
+    # On prod the 50.01 kassa already has Payments/JournalEntries; skip those
+    # — update_or_create in step 4 will assign the module in-place instead.
+    from django.db.models.deletion import ProtectedError  # noqa: PLC0415
+    for sub in GLSubaccount.objects.filter(
         account__organization=org,
         code__in=LEGACY_SUBACCOUNT_CODES,
         module__isnull=True,
-    ).delete()
+    ):
+        try:
+            sub.delete()
+        except ProtectedError:
+            pass
 
     # ── 3. Create garbage write-off warehouse for feed ────────────────────────
     if feed_module:
