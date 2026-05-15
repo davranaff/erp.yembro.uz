@@ -488,6 +488,24 @@ export interface DashboardArSummary {
   }>;
 }
 
+export interface ModuleCashflowPoint {
+  date: string;
+  in_uzs: string;
+  out_uzs: string;
+}
+
+export interface ModuleKpiPayload {
+  module_code: string;
+  period: { from: string; to: string };
+  payments_in_uzs: string;
+  payments_out_uzs: string;
+  /** All-time balance for this module (in − out of all POSTED payments). */
+  balance_uzs: string;
+  /** Unpaid AR from CONFIRMED SaleOrders linked to this module. */
+  ar_uzs: string;
+  cashflow: ModuleCashflowPoint[];
+}
+
 export interface DashboardModuleKassa {
   module_code: string;
   module_name: string;

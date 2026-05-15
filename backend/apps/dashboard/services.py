@@ -511,3 +511,84 @@ def module_cash_balances(
         })
 
     return sorted(result, key=lambda x: Decimal(x["balance_uzs"]), reverse=True)
+
+
+def module_kpi(
+    organization,
+    module_code: str,
+    *,
+    date_from: date,
+    date_to: date,
+) -> dict:
+    """Per-module KPIs for the module section on the dashboard.
+
+    Aggregates POSTED payments and CONFIRMED SaleOrders scoped to a single
+    module. Used by DashboardModuleView — the view enforces RBAC before calling.
+    """
+    base = Payment.objects.filter(
+        organization=organization,
+        status=Payment.Status.POSTED,
+        module__code=module_code,
+    )
+
+    period_in = (
+        base.filter(direction=Payment.Direction.IN, date__gte=date_from, date__lte=date_to)
+        .aggregate(s=Sum("amount_uzs"))["s"] or Decimal("0")
+    )
+    period_out = (
+        base.filter(direction=Payment.Direction.OUT, date__gte=date_from, date__lte=date_to)
+        .aggregate(s=Sum("amount_uzs"))["s"] or Decimal("0")
+    )
+
+    all_in = base.filter(direction=Payment.Direction.IN).aggregate(s=Sum("amount_uzs"))["s"] or Decimal("0")
+    all_out = base.filter(direction=Payment.Direction.OUT).aggregate(s=Sum("amount_uzs"))["s"] or Decimal("0")
+    balance = all_in - all_out
+
+    ar_agg = (
+        SaleOrder.objects.filter(
+            organization=organization,
+            status=SaleOrder.Status.CONFIRMED,
+            module__code=module_code,
+        )
+        .exclude(payment_status=SaleOrder.PaymentStatus.PAID)
+        .aggregate(amt=Sum("amount_uzs"), paid=Sum("paid_amount_uzs"))
+    )
+    ar = max(
+        (ar_agg["amt"] or Decimal("0")) - (ar_agg["paid"] or Decimal("0")),
+        Decimal("0"),
+    )
+
+    in_by_date = {
+        r["date"]: r["s"]
+        for r in base.filter(
+            direction=Payment.Direction.IN,
+            date__gte=date_from, date__lte=date_to,
+        ).values("date").annotate(s=Sum("amount_uzs"))
+    }
+    out_by_date = {
+        r["date"]: r["s"]
+        for r in base.filter(
+            direction=Payment.Direction.OUT,
+            date__gte=date_from, date__lte=date_to,
+        ).values("date").annotate(s=Sum("amount_uzs"))
+    }
+
+    cashflow: list[dict] = []
+    cur = date_from
+    while cur <= date_to:
+        cashflow.append({
+            "date": cur.isoformat(),
+            "in_uzs": str(in_by_date.get(cur, Decimal("0"))),
+            "out_uzs": str(out_by_date.get(cur, Decimal("0"))),
+        })
+        cur += timedelta(days=1)
+
+    return {
+        "module_code": module_code,
+        "period": {"from": date_from.isoformat(), "to": date_to.isoformat()},
+        "payments_in_uzs": str(period_in),
+        "payments_out_uzs": str(period_out),
+        "balance_uzs": str(balance),
+        "ar_uzs": str(ar),
+        "cashflow": cashflow,
+    }

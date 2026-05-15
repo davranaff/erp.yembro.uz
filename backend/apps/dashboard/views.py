@@ -8,6 +8,8 @@
 """
 from __future__ import annotations
 
+from datetime import date
+
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -21,6 +23,7 @@ from .services import (
     cashflow_chart,
     kpi_summary,
     module_cash_balances,
+    module_kpi,
     production_summary,
 )
 
@@ -136,3 +139,37 @@ class DashboardCashflowView(OrganizationContextMixin, APIView):
             "days": days,
             "points": cashflow_chart(request.organization, days=days),
         })
+
+
+class DashboardModuleView(OrganizationContextMixin, APIView):
+    """
+    GET /api/dashboard/module/<module_code>/?from=YYYY-MM-DD&to=YYYY-MM-DD
+
+    Per-module KPIs: payments in/out, all-time balance, AR from sales.
+    Access gated by module membership — 403 if the user cannot read the module.
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, module_code: str):
+        if not request.user.is_superuser:
+            readable = get_user_readable_module_codes(request.membership)
+            if module_code not in readable:
+                return Response({"detail": "Нет доступа к данному модулю."}, status=403)
+
+        today = date.today()
+        default_from = today.replace(day=1).isoformat()
+        default_to = today.isoformat()
+
+        try:
+            date_from = date.fromisoformat(request.query_params.get("from", default_from))
+            date_to = date.fromisoformat(request.query_params.get("to", default_to))
+        except ValueError:
+            return Response({"detail": "Неверный формат даты (YYYY-MM-DD)."}, status=400)
+
+        if date_from > date_to:
+            return Response({"detail": "from не может быть позже to."}, status=400)
+
+        return Response(
+            module_kpi(request.organization, module_code, date_from=date_from, date_to=date_to)
+        )

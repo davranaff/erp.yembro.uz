@@ -9,10 +9,11 @@ import KpiCard from '@/components/ui/KpiCard';
 import Panel from '@/components/ui/Panel';
 import Seg from '@/components/ui/Seg';
 import { useDashboardCashflow, useDashboardSummary } from '@/hooks/useDashboard';
-import type { DashboardArSummary, DashboardCashChannel, DashboardModuleKassa } from '@/types/auth';
+import type { DashboardArSummary, DashboardCashChannel } from '@/types/auth';
 
 import PurchaseOrderModal from '../purchases/PurchaseOrderModal';
 import CashflowChart from './CashflowChart';
+import ModuleSection from './ModuleSection';
 
 function fmt(v: string | number | null | undefined, opts: { short?: boolean } = {}): string {
   if (v == null) return '—';
@@ -181,10 +182,14 @@ export default function DashboardPage() {
         <ArSnapshotPanel ar={summary.ar} />
       )}
 
-      {/* ───── Кассы по подразделениям — видны по правам модуля ───── */}
-      {summary.module_kassas && summary.module_kassas.length > 0 && (
-        <ModuleKassasSection kassas={summary.module_kassas} period={formatPeriod(k.period.from, k.period.to)} />
-      )}
+      {/* ───── Per-module sections — видны по правам доступа к модулю ───── */}
+      {summary.module_kassas?.map((mk) => (
+        <ModuleSection
+          key={mk.module_code}
+          moduleCode={mk.module_code}
+          moduleName={mk.module_name}
+        />
+      ))}
 
       {/* ───── Cashflow chart + side panels — только при ledger.r ───── */}
       {financesVisible && cash && (
@@ -563,103 +568,6 @@ function ArSnapshotPanel({ ar }: { ar: DashboardArSummary }) {
         </div>
       </Panel>
     </div>
-  );
-}
-
-const MODULE_ICON: Record<string, string> = {
-  feedlot:    'box',
-  feed:       'box',
-  matochnik:  'users',
-  incubation: 'box',
-  sales:      'chart',
-  purchases:  'download',
-  ledger:     'book',
-  slaughter:  'box',
-  vet:        'check',
-  hr:         'users',
-};
-
-function ModuleKassasSection({
-  kassas,
-  period,
-}: { kassas: DashboardModuleKassa[]; period: string }) {
-  return (
-    <Panel
-      title="Кассы по подразделениям"
-      tools={
-        <a href="/finance/cashbox" style={{ fontSize: 12, color: 'var(--brand-orange)', textDecoration: 'none' }}>
-          Все движения →
-        </a>
-      }
-      style={{ marginBottom: 12 }}
-    >
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))',
-          gap: 1,
-          background: 'var(--border)',
-        }}
-      >
-        {kassas.map((k) => {
-          const balance = parseFloat(k.balance_uzs);
-          const pIn = parseFloat(k.period_in_uzs);
-          const pOut = parseFloat(k.period_out_uzs);
-          const isNeg = balance < 0;
-          const isZero = balance === 0;
-
-          return (
-            <div
-              key={k.module_code}
-              style={{
-                background: 'var(--bg-card)',
-                padding: '14px 16px',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: 6,
-              }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 2 }}>
-                <div style={{
-                  width: 28, height: 28, borderRadius: 4,
-                  background: 'var(--bg-soft)',
-                  display: 'grid', placeItems: 'center', flexShrink: 0,
-                }}>
-                  <Icon name={MODULE_ICON[k.module_code] ?? 'box'} size={14} />
-                </div>
-                <span style={{ fontSize: 13, fontWeight: 600 }}>{k.module_name}</span>
-              </div>
-
-              <div
-                className="mono"
-                style={{
-                  fontSize: 18,
-                  fontWeight: 700,
-                  color: isNeg ? 'var(--danger)' : isZero ? 'var(--fg-3)' : 'var(--fg-1)',
-                }}
-              >
-                {isZero ? '—' : `${isNeg ? '−' : ''}${fmt(Math.abs(balance))}`}
-                {!isZero && (
-                  <span style={{ fontSize: 11, color: 'var(--fg-3)', fontWeight: 400, marginLeft: 4 }}>
-                    UZS
-                  </span>
-                )}
-              </div>
-
-              <div style={{ display: 'flex', gap: 12, fontSize: 11, color: 'var(--fg-3)' }}>
-                <span style={{ color: pIn > 0 ? 'var(--success)' : 'var(--fg-3)' }}>
-                  ↑ {pIn > 0 ? fmt(pIn, { short: true }) : '—'}
-                </span>
-                <span style={{ color: pOut > 0 ? 'var(--danger)' : 'var(--fg-3)' }}>
-                  ↓ {pOut > 0 ? fmt(pOut, { short: true }) : '—'}
-                </span>
-                <span style={{ color: 'var(--fg-3)' }}>{period}</span>
-              </div>
-            </div>
-          );
-        })}
-      </div>
-    </Panel>
   );
 }
 
