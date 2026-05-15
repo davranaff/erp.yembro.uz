@@ -3,7 +3,9 @@
 import { useState } from 'react';
 
 import TgConnectModal from '@/components/ui/TgConnectModal';
-import { useDisconnectTgLink, useTgMyLink } from '@/hooks/useTgBot';
+import { useAuth } from '@/contexts/AuthContext';
+import { useHasLevel } from '@/hooks/usePermissions';
+import { useDisconnectTgLink, useTgMyLink, useTgOrgLinks, useToggleTgNotify } from '@/hooks/useTgBot';
 
 const TG_BLUE = '#229ED9';
 
@@ -35,10 +37,73 @@ const COMMANDS = [
   { cmd: '/production', desc: 'Поголовье и партии' },
 ];
 
+function NotifyRecipientsPanel() {
+  const { data: links, isLoading } = useTgOrgLinks();
+  const toggle = useToggleTgNotify();
+
+  if (isLoading) return <div style={{ color: 'var(--fg-3)', fontSize: 13, padding: '12px 0' }}>Загрузка…</div>;
+  if (!links?.length) return (
+    <div style={{ color: 'var(--fg-3)', fontSize: 13, padding: '12px 0' }}>
+      Нет привязанных аккаунтов
+    </div>
+  );
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+      {links.map((l) => (
+        <div key={l.id} style={{
+          display: 'flex', alignItems: 'center', gap: 12,
+          padding: '10px 14px',
+          background: 'var(--bg-soft)',
+          borderRadius: 8,
+          border: l.notify_enabled ? '1px solid #10b98130' : '1px solid var(--border)',
+        }}>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--fg-1)' }}>
+              {l.user_name || l.user_email}
+            </div>
+            <div style={{ fontSize: 11, color: 'var(--fg-3)', marginTop: 1 }}>
+              {l.tg_username ? `@${l.tg_username}` : `ID: ${l.chat_id}`}
+              {l.user_name ? ` · ${l.user_email}` : ''}
+            </div>
+          </div>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', flexShrink: 0 }}>
+            <span style={{ fontSize: 12, color: l.notify_enabled ? '#10b981' : 'var(--fg-3)' }}>
+              {l.notify_enabled ? 'Получает' : 'Выкл'}
+            </span>
+            <div
+              onClick={() => toggle.mutate({ id: l.id, notify_enabled: !l.notify_enabled })}
+              style={{
+                width: 36, height: 20, borderRadius: 10,
+                background: l.notify_enabled ? '#10b981' : 'var(--border)',
+                position: 'relative', cursor: 'pointer', transition: 'background .2s',
+                flexShrink: 0,
+              }}
+            >
+              <div style={{
+                position: 'absolute', top: 2,
+                left: l.notify_enabled ? 18 : 2,
+                width: 16, height: 16, borderRadius: '50%',
+                background: '#fff', transition: 'left .2s',
+                boxShadow: '0 1px 3px #0003',
+              }} />
+            </div>
+          </label>
+        </div>
+      ))}
+      <div style={{ fontSize: 11, color: 'var(--fg-3)', marginTop: 4 }}>
+        Только отмеченные пользователи получают уведомления бота и дайджесты.
+      </div>
+    </div>
+  );
+}
+
 export default function TelegramSection() {
   const { data: link, isLoading } = useTgMyLink();
   const disconnect = useDisconnectTgLink();
   const [showModal, setShowModal] = useState(false);
+  const hasLevel = useHasLevel();
+  const isAdmin = hasLevel('admin', 'r');
 
   return (
     <div style={{
@@ -195,6 +260,19 @@ export default function TelegramSection() {
             ))}
           </div>
         </div>
+
+        {/* Получатели уведомлений — только для admin */}
+        {isAdmin && (
+          <div style={{ marginTop: 24 }}>
+            <div style={{
+              fontSize: 11, fontWeight: 700, color: 'var(--fg-3)',
+              textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 10,
+            }}>
+              Получатели уведомлений
+            </div>
+            <NotifyRecipientsPanel />
+          </div>
+        )}
       </div>
 
       {showModal && (

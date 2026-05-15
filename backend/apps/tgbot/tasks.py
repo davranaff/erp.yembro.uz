@@ -45,6 +45,7 @@ def notify_admins_task(
             organization_id=organization_id,
             is_active=True,
             user__isnull=False,
+            notify_enabled=True,
         ).select_related("user")
     )
     if not links:
@@ -808,7 +809,8 @@ def owner_digest_task() -> dict:
         # иначе — `organization`.
         link_ids = list(
             TgLink.objects.filter(
-                is_active=True, user__isnull=False, digest_enabled=True,
+                is_active=True, user__isnull=False,
+                digest_enabled=True, notify_enabled=True,
             ).filter(
                 # либо явный active_organization == org,
                 # либо нет active + organization == org
@@ -908,7 +910,8 @@ def daily_stock_excel_task() -> dict:
         total_orgs += 1
         sent_chats: set = set()
         for link in TgLink.objects.filter(
-            organization=org, is_active=True, user_id__in=recipient_ids,
+            organization=org, is_active=True,
+            notify_enabled=True, user_id__in=recipient_ids,
         ):
             if link.chat_id in sent_chats:
                 continue
@@ -975,7 +978,8 @@ def daily_debtors_excel_task() -> dict:
         total_orgs += 1
         sent_chats: set = set()
         for link in TgLink.objects.filter(
-            organization=org, is_active=True, user_id__in=recipient_ids,
+            organization=org, is_active=True,
+            notify_enabled=True, user_id__in=recipient_ids,
         ):
             if link.chat_id in sent_chats:
                 continue

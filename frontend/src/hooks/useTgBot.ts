@@ -16,6 +16,11 @@ export interface TgLink {
   created_at: string;
 }
 
+export interface TgLinkAdmin extends TgLink {
+  user_name: string;
+  notify_enabled: boolean;
+}
+
 export interface TgLinkToken {
   id: string;
   token: string;
@@ -99,6 +104,28 @@ export interface DebtReminderPreview {
   tg_username: string | null;
   customer_name: string;
   doc_number: string;
+}
+
+export function useTgOrgLinks() {
+  return useQuery<TgLinkAdmin[]>({
+    queryKey: ['tg', 'links', 'org'],
+    queryFn: () => apiFetch<TgLinkAdmin[]>('/api/tg/links/org/'),
+    staleTime: 30_000,
+  });
+}
+
+export function useToggleTgNotify() {
+  const qc = useQueryClient();
+  return useMutation<TgLinkAdmin, Error, { id: string; notify_enabled: boolean }>({
+    mutationFn: ({ id, notify_enabled }) =>
+      apiFetch<TgLinkAdmin>(`/api/tg/links/org/${id}/`, {
+        method: 'PATCH',
+        body: { notify_enabled },
+      }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['tg', 'links', 'org'] });
+    },
+  });
 }
 
 export function usePreviewDebtReminder(saleOrderId: string | null) {

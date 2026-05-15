@@ -23,6 +23,7 @@ from apps.common.viewsets import OrganizationContextMixin
 
 from .models import TgLink, TgLinkToken
 from .serializers import (
+    TgLinkAdminSerializer,
     TgLinkSerializer,
     TgLinkTokenCreateSerializer,
     TgLinkTokenSerializer,
@@ -360,3 +361,85 @@ class PreviewDebtReminderView(OrganizationContextMixin, APIView):
             "customer_name": order.customer.name,
             "doc_number": order.doc_number,
         })
+
+
+class TgLinkOrgListView(OrganizationContextMixin, APIView):
+    """
+    GET  /api/tg/links/org/       — список всех user-линков организации
+    PATCH /api/tg/links/org/<id>/ — toggle notify_enabled (admin only)
+
+    Используется в Settings → Telegram → «Получатели уведомлений».
+    Доступен только администраторам (admin:r).
+    """
+    permission_classes = [IsAuthenticated]
+
+    def _require_admin(self, request) -> bool:
+        from apps.common.permissions import level_satisfies
+        from apps.rbac.models import UserModuleAccessOverride
+        from apps.organizations.models import OrganizationMembership
+
+        membership = OrganizationMembership.objects.filter(
+            organization=request.organization,
+            user=request.user,
+            is_active=True,
+        ).first()
+        if not membership:
+            return False
+        override = UserModuleAccessOverride.objects.filter(
+            membership=membership, module__code="admin",
+        ).values_list("level", flat=True).first()
+        if override:
+            return level_satisfies(override, "r")
+        from apps.rbac.models import RolePermission
+        return RolePermission.objects.filter(
+            role__assignments__membership=membership,
+            module__code="admin",
+        ).exists()
+
+    def get(self, request):
+        if not self._require_admin(request):
+            return Response(status=status.HTTP_403_FORBIDDEN)
+        links = (
+            TgLink.objects.filter(
+                organization=request.organization,
+                user__isnull=False,
+                is_active=True,
+            )
+            .select_related("user")
+            .order_by("-notify_enabled", "user__email")
+        )
+        return Response(TgLinkAdminSerializer(links, many=True).data)
+
+    def patch(self, request, pk):
+        if not self._require_admin(request):
+            return Response(status=status.HTTP_403_FORBIDDEN)
+        try:
+            link = TgLink.objects.get(
+                pk=pk,
+                organization=request.organization,
+                user__isnull=False,
+            )
+        except TgLink.DoesNotExist:
+            return Response(status=status.HTTP_404_NOT_FOUND)
+
+        serializer = TgLinkAdminSerializer(link, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+
+        # Обновить команды в Telegram немедленно (sync, без Celery —
+        # это быстрый вызов и делается редко).
+        try:
+            from .bot import set_my_commands
+            from .services.menu_scope import commands_for_user, user_module_levels
+            levels = user_module_levels(link)
+            cmds = commands_for_user(levels, notify_enabled=link.notify_enabled)
+            set_my_commands(cmds, chat_id=link.chat_id)
+        except Exception:  # noqa: BLE001
+            import logging
+            logging.getLogger(__name__).warning(
+                "TgLinkOrgListView.patch: failed to refresh commands for chat=%s",
+                link.chat_id,
+            )
+
+        return Response(TgLinkAdminSerializer(link).data)
+

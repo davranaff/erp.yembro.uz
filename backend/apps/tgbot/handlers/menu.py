@@ -53,7 +53,8 @@ def _menu_buttons_for(link) -> list[tuple[str, str]]:
     from ..services.menu_scope import has_any_access
 
     levels = user_module_levels(link)
-    if is_owner(levels):
+    notify_enabled = bool(getattr(link, "notify_enabled", False))
+    if is_owner(levels, notify_enabled=notify_enabled):
         return [(label, cb) for label, cb, _ in _MAIN_BUTTONS]
     buttons = [
         (label, cb) for (label, cb, mods) in _MAIN_BUTTONS
@@ -70,11 +71,10 @@ def _menu_text(link) -> str:
     from ..services.menu_scope import has_any_access
 
     levels = user_module_levels(link)
-    if is_owner(levels):
+    notify_enabled = bool(getattr(link, "notify_enabled", False))
+    if is_owner(levels, notify_enabled=notify_enabled):
         return "🏠 <b>Asosiy menyu</b>\n\nBo'limni tanlang:"
-    visible_count = sum(
-        1 for _, _, mods in _MAIN_BUTTONS if has_any_access(levels, mods)
-    )
+    visible_count = len(_menu_buttons_for(link))
     if visible_count == 0:
         return (
             "🏠 <b>Asosiy menyu</b>\n\n"
