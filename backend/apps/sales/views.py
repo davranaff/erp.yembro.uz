@@ -1,3 +1,4 @@
+from django.db.models import Q
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError as DRFValidationError
@@ -47,6 +48,18 @@ class SaleOrderViewSet(ImmutableStatusMixin, DeleteReasonMixin, OrgScopedModelVi
     search_fields = ["doc_number", "customer__name", "customer__code", "notes"]
     ordering_fields = ["date", "doc_number", "amount_uzs", "cost_uzs", "created_at"]
     ordering = ["-date"]
+
+    def get_queryset(self):
+        # opening_balance orders have module_id=NULL so the module scope filter
+        # (module_id__in=[...]) would exclude them. Re-include them explicitly
+        # so any user with sales:r access sees all opening debts.
+        scoped_qs = super().get_queryset()
+        org = getattr(self.request, "organization", None)
+        if org is None:
+            return scoped_qs
+        return self.queryset.filter(organization=org).filter(
+            Q(pk__in=scoped_qs.values("pk")) | Q(kind=SaleOrder.Kind.OPENING_BALANCE)
+        )
 
     def perform_create(self, serializer):
         """
