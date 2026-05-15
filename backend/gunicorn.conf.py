@@ -4,10 +4,10 @@ import multiprocessing
 # that gives 3. Cap at 4 to stay within memory budget.
 workers = min(multiprocessing.cpu_count() * 2 + 1, 4)
 
-# Gevent workers overlap I/O wait (DB, Redis, external HTTP) for free.
-# Requires `pip install gevent`.
-worker_class = "gevent"
-worker_connections = 1000
+# gthread: built into gunicorn, no extra deps, handles I/O concurrency via
+# threads (threads_per_worker). Safer than gevent on slim images.
+worker_class = "gthread"
+threads = 4
 
 # Recycle workers periodically to prevent memory leaks.
 max_requests = 1000
