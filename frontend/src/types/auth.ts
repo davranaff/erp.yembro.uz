@@ -433,8 +433,12 @@ export interface DashboardKpis {
   /** Долг по продажам периода = invoiced − revenue. */
   sales_unpaid_uzs: string;
   sales_cost_uzs: string;
-  /** Валовая маржа по отгрузке: sales_invoiced_uzs − sales_cost_uzs. */
+  /** Валовая маржа по оплате (cash-basis): Σ(paid_i − cost_i × paid_i/amount_i). */
   sales_margin_uzs: string;
+  /** Ожидаемые поступления: отгружено, но ещё не просрочено (due_date ≥ сегодня). */
+  sales_forecast_uzs: string;
+  /** Просроченные долги клиентов: не оплачено после due_date. */
+  sales_overdue_loss_uzs: string;
   active_batches: number;
   transfers_pending: number;
   purchases_drafts: number | null;

@@ -101,12 +101,14 @@ export default function DashboardPage() {
   // KPI приходят как null, а cash может быть полностью null.
   const financesVisible = (summary as { _finances_visible?: boolean })._finances_visible !== false;
 
-  // Маржа считается по отгрузке (sales_margin_uzs = invoiced − cost), поэтому
-  // и процент маржи берётся от отгруженного, а не от оплаченного.
+  // Маржа по оплате: только реально оплаченная часть (cash-basis).
+  // sales_margin_uzs = Σ(paid_i − cost_i × paid_i/amount_i)
   const margin = financesVisible && k.sales_margin_uzs ? parseFloat(k.sales_margin_uzs) : 0;
-  const marginPct = financesVisible && k.sales_invoiced_uzs && parseFloat(k.sales_invoiced_uzs) > 0
-    ? (margin / parseFloat(k.sales_invoiced_uzs)) * 100
+  const marginPct = financesVisible && k.sales_revenue_uzs && parseFloat(k.sales_revenue_uzs) > 0
+    ? (margin / parseFloat(k.sales_revenue_uzs)) * 100
     : 0;
+  const forecast = financesVisible && k.sales_forecast_uzs ? parseFloat(k.sales_forecast_uzs) : 0;
+  const overdueLoss = financesVisible && k.sales_overdue_loss_uzs ? parseFloat(k.sales_overdue_loss_uzs) : 0;
   const netCash = financesVisible && k.payments_in_uzs && k.payments_out_uzs
     ? parseFloat(k.payments_in_uzs) - parseFloat(k.payments_out_uzs)
     : 0;
@@ -158,13 +160,33 @@ export default function DashboardPage() {
             iconName="book"
             label="Прибыль (валовая)"
             sub={
-              parseFloat(k.sales_invoiced_uzs) > 0
-                ? `маржа ${marginPct.toFixed(1)}% · по отгрузке`
-                : 'нет продаж'
+              parseFloat(k.sales_revenue_uzs) > 0
+                ? `маржа ${marginPct.toFixed(1)}% · по оплате`
+                : 'нет оплат'
             }
             value={fmt(k.sales_margin_uzs)}
             valueSuffix="UZS"
           />
+          {forecast > 0 && (
+            <KpiCard
+              tone="blue"
+              iconName="chart"
+              label="Прогноз"
+              sub="отгружено · ожидаем оплату"
+              value={fmt(k.sales_forecast_uzs)}
+              valueSuffix="UZS"
+            />
+          )}
+          {overdueLoss > 0 && (
+            <KpiCard
+              tone="red"
+              iconName="users"
+              label="Долги (просрочка)"
+              sub="не оплачено после срока"
+              value={fmt(k.sales_overdue_loss_uzs)}
+              valueSuffix="UZS"
+            />
+          )}
           <KpiCard
             tone="red"
             iconName="users"
