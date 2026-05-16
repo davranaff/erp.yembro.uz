@@ -1,12 +1,11 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
 import Modal from '@/components/ui/Modal';
 import { ApiError } from '@/lib/api';
 import { usePackageFeedBatch } from '@/hooks/useFeed';
-import { useNomenclatureItems } from '@/hooks/useNomenclature';
-import { useWarehouses } from '@/hooks/useStockMovements';
+import { useWarehouseBalance, useWarehouses } from '@/hooks/useStockMovements';
 import type { FeedBatch } from '@/types/auth';
 
 interface Props {
@@ -17,33 +16,41 @@ interface Props {
 /**
  * Расфасовать партию готового комбикорма в мешки.
  *
- * UX-контракт (минимальный): оператор вводит сколько КГ расфасовать,
- * вес мешка (по умолчанию 50), и склад, с которого списываются пустые
- * мешки и куда лягут фасованные. Кол-во мешков и нужный SKU мешка
- * вычисляются автоматически.
+ * UX: оператор пишет сколько КГ расфасовать и вес мешка (дефолт 50),
+ * выбирает склад мешков и (опционально) сырьё, которое списать как
+ * расходник (пустые мешки) — список берётся из реальных остатков
+ * выбранного склада, никакого хардкода SKU.
  */
 export default function PackagingModal({ batch, onClose }: Props) {
   const { data: warehouses } = useWarehouses({ module_code: 'feed' });
-  const { data: feedItems } = useNomenclatureItems({ module_code: 'feed' });
   const pkg = usePackageFeedBatch();
 
   const [kgToPackage, setKgToPackage] = useState('');
   const [bagWeightKg, setBagWeightKg] = useState('50');
   const [warehouseId, setWarehouseId] = useState('');
+  // '' = не списывать пустые мешки (оператор спишет вручную или это
+  // не требуется). Иначе — nomenclature_id выбранного остатка.
+  const [bagNomenclatureId, setBagNomenclatureId] = useState('');
 
-  // SKU пустых мешков (KORM-XALTA-*) — нужен бэку для списания.
-  const bagSkus = useMemo(
-    () => (feedItems ?? []).filter((it) => it.sku.startsWith('KORM-XALTA')),
-    [feedItems],
+  // Балансы выбранного склада — источник списка для селектора сырья.
+  const { data: balance } = useWarehouseBalance(warehouseId || null);
+  const stockRows = useMemo(
+    () => (balance?.rows ?? []).filter((r) => parseFloat(r.balance_qty) > 0),
+    [balance],
   );
 
-  // Авторезолв SKU по весу: 25 → KORM-XALTA-25, 50 → KORM-XALTA-50.
-  // Если вес нецелый или нет SKU — бэк сам пропустит списание мешков.
-  const autoBagSku = useMemo(() => {
-    const w = parseFloat(bagWeightKg || '0');
-    if (!isFinite(w) || w !== Math.floor(w)) return null;
-    return bagSkus.find((it) => it.sku === `KORM-XALTA-${Math.floor(w)}`) ?? null;
-  }, [bagWeightKg, bagSkus]);
+  // Если склад сменился и текущий выбранный SKU там не существует —
+  // сбрасываем выбор, чтобы не отправлять некорректную пару.
+  useEffect(() => {
+    if (!bagNomenclatureId) return;
+    if (stockRows.some((r) => r.nomenclature_id === bagNomenclatureId)) return;
+    setBagNomenclatureId('');
+  }, [stockRows, bagNomenclatureId]);
+
+  const selectedBagRow = useMemo(
+    () => stockRows.find((r) => r.nomenclature_id === bagNomenclatureId) ?? null,
+    [stockRows, bagNomenclatureId],
+  );
 
   const remainingKg = parseFloat(batch.current_quantity_kg || '0');
   const bagWeight = parseFloat(bagWeightKg || '0');
@@ -59,6 +66,12 @@ export default function PackagingModal({ batch, onClose }: Props) {
   const totalKgPackaged = bagCount * bagWeight;
   const overflow = totalKgPackaged > remainingKg;
 
+  // Если выбран расходник — проверим, что его остаток не меньше нужного
+  // количества мешков (бэк это же проверит, но дадим предупреждение в UI).
+  const bagStockShortfall = selectedBagRow
+    && bagCount > 0
+    && parseFloat(selectedBagRow.balance_qty) < bagCount;
+
   const error = pkg.error;
   const fieldErrors = error instanceof ApiError && error.status === 400
     ? ((error.data as Record<string, string[] | string>) ?? {})
@@ -73,8 +86,8 @@ export default function PackagingModal({ batch, onClose }: Props) {
           bag_weight_kg: bagWeightKg,
           storage_warehouse: warehouseId,
           storage_bin: null,
-          packaging_nomenclature: null, // авторезолв по весу на бэке
-          packaging_warehouse: warehouseId, // тот же склад
+          packaging_nomenclature: bagNomenclatureId || null,
+          packaging_warehouse: warehouseId,
           notes: '',
         },
       });
@@ -87,6 +100,7 @@ export default function PackagingModal({ batch, onClose }: Props) {
     && bagWeight > 0
     && warehouseId
     && !overflow
+    && !bagStockShortfall
     && !pkg.isPending;
 
   return (
@@ -150,8 +164,32 @@ export default function PackagingModal({ batch, onClose }: Props) {
           ))}
         </select>
         <div style={{ fontSize: 11, color: 'var(--fg-3)', marginTop: 4 }}>
-          Сюда лягут фасованные мешки и отсюда же спишутся пустые.
+          Сюда лягут фасованные мешки и отсюда же спишется сырьё (пустые мешки).
         </div>
+      </div>
+
+      <div className="field" style={{ marginTop: 12 }}>
+        <label>Сырьё для списания (пустые мешки) — опционально</label>
+        <select
+          className="input"
+          value={bagNomenclatureId}
+          onChange={(e) => setBagNomenclatureId(e.target.value)}
+          disabled={!warehouseId}
+        >
+          <option value="">
+            {warehouseId ? '— не списывать —' : 'сначала выберите склад'}
+          </option>
+          {stockRows.map((r) => (
+            <option key={r.nomenclature_id} value={r.nomenclature_id}>
+              {r.sku} · {r.name} · остаток {parseFloat(r.balance_qty).toLocaleString('ru-RU')} {r.unit}
+            </option>
+          ))}
+        </select>
+        {warehouseId && stockRows.length === 0 && (
+          <div style={{ fontSize: 11, color: 'var(--fg-3)', marginTop: 4 }}>
+            На выбранном складе нет позиций с остатком.
+          </div>
+        )}
       </div>
 
       {(bagCount > 0 || kgRequested > 0) && (
@@ -176,10 +214,20 @@ export default function PackagingModal({ batch, onClose }: Props) {
               Превышает остаток партии — уменьшите кол-во кг.
             </div>
           )}
-          {bagWeight === 50 && !autoBagSku && bagCount > 0 && (
-            <div style={{ color: 'var(--brand-orange)', marginTop: 4 }}>
-              SKU пустого мешка <code>KORM-XALTA-50</code> не найден в номенклатуре —
-              пустые мешки придётся списать вручную в /stock.
+          {selectedBagRow && bagCount > 0 && !bagStockShortfall && (
+            <div style={{ color: 'var(--fg-3)', marginTop: 4 }}>
+              Спишется <b className="mono">{bagCount} {selectedBagRow.unit}</b>{' '}
+              позиции <b>{selectedBagRow.sku}</b>{' '}
+              (останется{' '}
+              <b className="mono">
+                {(parseFloat(selectedBagRow.balance_qty) - bagCount).toLocaleString('ru-RU')}
+              </b>).
+            </div>
+          )}
+          {bagStockShortfall && selectedBagRow && (
+            <div style={{ color: 'var(--danger)', marginTop: 4 }}>
+              Нужно {bagCount} {selectedBagRow.unit}, а на складе только{' '}
+              {parseFloat(selectedBagRow.balance_qty).toLocaleString('ru-RU')}.
             </div>
           )}
         </div>
