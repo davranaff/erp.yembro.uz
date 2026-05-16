@@ -35,6 +35,7 @@ from django.utils import timezone
 
 from apps.accounting.models import GLSubaccount, JournalEntry
 from apps.audit.models import AuditLog
+from apps.audit.services.diff import compute_diff, snapshot_model
 from apps.audit.services.writer import audit_log
 from apps.batches.models import Batch
 from apps.common.services.numbering import next_doc_number
@@ -363,6 +364,8 @@ def confirm_sale(
             )}
         )
 
+    before_snapshot = snapshot_model(order)
+
     items = list(
         order.items.select_related(
             "nomenclature", "nomenclature__category",
@@ -617,6 +620,7 @@ def confirm_sale(
         action=AuditLog.Action.POST,
         entity=order,
         action_verb=f"confirmed sale {order.doc_number}",
+        diff=compute_diff(before_snapshot, snapshot_model(order)),
     )
 
     return SaleConfirmResult(

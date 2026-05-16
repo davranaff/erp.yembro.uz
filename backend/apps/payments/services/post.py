@@ -40,6 +40,7 @@ from django.utils import timezone
 
 from apps.accounting.models import GLSubaccount, JournalEntry
 from apps.audit.models import AuditLog
+from apps.audit.services.diff import compute_diff, snapshot_model
 from apps.audit.services.writer import audit_log
 from apps.common.services.numbering import next_doc_number
 from apps.purchases.models import PurchaseOrder
@@ -241,6 +242,8 @@ def post_payment(payment: Payment, *, user=None) -> PaymentPostResult:
             {"status": "Отменённый платёж нельзя провести."}
         )
 
+    before_snapshot = snapshot_model(payment)
+
     # 2.5. OPENING_BALANCE_PREPAYMENT — синтетический Payment миграции.
     # Это НЕ реальное cash-движение, а факт «клиент уже занёс деньги
     # в старой ERP до миграции». Журнальную проводку не создаём
@@ -265,6 +268,7 @@ def post_payment(payment: Payment, *, user=None) -> PaymentPostResult:
             action=AuditLog.Action.POST,
             entity=payment,
             action_verb=f"posted opening-balance prepayment {payment.doc_number}",
+            diff=compute_diff(before_snapshot, snapshot_model(payment)),
         )
         return PaymentPostResult(
             payment=payment, journal_entry=None, affected_orders=[],
@@ -415,6 +419,7 @@ def post_payment(payment: Payment, *, user=None) -> PaymentPostResult:
         action=AuditLog.Action.POST,
         entity=payment,
         action_verb=f"posted payment {payment.doc_number}",
+        diff=compute_diff(before_snapshot, snapshot_model(payment)),
     )
 
     return PaymentPostResult(

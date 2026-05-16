@@ -33,6 +33,7 @@ from django.utils import timezone
 
 from apps.accounting.models import GLSubaccount, JournalEntry
 from apps.audit.models import AuditLog
+from apps.audit.services.diff import compute_diff, snapshot_model
 from apps.audit.services.writer import audit_log
 from apps.currency.selectors import get_rate_for
 from apps.warehouses.models import StockMovement
@@ -163,6 +164,11 @@ def confirm_purchase(
                 )
             }
         )
+
+    # Snapshot DRAFT-состояния заказа для audit-diff. Снимаем после
+    # row-lock + status guard — гарантирует что значения уже не поменяются
+    # под нами параллельной транзакцией.
+    before_snapshot = snapshot_model(order)
 
     # 3. Items обязательны
     items = list(order.items.select_related("nomenclature"))
@@ -338,6 +344,7 @@ def confirm_purchase(
         action=AuditLog.Action.POST,
         entity=order,
         action_verb=f"confirmed purchase {order.doc_number}",
+        diff=compute_diff(before_snapshot, snapshot_model(order)),
     )
 
     return PurchaseConfirmResult(

@@ -29,6 +29,7 @@ from django.utils import timezone
 
 from apps.accounting.models import JournalEntry
 from apps.audit.models import AuditLog
+from apps.audit.services.diff import compute_diff, snapshot_model
 from apps.audit.services.writer import audit_log
 from apps.common.services.numbering import next_doc_number
 from apps.warehouses.models import StockMovement
@@ -63,6 +64,8 @@ def reverse_purchase(
         raise PurchaseReverseError(
             {"status": f"Сторно возможно только из CONFIRMED, текущий: {order.get_status_display()}."}
         )
+
+    before_snapshot = snapshot_model(order)
     # Гард 1: явная проверка по payment_status — не должно быть зарегистрированных платежей
     if order.payment_status != PurchaseOrder.PaymentStatus.UNPAID:
         raise PurchaseReverseError(
@@ -178,6 +181,7 @@ def reverse_purchase(
         action=AuditLog.Action.UNPOST,
         entity=order,
         action_verb=f"reversed purchase {order.doc_number} ({reason})",
+        diff=compute_diff(before_snapshot, snapshot_model(order)),
     )
 
     return PurchaseReverseResult(

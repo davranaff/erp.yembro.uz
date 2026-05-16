@@ -23,6 +23,7 @@ from django.utils import timezone
 
 from apps.accounting.models import JournalEntry
 from apps.audit.models import AuditLog
+from apps.audit.services.diff import compute_diff, snapshot_model
 from apps.audit.services.writer import audit_log
 from apps.batches.models import Batch
 from apps.common.services.numbering import next_doc_number
@@ -123,6 +124,8 @@ def reverse_sale(order: SaleOrder, *, reason: str = "", user=None) -> SaleRevers
                 f"Сначала отмените платежи через reverse_payment."
             )}
         )
+
+    before_snapshot = snapshot_model(order)
 
     org = order.organization
     so_ct = ContentType.objects.get_for_model(SaleOrder)
@@ -226,6 +229,7 @@ def reverse_sale(order: SaleOrder, *, reason: str = "", user=None) -> SaleRevers
         action=AuditLog.Action.UNPOST,
         entity=order,
         action_verb=f"reversed sale {order.doc_number} ({reason})",
+        diff=compute_diff(before_snapshot, snapshot_model(order)),
     )
 
     return SaleReverseResult(
