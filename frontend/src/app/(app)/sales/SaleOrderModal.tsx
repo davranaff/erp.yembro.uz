@@ -774,15 +774,21 @@ export default function SaleOrderModal({ initial, preselect, onClose }: Props) {
                             }}
                           >
                             <option value="">— выберите партию —</option>
-                            {sellable.map((b) => (
-                              <option key={b.id} value={b.id}>
-                                {b.doc_number} · {b.recipe_code ?? ''}
-                                {b.nomenclature_name ? ` · ${b.nomenclature_name}` : ''} ·
-                                {' '}остаток {b.bags_remaining} шт ×{' '}
-                                {parseFloat(b.bag_weight_kg).toLocaleString('ru-RU')} кг
-                                {' '}· {parseFloat(b.unit_cost_uzs).toLocaleString('ru-RU', { maximumFractionDigits: 0 })} сум/мешок
-                              </option>
-                            ))}
+                            {sellable.map((b) => {
+                              const bagKg = parseFloat(b.bag_weight_kg);
+                              const remKg = b.bags_remaining * bagKg;
+                              const pricePerKg = bagKg > 0
+                                ? parseFloat(b.unit_cost_uzs) / bagKg
+                                : 0;
+                              const name = b.nomenclature_name || b.recipe_code || '—';
+                              return (
+                                <option key={b.id} value={b.id}>
+                                  {name}
+                                  {' · '}{pricePerKg.toLocaleString('ru-RU', { maximumFractionDigits: 0 })} сум/кг
+                                  {' · остаток '}{remKg.toLocaleString('ru-RU')} кг
+                                </option>
+                              );
+                            })}
                           </select>
                           {it.feed_bag_lot && !it.nomenclature && (
                             <div style={{ fontSize: 11, color: 'var(--danger)', marginTop: 4 }}>
