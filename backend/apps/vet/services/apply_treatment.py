@@ -131,27 +131,36 @@ def apply_vet_treatment(
     Повторный вызов (если treatment уже имеет JournalEntry с source=этот) —
     ValidationError.
     """
-    # 1. Row-lock без select_related
-    treatment = VetTreatmentLog.objects.select_for_update().get(pk=treatment.pk)
-    treatment = VetTreatmentLog.objects.select_related(
-        "organization",
-        "module",
-        "target_block",
-        "target_block__module",
-        "target_batch",
-        "target_batch__current_module",
-        "target_herd",
-        "target_herd__module",
-        "drug",
-        "drug__nomenclature",
-        "stock_batch",
-        "stock_batch__warehouse",
-        "unit",
-    ).get(pk=treatment.pk)
+    # 1. Row-lock + связи в одном запросе. of=("self",) обязателен:
+    # select_related тащит nullable FK через outer-join, обычный
+    # FOR UPDATE на них падает на PostgreSQL.
+    treatment = (
+        VetTreatmentLog.objects
+        .select_for_update(of=("self",))
+        .select_related(
+            "organization",
+            "module",
+            "target_block",
+            "target_block__module",
+            "target_batch",
+            "target_batch__current_module",
+            "target_herd",
+            "target_herd__module",
+            "drug",
+            "drug__nomenclature",
+            "stock_batch",
+            "stock_batch__warehouse",
+            "unit",
+        )
+        .get(pk=treatment.pk)
+    )
 
-    # 2. Идемпотентность: если уже есть JournalEntry с source=этот — второй раз нельзя.
+    # 2. Идемпотентность: select_for_update на JE-lookup. Раньше был
+    # обычный .filter().first() — два параллельных POST (например,
+    # ретрай с сети) могли оба прочесть «JE нет», оба пройти guard и
+    # создать дубль проводки. FOR UPDATE сериализует их.
     ct = ContentType.objects.get_for_model(VetTreatmentLog)
-    existing_je = JournalEntry.objects.filter(
+    existing_je = JournalEntry.objects.select_for_update().filter(
         source_content_type=ct, source_object_id=treatment.id
     ).first()
     if existing_je:
@@ -162,7 +171,16 @@ def apply_vet_treatment(
     # 3. Full-clean — XOR target, cross-org, stock_batch.drug == drug, etc.
     treatment.full_clean(exclude=None)
 
-    stock_batch = treatment.stock_batch
+    # 4. Lock на stock_batch ДО проверки status. Без этого параллельный
+    # recall_vet_stock_batch мог перевести лот в RECALLED после нашего
+    # status-чека и до F-decrement — получился бы двойной write-off
+    # (наш OUTGOING + recall'овый WRITE_OFF на весь остаток).
+    stock_batch = (
+        VetStockBatch.objects
+        .select_for_update(of=("self",))
+        .select_related("warehouse")
+        .get(pk=treatment.stock_batch_id)
+    )
     if stock_batch.status != VetStockBatch.Status.AVAILABLE:
         raise VetTreatmentApplyError(
             {
@@ -172,6 +190,14 @@ def apply_vet_treatment(
                 )
             }
         )
+    if stock_batch.current_quantity < treatment.dose_quantity:
+        raise VetTreatmentApplyError(
+            {"stock_batch": (
+                f"Недостаточно остатка лота {stock_batch.doc_number}: "
+                f"{stock_batch.current_quantity} < {treatment.dose_quantity}."
+            )}
+        )
+    treatment.stock_batch = stock_batch  # подменяем кэшированный объект
 
     org = treatment.organization
 

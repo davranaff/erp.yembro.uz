@@ -91,7 +91,9 @@ def sell_feed_bag_lot(
     customer: Counterparty | None = None,
     unit_price_uzs: Decimal | None = None,
 ) -> FeedBagSellResult:
-    bag_lot = FeedBagLot.objects.select_for_update().select_related(
+    # of=("self",) — иначе FOR UPDATE на nullable FK через outer-join
+    # падает на PostgreSQL. Блокируем только сам FeedBagLot, ок.
+    bag_lot = FeedBagLot.objects.select_for_update(of=("self",)).select_related(
         "recipe_version__recipe", "storage_warehouse", "module",
     ).get(pk=bag_lot.pk)
 
@@ -182,7 +184,12 @@ def sell_feed_bag_lot(
         raise FeedBagSellError({"__all__": f"Ошибка проведения продажи: {exc}"})
 
     order.refresh_from_db()
-    bag_lot.refresh_from_db()
+    # Повторно блокируем bag_lot перед чтением bags_remaining. После
+    # confirm_sale row-lock из начала функции остаётся за нами (мы всё
+    # ещё в той же atomic transaction), но чтобы решение «DEPLETED?»
+    # принималось на самом свежем значении (confirm_sale делает F()
+    # update в нашей же TX), читаем повторно с того же замка.
+    bag_lot = FeedBagLot.objects.select_for_update(of=("self",)).get(pk=bag_lot.pk)
 
     if bag_lot.bags_remaining <= 0:
         bag_lot.status = FeedBagLot.Status.DEPLETED
