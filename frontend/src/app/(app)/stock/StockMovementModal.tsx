@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 
+import NomenclaturePickerWithCreate from '@/components/NomenclaturePickerWithCreate';
 import AmountInput from '@/components/ui/AmountInput';
 import Modal from '@/components/ui/Modal';
 import SmartSelect from '@/components/ui/SmartSelect';
@@ -304,18 +305,13 @@ export default function StockMovementModal({ onClose, onSaved, onSwitchToFeedRaw
 
         <div className="field" style={{ gridColumn: '1 / -1' }}>
           <label>Номенклатура *</label>
-          <SmartSelect
+          <NomenclaturePickerWithCreate
             value={nomenclatureId}
             onChange={setNomenclatureId}
-            options={(items ?? []).map((i) => ({
-              value: i.id,
-              label: i.name,
-              sublabel: i.sku,
-            }))}
+            items={items ?? []}
             disabled={!moduleId}
             placeholder={moduleId ? '— выберите номенклатуру —' : 'сначала выберите склад'}
-            searchPlaceholder="Поиск по SKU или названию…"
-            emptyText="Не найдено"
+            hideCreate={!hasLevel('core', 'rw')}
           />
           {renderError('nomenclature')}
           {renderError('module')}

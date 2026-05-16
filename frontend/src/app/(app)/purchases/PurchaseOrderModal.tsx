@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from 'react';
 
+import NomenclaturePickerWithCreate from '@/components/NomenclaturePickerWithCreate';
 import AmountInput from '@/components/ui/AmountInput';
 import Icon from '@/components/ui/Icon';
 import Modal from '@/components/ui/Modal';
@@ -330,16 +331,14 @@ export default function PurchaseOrderModal({ initial, onClose }: Props) {
             >
               <div className="field" style={{ gridColumn: '1/3' }}>
                 <label>Номенклатура *</label>
-                <select
-                  className="input"
+                <NomenclaturePickerWithCreate
                   value={it.nomenclature}
-                  onChange={(e) => updateItem(it.key, { nomenclature: e.target.value })}
-                >
-                  <option value="">—</option>
-                  {nomenclature?.map((n) => (
-                    <option key={n.id} value={n.id}>{n.name}</option>
-                  ))}
-                </select>
+                  onChange={(v) => updateItem(it.key, { nomenclature: v })}
+                  items={nomenclature ?? []}
+                  disabled={!warehouseId}
+                  placeholder={warehouseId ? '— выберите —' : 'сначала выберите склад'}
+                  hideCreate={!hasLevel('core', 'rw')}
+                />
               </div>
 
               <div className="field">
