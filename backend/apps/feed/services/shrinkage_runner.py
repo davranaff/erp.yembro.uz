@@ -451,7 +451,10 @@ def _create_shrinkage_movement(lot: LotInfo, state, loss: Decimal, today: date, 
 
     state_ct = ContentType.objects.get_for_model(FeedLotShrinkageState)
     amount = _q_amt(loss * lot.unit_price)
-    move = StockMovement.objects.create(
+    # Используем builder + full_clean(), чтобы валидация StockMovement.clean()
+    # сработала и здесь (на этапе аудита нашли что objects.create() её
+    # пропускает — единственное место во всех сервисах).
+    move = StockMovement(
         organization_id=org_id,
         module_id=lot.module_id,
         doc_number=doc_number,
@@ -466,6 +469,15 @@ def _create_shrinkage_movement(lot: LotInfo, state, loss: Decimal, today: date, 
         source_content_type=state_ct,
         source_object_id=state.id,
     )
+    move.full_clean(exclude=None)
+    move.save()
+
+    # Парная JE: Dr 91.02 (прочие расходы) / Cr <inventory subaccount>.
+    # strict=False — cron не должен падать если в org не настроен
+    # полностью план счетов; запишет warning в лог.
+    from apps.warehouses.services.journal import create_journal_entry_for_movement
+    create_journal_entry_for_movement(move, strict=False)
+
     return move
 
 

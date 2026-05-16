@@ -22,6 +22,7 @@ from django.utils import timezone
 from apps.common.services.numbering import next_doc_number
 
 from ..models import StockMovement
+from .journal import create_journal_entry_for_movement
 
 
 class StockMovementCreateError(ValidationError):
@@ -141,6 +142,13 @@ def create_manual_movement(
     )
     movement.full_clean(exclude=None)
     movement.save()
+
+    # Парная JE в ГК (Dr/Cr по матрице из journal.py). Без неё счёт 10
+    # в Trial Balance не сходится с физическим складом. strict=False:
+    # если в организации не настроен полностью план счетов — не
+    # блокируем приход, но пишем warning. Сигналом «настройте план»
+    # будет дрифт в ОСВ — оператор увидит и попросит админа.
+    create_journal_entry_for_movement(movement, strict=False, user=user)
 
     # Двунаправленный синк «приход ↔ закуп»: если ручной приход
     # (INCOMING) сделан с указанием поставщика — автоматически создаём

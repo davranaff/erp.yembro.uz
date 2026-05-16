@@ -93,6 +93,13 @@ def create_movement_for_raw_batch(batch: RawMaterialBatch, *, user=None) -> Stoc
     )
     movement.full_clean(exclude=None)
     movement.save()
+
+    # Парная JE: сырьё пришло от поставщика (counterparty задан) →
+    # Dr <warehouse_to.gl> / Cr 60.01. strict=False: при отсутствии
+    # плана счетов лог + пропуск (см. journal.py).
+    from apps.warehouses.services.journal import create_journal_entry_for_movement
+    create_journal_entry_for_movement(movement, strict=False, user=user)
+
     return movement
 
 
