@@ -76,11 +76,23 @@ def receive_vet_accessory(
             {"quantity": "Количество должно быть больше нуля."}
         )
 
-    accessory = VetAccessory.objects.select_for_update().get(pk=accessory.pk)
-    accessory = VetAccessory.objects.select_related(
-        "organization", "module", "warehouse",
-        "nomenclature", "nomenclature__unit",
-    ).get(pk=accessory.pk)
+    # Один запрос с FOR UPDATE + select_related. Раньше второй .get()
+    # без select_for_update терял row-lock; два параллельных receive на
+    # один аксессуар читали одинаковый old_qty/old_cost и WAC получался
+    # неверным.
+    #
+    # of=("self",) обязателен: select_for_update + select_related на
+    # nullable FK (например warehouse → default_gl_subaccount) падает на
+    # PostgreSQL outer-join. Блокируем только саму строку VetAccessory.
+    accessory = (
+        VetAccessory.objects
+        .select_for_update(of=("self",))
+        .select_related(
+            "organization", "module", "warehouse",
+            "nomenclature", "nomenclature__unit",
+        )
+        .get(pk=accessory.pk)
+    )
 
     if not accessory.is_active:
         raise VetAccessoryReceiveError(

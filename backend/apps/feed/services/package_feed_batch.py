@@ -159,12 +159,24 @@ def package_feed_batch(
     if bag_weight <= 0:
         raise FeedPackageError({"bag_weight_kg": "Вес мешка должен быть > 0."})
 
-    # 1. Lock source
-    source = FeedBatch.objects.select_for_update().get(pk=source.pk)
-    source = FeedBatch.objects.select_related(
-        "organization", "module", "recipe_version", "recipe_version__recipe",
-        "storage_warehouse",
-    ).get(pk=source.pk)
+    # 1. Lock source. Раньше было две очереди .get() — вторая без
+    # select_for_update теряла row-lock, и параллельная фасовка той же
+    # партии могла пройти guard на остаток (line 182) дважды, уведя
+    # current_quantity_kg в минус.
+    #
+    # of=("self",) обязателен: select_for_update вместе с select_related
+    # на nullable FK (storage_warehouse) падает на PostgreSQL ("FOR
+    # UPDATE cannot be applied to the nullable side of an outer join").
+    # of="self" блокирует только строку FeedBatch, JOIN'ы остаются read.
+    source = (
+        FeedBatch.objects
+        .select_for_update(of=("self",))
+        .select_related(
+            "organization", "module", "recipe_version",
+            "recipe_version__recipe", "storage_warehouse",
+        )
+        .get(pk=source.pk)
+    )
 
     if source.status != FeedBatch.Status.APPROVED:
         raise FeedPackageError(

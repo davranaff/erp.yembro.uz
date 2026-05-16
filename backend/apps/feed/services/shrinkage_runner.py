@@ -395,16 +395,25 @@ def _ensure_state(state, lot: LotInfo, profile, initial_quantity: Decimal):
 
     if state is not None:
         return state
-    return FeedLotShrinkageState.objects.create(
-        organization_id=lot.organization_id,
+    # get_or_create вместо create — защита от dup-key, если два cron-
+    # запуска cтартанули параллельно (например, retry после таймаута)
+    # и оба прошли select_for_update().first() == None на одном лоте.
+    # На (lot_type, lot_id) фактически уникальный ключ — но без явного
+    # unique constraint полагаемся на DB-side упорядочивание через
+    # SELECT FOR UPDATE и идемпотентность get_or_create.
+    state, _ = FeedLotShrinkageState.objects.get_or_create(
         lot_type=lot.lot_type,
         lot_id=lot.lot_id,
-        profile=profile,
-        initial_quantity=initial_quantity,
-        accumulated_loss=_ZERO,
-        last_applied_on=None,
-        is_frozen=False,
+        defaults={
+            "organization_id": lot.organization_id,
+            "profile": profile,
+            "initial_quantity": initial_quantity,
+            "accumulated_loss": _ZERO,
+            "last_applied_on": None,
+            "is_frozen": False,
+        },
     )
+    return state
 
 
 def _create_shrinkage_movement(lot: LotInfo, state, loss: Decimal, today: date, periods: int, profile):
