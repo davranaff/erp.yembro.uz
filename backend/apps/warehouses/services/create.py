@@ -109,16 +109,10 @@ def create_manual_movement(
             {"batch": "Партия из другой организации."}
         )
 
-    # Поставщик обязателен для INCOMING — без него мы не можем создать
-    # связанный закуп в /purchases. Это держит инвариант
-    # «приход ↔ закуп»: каждый приход на склад имеет источник-поставщика.
-    if kind == StockMovement.Kind.INCOMING and counterparty is None:
-        raise StockMovementCreateError(
-            {"counterparty": (
-                "Для прихода обязательно укажите поставщика — он автоматически "
-                "становится закупом в /purchases (для отслеживания долга и оплаты)."
-            )}
-        )
+    # Поставщик для INCOMING опционален: если указан — backend создаёт
+    # связанный PurchaseOrder в /purchases (см. _link_to_auto_purchase ниже);
+    # если нет — приход остаётся «внутренним» (например, излишки при
+    # инвентаризации, безвозмездное поступление, перенос с другого учёта).
 
     when = date_value or timezone.now()
 
