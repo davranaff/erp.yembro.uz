@@ -6,17 +6,23 @@ import BatchSelector from '@/components/BatchSelector';
 import AmountInput from '@/components/ui/AmountInput';
 import Icon from '@/components/ui/Icon';
 import Modal from '@/components/ui/Modal';
-import Seg from '@/components/ui/Seg';
 import SmartSelect from '@/components/ui/SmartSelect';
+import { useAuth } from '@/contexts/AuthContext';
 import { useCounterparties } from '@/hooks/useCounterparties';
 import { POPULAR_CURRENCY_CODES, useCurrenciesSorted, useRateOnDate } from '@/hooks/useCurrencyRates';
-import { feedBagLotsCrud, feedBatchesCrud, rawBatchesCrud } from '@/hooks/useFeed';
+import { feedBagLotsCrud, rawBatchesCrud } from '@/hooks/useFeed';
 import { useModules } from '@/hooks/useModules';
 import { salesCrud } from '@/hooks/useSales';
 import { useWarehouses } from '@/hooks/useStockMovements';
 import { accessoriesCrud, stockBatchesCrud } from '@/hooks/useVet';
 import { ApiError } from '@/lib/api';
 import type { SaleOrder } from '@/types/auth';
+
+// Бизнес-модули, из которых можно продавать. Системные (admin, ledger, core,
+// reports, sales, cash, purchases, stock, hr) — не источники партий.
+const SALE_SOURCE_MODULE_CODES: ReadonlySet<string> = new Set([
+  'matochnik', 'incubation', 'feedlot', 'slaughter', 'feed', 'vet',
+]);
 
 export type SaleSourceKind =
   | 'batch'
@@ -73,22 +79,11 @@ interface ItemDraft {
   /** Единица измерения для подсказки. */
   unit_code?: string;
   /**
-   * UI-only: при продаже FeedBagLot юзер может вводить цену «за мешок»
-   * (default) или «за кг» — для convenience. На бэк всегда уходит цена
-   * за единицу учёта (мешок), kg-версия конвертируется через bag_weight_kg.
-   */
-  price_unit?: 'bag' | 'kg';
-  /**
-   * UI-only: режим ввода количества для FeedBagLot. 'bag' — пишем мешки
-   * (default), 'kg' — пишем кг, система округляет до целого числа мешков
-   * (1 мешок = bag_weight_kg). На бэк всегда уходит quantity в мешках.
-   */
-  quantity_unit?: 'bag' | 'kg';
-  /**
-   * UI-only буфер для kg-режима: то, что пользователь физически набрал
-   * в инпуте. quantity (мешки) пересчитывается через round(kg / bagKg),
-   * но если показывать в инпуте `bags * bagKg`, при наборе 99 (≈2 мешка)
-   * значение прыгает обратно в 100 — кажется, что не печатается.
+   * UI-only буфер: то, что пользователь физически набрал в кг-инпуте при
+   * продаже FeedBagLot. quantity (мешки) пересчитывается через
+   * round(kg / bagKg), но если показывать в инпуте `bags * bagKg`,
+   * при наборе 99 (≈2 мешка) значение прыгает обратно в 100 —
+   * кажется, что не печатается.
    */
   quantity_kg_input?: string;
 }
@@ -123,6 +118,17 @@ export default function SaleOrderModal({ initial, preselect, onClose }: Props) {
   const update = salesCrud.useUpdate();
 
   const { data: modules } = useModules();
+  const { hasAccess } = useAuth();
+
+  // Фильтрация модулей-источников: только основные бизнес-модули, и только
+  // те, к которым у пользователя есть права (как минимум read). Пользователь
+  // с ролью только на feed увидит в селекторе только «Корма».
+  const sourceModules = useMemo(
+    () => (modules ?? []).filter(
+      (m) => SALE_SOURCE_MODULE_CODES.has(m.code) && hasAccess(m.code, 'r'),
+    ),
+    [modules, hasAccess],
+  );
 
   // Пользователь может снять блокировку модуля при preselect (например чтобы
   // перенести продажу в другой модуль перед сохранением).
@@ -133,7 +139,6 @@ export default function SaleOrderModal({ initial, preselect, onClose }: Props) {
   // Справочники для vet/feed (ленивая загрузка по необходимости)
   const { data: vetLots } = stockBatchesCrud.useList({ status: 'available' });
   const { data: vetAccessories } = accessoriesCrud.useList({ is_active: 'true' });
-  const { data: feedLots } = feedBatchesCrud.useList();
   const { data: feedBagLots } = feedBagLotsCrud.useList({ status: 'active' });
   const { data: rawBatches } = rawBatchesCrud.useList({ status: 'available' });
 
@@ -227,8 +232,13 @@ export default function SaleOrderModal({ initial, preselect, onClose }: Props) {
 
   const moduleSourceKind: SaleSourceKind = sourceKindForModule(selectedModuleCode);
   // Per-item kind: для vet оператор может переключиться на vet_accessory.
-  const itemSourceKind = (it: ItemDraft): SaleSourceKind =>
-    it.kindOverride ?? moduleSourceKind;
+  // Для feed-модуля по умолчанию продаём мешки (насыпь убрана из UI), но
+  // оператор может переключиться на сырьё.
+  const itemSourceKind = (it: ItemDraft): SaleSourceKind => {
+    if (it.kindOverride) return it.kindOverride;
+    if (moduleSourceKind === 'feed_batch') return 'feed_bag_lot';
+    return moduleSourceKind;
+  };
   // Глобальный sourceKind для подсказки в шапке (не per-item)
   const sourceKind = moduleSourceKind;
 
@@ -258,15 +268,13 @@ export default function SaleOrderModal({ initial, preselect, onClose }: Props) {
     return totalInDocCurrency * r;
   }, [totalInDocCurrency, currencyCode, rateOnDate]);
 
-  // Авто-модуль при первом открытии (если не preselect и не edit)
+  // Авто-модуль при первом открытии (если не preselect и не edit):
+  // берём первый из доступных пользователю бизнес-модулей.
   useEffect(() => {
-    if (!moduleId && modules && modules.length > 0 && !initial && !preselect) {
-      const preferred = modules.find((m) =>
-        ['slaughter', 'feedlot', 'vet', 'feed', 'matochnik', 'incubation'].includes(m.code),
-      );
-      if (preferred) setModuleId(preferred.id);
+    if (!moduleId && sourceModules.length > 0 && !initial && !preselect) {
+      setModuleId(sourceModules[0].id);
     }
-  }, [modules, moduleId, initial, preselect]);
+  }, [sourceModules, moduleId, initial, preselect]);
 
   const error = create.error ?? update.error;
   const fieldErrors = error instanceof ApiError && error.status === 400
@@ -422,10 +430,17 @@ export default function SaleOrderModal({ initial, preselect, onClose }: Props) {
             title={moduleLocked ? 'Модуль-источник зафиксирован — вы открыли продажу из страницы модуля. Нажмите «изменить» чтобы сменить.' : undefined}
           >
             <option value="">—</option>
-            {modules?.map((m) => (
+            {sourceModules.map((m) => (
               <option key={m.id} value={m.id}>{m.name}</option>
             ))}
           </select>
+          {sourceModules.length === 0 && modules && modules.length > 0 && (
+            <div style={{ fontSize: 11, color: 'var(--warning)', marginTop: 4 }}>
+              Нет доступных модулей-источников. Попросите администратора выдать
+              права хотя бы на один из: маточник, инкубация, фабрика откорма,
+              убойня, корма, вет. аптека.
+            </div>
+          )}
           {getFieldErr('module') && <div style={{ fontSize: 11, color: 'var(--danger)' }}>{getFieldErr('module')}</div>}
         </div>
 
@@ -706,20 +721,6 @@ export default function SaleOrderModal({ initial, preselect, onClose }: Props) {
                           <input
                             type="radio"
                             name={`feedkind-${it.key}`}
-                            checked={itemSourceKind(it) === 'feed_batch'}
-                            onChange={() => updateItem(it.key, {
-                              kindOverride: undefined,
-                              feed_bag_lot: '', raw_batch: '',
-                              nomenclature: '', quantity: '', available_quantity: undefined,
-                              unit_code: '', batch_doc: undefined,
-                            })}
-                          />
-                          Готовый корм (насыпью, кг)
-                        </label>
-                        <label style={{ display: 'flex', gap: 4, alignItems: 'center', cursor: 'pointer' }}>
-                          <input
-                            type="radio"
-                            name={`feedkind-${it.key}`}
                             checked={itemSourceKind(it) === 'feed_bag_lot'}
                             onChange={() => updateItem(it.key, {
                               kindOverride: 'feed_bag_lot',
@@ -728,7 +729,7 @@ export default function SaleOrderModal({ initial, preselect, onClose }: Props) {
                               unit_code: '', batch_doc: undefined,
                             })}
                           />
-                          Готовый корм (мешки, шт)
+                          Готовый корм (мешки)
                         </label>
                         <label style={{ display: 'flex', gap: 4, alignItems: 'center', cursor: 'pointer' }}>
                           <input
@@ -746,55 +747,6 @@ export default function SaleOrderModal({ initial, preselect, onClose }: Props) {
                         </label>
                       </div>
                     </div>
-
-                    {itemSourceKind(it) === 'feed_batch' && (() => {
-                      // Только одобренные партии с положительным остатком
-                      const sellable = (feedLots ?? []).filter(
-                        (f) => f.status === 'approved'
-                          && parseFloat(f.current_quantity_kg) > 0,
-                      );
-                      return (
-                        <div className="field">
-                          <label>Партия комбикорма (насыпь) *</label>
-                          <select
-                            className="input"
-                            value={it.feed_batch}
-                            onChange={(e) => {
-                              const fb = sellable.find((f) => f.id === e.target.value);
-                              updateItem(it.key, {
-                                feed_batch: e.target.value,
-                                nomenclature: fb?.nomenclature ?? '',
-                                quantity: it.quantity || fb?.current_quantity_kg || '',
-                                available_quantity: fb?.current_quantity_kg,
-                                batch_doc: fb?.doc_number,
-                                unit_code: 'кг',
-                              });
-                            }}
-                          >
-                            <option value="">— выберите партию —</option>
-                            {sellable.map((f) => (
-                              <option key={f.id} value={f.id}>
-                                {f.nomenclature_name || f.recipe_code || f.doc_number} ·
-                                {' '}остаток {parseFloat(f.current_quantity_kg).toLocaleString('ru-RU')} кг
-                                {' '}· {parseFloat(f.unit_cost_uzs).toLocaleString('ru-RU', { maximumFractionDigits: 0 })} сум/кг
-                              </option>
-                            ))}
-                          </select>
-                          {it.feed_batch && !it.nomenclature && (
-                            <div style={{ fontSize: 11, color: 'var(--danger)', marginTop: 4 }}>
-                              В справочнике номенклатуры нет позиции с SKU = коду рецептуры.
-                              Создайте её в /nomenclature (модуль «Корма», SKU = код рецепта).
-                            </div>
-                          )}
-                          {sellable.length === 0 && (
-                            <div style={{ fontSize: 11, color: 'var(--warning)', marginTop: 4 }}>
-                              Нет одобренных партий насыпью. Партии становятся
-                              продаваемыми после контроля качества (статус «Одобрена»).
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })()}
 
                     {itemSourceKind(it) === 'feed_bag_lot' && (() => {
                       const sellable = (feedBagLots ?? []).filter(
@@ -904,8 +856,9 @@ export default function SaleOrderModal({ initial, preselect, onClose }: Props) {
               </div>
 
               {(() => {
-                // Для feed_bag_lot показываем кг-эквивалент: партия физически
-                // продаётся в мешках (целое число), но фермер думает в кг.
+                // Для feed_bag_lot UI всегда в кг — фермер думает в кг, а
+                // система сама округляет до целых мешков и хранит unit_price
+                // как цену за мешок (этого требует бэк: quantity = шт мешков).
                 const isBag = itemSourceKind(it) === 'feed_bag_lot';
                 const bagLot = isBag
                   ? (feedBagLots ?? []).find((b) => b.id === it.feed_bag_lot)
@@ -917,60 +870,41 @@ export default function SaleOrderModal({ initial, preselect, onClose }: Props) {
                   ? parseFloat(it.available_quantity)
                   : 0;
                 const availKg = isBag && bagKg > 0 ? availNum * bagKg : 0;
-                const qtyUnit = (it.quantity_unit ?? 'bag') as 'bag' | 'kg';
-                const priceUnit = (it.price_unit ?? 'bag') as 'bag' | 'kg';
-                // В kg-режиме показываем то, что юзер реально набрал
+                // В kg-инпуте показываем то, что юзер реально набрал
                 // (quantity_kg_input), а не bags × bagKg — иначе при наборе
                 // «99» значение прыгает обратно в 100 (1 мешок ≈ 50 кг).
-                const displayedQty = isBag && qtyUnit === 'kg' && bagKg > 0
+                const displayedQty = isBag && bagKg > 0
                   ? (it.quantity_kg_input ?? (qtyKg > 0 ? String(qtyKg) : ''))
                   : it.quantity;
                 return (
                   <>
                     <div className="field">
                       <label style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                        <span>Кол-во *</span>
-                        {isBag && bagKg > 0 && (
-                          <Seg
-                            options={[{ value: 'bag', label: 'шт' }, { value: 'kg', label: 'кг' }]}
-                            value={qtyUnit}
-                            onChange={(v) => {
-                              const next = v as 'bag' | 'kg';
-                              const patch: Partial<ItemDraft> = { quantity_unit: next };
-                              // При переключении на kg заполняем буфер из текущих мешков,
-                              // чтобы юзер сразу видел эквивалент в кг.
-                              if (next === 'kg' && qtyKg > 0) {
-                                patch.quantity_kg_input = String(qtyKg);
-                              }
-                              updateItem(it.key, patch);
-                            }}
-                          />
-                        )}
+                        <span>Кол-во * {isBag && bagKg > 0 ? '(кг)' : ''}</span>
                         {it.available_quantity && (
                           <span style={{ fontSize: 10, color: 'var(--fg-3)', fontWeight: 400 }}>
-                            доступно {availNum.toLocaleString('ru-RU')} {it.unit_code ?? ''}
-                            {isBag && availKg > 0 && (
-                              <> = {availKg.toLocaleString('ru-RU')} кг</>
-                            )}
+                            доступно{' '}
+                            {isBag && availKg > 0
+                              ? `${availKg.toLocaleString('ru-RU')} кг`
+                              : `${availNum.toLocaleString('ru-RU')} ${it.unit_code ?? ''}`}
                           </span>
                         )}
                       </label>
                       <input
                         className="input mono"
                         type="number"
-                        step={isBag && qtyUnit === 'kg' ? '0.1' : (isBag ? '1' : '0.001')}
+                        step={isBag && bagKg > 0 ? '0.1' : '0.001'}
                         min="0"
                         value={displayedQty}
-                        placeholder={isBag && qtyUnit === 'kg' ? 'кг' : (isBag ? 'мешков' : '')}
+                        placeholder={isBag && bagKg > 0 ? 'кг' : ''}
                         onChange={(e) => {
                           const val = e.target.value;
-                          if (!isBag || qtyUnit === 'bag' || bagKg <= 0) {
+                          if (!isBag || bagKg <= 0) {
                             updateItem(it.key, { quantity: val });
                             return;
                           }
-                          // KG-режим: сохраняем сырой ввод в буфер, чтобы юзер мог
-                          // свободно набирать; в quantity (мешки) кладём округлённое
-                          // значение для бэка.
+                          // Юзер пишет в кг — конвертим в целое число мешков
+                          // (Math.round) для бэка, сырой ввод сохраняем в буфер.
                           const kg = parseFloat(val || '0');
                           if (val === '' || kg <= 0) {
                             updateItem(it.key, { quantity: '', quantity_kg_input: val });
@@ -991,7 +925,7 @@ export default function SaleOrderModal({ initial, preselect, onClose }: Props) {
                       />
                       {isBag && qtyNum > 0 && bagKg > 0 && (
                         <div style={{ fontSize: 11, color: 'var(--fg-3)', marginTop: 4 }}>
-                          {qtyNum.toLocaleString('ru-RU')} мешок × {bagKg.toLocaleString('ru-RU')} кг ={' '}
+                          ≈ {qtyNum.toLocaleString('ru-RU')} мешок × {bagKg.toLocaleString('ru-RU')} кг ={' '}
                           <b>{qtyKg.toLocaleString('ru-RU')} кг</b>
                         </div>
                       )}
@@ -1005,34 +939,21 @@ export default function SaleOrderModal({ initial, preselect, onClose }: Props) {
                     </div>
 
                     <div className="field">
-                      <label style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                        <span>Цена * ({currencyCode})</span>
-                        {isBag && bagKg > 0 && (
-                          <Seg
-                            options={[
-                              { value: 'bag', label: 'за мешок' },
-                              { value: 'kg', label: 'за кг' },
-                            ]}
-                            value={priceUnit}
-                            onChange={(v) => updateItem(it.key, { price_unit: v as 'bag' | 'kg' })}
-                          />
-                        )}
-                      </label>
+                      <label>Цена * ({currencyCode}{isBag && bagKg > 0 ? ' за кг' : ''})</label>
                       {(() => {
-                        // Храним unit_price_uzs всегда как цену «за мешок» —
-                        // это то что нужно бэку (SaleItem.unit_price × quantity_шт).
-                        // Если юзер ввёл «за кг» — конвертим: bag_price = kg × bagKg.
+                        // Бэк хранит unit_price «за мешок» (quantity = шт мешков).
+                        // UI показывает «за кг», конвертим: bag_price = kg × bagKg.
                         const stored = parseFloat(it.unit_price_uzs || '0');
-                        const displayed = !isBag || bagKg <= 0 || priceUnit === 'bag'
+                        const displayed = !isBag || bagKg <= 0
                           ? it.unit_price_uzs
                           : (stored > 0 ? String(stored / bagKg) : '');
                         return (
                           <AmountInput
                             className="input mono"
                             value={displayed || ''}
-                            placeholder={isBag && priceUnit === 'kg' ? 'UZS за кг' : 'UZS за мешок'}
+                            placeholder={isBag && bagKg > 0 ? 'UZS за кг' : ''}
                             onChange={(val) => {
-                              if (!isBag || bagKg <= 0 || priceUnit === 'bag') {
+                              if (!isBag || bagKg <= 0) {
                                 updateItem(it.key, { unit_price_uzs: val });
                                 return;
                               }
