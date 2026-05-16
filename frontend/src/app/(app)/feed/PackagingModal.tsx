@@ -160,7 +160,7 @@ export default function PackagingModal({ batch, onClose }: Props) {
         >
           <option value="">— выберите склад —</option>
           {warehouses?.filter((w) => w.module_code === 'feed').map((w) => (
-            <option key={w.id} value={w.id}>{w.code} · {w.name}</option>
+            <option key={w.id} value={w.id}>{w.name}</option>
           ))}
         </select>
         <div style={{ fontSize: 11, color: 'var(--fg-3)', marginTop: 4 }}>
@@ -181,7 +181,7 @@ export default function PackagingModal({ batch, onClose }: Props) {
           </option>
           {stockRows.map((r) => (
             <option key={r.nomenclature_id} value={r.nomenclature_id}>
-              {r.sku} · {r.name} · остаток {parseFloat(r.balance_qty).toLocaleString('ru-RU')} {r.unit}
+              {r.name} · остаток {parseFloat(r.balance_qty).toLocaleString('ru-RU')} {r.unit}
             </option>
           ))}
         </select>
