@@ -194,7 +194,13 @@ class PaymentViewSet(ImmutableStatusMixin, DeleteReasonMixin, OrgScopedModelView
             )
         serializer = PaymentAllocationSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        PaymentAllocation.objects.create(payment=payment, **serializer.validated_data)
+        # objects.create() пропускает Model.clean() — поэтому строим
+        # через __init__ + full_clean() + save(). Иначе можно было
+        # просунуть amount_uzs <= 0 или target не PO/SO (см.
+        # PaymentAllocation.clean()).
+        allocation = PaymentAllocation(payment=payment, **serializer.validated_data)
+        allocation.full_clean()
+        allocation.save()
         payment = (
             Payment.objects.prefetch_related("allocations").get(pk=payment.pk)
         )
@@ -280,9 +286,13 @@ class PaymentViewSet(ImmutableStatusMixin, DeleteReasonMixin, OrgScopedModelView
                 "target_content_type": "OUT-предоплата применяется только к PurchaseOrder.",
             })
 
-        PaymentAllocation.objects.create(
+        # objects.create() пропускает Model.clean(); собираем + full_clean()
+        # чтобы прогнать те же проверки что и в /allocate/.
+        allocation = PaymentAllocation(
             payment=payment, **serializer.validated_data,
         )
+        allocation.full_clean()
+        allocation.save()
 
         # Пересчёт target документа.
         target_id = serializer.validated_data["target_object_id"]
