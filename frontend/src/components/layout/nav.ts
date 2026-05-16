@@ -47,15 +47,6 @@ export const NAV: NavEntry[] = [
       'feed', 'feedlot', 'matochnik', 'incubation', 'slaughter', 'vet', 'admin', 'cash'],
     aliases: ['dashboard', 'главная', 'kpi'] },
 
-  // ── Справочники ─────────────────────────────────────────────────────
-  { group: 'Ядро' },
-  // min='rw' — это редакторские справочники, бухгалтер с core=r их не видит,
-  // а Контрагенты живут отдельно в группе «Люди» с дефолтным min='r'.
-  { key: 'nomenclature',   label: 'Номенклатура', icon: 'box',     href: '/nomenclature',   module: 'core', min: 'rw',
-    aliases: ['товары', 'sku', 'позиции'] },
-  { key: 'blocks',         label: 'Блоки',        icon: 'factory', href: '/blocks',         module: 'core', min: 'rw',
-    aliases: ['корпус', 'птичник', 'шкаф', 'линия'] },
-
   // ── Люди ────────────────────────────────────────────────────────────
   { group: 'Люди' },
   { key: 'counterparties', label: 'Контрагенты',  icon: 'users',   href: '/counterparties', module: 'core',
@@ -139,6 +130,16 @@ export const NAV: NavEntry[] = [
     aliases: ['журнал', 'je', 'gl'] },
   { key: 'audit',   label: 'Журнал аудита',    icon: 'book',     href: '/audit-log', module: 'admin',
     aliases: ['аудит', 'история действий', 'audit log'] },
+
+  // ── Справочники (редкие админ-справочники, заводятся один раз) ─────
+  // min='rw' — редакторские справочники, бухгалтер с core=r их не видит.
+  // SKU обычно создаются inline из форм закупки/прихода, так что сюда
+  // ходят только за категориями/единицами и админ-чисткой.
+  { group: 'Справочники' },
+  { key: 'nomenclature',   label: 'Номенклатура', icon: 'box',     href: '/nomenclature',   module: 'core', min: 'rw',
+    aliases: ['товары', 'sku', 'позиции', 'категории', 'единицы'] },
+  { key: 'blocks',         label: 'Блоки',        icon: 'factory', href: '/blocks',         module: 'core', min: 'rw',
+    aliases: ['корпус', 'птичник', 'шкаф', 'линия'] },
 
   // ── Администрирование ──────────────────────────────────────────────
   { group: 'Администрирование' },
