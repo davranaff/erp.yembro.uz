@@ -31,9 +31,9 @@
 
 | Pri | File:line | Issue | Fix |
 |-----|-----------|-------|-----|
-| 🔴 P0 | `feed/services/package_feed_batch.py:163-167` | Двойной `select_for_update().get()` → второй `.get()` без lock теряет блокировку | Объединить в один `select_for_update().select_related().get()` |
-| 🔴 P0 | `feed/services/shrinkage_runner.py:398` | `FeedLotShrinkageState.objects.create()` без guard → параллельный cron ловит dup-key | `get_or_create()` |
-| 🔴 P0 | `feed/services/sell_feed_bag.py:180-189` | Lock теряется после `confirm_sale()` + `refresh_from_db()` → status flip может перезаписать | Повторный `select_for_update` после confirm |
+| ✅ P0 | `feed/services/package_feed_batch.py:163-167` | ~~Двойной `select_for_update().get()` → второй `.get()` без lock теряет блокировку~~ | Fixed in `479c2ca` |
+| ✅ P0 | `feed/services/shrinkage_runner.py:398` | ~~`FeedLotShrinkageState.objects.create()` без guard~~ | Fixed in `479c2ca` |
+| ✅ P0 | `feed/services/sell_feed_bag.py:180-189` | ~~Lock теряется после `confirm_sale()` + `refresh_from_db()`~~ | Fixed in `216d0fa` |
 | 🟡 P1 | `feed/services/package_feed_batch.py:222-230` | `_empty_bag_stock()` SELECT SUM без lock → может уйти в минус | `select_for_update` на packaging SKU |
 | 🟡 P1 | `feed/services/copy_components.py:85-90` | FIFO выбор партии без lock → 2 задания могут зацепиться за одну | `select_for_update` на выбранный batch |
 | 🟡 P1 | `feed/services/quality.py:39,85-88` | Status race APPROVED vs REJECTED parallel | re-check status after lock |
@@ -44,9 +44,9 @@
 
 | Pri | File:line | Issue | Fix |
 |-----|-----------|-------|-----|
-| 🔴 P0 | `vet/services/receive_accessory.py:79-83` | WAC race — двойной select_related теряет lock → weighted-avg cost ломается параллельным receive | Объединить `select_for_update().select_related()` |
-| 🔴 P0 | `vet/services/apply_treatment.py:166-185` | Recall vs apply parallel → двойной write-off возможен | `refresh_from_db(fields=["status"])` после lock + abort if not AVAILABLE |
-| 🔴 P0 | `vet/services/apply_treatment.py:152-160` | Idempotency check `if existing_je` — check-then-act, не атомарно | `JournalEntry.objects.select_for_update()` lookup |
+| ✅ P0 | `vet/services/receive_accessory.py:79-83` | ~~WAC race — двойной select_related теряет lock~~ | Fixed in `479c2ca` |
+| ✅ P0 | `vet/services/apply_treatment.py:166-185` | ~~Recall vs apply parallel → двойной write-off~~ | Fixed in `216d0fa` (explicit lock + status check) |
+| ✅ P0 | `vet/services/apply_treatment.py:152-160` | ~~Idempotency check `if existing_je` — check-then-act~~ | Fixed in `216d0fa` (select_for_update) |
 | 🟡 P1 | `vet/views_public.py:228-250` | Public scanner endpoint: double-submit на /sell/ может создать 2 SaleOrder | idempotency_key field + Redis cache |
 
 ### SLAUGHTER (3 fixes)
@@ -59,7 +59,14 @@
 
 ## Completed fixes (приоритет P0 закроем первыми)
 
-(заполнять по мере выполнения)
+| SHA | Issue | Cycle |
+|-----|-------|-------|
+| `479c2ca` | Feed package_feed_batch: lock lost between two `.get()` → fix to single `select_for_update(of="self").select_related()` | C1 P0 |
+| `479c2ca` | Feed shrinkage_runner: `objects.create()` → `get_or_create()` for FeedLotShrinkageState | C1 P0 |
+| `479c2ca` | Vet receive_accessory: same double-`.get()` WAC race → single select_for_update(of=self).select_related() | C1 P0 |
+| `216d0fa` | Vet apply_treatment: idempotency JE-lookup with `select_for_update()` | C1 P0 |
+| `216d0fa` | Vet apply_treatment: stock_batch explicit lock before status/qty check (recall race) | C1 P0 |
+| `216d0fa` | Feed sell_feed_bag_lot: re-lock bag_lot after confirm_sale before DEPLETED flip | C1 P0 |
 
 ## Deferred (need design discussion)
 
