@@ -1,6 +1,7 @@
 'use client';
 
 import { useModalLifecycle } from '@/hooks/useModalLifecycle';
+import { useUnsavedChangesGuard } from '@/hooks/useUnsavedChangesGuard';
 
 import Icon from './Icon';
 
@@ -12,15 +13,16 @@ interface ModalProps {
 }
 
 export default function Modal({ title, onClose, footer, children }: ModalProps) {
-  useModalLifecycle(onClose);
+  const { containerRef, handleClose, handleClickCapture } = useUnsavedChangesGuard(onClose);
+  useModalLifecycle(handleClose);
   return (
-    <div className="modal-backdrop" onClick={onClose}>
-      <div className="modal" onClick={e => e.stopPropagation()}>
+    <div className="modal-backdrop" onClick={handleClose} onClickCapture={handleClickCapture}>
+      <div className="modal" ref={containerRef} onClick={(e) => e.stopPropagation()}>
         <div className="modal-hdr">
           <h3>{title}</h3>
           <button
             className="close-btn"
-            onClick={onClose}
+            onClick={handleClose}
             aria-label="Закрыть"
             title="Закрыть (Esc)"
           >
