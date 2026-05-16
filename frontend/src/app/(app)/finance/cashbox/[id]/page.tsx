@@ -92,8 +92,8 @@ export default function CashboxDetailPage() {
   const [drawerPayment, setDrawerPayment] = useState<Payment | null>(null);
 
   const hasLevel = useHasLevel();
-  const canEdit = hasLevel('ledger', 'rw');
-  const isOrgAdmin = hasLevel('admin', 'admin') || hasLevel('ledger', 'admin');
+  const canEdit = hasLevel('ledger', 'rw') || hasLevel('cash', 'rw');
+  const isOrgAdmin = hasLevel('admin', 'admin') || hasLevel('ledger', 'admin') || hasLevel('cash', 'admin');
 
   const { data: subs } = useSubaccounts();
   const { data: modules } = useModules();

@@ -24,7 +24,7 @@ import type {
 export const recipesCrud = makeCrud<Recipe>({
   key: ['feed', 'recipes'],
   path: '/api/feed/recipes/',
-  ordering: 'code',
+  ordering: '-created_at',
 });
 
 export const recipeVersionsCrud = makeCrud<RecipeVersion>({
@@ -41,7 +41,7 @@ export const recipeComponentsCrud = makeCrud<RecipeComponent>({
 export const tasksCrud = makeCrud<ProductionTask>({
   key: ['feed', 'production-tasks'],
   path: '/api/feed/production-tasks/',
-  ordering: '-scheduled_at',
+  ordering: '-created_at',
 });
 
 /**
@@ -71,7 +71,7 @@ export const useCancelTask = tasksCrud.makeAction<
 export const feedBatchesCrud = makeCrud<FeedBatch>({
   key: ['feed', 'batches'],
   path: '/api/feed/feed-batches/',
-  ordering: '-produced_at',
+  ordering: '-created_at',
 });
 
 export const useApprovePassport = feedBatchesCrud.makeAction<void, FeedBatch>(
@@ -87,7 +87,7 @@ export const useRejectPassport = feedBatchesCrud.makeAction<{ reason: string }, 
 export const feedBagLotsCrud = makeCrud<FeedBagLot>({
   key: ['feed', 'bag-lots'],
   path: '/api/feed/feed-bag-lots/',
-  ordering: '-packaged_at',
+  ordering: '-created_at',
 });
 
 /**
@@ -238,7 +238,7 @@ export const rawBatchesCrud = makeCrud<
 >({
   key: ['feed', 'raw-batches'],
   path: '/api/feed/raw-batches/',
-  ordering: '-received_date',
+  ordering: '-created_at',
 });
 
 export const useReleaseQuarantine = rawBatchesCrud.makeAction<void, RawMaterialBatch>(

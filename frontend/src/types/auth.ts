@@ -433,8 +433,12 @@ export interface DashboardKpis {
   /** Долг по продажам периода = invoiced − revenue. */
   sales_unpaid_uzs: string;
   sales_cost_uzs: string;
-  /** Валовая маржа по отгрузке: sales_invoiced_uzs − sales_cost_uzs. */
+  /** Валовая маржа по оплате (cash-basis): Σ(paid_i − cost_i × paid_i/amount_i). */
   sales_margin_uzs: string;
+  /** Ожидаемые поступления: отгружено, но ещё не просрочено (due_date ≥ сегодня). */
+  sales_forecast_uzs: string;
+  /** Просроченные долги клиентов: не оплачено после due_date. */
+  sales_overdue_loss_uzs: string;
   active_batches: number;
   transfers_pending: number;
   purchases_drafts: number | null;
@@ -484,12 +488,43 @@ export interface DashboardArSummary {
   }>;
 }
 
+export interface ModuleCashflowPoint {
+  date: string;
+  in_uzs: string;
+  out_uzs: string;
+}
+
+export interface ModuleKpiPayload {
+  module_code: string;
+  period: { from: string; to: string };
+  payments_in_uzs: string;
+  payments_out_uzs: string;
+  balance_uzs: string;
+  ar_uzs: string;
+  sales_drafts: number;
+  purchases_drafts: number;
+  cashflow: ModuleCashflowPoint[];
+}
+
+export interface DashboardModuleKassa {
+  module_code: string;
+  module_name: string;
+  /** All-time balance (in − out). */
+  balance_uzs: string;
+  /** Inflows for the current period (month). */
+  period_in_uzs: string;
+  /** Outflows for the current period (month). */
+  period_out_uzs: string;
+}
+
 export interface DashboardSummary {
   kpis: DashboardKpis;
   production: DashboardProduction;
   cash: DashboardCash | null;
   /** AR snapshot (NULL если у пользователя нет ledger.r). */
   ar?: DashboardArSummary | null;
+  /** Per-module kassa balances — only for modules the user can read. */
+  module_kassas?: DashboardModuleKassa[];
   _finances_visible?: boolean;
 }
 
@@ -901,7 +936,10 @@ export interface ProductionTask {
   id: string;
   doc_number: string;
   recipe_version: string;
+  recipe_code: string | null;
+  recipe_version_number: number | null;
   production_line: string;
+  production_line_code: string | null;
   shift: 'day' | 'night';
   scheduled_at: string;
   started_at: string | null;

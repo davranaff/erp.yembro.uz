@@ -8,11 +8,19 @@
 """
 from __future__ import annotations
 
+from datetime import date
+
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from apps.common.permissions import can_see_finances, get_user_readable_module_codes
+from apps.common.permissions import (
+    _effective_level,
+    can_see_finances,
+    get_user_admin_module_codes,
+    get_user_readable_module_codes,
+    level_satisfies,
+)
 from apps.common.viewsets import OrganizationContextMixin
 
 from .services import (
@@ -20,6 +28,8 @@ from .services import (
     cash_balances,
     cashflow_chart,
     kpi_summary,
+    module_cash_balances,
+    module_kpi,
     production_summary,
 )
 
@@ -65,9 +75,17 @@ class DashboardSummaryView(OrganizationContextMixin, APIView):
         # 403 before get() is called when membership cannot be resolved.
         membership = request.membership
         if request.user.is_superuser:
-            readable_modules = None  # unlimited: superuser bypasses module-level RBAC
+            readable_modules = None   # unlimited
+            kassas_modules = None     # unlimited
         else:
             readable_modules = get_user_readable_module_codes(membership)
+            # Module kassas only appear when user has admin on that module
+            # AND rw+ access to cash or stock (financial tracking modules).
+            has_financial_rw = (
+                level_satisfies(_effective_level(membership, "cash"), "rw")
+                or level_satisfies(_effective_level(membership, "stock"), "rw")
+            )
+            kassas_modules = get_user_admin_module_codes(membership) if has_financial_rw else set()
 
         kpis = kpi_summary(org, readable_modules=readable_modules)
         if not finances_visible:
@@ -78,6 +96,7 @@ class DashboardSummaryView(OrganizationContextMixin, APIView):
             "production": production_summary(org, readable_modules=readable_modules),
             "cash": cash_balances(org) if finances_visible else None,
             "ar": ar_summary(org) if finances_visible else None,
+            "module_kassas": module_cash_balances(org, readable_modules=kassas_modules),
             "_finances_visible": finances_visible,
         })
 
@@ -132,3 +151,45 @@ class DashboardCashflowView(OrganizationContextMixin, APIView):
             "days": days,
             "points": cashflow_chart(request.organization, days=days),
         })
+
+
+class DashboardModuleView(OrganizationContextMixin, APIView):
+    """
+    GET /api/dashboard/module/<module_code>/?from=YYYY-MM-DD&to=YYYY-MM-DD
+
+    Per-module KPIs: payments in/out, all-time balance, AR from sales.
+    Access gated by module membership — 403 if the user cannot read the module.
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, module_code: str):
+        if not request.user.is_superuser:
+            membership = request.membership
+            # Require admin level on this specific module.
+            if not level_satisfies(_effective_level(membership, module_code), "admin"):
+                return Response({"detail": "Нет доступа к данному модулю."}, status=403)
+            # Require rw+ on cash (Кассы) or stock (Склад и движения).
+            has_financial_rw = (
+                level_satisfies(_effective_level(membership, "cash"), "rw")
+                or level_satisfies(_effective_level(membership, "stock"), "rw")
+            )
+            if not has_financial_rw:
+                return Response({"detail": "Нет доступа к данному модулю."}, status=403)
+
+        today = date.today()
+        default_from = today.replace(day=1).isoformat()
+        default_to = today.isoformat()
+
+        try:
+            date_from = date.fromisoformat(request.query_params.get("from", default_from))
+            date_to = date.fromisoformat(request.query_params.get("to", default_to))
+        except ValueError:
+            return Response({"detail": "Неверный формат даты (YYYY-MM-DD)."}, status=400)
+
+        if date_from > date_to:
+            return Response({"detail": "from не может быть позже to."}, status=400)
+
+        return Response(
+            module_kpi(request.organization, module_code, date_from=date_from, date_to=date_to)
+        )

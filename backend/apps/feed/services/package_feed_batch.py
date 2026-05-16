@@ -91,17 +91,26 @@ def _resolve_bag_sku_by_weight(org_id, bag_weight: Decimal):
 def _empty_bag_stock(nom_item, warehouse):
     """Текущий остаток пустых мешков на складе по StockMovement-ам.
 
-    Stock = Σ INCOMING (warehouse_to=wh) − Σ OUTGOING (warehouse_from=wh).
-    Возвращает Decimal.
+    Stock = Σ(INCOMING + TRANSFER-in, warehouse_to=wh)
+          − Σ(OUTGOING + WRITE_OFF + TRANSFER-out, warehouse_from=wh).
+
+    Транзитные движения (TRANSFER) обязательно учитываем — иначе
+    «доступный остаток» расходится с тем, что показывает /balance/-API:
+    после трансфера мешков между складами фасовщик не сможет списать
+    их с целевого склада, хотя физически они там лежат.
     """
     from django.db.models import Sum
     incoming = StockMovement.objects.filter(
         nomenclature=nom_item, warehouse_to=warehouse,
-        kind=StockMovement.Kind.INCOMING,
+        kind__in=[StockMovement.Kind.INCOMING, StockMovement.Kind.TRANSFER],
     ).aggregate(s=Sum("quantity"))["s"] or Decimal(0)
     outgoing = StockMovement.objects.filter(
         nomenclature=nom_item, warehouse_from=warehouse,
-        kind__in=[StockMovement.Kind.OUTGOING, StockMovement.Kind.WRITE_OFF],
+        kind__in=[
+            StockMovement.Kind.OUTGOING,
+            StockMovement.Kind.WRITE_OFF,
+            StockMovement.Kind.TRANSFER,
+        ],
     ).aggregate(s=Sum("quantity"))["s"] or Decimal(0)
     return Decimal(incoming) - Decimal(outgoing)
 

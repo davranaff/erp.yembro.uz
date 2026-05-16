@@ -210,13 +210,13 @@ def get_user_rw_module_codes(membership) -> set[str]:
 
 
 def get_user_readable_module_codes(membership) -> set[str]:
-    """Module codes where membership has effective level >= r (read).
-
-    Used to scope the dashboard: a module-head sees aggregates only for
-    modules they can actually open. Superusers bypass this via the call
-    site (readable_modules=None means unlimited).
-    """
+    """Module codes where membership has effective level >= r (read)."""
     return _get_user_module_codes(membership, "r")
+
+
+def get_user_admin_module_codes(membership) -> set[str]:
+    """Module codes where membership has effective level == admin."""
+    return _get_user_module_codes(membership, "admin")
 
 
 def is_org_admin(membership) -> bool:

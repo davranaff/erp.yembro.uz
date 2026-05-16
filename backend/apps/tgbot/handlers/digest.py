@@ -13,20 +13,17 @@ from __future__ import annotations
 
 from django.utils import timezone
 
-from ..bot import send_message
 from ..dispatcher import HandlerCtx, command
 
 
 @command("/digest", help="Сводка за сегодня (live)", module="reports", category="reports")
 def handle_digest_preview(ctx: HandlerCtx) -> None:
-    from ..services.digest import build_digest, format_digest
+    from ..services.digest import build_digest, send_digest_to
 
     org = ctx.org()
-    # timezone.localdate() уважает TIME_ZONE = 'Asia/Tashkent', чтобы у юзера
-    # в UZ «сегодня» совпадало с серверным «сегодня».
     today = timezone.localdate()
     data = build_digest(org, on_date=today)
-    send_message(ctx.chat_id, format_digest(data, organization_name=org.name))
+    send_digest_to(ctx.chat_id, data, org_name=org.name)
 
 
 @command("/digest_on", help="Включить ежедневную сводку (08:00)", module="reports", category="reports")

@@ -25,6 +25,27 @@ class TgLinkSerializer(serializers.ModelSerializer):
         )
 
 
+class TgLinkAdminSerializer(serializers.ModelSerializer):
+    """Для админского списка «Получатели уведомлений». Показывает все
+    user-линки организации с возможностью toggle notify_enabled."""
+
+    user_email = serializers.EmailField(source="user.email", read_only=True)
+    user_name = serializers.CharField(source="user.full_name", read_only=True, default="")
+
+    class Meta:
+        model = TgLink
+        fields = (
+            "id", "chat_id", "tg_username",
+            "user", "user_email", "user_name",
+            "notify_enabled", "is_active", "created_at",
+        )
+        read_only_fields = (
+            "id", "chat_id", "tg_username",
+            "user", "user_email", "user_name",
+            "is_active", "created_at",
+        )
+
+
 class TgLinkTokenSerializer(serializers.ModelSerializer):
     bot_url = serializers.SerializerMethodField()
     bot_configured = serializers.SerializerMethodField()

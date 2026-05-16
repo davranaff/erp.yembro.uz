@@ -57,6 +57,7 @@ def test_summary_shape(client):
         "payments_in_uzs", "payments_out_uzs",
         "sales_revenue_uzs", "sales_invoiced_uzs", "sales_unpaid_uzs",
         "sales_cost_uzs", "sales_margin_uzs",
+        "sales_forecast_uzs", "sales_overdue_loss_uzs",
         "active_batches", "transfers_pending",
         "purchases_drafts", "sales_drafts", "payments_drafts",
     ]:
@@ -73,11 +74,11 @@ def test_summary_shape(client):
 
 
 def test_summary_sales_revenue_excludes_unpaid_debt(org):
-    """Продажа с частичной оплатой: в «Выручку» (sales_revenue_uzs) попадает
-    только реально оплаченная часть. Полный объём отгрузок — отдельно в
-    sales_invoiced_uzs, долг — в sales_unpaid_uzs. Маржа считается по
-    отгрузке (invoiced − cost)."""
-    from datetime import date
+    """Продажа с частичной оплатой: выручка — только оплаченная часть.
+    Маржа cash-basis: paid - cost×(paid/amount).
+    Непросроченный остаток — в sales_forecast_uzs.
+    """
+    from datetime import date, timedelta
     from decimal import Decimal
 
     from apps.counterparties.models import Counterparty
@@ -85,7 +86,6 @@ def test_summary_sales_revenue_excludes_unpaid_debt(org):
     from apps.sales.models import SaleOrder
     from apps.warehouses.models import Warehouse
 
-    # Свежая организация — чтобы агрегаты были детерминированы (без seed-данных).
     fresh = Organization.objects.create(
         code="DASH-DEBT", name="Dashboard debt test",
         accounting_currency=org.accounting_currency,
@@ -97,22 +97,67 @@ def test_summary_sales_revenue_excludes_unpaid_debt(org):
     customer = Counterparty.objects.create(
         organization=fresh, code="C-DD", kind="buyer", name="Должник",
     )
+    today = date.today()
     SaleOrder.objects.create(
-        organization=fresh, doc_number="П-DD-1", date=date.today(),
+        organization=fresh, doc_number="П-DD-1", date=today,
         module=m_sales, customer=customer, warehouse=warehouse,
         status=SaleOrder.Status.CONFIRMED,
         payment_status=SaleOrder.PaymentStatus.PARTIAL,
         amount_uzs=Decimal("1000000"),
         paid_amount_uzs=Decimal("300000"),
         cost_uzs=Decimal("400000"),
+        due_date=today + timedelta(days=14),  # ещё не просрочен
     )
 
-    kpis = kpi_summary(fresh)
-    assert Decimal(kpis["sales_revenue_uzs"]) == Decimal("300000")   # оплачено
+    kpis = kpi_summary(fresh, today=today)
+    assert Decimal(kpis["sales_revenue_uzs"]) == Decimal("300000")    # оплачено
     assert Decimal(kpis["sales_invoiced_uzs"]) == Decimal("1000000")  # отгружено
     assert Decimal(kpis["sales_unpaid_uzs"]) == Decimal("700000")     # долг — отдельно
     assert Decimal(kpis["sales_cost_uzs"]) == Decimal("400000")
-    assert Decimal(kpis["sales_margin_uzs"]) == Decimal("600000")     # 1.0M − 0.4M
+    # cash-basis margin = 300000 - 400000 * (300000/1000000) = 300000 - 120000 = 180000
+    assert Decimal(kpis["sales_margin_uzs"]) == Decimal("180000")
+    # Не просрочен → в прогнозе, не в убытках
+    assert Decimal(kpis["sales_forecast_uzs"]) == Decimal("700000")
+    assert Decimal(kpis["sales_overdue_loss_uzs"]) == Decimal("0")
+
+
+def test_summary_overdue_goes_to_loss(org):
+    """Продажа с due_date в прошлом и неполной оплатой: остаток попадает в
+    sales_overdue_loss_uzs, а не в sales_forecast_uzs."""
+    from datetime import date, timedelta
+    from decimal import Decimal
+
+    from apps.counterparties.models import Counterparty
+    from apps.dashboard.services import kpi_summary
+    from apps.sales.models import SaleOrder
+    from apps.warehouses.models import Warehouse
+
+    fresh = Organization.objects.create(
+        code="DASH-LOSS", name="Dashboard loss test",
+        accounting_currency=org.accounting_currency,
+    )
+    m_sales = Module.objects.get(code="sales")
+    warehouse = Warehouse.objects.create(
+        organization=fresh, module=m_sales, code="WH-DL", name="Склад теста",
+    )
+    customer = Counterparty.objects.create(
+        organization=fresh, code="C-DL", kind="buyer", name="Просрочник",
+    )
+    today = date.today()
+    SaleOrder.objects.create(
+        organization=fresh, doc_number="П-DL-1", date=today,
+        module=m_sales, customer=customer, warehouse=warehouse,
+        status=SaleOrder.Status.CONFIRMED,
+        payment_status=SaleOrder.PaymentStatus.PARTIAL,
+        amount_uzs=Decimal("2000000"),
+        paid_amount_uzs=Decimal("500000"),
+        cost_uzs=Decimal("800000"),
+        due_date=today - timedelta(days=1),  # просрочен вчера
+    )
+
+    kpis = kpi_summary(fresh, today=today)
+    assert Decimal(kpis["sales_overdue_loss_uzs"]) == Decimal("1500000")  # 2M - 0.5M
+    assert Decimal(kpis["sales_forecast_uzs"]) == Decimal("0")
 
 
 def test_summary_purchases_paid_excludes_unpaid_debt(org):

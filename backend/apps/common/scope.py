@@ -72,13 +72,43 @@ class UserScope:
         )
 
 
+def _rbac_allowed_module_ids(membership) -> FrozenSet[str]:
+    """Module UUIDs where membership's effective level >= 'r'.
+
+    Uses 2 queries (RolePermission + UserModuleAccessOverride). Overrides
+    win over role-based permissions (same as _effective_level logic).
+    """
+    from apps.rbac.models import RolePermission, UserModuleAccessOverride
+
+    _order = {"none": 0, "r": 1, "rw": 2, "admin": 3}
+
+    role_ids = list(membership.user_roles.values_list("role_id", flat=True))
+    role_perms = list(
+        RolePermission.objects.filter(role_id__in=role_ids).values("module_id", "level")
+    )
+    overrides = list(
+        UserModuleAccessOverride.objects.filter(membership=membership).values("module_id", "level")
+    )
+
+    effective: dict[str, str] = {}
+    for p in role_perms:
+        mid = str(p["module_id"])
+        if _order.get(p["level"], 0) > _order.get(effective.get(mid, "none"), 0):
+            effective[mid] = p["level"]
+    for ov in overrides:
+        effective[str(ov["module_id"])] = ov["level"]
+
+    return frozenset(mid for mid, lv in effective.items() if _order.get(lv, 0) >= 1)
+
+
 def get_user_scope(user, organization) -> UserScope:
     """Резолвит UserScope для пары (user, org).
 
     Логика:
       1. Если нет user/org → пустой scope (видит ничего).
-      2. Если нет UserScopeAssignment-записей → проверяем is_admin;
-         admin → unlimited, обычный пользователь → unlimited (default).
+      2. Если нет UserScopeAssignment-записей → ограничиваем по RBAC-модулям
+         (только модули где у юзера уровень >= r). Так HEAD_SLAUGHTER
+         не видит склады feed-модуля, даже без явных ScopeAssignment.
       3. Если есть хоть одна запись → строгий режим по этим измерениям,
          **даже для admin'а** (см. docstring модуля).
     """
@@ -111,12 +141,15 @@ def get_user_scope(user, organization) -> UserScope:
     )
 
     if not assignments:
-        # Нет ни одного назначения → default unlimited (admin или нет —
-        # неважно, доступ ко всем измерениям).
+        # Нет явных назначений → ограничиваем по RBAC-модулям автоматически.
+        # allowed_module_ids = set of module UUIDs where user has >= r.
+        # None (без ограничения) здесь не возвращаем — иначе HEAD_SLAUGHTER
+        # видел бы склады feed-модуля через scope_fields=("module_id",).
+        module_ids = _rbac_allowed_module_ids(membership)
         return UserScope(
             allowed_warehouse_ids=None,
             allowed_block_ids=None,
-            allowed_module_ids=None,
+            allowed_module_ids=module_ids,
             is_org_admin=membership.module_overrides.filter(level="admin").exists(),
         )
 

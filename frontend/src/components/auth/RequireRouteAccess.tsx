@@ -27,10 +27,18 @@ const PUBLIC_ROUTES = new Set<string>([
  * отдельные пункты. Смотрим по `pathname.startsWith(prefix)`.
  *
  * Например `/feed/<batchId>/print` использует тот же модуль `feed`, что и `/feed`.
+ * `anyModule` — пускаем если у пользователя есть r+ хотя бы на один из списка.
  */
-const PREFIX_RULES: { prefix: string; module: string; min?: ModuleLevel }[] = [
-  { prefix: '/reports', module: 'ledger' },          // /reports/trial-balance, /reports/pl, /reports/gl-ledger
-  { prefix: '/finance', module: 'ledger' },          // /finance/cashbox, /finance/rates
+const PREFIX_RULES: {
+  prefix: string;
+  module?: string;
+  anyModule?: string[];
+  min?: ModuleLevel;
+}[] = [
+  { prefix: '/reports', module: 'ledger' },
+  // Кассы доступны с cash-модулем ИЛИ с ledger/purchases/sales/vet/feed/admin.
+  { prefix: '/finance/cashbox', anyModule: ['cash', 'ledger', 'purchases', 'sales', 'vet', 'feed', 'admin'] },
+  { prefix: '/finance', module: 'ledger' },          // /finance/rates и прочее
   { prefix: '/feed/',   module: 'feed' },            // /feed/<id>/print
   { prefix: '/matochnik/', module: 'matochnik' },    // /matochnik/<id>/print/...
   { prefix: '/payroll', module: 'hr' },              // /payroll/templates etc.
@@ -45,20 +53,26 @@ const PREFIX_RULES: { prefix: string; module: string; min?: ModuleLevel }[] = [
  *   3. PREFIX_RULES (для вложенных путей которые не в nav)
  *   4. Иначе — публичный (fail-open для несуществующих и системных страниц)
  */
-function resolveRequirement(
-  pathname: string,
-): { module: string; min: ModuleLevel } | null {
+type Requirement =
+  | { kind: 'single'; module: string; min: ModuleLevel }
+  | { kind: 'any'; modules: string[]; min: ModuleLevel };
+
+function resolveRequirement(pathname: string): Requirement | null {
   if (PUBLIC_ROUTES.has(pathname)) return null;
 
   const exact = flatItems().find((i) => i.href === pathname);
   if (exact?.module) {
-    return { module: exact.module, min: exact.min ?? 'r' };
+    return { kind: 'single', module: exact.module, min: exact.min ?? 'r' };
   }
   if (exact && !exact.module) return null;
 
   for (const rule of PREFIX_RULES) {
-    if (pathname.startsWith(rule.prefix)) {
-      return { module: rule.module, min: rule.min ?? 'r' };
+    if (!pathname.startsWith(rule.prefix)) continue;
+    if (rule.anyModule) {
+      return { kind: 'any', modules: rule.anyModule, min: rule.min ?? 'r' };
+    }
+    if (rule.module) {
+      return { kind: 'single', module: rule.module, min: rule.min ?? 'r' };
     }
   }
 
@@ -85,24 +99,31 @@ export default function RequireRouteAccess({ children }: Props) {
 
   if (!requirement) return <>{children}</>;
 
-  // Сначала проверяем org-level toggle: модуль может быть отключён
-  // владельцем через /settings. У такого юзера пермишны RBAC ещё могут
-  // быть (он раньше работал) — но мы должны показать «отключён», а
-  // не «нет прав», чтобы он не тыкал к админам зря.
+  if (requirement.kind === 'any') {
+    const passed = requirement.modules.some((m) => hasLevel(m, requirement.min));
+    if (passed) return <>{children}</>;
+    // Show denial for the first module in the list that is enabled.
+    const firstEnabled = requirement.modules.find((m) => isModuleEnabled(m)) ?? requirement.modules[0];
+    return (
+      <NoAccess
+        module={firstEnabled}
+        requiredLevel={requirement.min}
+        currentLevel={permissions[firstEnabled] ?? 'none'}
+      />
+    );
+  }
+
+  // kind === 'single'
   if (!isModuleEnabled(requirement.module)) {
     return <ModuleDisabled module={requirement.module} />;
   }
-
   if (hasLevel(requirement.module, requirement.min)) return <>{children}</>;
-
-  const userLevel = permissions[requirement.module] ?? 'none';
-  const requiredLevel = requirement.min;
 
   return (
     <NoAccess
       module={requirement.module}
-      requiredLevel={requiredLevel}
-      currentLevel={userLevel}
+      requiredLevel={requirement.min}
+      currentLevel={permissions[requirement.module] ?? 'none'}
     />
   );
 }
@@ -134,6 +155,8 @@ const MODULE_LABEL: Record<string, string> = {
   purchases: 'Закупки',
   sales: 'Продажи',
   admin: 'Администрирование',
+  hr: 'Кадры и ЗП',
+  cash: 'Кассы',
 };
 
 function NoAccess({ module, requiredLevel, currentLevel }: NoAccessProps) {

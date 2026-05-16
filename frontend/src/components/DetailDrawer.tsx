@@ -2,6 +2,7 @@
 
 import Icon from '@/components/ui/Icon';
 import { useModalLifecycle } from '@/hooks/useModalLifecycle';
+import { useUnsavedChangesGuard } from '@/hooks/useUnsavedChangesGuard';
 
 interface Tab {
   key: string;
@@ -21,15 +22,16 @@ interface DetailDrawerProps {
 }
 
 export default function DetailDrawer({ title, subtitle, onClose, tabs, activeTab, onTab, actions, children }: DetailDrawerProps) {
-  useModalLifecycle(onClose);
+  const { containerRef, handleClose, handleClickCapture } = useUnsavedChangesGuard(onClose);
+  useModalLifecycle(handleClose);
   return (
-    <div className="drawer-backdrop" onClick={onClose}>
-      <div className="drawer" onClick={e => e.stopPropagation()}>
+    <div className="drawer-backdrop" onClick={handleClose} onClickCapture={handleClickCapture}>
+      <div className="drawer" ref={containerRef} onClick={(e) => e.stopPropagation()}>
         <div className="drawer-hdr">
           <div style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 10 }}>
             <button
               className="close-btn"
-              onClick={onClose}
+              onClick={handleClose}
               aria-label="Закрыть"
               title="Закрыть (Esc)"
             >

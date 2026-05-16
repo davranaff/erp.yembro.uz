@@ -12,7 +12,7 @@ from datetime import date, timedelta
 from decimal import Decimal
 from typing import Optional
 
-from django.db.models import Count, Q, Sum
+from django.db.models import Count, DecimalField, ExpressionWrapper, F, Q, Sum
 
 from apps.batches.models import Batch
 from apps.feedlot.models import FeedlotBatch
@@ -85,6 +85,8 @@ def kpi_summary(organization, *, readable_modules: Optional[set] = None, today: 
         or Decimal("0")
     )
 
+    today_date = today or date.today()
+
     sales_agg = (
         SaleOrder.objects.filter(
             organization=organization,
@@ -100,7 +102,55 @@ def kpi_summary(organization, *, readable_modules: Optional[set] = None, today: 
     sales_paid = sales_agg["paid"] or Decimal("0")
     sales_cost = sales_agg["cost"] or Decimal("0")
     sales_unpaid = sales_invoiced - sales_paid
-    sales_margin = sales_invoiced - sales_cost
+
+    # Cash-basis margin: for each order, only count the paid portion of cost.
+    # paid_cost_i = cost_i * (paid_i / amount_i)  →  margin contribution = paid_i - paid_cost_i
+    # Filter amount_uzs > 0 to avoid division by zero.
+    paid_margin_agg = (
+        SaleOrder.objects.filter(
+            organization=organization,
+            status=SaleOrder.Status.CONFIRMED,
+            date__gte=start, date__lte=end,
+            amount_uzs__gt=0,
+        ).annotate(
+            paid_cost_portion=ExpressionWrapper(
+                F("cost_uzs") * F("paid_amount_uzs") / F("amount_uzs"),
+                output_field=DecimalField(max_digits=20, decimal_places=2),
+            )
+        ).aggregate(
+            total_paid=Sum("paid_amount_uzs"),
+            total_paid_cost=Sum("paid_cost_portion"),
+        )
+    )
+    sales_margin = (paid_margin_agg["total_paid"] or Decimal("0")) - (
+        paid_margin_agg["total_paid_cost"] or Decimal("0")
+    )
+
+    # Forecast: unpaid on this month's orders where due_date is in the future
+    # (or null — not yet explicitly overdue).
+    _month_unpaid_qs = (
+        SaleOrder.objects.filter(
+            organization=organization,
+            status=SaleOrder.Status.CONFIRMED,
+            date__gte=start, date__lte=end,
+        ).exclude(payment_status=SaleOrder.PaymentStatus.PAID)
+    )
+    forecast_agg = _month_unpaid_qs.filter(
+        Q(due_date__gte=today_date) | Q(due_date__isnull=True)
+    ).aggregate(amt=Sum("amount_uzs"), paid=Sum("paid_amount_uzs"))
+    sales_forecast = max(
+        (forecast_agg["amt"] or Decimal("0")) - (forecast_agg["paid"] or Decimal("0")),
+        Decimal("0"),
+    )
+
+    # Overdue loss: unpaid amounts on this month's orders past their due_date.
+    loss_agg = _month_unpaid_qs.filter(
+        due_date__lt=today_date
+    ).aggregate(amt=Sum("amount_uzs"), paid=Sum("paid_amount_uzs"))
+    sales_overdue_loss = max(
+        (loss_agg["amt"] or Decimal("0")) - (loss_agg["paid"] or Decimal("0")),
+        Decimal("0"),
+    )
 
     debtor_agg = (
         SaleOrder.objects.filter(
@@ -172,6 +222,8 @@ def kpi_summary(organization, *, readable_modules: Optional[set] = None, today: 
         "sales_unpaid_uzs": str(sales_unpaid),
         "sales_cost_uzs": str(sales_cost),
         "sales_margin_uzs": str(sales_margin),
+        "sales_forecast_uzs": str(sales_forecast),
+        "sales_overdue_loss_uzs": str(sales_overdue_loss),
         "active_batches": active_batches,
         "transfers_pending": transfers_pending,
         "purchases_drafts": purchases_drafts,
@@ -406,3 +458,151 @@ def cashflow_chart(organization, *, days: int = 30) -> list[dict]:
         })
         cur += timedelta(days=1)
     return points
+
+
+def module_cash_balances(
+    organization,
+    *,
+    readable_modules: Optional[set] = None,
+    today: Optional[date] = None,
+) -> list[dict]:
+    """Per-module cash balances for the dashboard kassas section.
+
+    Returns one entry per module that has any POSTED payment activity.
+    Filtered by readable_modules — modules the user cannot read are excluded.
+    Each entry includes all-time balance and current-period in/out.
+    """
+    from apps.modules.models import Module
+
+    start, end = _month_bounds(today)
+
+    base = Payment.objects.filter(
+        organization=organization,
+        status=Payment.Status.POSTED,
+        module__isnull=False,
+    )
+
+    module_ids = list(base.values_list("module_id", flat=True).distinct())
+    if not module_ids:
+        return []
+
+    modules = Module.objects.filter(id__in=module_ids).order_by("name")
+    result = []
+
+    for module in modules:
+        if readable_modules is not None and module.code not in readable_modules:
+            continue
+
+        mqs = base.filter(module=module)
+
+        balance_in = mqs.filter(direction=Payment.Direction.IN).aggregate(s=Sum("amount_uzs"))["s"] or Decimal("0")
+        balance_out = mqs.filter(direction=Payment.Direction.OUT).aggregate(s=Sum("amount_uzs"))["s"] or Decimal("0")
+        balance = balance_in - balance_out
+
+        period_in = mqs.filter(direction=Payment.Direction.IN, date__gte=start, date__lte=end).aggregate(s=Sum("amount_uzs"))["s"] or Decimal("0")
+        period_out = mqs.filter(direction=Payment.Direction.OUT, date__gte=start, date__lte=end).aggregate(s=Sum("amount_uzs"))["s"] or Decimal("0")
+
+        result.append({
+            "module_code": module.code,
+            "module_name": module.name,
+            "balance_uzs": str(balance),
+            "period_in_uzs": str(period_in),
+            "period_out_uzs": str(period_out),
+        })
+
+    return sorted(result, key=lambda x: Decimal(x["balance_uzs"]), reverse=True)
+
+
+def module_kpi(
+    organization,
+    module_code: str,
+    *,
+    date_from: date,
+    date_to: date,
+) -> dict:
+    """Per-module KPIs for the module section on the dashboard.
+
+    Aggregates POSTED payments and CONFIRMED SaleOrders scoped to a single
+    module. Used by DashboardModuleView — the view enforces RBAC before calling.
+    """
+    base = Payment.objects.filter(
+        organization=organization,
+        status=Payment.Status.POSTED,
+        module__code=module_code,
+    )
+
+    period_in = (
+        base.filter(direction=Payment.Direction.IN, date__gte=date_from, date__lte=date_to)
+        .aggregate(s=Sum("amount_uzs"))["s"] or Decimal("0")
+    )
+    period_out = (
+        base.filter(direction=Payment.Direction.OUT, date__gte=date_from, date__lte=date_to)
+        .aggregate(s=Sum("amount_uzs"))["s"] or Decimal("0")
+    )
+
+    all_in = base.filter(direction=Payment.Direction.IN).aggregate(s=Sum("amount_uzs"))["s"] or Decimal("0")
+    all_out = base.filter(direction=Payment.Direction.OUT).aggregate(s=Sum("amount_uzs"))["s"] or Decimal("0")
+    balance = all_in - all_out
+
+    ar_agg = (
+        SaleOrder.objects.filter(
+            organization=organization,
+            status=SaleOrder.Status.CONFIRMED,
+            module__code=module_code,
+        )
+        .exclude(payment_status=SaleOrder.PaymentStatus.PAID)
+        .aggregate(amt=Sum("amount_uzs"), paid=Sum("paid_amount_uzs"))
+    )
+    ar = max(
+        (ar_agg["amt"] or Decimal("0")) - (ar_agg["paid"] or Decimal("0")),
+        Decimal("0"),
+    )
+
+    sales_drafts = SaleOrder.objects.filter(
+        organization=organization,
+        status=SaleOrder.Status.DRAFT,
+        module__code=module_code,
+    ).count()
+
+    purchases_drafts = PurchaseOrder.objects.filter(
+        organization=organization,
+        status=PurchaseOrder.Status.DRAFT,
+        module__code=module_code,
+    ).count()
+
+    in_by_date = {
+        r["date"]: r["s"]
+        for r in base.filter(
+            direction=Payment.Direction.IN,
+            date__gte=date_from, date__lte=date_to,
+        ).values("date").annotate(s=Sum("amount_uzs"))
+    }
+    out_by_date = {
+        r["date"]: r["s"]
+        for r in base.filter(
+            direction=Payment.Direction.OUT,
+            date__gte=date_from, date__lte=date_to,
+        ).values("date").annotate(s=Sum("amount_uzs"))
+    }
+
+    cashflow: list[dict] = []
+    cur = date_from
+    while cur <= date_to:
+        cashflow.append({
+            "date": cur.isoformat(),
+            "in_uzs": str(in_by_date.get(cur, Decimal("0"))),
+            "out_uzs": str(out_by_date.get(cur, Decimal("0"))),
+        })
+        cur += timedelta(days=1)
+
+    return {
+        "module_code": module_code,
+        "period": {"from": date_from.isoformat(), "to": date_to.isoformat()},
+        "payments_in_uzs": str(period_in),
+        "payments_out_uzs": str(period_out),
+        "balance_uzs": str(balance),
+        "ar_uzs": str(ar),
+        "sales_drafts": sales_drafts,
+        "purchases_drafts": purchases_drafts,
+        "cashflow": cashflow,
+    }

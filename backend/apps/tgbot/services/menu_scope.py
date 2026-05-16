@@ -115,10 +115,14 @@ def user_module_levels(link) -> dict[str, str]:
     return result
 
 
-def is_owner(levels: dict[str, str]) -> bool:
-    """Owner = admin доступ к 'admin'-модулю. Видит всё во всех разделах."""
+def is_owner(levels: dict[str, str], notify_enabled: bool = False) -> bool:
+    """Owner = admin доступ к 'admin'-модулю ИЛИ notify_enabled=True (trusted admin).
+
+    notify_enabled — флаг TgLink: если True, юзер явно отмечен
+    администратором как доверенный и получает полный набор меню + уведомлений.
+    """
     from apps.rbac.models import AccessLevel
-    return levels.get("admin") == AccessLevel.ADMIN
+    return notify_enabled or levels.get("admin") == AccessLevel.ADMIN
 
 
 def has_any_access(levels: dict[str, str], modules: Iterable[str]) -> bool:
@@ -136,12 +140,11 @@ def can_see_section(levels: dict[str, str], section: str) -> bool:
     return has_any_access(levels, modules)
 
 
-def commands_for_user(levels: dict[str, str]) -> list[dict]:
+def commands_for_user(levels: dict[str, str], notify_enabled: bool = False) -> list[dict]:
     """Список команд для setMyCommands per chat — только доступные.
 
-    Owner получает все. Каждой команде сопоставлен required-модуль (см.
-    COMMAND_MODULES); если у юзера на этот модуль нет r — команда не
-    показывается в /menu Telegram'а.
+    Owner (admin:admin) и notify_enabled=True получают все. Остальным
+    показываем только команды, к которым есть >=r доступ по RBAC.
     """
     from apps.common.permissions import level_satisfies
 
@@ -160,7 +163,7 @@ def commands_for_user(levels: dict[str, str]) -> list[dict]:
         "cred":       "Yetkazib beruvchi qarzlari",
         "production": "Ishlab chiqarish hozir",
     }
-    owner = is_owner(levels)
+    owner = is_owner(levels, notify_enabled=notify_enabled)
     for cmd, mod in COMMAND_MODULES.items():
         if mod == "" or owner or level_satisfies(levels.get(mod, "none"), "r"):
             available.append({

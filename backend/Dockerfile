@@ -30,4 +30,4 @@ EXPOSE 30000
 
 # Default command runs Gunicorn on port 30000 (matches compose.base.yml + Caddyfile).
 # `migrate` service in compose runs migrations separately.
-CMD ["gunicorn", "config.wsgi:application", "--bind", "0.0.0.0:30000", "--workers", "3", "--access-logfile", "-", "--error-logfile", "-"]
+CMD ["gunicorn", "config.wsgi:application", "--bind", "0.0.0.0:30000", "--config", "gunicorn.conf.py"]

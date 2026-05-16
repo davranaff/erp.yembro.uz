@@ -24,7 +24,7 @@ export default function CashboxListPage() {
   const hasLevel = useHasLevel();
   // Org-admin: только владелец/CFO. Управление кассами/счетами — это
   // структурное изменение плана счетов, не делегируется heads.
-  const isOrgAdmin = hasLevel('admin', 'admin') || hasLevel('ledger', 'admin');
+  const isOrgAdmin = hasLevel('admin', 'admin') || hasLevel('ledger', 'admin') || hasLevel('cash', 'admin');
 
   const { data: subs } = useSubaccounts();
   const { data: modules } = useModules();

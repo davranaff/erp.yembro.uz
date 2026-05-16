@@ -76,7 +76,7 @@ export default function OpexModal({ preselect, onClose }: Props) {
   const { data: articles } = expenseArticlesCrud.useList({ is_active: 'true' });
   const hasLevel = useHasLevel();
   const permissions = usePermissions();
-  const isOrgAdmin = hasLevel('admin', 'admin') || hasLevel('ledger', 'admin');
+  const isOrgAdmin = hasLevel('admin', 'admin') || hasLevel('ledger', 'admin') || hasLevel('cash', 'admin');
 
   const [direction, setDirection] = useState<'out' | 'in'>(preselect?.direction ?? 'out');
   const [kind, setKind] = useState<'opex' | 'income' | 'salary'>(

@@ -44,7 +44,7 @@ export const NAV: NavEntry[] = [
   // и без остальных модулей).
   { key: 'dash',         label: 'Сводка',             icon: 'grid',  href: '/dashboard',
     requireAnyModule: ['core', 'ledger', 'reports', 'sales', 'purchases', 'stock',
-      'feed', 'feedlot', 'matochnik', 'incubation', 'slaughter', 'vet', 'admin'],
+      'feed', 'feedlot', 'matochnik', 'incubation', 'slaughter', 'vet', 'admin', 'cash'],
     aliases: ['dashboard', 'главная', 'kpi'] },
 
   // ── Справочники ─────────────────────────────────────────────────────
@@ -114,7 +114,7 @@ export const NAV: NavEntry[] = [
   // Касса и банк: cross-module, фильтрация платежей по модулям внутри viewset.
   // Скрываем для тех, у кого только узкий модуль (например HR).
   { key: 'cashbox',   label: 'Касса и банк',     icon: 'book',  href: '/finance/cashbox',
-    requireAnyModule: ['ledger', 'purchases', 'sales', 'vet', 'feed', 'admin'],
+    requireAnyModule: ['cash', 'ledger', 'purchases', 'sales', 'vet', 'feed', 'admin'],
     aliases: ['платёж', 'оплата', 'банк', 'касса'] },
   // История оповещений: журнал SMS+TG (для админов и sales-руководителей).
   { key: 'notifications', label: 'Оповещения',  icon: 'inbox', href: '/notifications',

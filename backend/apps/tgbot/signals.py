@@ -62,7 +62,7 @@ def _refresh_commands_for_membership(membership_id) -> None:
     for link in links:
         try:
             levels = user_module_levels(link)
-            cmds = commands_for_user(levels)
+            cmds = commands_for_user(levels, notify_enabled=link.notify_enabled)
             set_my_commands(cmds, chat_id=link.chat_id)
             logger.info(
                 "rbac-sync: setMyCommands updated for chat=%s user=%s commands=%d",

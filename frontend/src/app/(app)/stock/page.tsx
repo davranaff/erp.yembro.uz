@@ -57,6 +57,16 @@ function fmtDate(iso: string) {
   }
 }
 
+function todayISO(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function shiftDate(iso: string, days: number): string {
+  const d = new Date(iso);
+  d.setDate(d.getDate() + days);
+  return d.toISOString().slice(0, 10);
+}
+
 function fmtMoney(v: string | null | undefined) {
   if (!v) return '—';
   const n = parseFloat(v);
@@ -93,6 +103,9 @@ export default function StockPage() {
   const [warehouseId, setWarehouseId] = useState('');
   const [nomenclatureId, setNomenclatureId] = useState('');
   const [nomenclatureLabel, setNomenclatureLabel] = useState('');
+  // По умолчанию показываем сегодняшний день. Пустая строка = «все даты»
+  // (можно переключиться кнопкой). UX-паттерн совпадает со «сводкой дня».
+  const [date, setDate] = useState<string>(todayISO());
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(50);
   const [sel, setSel] = useState<StockMovement | null>(null);
@@ -125,8 +138,12 @@ export default function StockPage() {
       warehouse: warehouseId || undefined,
       nomenclature: nomenclatureId || undefined,
       search: search || undefined,
+      // Дневной фильтр: бэк ждёт ISO datetime, ограничиваем интервалом
+      // [день 00:00, день 23:59:59]. Пустой `date` = «все даты».
+      date_after: date ? `${date}T00:00:00` : undefined,
+      date_before: date ? `${date}T23:59:59` : undefined,
     }),
-    [kind, moduleCode, warehouseId, nomenclatureId, search],
+    [kind, moduleCode, warehouseId, nomenclatureId, search, date],
   );
 
   const { data: pageData, isLoading, error, refetch, isFetching } = useStockMovementsPaginated(filter, page, pageSize);
@@ -143,6 +160,8 @@ export default function StockPage() {
     if (filter.module_code) params.set('module_code', filter.module_code);
     if (filter.warehouse) params.set('warehouse', filter.warehouse);
     if (filter.search) params.set('search', filter.search);
+    if (filter.date_after) params.set('date_after', filter.date_after);
+    if (filter.date_before) params.set('date_before', filter.date_before);
     const qs = params.toString();
     return qs
       ? `/api/warehouses/movements/?${qs}`
@@ -275,6 +294,57 @@ export default function StockPage() {
               sub={stats ? `${stats.by_kind.write_off.count} док.` : ''}
               value={stats ? fmtMoneyShort(stats.by_kind.write_off.amount_uzs) : '…'}
             />
+          </div>
+
+          {/* Date navigation — паттерн из /feed/dashboard:
+              «← пред | <date> | Сегодня | след →». Пустая дата = «все даты». */}
+          <div style={{
+            display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 8,
+            marginBottom: 12, padding: 10, background: 'var(--bg-soft)', borderRadius: 6,
+          }}>
+            <button
+              className="btn btn-secondary btn-sm"
+              disabled={!date}
+              onClick={() => { setDate((d) => shiftDate(d || todayISO(), -1)); setPage(1); }}
+            >
+              ← пред
+            </button>
+            <input
+              className="input mono"
+              type="date"
+              value={date}
+              onChange={(e) => { setDate(e.target.value); setPage(1); }}
+              style={{ width: 160 }}
+            />
+            <button
+              className="btn btn-secondary btn-sm"
+              onClick={() => { setDate(todayISO()); setPage(1); }}
+            >
+              Сегодня
+            </button>
+            <button
+              className="btn btn-secondary btn-sm"
+              disabled={!date}
+              onClick={() => { setDate((d) => shiftDate(d || todayISO(), 1)); setPage(1); }}
+            >
+              след →
+            </button>
+            <button
+              className="btn btn-ghost btn-sm"
+              onClick={() => { setDate(''); setPage(1); }}
+              disabled={!date}
+              title="Показать движения за все даты"
+            >
+              Все даты
+            </button>
+            <div style={{ flex: 1 }} />
+            <span style={{ fontSize: 13, color: 'var(--fg-3)' }}>
+              {date
+                ? new Date(date).toLocaleDateString('ru-RU', {
+                    weekday: 'long', day: 'numeric', month: 'long', year: 'numeric',
+                  })
+                : 'все даты'}
+            </span>
           </div>
 
           <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>

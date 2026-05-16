@@ -58,13 +58,27 @@ def test_no_assignments_admin_is_unlimited(admin_user, org):
     assert scope.is_org_admin
 
 
-def test_no_assignments_regular_user_is_unlimited(org):
-    """Без UserScopeAssignment обычный юзер видит всё (default open)."""
+def test_no_assignments_regular_user_sees_only_rbac_modules(org, feed_module):
+    """Без UserScopeAssignment юзер ограничен своими RBAC-модулями.
+
+    Раньше был 'default open' — теперь allowed_module_ids берётся из ролей/overrides.
+    Юзер без ролей видит nothing; юзер с override на feed видит только feed.
+    """
     u = User.objects.create_user(email="scope-reg@test.local", password="x")
-    OrganizationMembership.objects.create(user=u, organization=org, is_active=True)
+    m = OrganizationMembership.objects.create(user=u, organization=org, is_active=True)
+
+    # Без ролей — пустой allowed_module_ids, is_unlimited=False.
     scope = get_user_scope(u, org)
-    assert scope.is_unlimited
-    assert not scope.is_org_admin
+    assert not scope.is_unlimited
+    assert scope.allowed_module_ids == frozenset()
+
+    # Добавляем override на feed → теперь только feed в scope.
+    UserModuleAccessOverride.objects.create(
+        membership=m, module=feed_module, level=AccessLevel.READ,
+    )
+    scope2 = get_user_scope(u, org)
+    assert not scope2.is_unlimited
+    assert scope2.allowed_module_ids == frozenset({str(feed_module.id)})
 
 
 def test_module_assignment_restricts_even_admin(admin_user, org, feed_module):

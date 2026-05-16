@@ -57,6 +57,11 @@ class TgLink(UUIDModel, TimestampedModel):
     # сводку). Counterparty-линки никогда не получают digest, для них
     # есть только debt-reminders. См. tasks.owner_digest_task.
     digest_enabled = models.BooleanField(default=True)
+    # Если True — юзер получает ВСЕ уведомления и дайджесты бота,
+    # а также видит полный набор команд /menu. Управляется из UI
+    # Settings → Telegram → «Получатели уведомлений» (только admin).
+    # Default=False: новые линки молчат до явного включения.
+    notify_enabled = models.BooleanField(default=False)
 
     class Meta:
         unique_together = [("organization", "chat_id")]
