@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 
 import AmountInput from '@/components/ui/AmountInput';
 import Icon from '@/components/ui/Icon';
@@ -10,10 +10,11 @@ import { useCounterparties } from '@/hooks/useCounterparties';
 import { POPULAR_CURRENCY_CODES, useCurrenciesSorted, useRateOnDate } from '@/hooks/useCurrencyRates';
 import { useModules } from '@/hooks/useModules';
 import { useNomenclatureItems } from '@/hooks/useNomenclature';
+import { useHasLevel, usePermissions } from '@/hooks/usePermissions';
 import { purchasesCrud } from '@/hooks/usePurchases';
 import { useWarehouses } from '@/hooks/useStockMovements';
 import { ApiError } from '@/lib/api';
-import type { PurchaseOrder } from '@/types/auth';
+import { LEVEL_ORDER, type ModuleLevel, type PurchaseOrder } from '@/types/auth';
 
 interface Props {
   initial?: PurchaseOrder | null;
@@ -47,25 +48,59 @@ export default function PurchaseOrderModal({ initial, onClose }: Props) {
   const { data: suppliers } = useCounterparties({ kind: 'supplier' });
   const { data: currencies } = useCurrenciesSorted();
 
-  const [moduleId, setModuleId] = useState(initial?.module ?? '');
+  const hasLevel = useHasLevel();
+  const permissions = usePermissions();
+  const isOrgAdmin = hasLevel('admin', 'admin');
 
-  // Номенклатура — фильтр по выбранному модулю-цели закупки. Без него
-  // покупка для feed выводила список всех SKU включая тушки/яйца, что
-  // бессмысленно. Склад тоже фильтруется по модулю — иначе finance_head
-  // feed-модуля видел бы склады vet/slaughter.
-  const selectedModuleCode = modules?.find((m) => m.id === moduleId)?.code;
-  const { data: warehouses } = useWarehouses(
-    selectedModuleCode ? { module_code: selectedModuleCode } : {},
-  );
-  const { data: nomenclature } = useNomenclatureItems({
-    is_active: 'true',
-    ...(selectedModuleCode ? { module_code: selectedModuleCode } : {}),
-  });
+  // ID-сет модулей, в которые у пользователя есть rw — для фильтрации
+  // складов на клиенте. null = org-admin (видит все). См. StockMovementModal
+  // — там тот же паттерн, иначе head feed мог бы выбирать склад vet.
+  const accessibleModuleIds = useMemo<Set<string> | null>(() => {
+    if (isOrgAdmin) return null;
+    if (!modules) return new Set();
+    const allowedCodes = new Set(
+      Object.entries(permissions)
+        .filter(([, lvl]) => LEVEL_ORDER[lvl as ModuleLevel] >= LEVEL_ORDER.rw)
+        .map(([code]) => code),
+    );
+    return new Set(modules.filter((m) => allowedCodes.has(m.code)).map((m) => m.id));
+  }, [isOrgAdmin, modules, permissions]);
+
   const [date, setDate] = useState(initial?.date ?? new Date().toISOString().slice(0, 10));
   const [supplierId, setSupplierId] = useState(initial?.counterparty ?? '');
   const [warehouseId, setWarehouseId] = useState(initial?.warehouse ?? '');
   const [currencyId, setCurrencyId] = useState(initial?.currency ?? '');
   const [notes, setNotes] = useState(initial?.notes ?? '');
+
+  const { data: allWarehouses } = useWarehouses();
+  // На клиенте отфильтровываем по правам — backend пока возвращает все
+  // склады организации.
+  const warehouses = useMemo(() => {
+    if (!allWarehouses) return [];
+    return allWarehouses.filter((w) => {
+      if (accessibleModuleIds === null) return true;
+      if (!w.module) return false;
+      return accessibleModuleIds.has(w.module);
+    });
+  }, [allWarehouses, accessibleModuleIds]);
+
+  // Модуль закупки выводим из выбранного склада — у warehouse уже
+  // есть FK module. Раньше юзер выбирал модуль вручную, теперь шаг
+  // лишний (модуль = модуль склада прихода).
+  const selectedWarehouse = useMemo(
+    () => warehouses.find((w) => w.id === warehouseId),
+    [warehouses, warehouseId],
+  );
+  // При редактировании сохраняем исходный модуль (его menять нельзя).
+  const moduleId = isEdit
+    ? initial?.module ?? ''
+    : selectedWarehouse?.module ?? '';
+  const selectedModuleCode = modules?.find((m) => m.id === moduleId)?.code;
+
+  const { data: nomenclature } = useNomenclatureItems({
+    is_active: 'true',
+    ...(selectedModuleCode ? { module_code: selectedModuleCode } : {}),
+  });
 
   const [items, setItems] = useState<ItemDraft[]>(() => {
     if (initial?.items && initial.items.length > 0) {
@@ -102,15 +137,6 @@ export default function PurchaseOrderModal({ initial, onClose }: Props) {
     const r = parseFloat(rateOnDate.rate) / (rateOnDate.nominal || 1);
     return totalInDocCurrency * r;
   }, [totalInDocCurrency, currencyCode, rateOnDate]);
-
-  useEffect(() => {
-    if (!moduleId && modules && modules.length > 0 && !initial) {
-      const preferred = modules.find((m) =>
-        ['purchases', 'feed', 'vet', 'matochnik', 'incubation', 'feedlot'].includes(m.code),
-      );
-      if (preferred) setModuleId(preferred.id);
-    }
-  }, [modules, moduleId, initial]);
 
   const error = create.error ?? update.error;
   const fieldErrors = error instanceof ApiError && error.status === 400
@@ -192,26 +218,30 @@ export default function PurchaseOrderModal({ initial, onClose }: Props) {
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
         <div className="field">
-          <label>Модуль *</label>
-          <select
-            className="input"
-            value={moduleId}
-            onChange={(e) => setModuleId(e.target.value)}
-            disabled={isEdit}
-          >
-            <option value="">—</option>
-            {modules?.map((m) => (
-              <option key={m.id} value={m.id}>{m.name}</option>
-            ))}
-          </select>
-          {getFieldErr('module') && (
-            <div style={{ fontSize: 11, color: 'var(--danger)' }}>{getFieldErr('module')}</div>
-          )}
+          <label>Дата *</label>
+          <input className="input" type="date" value={date} onChange={(e) => setDate(e.target.value)} />
         </div>
 
         <div className="field">
-          <label>Дата *</label>
-          <input className="input" type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+          <label>Склад прихода *</label>
+          <SmartSelect
+            value={warehouseId}
+            onChange={setWarehouseId}
+            options={warehouses.map((w) => ({
+              value: w.id,
+              label: `${w.code} · ${w.name}`,
+            }))}
+            placeholder="— выберите склад —"
+            searchPlaceholder="Поиск склада…"
+            emptyText="Складов нет"
+            disabled={isEdit}
+          />
+          {getFieldErr('warehouse') && (
+            <div style={{ fontSize: 11, color: 'var(--danger)' }}>{getFieldErr('warehouse')}</div>
+          )}
+          {getFieldErr('module') && (
+            <div style={{ fontSize: 11, color: 'var(--danger)' }}>{getFieldErr('module')}</div>
+          )}
         </div>
 
         <div className="field">
@@ -231,21 +261,6 @@ export default function PurchaseOrderModal({ initial, onClose }: Props) {
           {getFieldErr('counterparty') && (
             <div style={{ fontSize: 11, color: 'var(--danger)' }}>{getFieldErr('counterparty')}</div>
           )}
-        </div>
-
-        <div className="field">
-          <label>Склад прихода *</label>
-          <SmartSelect
-            value={warehouseId}
-            onChange={setWarehouseId}
-            options={(warehouses ?? []).map((w) => ({
-              value: w.id,
-              label: `${w.code} · ${w.name}`,
-            }))}
-            placeholder="— выберите склад —"
-            searchPlaceholder="Поиск склада…"
-            emptyText={selectedModuleCode ? 'Складов модуля нет' : 'Сначала выберите модуль'}
-          />
         </div>
 
         <div className="field">

@@ -46,7 +46,6 @@ export default function StockMovementModal({ onClose, onSaved, onSwitchToFeedRaw
   const error = create.error;
 
   const [kind, setKind] = useState<StockMovementKind>('incoming');
-  const [moduleId, setModuleId] = useState('');
   const [nomenclatureId, setNomenclatureId] = useState('');
   const [quantity, setQuantity] = useState('');
   const [unitPrice, setUnitPrice] = useState('');
@@ -79,22 +78,10 @@ export default function StockMovementModal({ onClose, onSaved, onSwitchToFeedRaw
     );
   }, [isOrgAdmin, modules, permissions]);
 
-  const moduleCode = useMemo(
-    () => modules?.find((m) => m.id === moduleId)?.code,
-    [modules, moduleId],
-  );
-
-  // Список модулей в дропдауне — только те, где у юзера rw.
-  const visibleModules = useMemo(() => {
-    if (!modules) return [];
-    if (accessibleModuleIds === null) return modules;
-    return modules.filter((m) => accessibleModuleIds.has(m.id));
-  }, [modules, accessibleModuleIds]);
-
   const { data: warehouses } = useWarehouses();
-  // Склады — фильтруются и по выбранному модулю (как раньше), и по
-  // правам юзера. Чтобы не оказалось так что в дропдауне «На склад»
-  // висит склад модуля к которому у юзера нет доступа.
+  // Склады — фильтруются по правам юзера. Чтобы не оказалось так что
+  // в дропдауне «На склад» висит склад модуля к которому у юзера нет
+  // доступа.
   const visibleWarehouses = useMemo(() => {
     if (!warehouses) return [];
     return warehouses.filter((w) => {
@@ -104,6 +91,24 @@ export default function StockMovementModal({ onClose, onSaved, onSwitchToFeedRaw
       return accessibleModuleIds.has(w.module);
     });
   }, [warehouses, accessibleModuleIds]);
+
+  const needFrom = kind === 'outgoing' || kind === 'transfer' || kind === 'write_off';
+  const needTo = kind === 'incoming' || kind === 'transfer';
+
+  // Модуль выводим из выбранного склада — у warehouse уже есть FK module.
+  // Для transfer берём whFrom как ведущий (если оба указаны и в разных
+  // модулях, бэкенд отвергнет — это межмодульная передача, отдельный поток).
+  const primaryWhId = needFrom ? whFrom : whTo;
+  const primaryWh = useMemo(
+    () => warehouses?.find((w) => w.id === primaryWhId),
+    [warehouses, primaryWhId],
+  );
+  const moduleId = primaryWh?.module ?? '';
+  const moduleCode = useMemo(
+    () => modules?.find((m) => m.id === moduleId)?.code,
+    [modules, moduleId],
+  );
+
   const { data: items } = useNomenclatureItems({
     module_code: moduleCode,
     is_active: 'true',
@@ -119,6 +124,12 @@ export default function StockMovementModal({ onClose, onSaved, onSwitchToFeedRaw
     }
   }, [kind]);
 
+  // При смене модуля (через смену склада) сбрасываем номенклатуру —
+  // выбранная могла быть из другого модуля.
+  useEffect(() => {
+    setNomenclatureId('');
+  }, [moduleCode]);
+
   const fieldErrors =
     error instanceof ApiError && error.status === 400
       ? ((error.data as Record<string, string[] | string>) ?? {})
@@ -130,9 +141,6 @@ export default function StockMovementModal({ onClose, onSaved, onSwitchToFeedRaw
     if (Number.isNaN(q) || Number.isNaN(p)) return 0;
     return q * p;
   }, [quantity, unitPrice]);
-
-  const needFrom = kind === 'outgoing' || kind === 'transfer' || kind === 'write_off';
-  const needTo = kind === 'incoming' || kind === 'transfer';
 
   const canSave =
     !saving &&
@@ -258,69 +266,6 @@ export default function StockMovementModal({ onClose, onSaved, onSwitchToFeedRaw
           </div>
         </div>
 
-        <div className="field">
-          <label>Модуль *</label>
-          <select
-            className="input"
-            value={moduleId}
-            onChange={(e) => {
-              setModuleId(e.target.value);
-              setNomenclatureId('');
-            }}
-          >
-            <option value="">— выберите —</option>
-            {visibleModules.map((m) => (
-              <option key={m.id} value={m.id}>
-                {m.name}
-              </option>
-            ))}
-          </select>
-          {renderError('module')}
-        </div>
-
-        <div className="field">
-          <label>Номенклатура *</label>
-          <SmartSelect
-            value={nomenclatureId}
-            onChange={setNomenclatureId}
-            options={(items ?? []).map((i) => ({
-              value: i.id,
-              label: i.name,
-              sublabel: i.sku,
-            }))}
-            disabled={!moduleId}
-            placeholder={moduleId ? '— выберите номенклатуру —' : 'сначала выберите модуль'}
-            searchPlaceholder="Поиск по SKU или названию…"
-            emptyText="Не найдено"
-          />
-          {renderError('nomenclature')}
-        </div>
-
-        <div className="field">
-          <label>Количество *</label>
-          <input
-            className="input mono"
-            type="number"
-            step="0.001"
-            min="0"
-            value={quantity}
-            onChange={(e) => setQuantity(e.target.value)}
-            placeholder="0.000"
-          />
-          {renderError('quantity')}
-        </div>
-
-        <div className="field">
-          <label>Цена за ед., UZS *</label>
-          <AmountInput
-            className="input mono"
-            value={unitPrice}
-            onChange={setUnitPrice}
-            placeholder="0.00"
-          />
-          {renderError('unit_price_uzs')}
-        </div>
-
         {needFrom && (
           <div className="field">
             <label>Со склада *</label>
@@ -356,6 +301,50 @@ export default function StockMovementModal({ onClose, onSaved, onSwitchToFeedRaw
             {renderError('warehouse_to')}
           </div>
         )}
+
+        <div className="field" style={{ gridColumn: '1 / -1' }}>
+          <label>Номенклатура *</label>
+          <SmartSelect
+            value={nomenclatureId}
+            onChange={setNomenclatureId}
+            options={(items ?? []).map((i) => ({
+              value: i.id,
+              label: i.name,
+              sublabel: i.sku,
+            }))}
+            disabled={!moduleId}
+            placeholder={moduleId ? '— выберите номенклатуру —' : 'сначала выберите склад'}
+            searchPlaceholder="Поиск по SKU или названию…"
+            emptyText="Не найдено"
+          />
+          {renderError('nomenclature')}
+          {renderError('module')}
+        </div>
+
+        <div className="field">
+          <label>Количество *</label>
+          <input
+            className="input mono"
+            type="number"
+            step="0.001"
+            min="0"
+            value={quantity}
+            onChange={(e) => setQuantity(e.target.value)}
+            placeholder="0.000"
+          />
+          {renderError('quantity')}
+        </div>
+
+        <div className="field">
+          <label>Цена за ед., UZS *</label>
+          <AmountInput
+            className="input mono"
+            value={unitPrice}
+            onChange={setUnitPrice}
+            placeholder="0.00"
+          />
+          {renderError('unit_price_uzs')}
+        </div>
 
         <div className="field" style={{ gridColumn: '1 / -1' }}>
           <label>Контрагент (опционально)</label>
