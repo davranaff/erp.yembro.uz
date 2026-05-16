@@ -936,7 +936,10 @@ export interface ProductionTask {
   id: string;
   doc_number: string;
   recipe_version: string;
+  recipe_code: string | null;
+  recipe_version_number: number | null;
   production_line: string;
+  production_line_code: string | null;
   shift: 'day' | 'night';
   scheduled_at: string;
   started_at: string | null;

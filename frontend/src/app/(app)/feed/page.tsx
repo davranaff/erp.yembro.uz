@@ -587,8 +587,20 @@ export default function FeedPage() {
             columns={[
               { key: 'sched', label: 'Запланировано', mono: true, cellStyle: { fontSize: 12 },
                 render: (t) => fmtDateTime(t.scheduled_at) },
-              { key: 'shift', label: 'Смена', cellStyle: { fontSize: 12 },
-                render: (t) => t.shift === 'day' ? 'День' : 'Ночь' },
+              { key: 'recipe', label: 'Рецепт', cellStyle: { fontSize: 12 },
+                render: (t) => {
+                  const code = t.recipe_code ?? '—';
+                  const ver = t.recipe_version_number;
+                  const recipe = (recipes ?? []).find((r) => r.code === t.recipe_code);
+                  return (
+                    <>
+                      <span className="mono" style={{ fontSize: 11, color: 'var(--fg-3)', marginRight: 6 }}>
+                        {code}{ver != null ? ` · v${ver}` : ''}
+                      </span>
+                      {recipe?.name ?? ''}
+                    </>
+                  );
+                } },
               { key: 'plan', label: 'План, кг', align: 'right', mono: true,
                 render: (t) => fmtNum(t.planned_quantity_kg, 0) },
               { key: 'actual', label: 'Факт, кг', align: 'right', mono: true,
