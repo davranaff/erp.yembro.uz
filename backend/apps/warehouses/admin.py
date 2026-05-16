@@ -50,3 +50,30 @@ class StockMovementAdmin(admin.ModelAdmin):
         "counterparty",
         "batch",
     )
+
+    # StockMovement, привязанный к проведённому документу (sale/purchase/
+    # production_task/payment) через source_content_type — это «нога»
+    # цепочки проводок. Менять количество/склад через админку без сторно
+    # документа-источника = рассинхрон ГК и физики склада. Делаем такие
+    # записи полностью readonly. Полностью ручные записи (source=NULL)
+    # редактируются как раньше.
+    def _is_linked_to_source(self, obj):
+        return obj is not None and obj.source_content_type_id is not None
+
+    def get_readonly_fields(self, request, obj=None):
+        base = list(super().get_readonly_fields(request, obj))
+        if self._is_linked_to_source(obj):
+            return [f.name for f in self.model._meta.fields]
+        return base
+
+    def has_delete_permission(self, request, obj=None):
+        if self._is_linked_to_source(obj):
+            return False
+        return super().has_delete_permission(request, obj)
+
+    def save_model(self, request, obj, form, change):
+        # Прогоняем валидацию модели (kind ↔ warehouse_from/to) даже
+        # при сохранении из админки — иначе можно записать OUTGOING
+        # без warehouse_from.
+        obj.full_clean()
+        super().save_model(request, obj, form, change)
