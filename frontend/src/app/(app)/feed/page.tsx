@@ -139,6 +139,16 @@ function fmtNum(v: string | null | undefined, digits = 2): string {
   return n.toLocaleString('ru-RU', { maximumFractionDigits: digits });
 }
 
+function fmtDateTime(v: string | null | undefined): string {
+  if (!v) return '—';
+  const d = new Date(v);
+  if (Number.isNaN(d.getTime())) return '—';
+  return d.toLocaleString('ru-RU', {
+    day: '2-digit', month: '2-digit', year: 'numeric',
+    hour: '2-digit', minute: '2-digit',
+  });
+}
+
 export default function FeedPage() {
   const [tab, setTab] = useState<TabKey>('recipes');
   const [taskStatus, setTaskStatus] = useState('');
@@ -399,8 +409,6 @@ export default function FeedPage() {
                 render: (r) => r.direction },
               { key: 'versions', label: 'Версий', align: 'right', mono: true,
                 render: (r) => r.versions_count },
-              { key: 'med', label: 'Мед.',
-                render: (r) => r.is_medicated ? <Badge tone="warn">мед</Badge> : '—' },
               { key: 'status', label: 'Статус',
                 render: (r) => r.is_active
                   ? <Badge tone="success" dot>Активна</Badge>
@@ -462,8 +470,6 @@ export default function FeedPage() {
             onRowClick={(r) => setSelRaw(r)}
             rowProps={(r) => ({ active: selRaw?.id === r.id })}
             columns={[
-              { key: 'doc', label: 'Документ',
-                render: (r) => <span className="badge id">{r.doc_number}</span> },
               { key: 'nom', label: 'Номенклатура',
                 render: (r) => (
                   <>
@@ -477,8 +483,8 @@ export default function FeedPage() {
                 render: (r) => r.supplier_name ?? '—' },
               { key: 'wh', label: 'Склад · Бункер', mono: true, cellStyle: { fontSize: 12 },
                 render: (r) => `${r.warehouse_code ?? '—'}${r.storage_bin ? ' · ' + r.storage_bin : ''}` },
-              { key: 'date', label: 'Прибыло', mono: true, cellStyle: { fontSize: 12 },
-                render: (r) => r.received_date },
+              { key: 'date', label: 'Создано', mono: true, cellStyle: { fontSize: 12 },
+                render: (r) => fmtDateTime(r.created_at) },
               { key: 'gross', label: 'Брутто кг', align: 'right', mono: true, cellStyle: { fontSize: 12 },
                 render: (r) => fmtNum(r.gross_weight_kg, 0) },
               { key: 'settle', label: 'Зачёт. кг', align: 'right', mono: true,
@@ -579,10 +585,8 @@ export default function FeedPage() {
             onRowClick={(t) => setSelTask(t)}
             rowProps={(t) => ({ active: selTask?.id === t.id })}
             columns={[
-              { key: 'doc', label: 'Документ',
-                render: (t) => <span className="badge id">{t.doc_number}</span> },
               { key: 'sched', label: 'Запланировано', mono: true, cellStyle: { fontSize: 12 },
-                render: (t) => new Date(t.scheduled_at).toLocaleString('ru') },
+                render: (t) => fmtDateTime(t.scheduled_at) },
               { key: 'shift', label: 'Смена', cellStyle: { fontSize: 12 },
                 render: (t) => t.shift === 'day' ? 'День' : 'Ночь' },
               { key: 'plan', label: 'План, кг', align: 'right', mono: true,
@@ -653,12 +657,10 @@ export default function FeedPage() {
             onRowClick={(b) => setSelBatch(b)}
             rowProps={(b) => ({ active: selBatch?.id === b.id })}
             columns={[
-              { key: 'doc', label: 'Документ',
-                render: (b) => <span className="badge id">{b.doc_number}</span> },
               { key: 'recipe', label: 'Рецепт', cellStyle: { fontSize: 12 },
                 render: (b) => b.recipe_code ?? '—' },
               { key: 'date', label: 'Произведено', mono: true, cellStyle: { fontSize: 12 },
-                render: (b) => new Date(b.produced_at).toLocaleDateString('ru-RU') },
+                render: (b) => fmtDateTime(b.produced_at) },
               { key: 'progress', label: 'Продано / Выпущено', mono: true,
                 cellStyle: { fontSize: 12 },
                 render: (b) => {
@@ -695,8 +697,6 @@ export default function FeedPage() {
                 cellStyle: { fontSize: 12 },
                 render: (b: FeedBatch) => fmtNum(b.unit_cost_uzs, 2) + ' сум',
               }] : []),
-              { key: 'med', label: 'Мед.',
-                render: (b) => b.is_medicated ? <Badge tone="warn">мед</Badge> : '—' },
               { key: 'status', label: 'Статус', cellStyle: { fontSize: 12 },
                 render: (b) => (
                   <Badge tone={FEED_BATCH_STATUS_TONE[b.status]} dot>
@@ -753,14 +753,10 @@ export default function FeedPage() {
             onRowClick={(b) => setSelBagLot(b)}
             rowProps={(b) => ({ active: selBagLot?.id === b.id })}
             columns={[
-              { key: 'doc', label: 'Документ',
-                render: (b) => <span className="badge id">{b.doc_number}</span> },
-              { key: 'source', label: 'Из замеса', mono: true, cellStyle: { fontSize: 11, color: 'var(--fg-3)' },
-                render: (b) => b.source_doc_number ?? '—' },
               { key: 'recipe', label: 'Рецепт', cellStyle: { fontSize: 12 },
                 render: (b) => b.recipe_code ?? '—' },
               { key: 'date', label: 'Расфасовано', mono: true, cellStyle: { fontSize: 12 },
-                render: (b) => new Date(b.packaged_at).toLocaleDateString('ru-RU') },
+                render: (b) => fmtDateTime(b.packaged_at) },
               { key: 'weight', label: 'Вес мешка', align: 'right', mono: true,
                 render: (b) => `${parseFloat(b.bag_weight_kg).toLocaleString('ru-RU')} кг` },
               { key: 'progress', label: 'Остаток / Расфасовано', mono: true,
@@ -805,8 +801,6 @@ export default function FeedPage() {
                 cellStyle: { fontSize: 12 },
                 render: (b: FeedBagLot) => fmtNum(b.unit_cost_uzs, 0) + ' сум',
               }] : []),
-              { key: 'med', label: 'Мед.',
-                render: (b) => b.is_medicated ? <Badge tone="warn">мед</Badge> : '—' },
               { key: 'status', label: 'Статус',
                 render: (b) => (
                   <Badge tone={BAG_STATUS_TONE[b.status]} dot>
