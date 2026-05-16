@@ -425,6 +425,19 @@ def confirm_sale(
             rate = _quantize_rate(override)
         else:
             rate_obj = get_rate_for(order.currency.code, order.date)
+            # get_rate_for() возвращает None если в БД нет курса на/до
+            # этой даты. Без guard'а ниже падало AttributeError
+            # ('NoneType' has no .rate) — даём осмысленную ошибку с
+            # подсказкой как закрыть проблему.
+            if rate_obj is None:
+                raise SaleConfirmError({
+                    "exchange_rate": (
+                        f"Нет курса {order.currency.code} на {order.date} "
+                        "и ранее. Синхронизируйте курсы ЦБ в разделе "
+                        "«Курсы валют» или укажите ручной курс в поле "
+                        "exchange_rate_override."
+                    ),
+                })
             rate = _quantize_rate(Decimal(rate_obj.rate) / Decimal(rate_obj.nominal))
     else:
         rate = Decimal("1")
