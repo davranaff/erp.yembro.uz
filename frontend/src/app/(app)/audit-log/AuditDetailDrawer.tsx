@@ -7,6 +7,8 @@ import Badge from '@/components/ui/Badge';
 import Panel from '@/components/ui/Panel';
 import type { AuditLogEntry } from '@/types/auth';
 
+import DiffTable from './DiffTable';
+
 interface Props {
   entry: AuditLogEntry;
   onClose: () => void;
@@ -111,26 +113,13 @@ export default function AuditDetailDrawer({ entry, onClose }: Props) {
         <Panel title="Изменения полей" flush>
           {!hasDiff ? (
             <div style={{ padding: 16, color: 'var(--fg-3)', fontSize: 13 }}>
-              Diff не записан для этого события. Это нормально для action типа{' '}
-              <code>create</code>, <code>delete</code>, <code>login</code>: всё
-              состояние объекта зафиксировано в его связанной модели или
-              entity_repr.
+              Diff не записан для этого события. Backend начал писать
+              diff в audit_log() недавно — для старых записей поле NULL.
+              Также diff не пишется на action <code>login</code> и подобных,
+              где нет «до/после».
             </div>
           ) : (
-            <pre
-              style={{
-                padding: 12,
-                margin: 0,
-                fontSize: 12,
-                lineHeight: 1.5,
-                background: 'var(--bg-soft)',
-                color: 'var(--fg-1)',
-                overflowX: 'auto',
-                fontFamily: 'var(--font-mono)',
-              }}
-            >
-              {JSON.stringify(entry.diff, null, 2)}
-            </pre>
+            <DiffTable diff={entry.diff as Record<string, unknown>} />
           )}
         </Panel>
       )}
