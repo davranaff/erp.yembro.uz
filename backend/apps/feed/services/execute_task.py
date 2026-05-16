@@ -130,6 +130,30 @@ def execute_production_task(
         copy_components_from_version(task)
         components = list(task.components.select_related("nomenclature", "source_batch"))
 
+    # Row-lock на партии сырья. Без этого два параллельных execute_task
+    # разных рецептов, делящих один и тот же ingredient batch, могли
+    # оба пройти guard `current_quantity >= required` (читая в одну и
+    # ту же миллисекунду), и оба выполнить F-update — батч уходил в
+    # минус. select_for_update() в детерминистическом порядке (по id)
+    # сериализует их и убирает риск deadlock'а между двумя замесами,
+    # которые делят 2+ общих ингредиента.
+    raw_batch_ids = sorted({
+        comp.source_batch_id for comp in components if comp.source_batch_id
+    })
+    if raw_batch_ids:
+        locked = {
+            b.id: b for b in RawMaterialBatch.objects
+                .select_for_update()
+                .filter(id__in=raw_batch_ids)
+                .order_by("id")
+        }
+        # Подменяем source_batch на свежепрочитанный (с актуальным
+        # current_quantity и блокировкой). Проверка остатка ниже на
+        # line 216 теперь работает с защищённой строкой.
+        for comp in components:
+            if comp.source_batch_id in locked:
+                comp.source_batch = locked[comp.source_batch_id]
+
     if not components:
         # Если и после fallback пусто — у версии действительно нет компонентов.
         raise FeedTaskExecuteError(
