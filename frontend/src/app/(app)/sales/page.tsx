@@ -10,7 +10,9 @@ import KpiCard from '@/components/ui/KpiCard';
 import Panel from '@/components/ui/Panel';
 import RowActions from '@/components/ui/RowActions';
 import Seg from '@/components/ui/Seg';
+import SmartSelect from '@/components/ui/SmartSelect';
 import TablePagination from '@/components/ui/TablePagination';
+import { useCounterparties } from '@/hooks/useCounterparties';
 import { useHasLevel } from '@/hooks/usePermissions';
 import { salesCrud, useConfirmSale, useReverseSale } from '@/hooks/useSales';
 import type { SaleOrder, SalePaymentStatus, SaleStatus } from '@/types/auth';
@@ -72,11 +74,15 @@ export default function SalesPage() {
 
   const [dateFrom, setDateFrom] = useState<string>('');
   const [dateTo, setDateTo] = useState<string>('');
+  const [customerId, setCustomerId] = useState<string>('');
   const [sortField, setSortField] = useState<'date' | 'amount_uzs' | 'doc_number'>('date');
   const [sortDir, setSortDir] = useState<'desc' | 'asc'>('desc');
 
   const hasLevel = useHasLevel();
   const canEdit = hasLevel('sales', 'rw');
+  // Покупатели для селектора-фильтра. kind=buyer — те же контрагенты,
+  // которых модалка продажи показывает при создании.
+  const { data: customers } = useCounterparties({ kind: 'buyer' });
 
   const ordering = `${sortDir === 'desc' ? '-' : ''}${sortField}`;
 
@@ -85,8 +91,9 @@ export default function SalesPage() {
     if (tab !== 'all') f.status = tab;
     if (dateFrom) f.date_after = dateFrom;
     if (dateTo) f.date_before = dateTo;
+    if (customerId) f.customer = customerId;
     return f;
-  }, [tab, dateFrom, dateTo]);
+  }, [tab, dateFrom, dateTo, customerId]);
 
   const { data: pageData, isLoading } = salesCrud.useListPaginated(filter, page, pageSize, ordering);
   const orders = pageData?.results ?? [];
@@ -208,6 +215,37 @@ export default function SalesPage() {
             title="Все даты"
           >
             Сбросить
+          </button>
+        )}
+
+        <span style={{
+          fontSize: 11, fontWeight: 700, color: 'var(--fg-3)',
+          textTransform: 'uppercase', letterSpacing: '.04em', marginLeft: 8,
+        }}>
+          Клиент:
+        </span>
+        <div style={{ minWidth: 220 }}>
+          <SmartSelect
+            value={customerId}
+            onChange={(v) => { setCustomerId(v); setPage(1); }}
+            options={(customers ?? []).map((c) => ({
+              value: c.id,
+              label: c.name,
+              sublabel: c.code,
+            }))}
+            placeholder="— все клиенты —"
+            searchPlaceholder="Поиск по названию или коду…"
+            emptyText="Клиенты не найдены"
+          />
+        </div>
+        {customerId && (
+          <button
+            type="button"
+            className="btn btn-ghost btn-sm"
+            onClick={() => { setCustomerId(''); setPage(1); }}
+            title="Снять фильтр по клиенту"
+          >
+            ✕
           </button>
         )}
 
