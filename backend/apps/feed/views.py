@@ -40,6 +40,10 @@ from .serializers import (
     RecipeSerializer,
     RecipeVersionSerializer,
 )
+from .services.reverse_task import (
+    FeedTaskReverseError,
+    reverse_production_task,
+)
 from .services.cancel_task import (
     FeedTaskCancelError,
     cancel_production_task,
@@ -441,6 +445,29 @@ class ProductionTaskViewSet(OrgScopedModelViewSet):
                 task, reason=request.data.get("reason", ""), user=request.user,
             )
         except FeedTaskCancelError as exc:
+            raise DRFValidationError(
+                exc.message_dict if hasattr(exc, "message_dict") else exc.messages
+            )
+        task.refresh_from_db()
+        return Response(self.get_serializer(task).data)
+
+    @action(detail=True, methods=["post"])
+    def reverse(self, request, pk=None):
+        """POST /api/feed/production-tasks/{id}/reverse/
+        Body: {"reason": str (optional)}
+
+        Сторно DONE-замеса: создаёт компенсирующие StockMovement и
+        сторно-проводки, восстанавливает партии сырья, REJECT'ит готовую
+        партию корма, переводит задание в CANCELLED. Доступно только пока
+        партия корма не упакована в мешки и не списана в feed_consumption.
+        Если что-то из этого было — сначала откатить через свои сервисы.
+        """
+        task = self.get_object()
+        try:
+            reverse_production_task(
+                task, reason=request.data.get("reason", ""), user=request.user,
+            )
+        except FeedTaskReverseError as exc:
             raise DRFValidationError(
                 exc.message_dict if hasattr(exc, "message_dict") else exc.messages
             )
