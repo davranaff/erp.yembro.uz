@@ -117,8 +117,31 @@ def cancel_vet_treatment(
     # 4. Возврат остатка на лот (только если лот не RECALLED — иначе остаток
     # списан физически и возвращать некуда).
     reversal_sm = None
-    stock_batch = treatment.stock_batch
+    # of=("self",) — иначе FOR UPDATE на nullable JOIN падает. Lock на
+    # сам VetStockBatch row нужен ниже для guard'a против overshoot
+    # (current + restored <= original quantity) — без него параллельный
+    # cancel на двух лечениях одной партии мог суммарно вернуть
+    # больше чем было изначально, и current_quantity превышал quantity.
+    stock_batch = (
+        VetStockBatch.objects
+        .select_for_update(of=("self",))
+        .get(pk=treatment.stock_batch_id)
+    )
     if stock_batch.status != VetStockBatch.Status.RECALLED:
+        # Guard: восстанавливаемое количество не должно превысить
+        # исходный остаток партии. Если превышает — обычно это сигнал
+        # что cancel вызывается дважды или что вне сервиса кто-то уже
+        # вернул остаток.
+        projected = Decimal(stock_batch.current_quantity) + Decimal(
+            treatment.dose_quantity
+        )
+        if projected > Decimal(stock_batch.quantity):
+            raise VetTreatmentCancelError({"__all__": (
+                f"Восстановление превысит исходный остаток партии "
+                f"{stock_batch.doc_number}: {projected} > {stock_batch.quantity}. "
+                "Похоже cancel уже был выполнен либо есть другой источник "
+                "возврата (recall, ручная корректировка)."
+            )})
         VetStockBatch.objects.filter(pk=stock_batch.pk).update(
             current_quantity=F("current_quantity") + treatment.dose_quantity
         )

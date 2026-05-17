@@ -265,7 +265,14 @@ def _accept_poultry_transfer(
     transfer: InterModuleTransfer, *, user
 ) -> TransferAcceptResult:
     org = transfer.organization
-    batch = transfer.batch
+    # Lock на партию ДО guards — параллельная передача той же партии
+    # (например ошибочно дважды) не должна race-ить на current_quantity.
+    # of=("self",) — иначе FOR UPDATE на JOIN nullable FK падает.
+    batch = (
+        Batch.objects.select_for_update(of=("self",))
+        .select_related("current_module")
+        .get(pk=transfer.batch_id)
+    )
 
     # Guards
     if batch.current_module_id != transfer.from_module_id:
@@ -277,6 +284,17 @@ def _accept_poultry_transfer(
                     f"а передача заявлена из {transfer.from_module.code}."
                 )
             }
+        )
+
+    # Guard на overspend: в партии должно быть достаточно поголовья.
+    # Без этого передача могла бы списать больше чем есть, и
+    # batch.current_quantity уходил в минус.
+    if Decimal(batch.current_quantity or 0) < Decimal(transfer.quantity):
+        raise TransferAcceptError(
+            {"quantity": (
+                f"В партии {batch.doc_number} {batch.current_quantity} гол, "
+                f"передача требует {transfer.quantity} гол."
+            )}
         )
 
     inter_sub = _get_subaccount(org, INTER_MODULE_SUBACCOUNT)
