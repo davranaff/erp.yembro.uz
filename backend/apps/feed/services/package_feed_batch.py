@@ -178,6 +178,40 @@ def package_feed_batch(
         .get(pk=source.pk)
     )
 
+    # Idempotency: если за последние 5 минут уже была фасовка той же
+    # партии с теми же bag_count + bag_weight — это почти наверняка
+    # network retry или двойной клик. Вместо создания второго FeedBagLot
+    # (и второго списания source.current_quantity_kg) возвращаем
+    # существующий лот. Окно 5 мин — компромисс: короче чем typical
+    # ретрай (max 30s), длинее чем намеренная повторная фасовка
+    # (оператор успеет осознать клик в течение секунд).
+    from datetime import timedelta
+    from apps.warehouses.models import StockMovement
+    from django.contrib.contenttypes.models import ContentType
+    recent_cutoff = timezone.now() - timedelta(minutes=5)
+    existing_lot = (
+        FeedBagLot.objects.filter(
+            source_feed_batch=source,
+            bag_weight_kg=bag_weight,
+            bags_initial=bag_count,
+            packaged_at__gte=recent_cutoff,
+        )
+        .order_by("-packaged_at")
+        .first()
+    )
+    if existing_lot is not None:
+        lot_ct = ContentType.objects.get_for_model(FeedBagLot)
+        return FeedPackageResult(
+            bag_lot=existing_lot,
+            source_feed_batch=source,
+            stock_movements=list(
+                StockMovement.objects.filter(
+                    source_content_type=lot_ct,
+                    source_object_id=existing_lot.id,
+                ).order_by("id")
+            ),
+        )
+
     if source.status != FeedBatch.Status.APPROVED:
         raise FeedPackageError(
             {"status": (

@@ -10,9 +10,11 @@ Bearer-only GET /api/vet/public/customers/ — список покупателе
 """
 from __future__ import annotations
 
+from datetime import timedelta
 from decimal import Decimal
 
 from django.shortcuts import get_object_or_404
+from django.utils import timezone
 from rest_framework import permissions, status, views
 from rest_framework.authentication import SessionAuthentication
 from rest_framework.exceptions import ValidationError as DRFValidationError
@@ -25,6 +27,58 @@ from .models import VetAccessory, VetStockBatch
 from .serializers import VetAccessoryPublicSerializer, VetStockBatchPublicSerializer
 from .services.sell import VetSellError, sell_vet_stock
 from .services.sell_accessory import VetAccessorySellError, sell_vet_accessory
+
+
+# Префикс в SaleOrder.notes для записи и поиска idempotency-token.
+# Без отдельной модели/кэша — хранится прямо в notes.
+_IDEMPOTENCY_PREFIX = "idempotency_key="
+_IDEMPOTENCY_WINDOW_MIN = 30
+
+
+def _find_idempotent_sale(organization, idempotency_key: str):
+    """Найти уже созданный SaleOrder с этим idempotency-ключом
+    за последние 30 минут. None если не найден."""
+    from apps.sales.models import SaleOrder
+    if not idempotency_key:
+        return None
+    cutoff = timezone.now() - timedelta(minutes=_IDEMPOTENCY_WINDOW_MIN)
+    needle = f"{_IDEMPOTENCY_PREFIX}{idempotency_key}"
+    return (
+        SaleOrder.objects
+        .filter(
+            organization=organization,
+            notes__contains=needle,
+            created_at__gte=cutoff,
+        )
+        .order_by("-created_at")
+        .first()
+    )
+
+
+def _annotate_idempotency(sale_order, idempotency_key: str) -> None:
+    """Дописать idempotency_key в SaleOrder.notes для будущего dedup."""
+    if not idempotency_key:
+        return
+    marker = f"{_IDEMPOTENCY_PREFIX}{idempotency_key}"
+    if sale_order.notes and marker in sale_order.notes:
+        return
+    sale_order.notes = (
+        (sale_order.notes or "") + f"\n{marker}"
+    ).strip()
+    sale_order.save(update_fields=["notes", "updated_at"])
+
+
+def _serialize_existing_sale(sale_order) -> dict:
+    """Свернуть существующий SaleOrder в payload, идентичный возвращаемому
+    свежим успешным sell-ом. Используется при idempotent retry."""
+    return {
+        "source_kind": "idempotent_replay",
+        "sale_order_id": str(sale_order.id),
+        "sale_order_doc": sale_order.doc_number,
+        "total_uzs": str(sale_order.amount_uzs or "0"),
+        "customer_id": str(sale_order.customer_id) if sale_order.customer_id else None,
+        "customer_name": sale_order.customer.name if sale_order.customer_id else None,
+    }
 
 
 class VetPublicScanView(views.APIView):
@@ -188,6 +242,20 @@ class VetPublicSellView(views.APIView):
             qty = Decimal(str(qty_raw))
         except Exception:
             raise DRFValidationError({"quantity": "Неверное число."})
+        if qty <= 0:
+            raise DRFValidationError(
+                {"quantity": "Количество должно быть > 0."}
+            )
+
+        # Idempotency: на mobile-сканере network glitch + auto-retry легко
+        # отправляет POST дважды → создавались два SaleOrder + двойная JE
+        # на один отсканированный товар. Клиенту рекомендуется отправлять
+        # Idempotency-Key header (UUID на каждое нажатие SELL); если он
+        # задан, мы ищем существующий SaleOrder с этим ключом в notes и
+        # возвращаем результат прошлого вызова.
+        idempotency_key = (
+            request.META.get("HTTP_IDEMPOTENCY_KEY") or ""
+        ).strip()
 
         unit_price_raw = request.data.get("unit_price_uzs")
         unit_price = None
@@ -201,6 +269,15 @@ class VetPublicSellView(views.APIView):
         organization = getattr(request, "organization", None)
         if organization is None:
             raise DRFValidationError({"__all__": "Не определена организация токена."})
+
+        # Idempotency lookup: если этот ключ уже встречался — вернём
+        # тот же SaleOrder без повторной продажи.
+        existing_sale = _find_idempotent_sale(organization, idempotency_key)
+        if existing_sale is not None:
+            return Response(
+                _serialize_existing_sale(existing_sale),
+                status=status.HTTP_200_OK,
+            )
 
         # Опциональный явный клиент. Если не задан — sell_vet_stock сам
         # фолбекнется на «Розничный покупатель».
@@ -238,6 +315,7 @@ class VetPublicSellView(views.APIView):
                 raise DRFValidationError(
                     exc.message_dict if hasattr(exc, "message_dict") else exc.messages
                 )
+            _annotate_idempotency(result.sale_order, idempotency_key)
             return Response({
                 "source_kind": "drug_lot",
                 "sale_order_id": str(result.sale_order.id),
@@ -268,6 +346,7 @@ class VetPublicSellView(views.APIView):
                 raise DRFValidationError(
                     exc.message_dict if hasattr(exc, "message_dict") else exc.messages
                 )
+            _annotate_idempotency(result.sale_order, idempotency_key)
             return Response({
                 "source_kind": "accessory",
                 "sale_order_id": str(result.sale_order.id),
@@ -306,6 +385,7 @@ class VetPublicSellView(views.APIView):
                 raise DRFValidationError(
                     exc.message_dict if hasattr(exc, "message_dict") else exc.messages
                 )
+            _annotate_idempotency(result.sale_order, idempotency_key)
             return Response({
                 "source_kind": "feed_bag_lot",
                 "sale_order_id": str(result.sale_order.id),

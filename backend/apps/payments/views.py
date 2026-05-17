@@ -194,11 +194,31 @@ class PaymentViewSet(ImmutableStatusMixin, DeleteReasonMixin, OrgScopedModelView
             )
         serializer = PaymentAllocationSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+
+        # Idempotency: если на этот платёж уже есть аллокация с тем же
+        # target + amount — это почти наверняка двойной клик «Разнести».
+        # Возвращаем существующее, не создавая дубль. Без guard'а каждый
+        # лишний клик удваивал учёт долга по PO/SO.
+        existing = payment.allocations.filter(
+            target_content_type=data.get("target_content_type"),
+            target_object_id=data.get("target_object_id"),
+            amount_uzs=data.get("amount_uzs"),
+        ).first()
+        if existing is not None:
+            payment = (
+                Payment.objects.prefetch_related("allocations").get(pk=payment.pk)
+            )
+            return Response(
+                self.get_serializer(payment).data,
+                status=http_status.HTTP_200_OK,
+            )
+
         # objects.create() пропускает Model.clean() — поэтому строим
         # через __init__ + full_clean() + save(). Иначе можно было
         # просунуть amount_uzs <= 0 или target не PO/SO (см.
         # PaymentAllocation.clean()).
-        allocation = PaymentAllocation(payment=payment, **serializer.validated_data)
+        allocation = PaymentAllocation(payment=payment, **data)
         allocation.full_clean()
         allocation.save()
         payment = (
@@ -286,6 +306,24 @@ class PaymentViewSet(ImmutableStatusMixin, DeleteReasonMixin, OrgScopedModelView
                 "target_content_type": "OUT-предоплата применяется только к PurchaseOrder.",
             })
 
+        # Idempotency: если у этой предоплаты уже есть аллокация на тот
+        # же target c тем же amount — двойной клик. Возвращаем как было,
+        # не создавая дубль.
+        target_id = serializer.validated_data["target_object_id"]
+        existing = payment.allocations.filter(
+            target_content_type=target_ct,
+            target_object_id=target_id,
+            amount_uzs=serializer.validated_data["amount_uzs"],
+        ).first()
+        if existing is not None:
+            payment = (
+                Payment.objects.prefetch_related("allocations").get(pk=payment.pk)
+            )
+            return Response(
+                self.get_serializer(payment).data,
+                status=http_status.HTTP_200_OK,
+            )
+
         # objects.create() пропускает Model.clean(); собираем + full_clean()
         # чтобы прогнать те же проверки что и в /allocate/.
         allocation = PaymentAllocation(
@@ -295,7 +333,6 @@ class PaymentViewSet(ImmutableStatusMixin, DeleteReasonMixin, OrgScopedModelView
         allocation.save()
 
         # Пересчёт target документа.
-        target_id = serializer.validated_data["target_object_id"]
         if target_ct.id == so_ct.id:
             order = SaleOrder.objects.get(pk=target_id)
             _recalc_sale_payment_status(order)
