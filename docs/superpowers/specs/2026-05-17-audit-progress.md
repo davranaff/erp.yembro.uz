@@ -67,6 +67,16 @@
 | `216d0fa` | Vet apply_treatment: idempotency JE-lookup with `select_for_update()` | C1 P0 |
 | `216d0fa` | Vet apply_treatment: stock_batch explicit lock before status/qty check (recall race) | C1 P0 |
 | `216d0fa` | Feed sell_feed_bag_lot: re-lock bag_lot after confirm_sale before DEPLETED flip | C1 P0 |
+| `3a0be72` | Feed copy_components: FIFO source-batch lookup with select_for_update | C1 P1 |
+| `3a0be72` | Slaughter reverse_shift: source_batch lock early (after shift lock) | C1 P1 |
+| `3a0be72` | Slaughter post_shift: SlaughterQualityCheck select_for_update | C1 P1 |
+| `3a0be72` | Feed views: release/reject_quarantine + approve/reject_passport view-level lock | C1 P1 |
+| `2e50373` | Warehouses create_manual_movement: balance guard against overspend on OUTGOING/WRITE_OFF/SHRINKAGE/TRANSFER | C2 P0 |
+| `2e50373` | Warehouses balance.compute_warehouse_balance_for_sku: include SHRINKAGE in out_qty | C2 P0 |
+| `2e50373` | Feed shrinkage_runner._decrement_lot_current_quantity: floor loss to current_quantity, early-return on 0 | C2 P0 |
+| `972ca60` | Transfers _accept_poultry_transfer: lock batch + guard current_quantity ≥ transfer.quantity | C2 P1 |
+| `972ca60` | Vet cancel_treatment: lock VetStockBatch + reject overshoot (current + dose > quantity) | C2 P1 |
+| `269c1aa` | Feed/Vet admin: readonly_fields on quantity/current_quantity/bags_remaining/unit_cost on stock entities | C2 P2 |
 
 ## Deferred (need design discussion)
 
@@ -74,7 +84,20 @@
 - DB-level CHECK constraint `current_quantity >= 0` — миграция, требует решения.
 - VetTreatmentLog `journal_entry_id` unique field — миграция, требует решения.
 
-## Цикл 2 — Negative balances: pending
+## Цикл 2 — Negative balances: completed
+
+### Closed
+- Manual stock movement overspend (P0) — теперь нельзя списать с пустого склада через API
+- Balance aggregation: SHRINKAGE учтён (P0) — счета на проде больше не «лежат» сотни кг усушки
+- Shrinkage runner: loss floored to current_quantity (P0) — больше нет негативного остатка
+- Transfers poultry: guard на batch.current_quantity (P1)
+- Vet cancel: overshoot guard + lock (P1)
+- Admin readonly на counter-полях стоков (P2)
+
+### Deferred / not changed
+- execute_task TOCTOU: уже закрыт через row-lock в Cycle 1 (`d290291` + `479c2ca`), агент не учёл fix
+- Decimal precision mismatch dose_quantity (4) vs current_quantity (3): требует data migration на изменение precision — design discussion
+- Views frontend: показ ⚠️ при negative balance — frontend задача, делать отдельно
 
 ## Цикл 3 — Idempotency: pending
 
