@@ -90,6 +90,10 @@ class VetStockBatchAdmin(admin.ModelAdmin):
         "unit",
         "created_by",
     )
+    # quantity / current_quantity управляются receive_vet_stock_batch +
+    # apply_treatment + cancel_treatment + recall. Прямая правка ломает
+    # WAC/ledger reconciliation.
+    readonly_fields = ("quantity", "current_quantity")
 
 
 class VaccinationScheduleItemInline(admin.TabularInline):

@@ -111,6 +111,12 @@ class RawMaterialBatchAdmin(admin.ModelAdmin):
         "warehouse",
         "unit",
     )
+    # quantity и current_quantity управляются сервисами (приёмка, замес,
+    # упаковка, усушка). Прямая правка через админку сломала бы GL ↔
+    # склад reconciliation без сторно. Делаем readonly даже для админов
+    # — для исправления используйте операции в /feed UI или
+    # компенсирующие записи.
+    readonly_fields = ("quantity", "current_quantity")
 
 
 @admin.register(LabResult)
@@ -207,6 +213,12 @@ class FeedBatchAdmin(admin.ModelAdmin):
         "storage_bin",
         "storage_warehouse",
     )
+    # quantity_kg / current_quantity_kg / unit_cost_uzs / total_cost_uzs
+    # — продукты execute_production_task / packaging / shrinkage / sales.
+    # Прямая правка ломала бы JE и FIFO-расчёты.
+    readonly_fields = (
+        "quantity_kg", "current_quantity_kg", "unit_cost_uzs", "total_cost_uzs",
+    )
 
 
 @admin.register(FeedBagLot)
@@ -235,6 +247,9 @@ class FeedBagLotAdmin(admin.ModelAdmin):
         "storage_bin",
         "created_by",
     )
+    # bags_initial / bags_remaining / unit_cost_uzs — управляются
+    # package_feed_batch + sell_feed_bag_lot. Не редактируем напрямую.
+    readonly_fields = ("bags_initial", "bags_remaining", "unit_cost_uzs")
 
 
 @admin.register(FeedShrinkageProfile)
