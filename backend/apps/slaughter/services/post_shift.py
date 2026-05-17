@@ -234,8 +234,13 @@ def post_slaughter_shift(
             }
         )
 
-    # 4c. Гард: ветеринарная инспекция пройдена
-    qc = SlaughterQualityCheck.objects.filter(shift=shift).first()
+    # 4c. Гард: ветеринарная инспекция пройдена. select_for_update —
+    # чтобы параллельный POST на /quality-check/{id}/ (например, удаление
+    # отметки или смена флага) не мог проскочить между нашей проверкой и
+    # созданием движений. К моменту коммита смены QC должен быть зафиксирован.
+    qc = SlaughterQualityCheck.objects.select_for_update().filter(
+        shift=shift
+    ).first()
     if qc is None or not qc.vet_inspection_passed:
         raise SlaughterPostError(
             {

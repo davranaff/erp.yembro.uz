@@ -41,8 +41,15 @@ def _find_fifo_source_batch(
     FIFO выбор партии сырья: первая по received_date с достаточным остатком.
     Если хватит только частично — берём ту, у которой больше остаток.
     Возвращает None если подходящих партий нет.
+
+    Все запросы с select_for_update(of=("self",)). Без этого два
+    параллельных copy_components_from_version (двойной submit «Создать
+    задание») могли выбрать одну и ту же партию для одинаковых
+    ингредиентов. На execute_task мы поймали бы это row-lock'ом, но
+    компоненты обоих заданий уже указывали бы на одну партию, что
+    мешает планированию и отчётам.
     """
-    qs = RawMaterialBatch.objects.filter(
+    qs = RawMaterialBatch.objects.select_for_update(of=("self",)).filter(
         organization=organization,
         nomenclature=nomenclature,
         status=RawMaterialBatch.Status.AVAILABLE,

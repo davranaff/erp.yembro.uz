@@ -244,16 +244,27 @@ class RawMaterialBatchViewSet(OrgScopedModelViewSet):
         требует его явно). Для UI-шной кнопки достаточно ручного снятия —
         ответственность подтверждения качества лежит на технологе.
         """
-        batch = self.get_object()
-        if batch.status != RawMaterialBatch.Status.QUARANTINE:
-            raise DRFValidationError(
-                {"status": (
-                    f"Карантин снимается только из QUARANTINE, текущий: "
-                    f"{batch.get_status_display()}."
-                )}
+        from django.db import transaction
+        with transaction.atomic():
+            # select_for_update — без него двойной POST (быстрый клик
+            # или ретрай сети) мог пройти status guard в двух параллельных
+            # request'ах и оба бы записали AVAILABLE (idempotent, но
+            # AuditLog дублируется). А если соседний reject_quarantine
+            # бежит параллельно — могла быть гонка AVAILABLE↔REJECTED.
+            batch = (
+                RawMaterialBatch.objects
+                .select_for_update(of=("self",))
+                .get(pk=self.get_object().pk)
             )
-        batch.status = RawMaterialBatch.Status.AVAILABLE
-        batch.save(update_fields=["status", "updated_at"])
+            if batch.status != RawMaterialBatch.Status.QUARANTINE:
+                raise DRFValidationError(
+                    {"status": (
+                        f"Карантин снимается только из QUARANTINE, текущий: "
+                        f"{batch.get_status_display()}."
+                    )}
+                )
+            batch.status = RawMaterialBatch.Status.AVAILABLE
+            batch.save(update_fields=["status", "updated_at"])
 
         from apps.audit.models import AuditLog
         from apps.audit.services.writer import audit_log
@@ -274,21 +285,31 @@ class RawMaterialBatchViewSet(OrgScopedModelViewSet):
         Body: {"reason": "..."}
         Отклонить партию из карантина (status: QUARANTINE → REJECTED).
         """
-        batch = self.get_object()
+        from django.db import transaction
         reason = (request.data.get("reason") or "").strip()
-        if batch.status != RawMaterialBatch.Status.QUARANTINE:
-            raise DRFValidationError(
-                {"status": (
-                    f"Отклонить можно только из QUARANTINE, текущий: "
-                    f"{batch.get_status_display()}."
-                )}
-            )
         if not reason:
             raise DRFValidationError({"reason": "Причина обязательна."})
-
-        batch.status = RawMaterialBatch.Status.REJECTED
-        batch.rejection_reason = reason
-        batch.save(update_fields=["status", "rejection_reason", "updated_at"])
+        with transaction.atomic():
+            # select_for_update — защита от параллельного release_quarantine
+            # на той же партии. Без lock'a статус мог уйти в AVAILABLE и
+            # тут же быть переписан в REJECTED (или наоборот), смотря какой
+            # запрос первый закоммитит. Сейчас второй запрос увидит уже
+            # не-QUARANTINE статус и упадёт на guard.
+            batch = (
+                RawMaterialBatch.objects
+                .select_for_update(of=("self",))
+                .get(pk=self.get_object().pk)
+            )
+            if batch.status != RawMaterialBatch.Status.QUARANTINE:
+                raise DRFValidationError(
+                    {"status": (
+                        f"Отклонить можно только из QUARANTINE, текущий: "
+                        f"{batch.get_status_display()}."
+                    )}
+                )
+            batch.status = RawMaterialBatch.Status.REJECTED
+            batch.rejection_reason = reason
+            batch.save(update_fields=["status", "rejection_reason", "updated_at"])
 
         from apps.audit.models import AuditLog
         from apps.audit.services.writer import audit_log
@@ -500,19 +521,28 @@ class FeedBatchViewSet(OrgReadOnlyViewSet):
         Выпустить паспорт качества (PASSED) → status: QUALITY_CHECK → APPROVED.
         После этого партия становится продаваемой и расходуемой.
         """
-        batch = self.get_object()
-        if batch.status != FeedBatch.Status.QUALITY_CHECK:
-            raise DRFValidationError(
-                {"status": (
-                    f"Паспорт выпускается только из «На лаб. контроле», "
-                    f"текущий статус: {batch.get_status_display()}."
-                )}
+        from django.db import transaction
+        with transaction.atomic():
+            # select_for_update — параллельный approve/reject на одной
+            # партии без lock'a мог переписывать друг друга. С lock'ом
+            # второй request увидит уже не-QUALITY_CHECK и упадёт на guard.
+            batch = (
+                FeedBatch.objects
+                .select_for_update(of=("self",))
+                .get(pk=self.get_object().pk)
             )
-        batch.status = FeedBatch.Status.APPROVED
-        batch.quality_passport_status = FeedBatch.PassportStatus.PASSED
-        batch.save(update_fields=[
-            "status", "quality_passport_status", "updated_at",
-        ])
+            if batch.status != FeedBatch.Status.QUALITY_CHECK:
+                raise DRFValidationError(
+                    {"status": (
+                        f"Паспорт выпускается только из «На лаб. контроле», "
+                        f"текущий статус: {batch.get_status_display()}."
+                    )}
+                )
+            batch.status = FeedBatch.Status.APPROVED
+            batch.quality_passport_status = FeedBatch.PassportStatus.PASSED
+            batch.save(update_fields=[
+                "status", "quality_passport_status", "updated_at",
+            ])
 
         from apps.audit.models import AuditLog
         from apps.audit.services.writer import audit_log
@@ -533,23 +563,28 @@ class FeedBatchViewSet(OrgReadOnlyViewSet):
         Body: {"reason": "..."}
         Паспорт не пройден (FAILED) → status: QUALITY_CHECK → REJECTED.
         """
-        batch = self.get_object()
+        from django.db import transaction
         reason = (request.data.get("reason") or "").strip()
-        if batch.status != FeedBatch.Status.QUALITY_CHECK:
-            raise DRFValidationError(
-                {"status": (
-                    f"Отклонить паспорт можно только из «На лаб. контроле», "
-                    f"текущий статус: {batch.get_status_display()}."
-                )}
-            )
         if not reason:
             raise DRFValidationError({"reason": "Причина отклонения обязательна."})
-
-        batch.status = FeedBatch.Status.REJECTED
-        batch.quality_passport_status = FeedBatch.PassportStatus.FAILED
-        batch.save(update_fields=[
-            "status", "quality_passport_status", "updated_at",
-        ])
+        with transaction.atomic():
+            batch = (
+                FeedBatch.objects
+                .select_for_update(of=("self",))
+                .get(pk=self.get_object().pk)
+            )
+            if batch.status != FeedBatch.Status.QUALITY_CHECK:
+                raise DRFValidationError(
+                    {"status": (
+                        f"Отклонить паспорт можно только из «На лаб. контроле», "
+                        f"текущий статус: {batch.get_status_display()}."
+                    )}
+                )
+            batch.status = FeedBatch.Status.REJECTED
+            batch.quality_passport_status = FeedBatch.PassportStatus.FAILED
+            batch.save(update_fields=[
+                "status", "quality_passport_status", "updated_at",
+            ])
 
         from apps.audit.models import AuditLog
         from apps.audit.services.writer import audit_log

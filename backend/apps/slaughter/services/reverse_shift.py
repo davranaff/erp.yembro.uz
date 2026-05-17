@@ -62,10 +62,15 @@ def reverse_slaughter_shift(
     reason: str = "",
     user=None,
 ) -> SlaughterReverseResult:
-    shift = SlaughterShift.objects.select_for_update().get(pk=shift.pk)
-    shift = SlaughterShift.objects.select_related(
-        "organization", "module", "source_batch"
-    ).get(pk=shift.pk)
+    # Lock shift + связи в одном запросе. of=("self",) обязателен —
+    # source_batch это FK, select_related тащит его через JOIN, и
+    # FOR UPDATE на nullable JOIN падает на PostgreSQL.
+    shift = (
+        SlaughterShift.objects
+        .select_for_update(of=("self",))
+        .select_related("organization", "module", "source_batch")
+        .get(pk=shift.pk)
+    )
 
     if shift.status != SlaughterShift.Status.POSTED:
         raise SlaughterReverseError(
@@ -76,7 +81,14 @@ def reverse_slaughter_shift(
         )
 
     org = shift.organization
-    source_batch = shift.source_batch
+
+    # Lock source_batch ДО операций с output_batches и stock movements.
+    # Без этого параллельный post_shift (с reverse одной смены и
+    # post-провод другой на тот же live-bird batch) мог race-ить
+    # на batch.state / batch.current_quantity.
+    source_batch = (
+        Batch.objects.select_for_update(of=("self",)).get(pk=shift.source_batch_id)
+    )
 
     ct_shift = ContentType.objects.get_for_model(SlaughterShift)
 
@@ -190,8 +202,8 @@ def reverse_slaughter_shift(
         rev_je.save()
         reverse_journals.append(rev_je)
 
-    # 5. Возврат source_batch
-    source_batch = Batch.objects.select_for_update().get(pk=source_batch.pk)
+    # 5. Возврат source_batch. Lock уже взят выше (line ~86), повторно
+    # не блокируем — просто пишем.
     source_batch.state = Batch.State.ACTIVE
     source_batch.current_quantity = source_batch.initial_quantity
     source_batch.completed_at = None
