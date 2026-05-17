@@ -141,7 +141,28 @@ unwinds inner side-effects. Текущий код atomicity-safe.
   внутри одного `@atomic`, TX откатит обе если что-либо упадёт.
 - sell_feed_bag nested confirm_sale — Django savepoints спасают.
 
-## Цикл 5 — Validation: pending
+## Цикл 5 — Validation + cross-org + FK: completed
+
+### Closed (P0/P1)
+- `5867189` — vet public scan endpoint: org-filter when seller token
+  authenticated. Раньше продавец orgB сканировал barcode orgA и видел
+  cost/price fields через `is_seller` ветку serializer.
+- `5867189` — slaughter post_shift view: org-filter на Warehouse.get
+  чтобы 400 был ясный («не найден в организации смены»), не полагаясь
+  на service-layer org guard.
+
+### Deferred (требует миграции модели)
+- Feed `RecipeComponent.recipe_version` `on_delete=CASCADE` →
+  предлагается PROTECT. Удаление RecipeVersion молча удаляет
+  компоненты исторических заданий. Защита данных, но миграция.
+- Vet `dose_quantity` (4dp) vs `current_quantity` (3dp) precision
+  mismatch. Микродозовые сценарии редки, для прод-готовности norma-
+  лизовать оба до 4 знаков. Миграция.
+- SlaughterShift.shift_date / InterModuleTransfer.transfer_date не
+  блокируют будущие даты. Бизнес-правило (можно planning?), отложить
+  до design review.
+- SlaughterYield.share_percent не валидируется > 100%. Минор, defer
+  до отдельного PR.
 
 ## Commit log
 
