@@ -94,39 +94,52 @@ class VetPublicScanView(views.APIView):
     permission_classes = [permissions.AllowAny]
     authentication_classes = []  # auth делаем вручную (см. _try_seller_auth)
 
-    def _try_seller_auth(self, request) -> bool:
+    def _try_seller_auth(self, request):
         """Тихая попытка авторизоваться как продавец.
 
-        Возвращает True если Bearer-токен валиден. Невалидный/отсутствующий
-        токен → False (без 401), чтобы анонимный пользователь мог смотреть
+        Возвращает SellerDeviceToken (с привязанной organization) если
+        Bearer-токен валиден, иначе None. Невалидный/отсутствующий токен →
+        None (без 401), чтобы анонимный пользователь мог смотреть
         публичную карточку без авторизации.
         """
         from .models import SellerDeviceToken
 
         auth_header = request.META.get("HTTP_AUTHORIZATION", "")
         if not auth_header:
-            return False
+            return None
         parts = auth_header.split()
         if len(parts) != 2 or parts[0] != "Bearer":
-            return False
+            return None
         try:
-            tok = SellerDeviceToken.objects.get(token=parts[1])
+            tok = SellerDeviceToken.objects.select_related(
+                "organization"
+            ).get(token=parts[1])
         except SellerDeviceToken.DoesNotExist:
-            return False
+            return None
         if not tok.is_active or tok.revoked_at is not None:
-            return False
-        return True
+            return None
+        return tok
 
     def get(self, request, barcode: str):
-        # Поиск без фильтра по organization — barcode уникален в рамках org,
-        # но мы хотим работать кросс-орг для public. Порядок поиска:
-        #   1. VetStockBatch (лот препарата)
-        #   2. VetAccessory (аксессуар)
-        #   3. FeedBagLot (партия фасованного корма)
+        # Сужение по organization: если запрос пришёл с валидным
+        # seller-token'ом, ограничиваем поиск этой организацией. Без
+        # этого продавец orgB сканировал barcode из orgA и получал
+        # карточку чужого товара — включая cost-данные через
+        # VetStockBatchPublicSerializer (видит «cost_per_unit» через
+        # `is_seller` ветку). Cross-org leak.
+        # Anonymous (без токена) видит публичную карточку любой орги —
+        # cost-поля скрываются сериализатором.
+        seller_tok = self._try_seller_auth(request)
+        org_filter = (
+            {"organization": seller_tok.organization}
+            if seller_tok is not None
+            else {}
+        )
+
         batch = (
             VetStockBatch.objects
             .select_related("drug__nomenclature", "unit")
-            .filter(barcode=barcode)
+            .filter(barcode=barcode, **org_filter)
             .first()
         )
         if batch is not None:
@@ -137,7 +150,7 @@ class VetPublicScanView(views.APIView):
         accessory = (
             VetAccessory.objects
             .select_related("nomenclature", "nomenclature__unit")
-            .filter(barcode=barcode)
+            .filter(barcode=barcode, **org_filter)
             .first()
         )
         if accessory is not None:
@@ -155,7 +168,7 @@ class VetPublicScanView(views.APIView):
                 "source_feed_batch",
                 "storage_warehouse",
             )
-            .filter(barcode=barcode)
+            .filter(barcode=barcode, **org_filter)
             .first()
         )
         if bag_lot is not None:

@@ -77,15 +77,30 @@ class SlaughterShiftViewSet(ImmutableStatusMixin, OrgScopedModelViewSet):
         if not src_wh_id:
             raise DRFValidationError({"source_warehouse": "Обязательно."})
 
+        # Сужение по организации смены: warehouse-id может быть прислан
+        # с любым UUID, и без org-фильтра API возвращал бы 404
+        # «warehouse not found», но в случае ошибочной отправки uuid
+        # склада из ДРУГОЙ организации лучше дать ясный 400 вместо
+        # надежды на сервис-уровень валидацию (которая всё-таки
+        # сработает — `post_shift.py:279-281` проверяет, но
+        # query без org-сужения ходит впустую).
         try:
-            out_wh = Warehouse.objects.get(pk=out_wh_id)
+            out_wh = Warehouse.objects.get(
+                pk=out_wh_id, organization=shift.organization
+            )
         except Warehouse.DoesNotExist:
-            raise DRFValidationError({"output_warehouse": "Не найден."})
+            raise DRFValidationError(
+                {"output_warehouse": "Не найден в организации смены."}
+            )
 
         try:
-            src_wh = Warehouse.objects.get(pk=src_wh_id)
+            src_wh = Warehouse.objects.get(
+                pk=src_wh_id, organization=shift.organization
+            )
         except Warehouse.DoesNotExist:
-            raise DRFValidationError({"source_warehouse": "Не найден."})
+            raise DRFValidationError(
+                {"source_warehouse": "Не найден в организации смены."}
+            )
 
         try:
             result = post_slaughter_shift(
