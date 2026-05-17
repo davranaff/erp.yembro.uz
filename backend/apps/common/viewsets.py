@@ -133,7 +133,7 @@ class AuditMixin:
         ua = req.META.get("HTTP_USER_AGENT", "")[:255]
         return (ip or None), ua
 
-    def _write_audit(self, action: str, instance, verb: str = ""):
+    def _write_audit(self, action: str, instance, verb: str = "", diff=None):
         if not self.audit_enabled:
             return
         from apps.audit.services.writer import audit_log
@@ -154,6 +154,7 @@ class AuditMixin:
             action_verb=verb or f"{action} {type(instance).__name__}",
             ip_address=ip,
             user_agent=ua,
+            diff=diff,
         )
 
 
@@ -220,17 +221,31 @@ class OrganizationScopedMixin(OrganizationContextMixin, AuditMixin):
     def perform_create(self, serializer):
         instance = serializer.save(**self._save_kwargs_for_create(serializer))
         from apps.audit.models import AuditLog
+        from apps.audit.services.diff import compute_diff, snapshot_model
 
-        self._write_audit(AuditLog.Action.CREATE, instance)
+        # Для CREATE: diff = {"_created": <snapshot>} — отрисуется
+        # маркером «Создано» в audit drawer. Поля иммутабельных
+        # сущностей (id, created_at) DiffTable отфильтрует.
+        diff = compute_diff(None, snapshot_model(instance))
+        self._write_audit(AuditLog.Action.CREATE, instance, diff=diff)
 
     def perform_update(self, serializer):
-        instance = serializer.save()
+        # Снимок BEFORE снимаем перед serializer.save(). serializer.instance
+        # — это исходный объект, загруженный get_object() с актуальными
+        # полями из БД. serializer.save() мутирует его и пишет в БД, так
+        # что после save() snapshot_model(instance) уже даёт AFTER.
         from apps.audit.models import AuditLog
+        from apps.audit.services.diff import compute_diff, snapshot_model
 
-        self._write_audit(AuditLog.Action.UPDATE, instance)
+        before = snapshot_model(serializer.instance)
+        instance = serializer.save()
+        after = snapshot_model(instance)
+        diff = compute_diff(before, after)
+        self._write_audit(AuditLog.Action.UPDATE, instance, diff=diff)
 
     def perform_destroy(self, instance):
         from apps.audit.models import AuditLog
+        from apps.audit.services.diff import compute_diff, snapshot_model
 
         # Сначала пишем аудит, пока instance ещё существует (__str__).
         # Если миксин определяет _audit_verb_for_delete — используем его (например
@@ -240,7 +255,9 @@ class OrganizationScopedMixin(OrganizationContextMixin, AuditMixin):
             verb_fn(instance) if callable(verb_fn)
             else f"delete {type(instance).__name__} {instance}"
         )
-        self._write_audit(AuditLog.Action.DELETE, instance, verb=verb)
+        # Для DELETE: diff = {"_deleted": <snapshot>}.
+        diff = compute_diff(snapshot_model(instance), None)
+        self._write_audit(AuditLog.Action.DELETE, instance, verb=verb, diff=diff)
         instance.delete()
 
 
