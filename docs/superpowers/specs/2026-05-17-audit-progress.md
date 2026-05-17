@@ -77,6 +77,9 @@
 | `972ca60` | Transfers _accept_poultry_transfer: lock batch + guard current_quantity ≥ transfer.quantity | C2 P1 |
 | `972ca60` | Vet cancel_treatment: lock VetStockBatch + reject overshoot (current + dose > quantity) | C2 P1 |
 | `269c1aa` | Feed/Vet admin: readonly_fields on quantity/current_quantity/bags_remaining/unit_cost on stock entities | C2 P2 |
+| `70859ce` | Feed package_feed_batch: 5-minute same-day dedup → idempotent retry returns existing FeedBagLot | C3 P0 |
+| `70859ce` | Payments /allocate/ + /apply_prepayment/: dedup by (target_ct, target_id, amount) — no duplicate PaymentAllocation on double-click | C3 P0 |
+| `70859ce` | Vet public sell endpoint: Idempotency-Key HTTP header support (30-min window dedup via SaleOrder.notes) + qty>0 guard | C3 P0 |
 
 ## Deferred (need design discussion)
 
@@ -99,7 +102,23 @@
 - Decimal precision mismatch dose_quantity (4) vs current_quantity (3): требует data migration на изменение precision — design discussion
 - Views frontend: показ ⚠️ при negative balance — frontend задача, делать отдельно
 
-## Цикл 3 — Idempotency: pending
+## Цикл 3 — Idempotency: completed
+
+### Closed (P0)
+- Feed package_feed_batch: same-day source-based dedup
+- Payments allocate / apply_prepayment: PaymentAllocation dedup
+- Vet public sell: Idempotency-Key header support
+
+### Deferred (need design discussion / migration)
+- Vet receive_accessory double-receive: WAC + qty inflate. Fix требует
+  redesign WAC pipeline (текущий read-modify-write — не race-safe).
+  Workaround: добавить Idempotency-Key как в public sell (отдельная
+  задача, нужна модель).
+- Vet receive_stock: unique constraint (lot_number, drug, warehouse) —
+  миграция модели + data cleanup. Откладываем.
+- Slaughter/sales bulk loops partial fail retry: транзакция atomic
+  откатывается полностью, новый retry начинает с чистого состояния —
+  defensive, не баг.
 
 ## Цикл 4 — Atomicity: pending
 
