@@ -42,6 +42,10 @@ def compute_warehouse_balance_for_sku(warehouse, nomenclature) -> Decimal:
                 StockMovement.Kind.OUTGOING,
                 StockMovement.Kind.WRITE_OFF,
                 StockMovement.Kind.TRANSFER,
+                # SHRINKAGE физически списывает товар (cron усушки).
+                # Без него балансы хранения корма врали на величину
+                # испарения — на проде это сотни кг за месяц.
+                StockMovement.Kind.SHRINKAGE,
             ],
         )),
     )

@@ -491,16 +491,31 @@ def _create_shrinkage_movement(lot: LotInfo, state, loss: Decimal, today: date, 
 
 
 def _decrement_lot_current_quantity(lot: LotInfo, loss: Decimal) -> None:
+    """Безопасный декремент остатка партии при усушке.
+
+    lot.current_quantity — snapshot, прочитанный при сборе лотов.
+    Между сборкой и декрементом параллельный сервис (упаковка, продажа,
+    feed_consumption) может частично списать партию, и наш `loss` может
+    оказаться больше актуального остатка. Чтобы не уйти в минус,
+    подрезаем loss до min(loss, current_quantity) перед F-update.
+    """
     from ..models import FeedBatch, RawMaterialBatch
+
+    if loss <= 0:
+        return
+
+    actual_loss = min(Decimal(loss), Decimal(lot.current_quantity))
+    if actual_loss <= 0:
+        return
 
     if lot.lot_type == "raw_arrival":
         RawMaterialBatch.objects.filter(pk=lot.lot_id).update(
-            current_quantity=F("current_quantity") - loss,
+            current_quantity=F("current_quantity") - actual_loss,
             updated_at=_now(),
         )
     else:
         FeedBatch.objects.filter(pk=lot.lot_id).update(
-            current_quantity_kg=F("current_quantity_kg") - loss,
+            current_quantity_kg=F("current_quantity_kg") - actual_loss,
             updated_at=_now(),
         )
 

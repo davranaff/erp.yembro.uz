@@ -22,6 +22,7 @@ from django.utils import timezone
 from apps.common.services.numbering import next_doc_number
 
 from ..models import StockMovement
+from .balance import compute_warehouse_balance_for_sku
 from .journal import create_journal_entry_for_movement
 
 
@@ -114,6 +115,34 @@ def create_manual_movement(
     # связанный PurchaseOrder в /purchases (см. _link_to_auto_purchase ниже);
     # если нет — приход остаётся «внутренним» (например, излишки при
     # инвентаризации, безвозмездное поступление, перенос с другого учёта).
+
+    # Гард: для расходных операций требуем чтобы остаток на складе был
+    # >= списываемого количества. Раньше можно было через API создать
+    # OUTGOING на товар, которого физически нет — balance уходил в
+    # минус и GL расходился с физикой. Для TRANSFER гард тот же на
+    # warehouse_from (тоже выход). INCOMING всегда разрешён.
+    if kind in (
+        StockMovement.Kind.OUTGOING,
+        StockMovement.Kind.WRITE_OFF,
+        StockMovement.Kind.SHRINKAGE,
+        StockMovement.Kind.TRANSFER,
+    ):
+        if warehouse_from is None:
+            # Дополнительная страховка к full_clean ниже — иначе compute_balance
+            # упадёт на None.
+            raise StockMovementCreateError(
+                {"warehouse_from": "Для расхода требуется склад-источник."}
+            )
+        current_balance = compute_warehouse_balance_for_sku(
+            warehouse_from, nomenclature,
+        )
+        if current_balance < qty:
+            raise StockMovementCreateError(
+                {"quantity": (
+                    f"Недостаточно остатка на складе «{warehouse_from.code}»: "
+                    f"в наличии {current_balance}, требуется {qty}."
+                )}
+            )
 
     when = date_value or timezone.now()
 
