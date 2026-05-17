@@ -120,7 +120,26 @@
   откатывается полностью, новый retry начинает с чистого состояния —
   defensive, не баг.
 
-## Цикл 4 — Atomicity: pending
+## Цикл 4 — Atomicity: completed (mostly defensive)
+
+### Conclusion
+Большинство P0 находок Cycle 4 — false positives: Django nested
+`@transaction.atomic` создаёт savepoints, outer rollback correctly
+unwinds inner side-effects. Текущий код atomicity-safe.
+
+### Closed (observability + fail-fast)
+- `5680191` — vet recall: defensive logging + re-raise as VetRecallError с
+  именем сломанного treatment'а
+- `5680191` — slaughter post_shift: pre-flight validation на yields
+
+### Deferred (намеренное поведение, не bug)
+- feed signal handlers (auto_create_nomenclature, auto_create_profile)
+  swallow exceptions намеренно. Spec: "Сигнал не должен ломать создание
+  Recipe/Batch". Failure режим: execute_task позже отдаст явную ошибку
+  "Не найдена NomenclatureItem" с инструкцией.
+- transfers accept ordering — batch.save до transfer.save(POSTED)
+  внутри одного `@atomic`, TX откатит обе если что-либо упадёт.
+- sell_feed_bag nested confirm_sale — Django savepoints спасают.
 
 ## Цикл 5 — Validation: pending
 
