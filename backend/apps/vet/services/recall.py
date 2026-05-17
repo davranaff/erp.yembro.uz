@@ -66,31 +66,52 @@ def recall_vet_stock_batch(
         .filter(stock_batch=stock_batch, cancelled_at__isnull=True)
         .select_related("drug__nomenclature")
     )
+    # Cancel каждого treatment. Цикл и stock_batch.save ниже находятся
+    # в одной @transaction.atomic — если хоть один cancel_vet_treatment
+    # упадёт, Django откатит ВСЁ (включая закансованные ранее).
+    # Логируем причину падения с id конкретного treatment'а, чтобы при
+    # ретрае оператор знал какой именно лот/JE сломан.
+    import logging as _logging
+    _logger = _logging.getLogger(__name__)
+    from django.contrib.contenttypes.models import ContentType
+    from apps.accounting.models import JournalEntry
+
+    ct = ContentType.objects.get_for_model(VetTreatmentLog)
+
     for t in active_treatments:
         # Проверим что у лечения есть JE (т.е. оно реально проведено).
         # Если JE нет — просто помечаем cancelled без compensating записей.
-        from django.contrib.contenttypes.models import ContentType
-        from apps.accounting.models import JournalEntry
-
-        ct = ContentType.objects.get_for_model(VetTreatmentLog)
         has_je = JournalEntry.objects.filter(
             source_content_type=ct, source_object_id=t.id,
         ).exists()
-        if has_je:
-            cancel_vet_treatment(
-                t,
-                reason=f"recall лота {stock_batch.doc_number}: {reason}",
-                user=user,
+        try:
+            if has_je:
+                cancel_vet_treatment(
+                    t,
+                    reason=f"recall лота {stock_batch.doc_number}: {reason}",
+                    user=user,
+                )
+                cancelled.append(t)
+            else:
+                t.cancelled_at = timezone.now()
+                t.cancelled_by = user
+                t.cancel_reason = f"recall: {reason}"
+                t.save(update_fields=[
+                    "cancelled_at", "cancelled_by", "cancel_reason", "updated_at"
+                ])
+                cancelled.append(t)
+        except Exception as exc:
+            _logger.exception(
+                "recall_vet_stock_batch: cancel of treatment %s failed "
+                "during recall of lot %s — entire recall TX will rollback",
+                t.id, stock_batch.doc_number,
             )
-            cancelled.append(t)
-        else:
-            t.cancelled_at = timezone.now()
-            t.cancelled_by = user
-            t.cancel_reason = f"recall: {reason}"
-            t.save(update_fields=[
-                "cancelled_at", "cancelled_by", "cancel_reason", "updated_at"
-            ])
-            cancelled.append(t)
+            raise VetRecallError({"__all__": (
+                f"Не удалось отменить лечение {t.doc_number or t.id} "
+                f"в процессе отзыва лота {stock_batch.doc_number}: {exc}. "
+                "Все изменения отменены, исправьте проблемное лечение и "
+                "запустите recall повторно."
+            )}) from exc
 
     # 3. Перевод лота в RECALLED.
     # Важно: после cancel'ов остаток мог увеличиться (мы вернули списания).

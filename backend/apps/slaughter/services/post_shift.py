@@ -372,6 +372,28 @@ def post_slaughter_shift(
     #     Σ allocated == total_cost.
     allocated_costs: list[Decimal] = _allocate_costs(yields, total_cost)
 
+    # Pre-flight: проверка обязательных полей у каждого yield ДО mutations.
+    # Если 5-й yield невалиден, нам не нужно сначала создавать 4 батча и
+    # 4 StockMovement'a, чтобы потом откатить TX. Fail fast = чище логи и
+    # быстрее операторская обратная связь. TX откатывает всё либо так,
+    # либо так (через @transaction.atomic line 165), но pre-flight даёт
+    # точное указание какой именно yield сломан.
+    for yield_row in yields:
+        if yield_row.nomenclature_id is None:
+            raise SlaughterPostError({"yields": (
+                f"У выхода (yield) #{yield_row.id} не указана номенклатура — "
+                "проверьте состав смены и попробуйте провести повторно."
+            )})
+        if yield_row.unit_id is None:
+            raise SlaughterPostError({"yields": (
+                f"У выхода #{yield_row.id} нет единицы измерения."
+            )})
+        if not yield_row.quantity or Decimal(yield_row.quantity) <= 0:
+            raise SlaughterPostError({"yields": (
+                f"У выхода {yield_row.nomenclature.sku} количество "
+                f"{yield_row.quantity} — должно быть > 0."
+            )})
+
     for yield_row, allocated_cost in zip(yields, allocated_costs):
         # Output batch
         out_batch = yield_row.output_batch
